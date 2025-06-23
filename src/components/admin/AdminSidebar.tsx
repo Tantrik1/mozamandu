@@ -25,6 +25,8 @@ import {
   LogOut,
   Store,
   CreditCard,
+  Bell,
+  Type,
 } from 'lucide-react';
 
 const menuItems = [
@@ -68,6 +70,16 @@ const menuItems = [
     title: 'Delivery Charges',
     url: '/admin/delivery-charges',
     icon: Truck,
+  },
+  {
+    title: 'Notices',
+    url: '/admin/notices',
+    icon: Bell,
+  },
+  {
+    title: 'Top Bar Text',
+    url: '/admin/top-bar-text',
+    icon: Type,
   },
 ];
 
