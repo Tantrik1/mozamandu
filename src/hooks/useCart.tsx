@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ComboCongratsModal } from '@/components/customer/ComboCongratsModal';
@@ -14,6 +15,8 @@ interface CartItem {
   price: number;
   subcategoryId: string;
   image_url?: string;
+  pricingDescription?: string;
+  subtotal: number;
 }
 
 interface AddToCartParams {
@@ -86,6 +89,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveCartToStorage();
     checkComboEligibility();
+    recalculateCartPricing();
   }, [cartItems]);
 
   const fetchSubcategoriesData = async () => {
@@ -160,118 +164,133 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return result;
   };
 
-  // Fixed rebalanceCartItems function to properly maintain MOQ-based pricing split
-  const rebalanceCartItems = async (updatedItems: CartItem[]) => {
-    const subcategoryGroups: { [key: string]: CartItem[] } = {};
-    
-    // Group items by subcategory
-    updatedItems.forEach(item => {
-      if (!subcategoryGroups[item.subcategoryId]) {
-        subcategoryGroups[item.subcategoryId] = [];
-      }
-      subcategoryGroups[item.subcategoryId].push(item);
-    });
+  const calculatePricingDescription = async (item: CartItem, subcategoryTotal: number) => {
+    const subcategoryData = subcategoriesData[item.subcategoryId];
+    if (!subcategoryData) return '';
 
-    let rebalancedItems: CartItem[] = [];
-
-    for (const subcategoryId of Object.keys(subcategoryGroups)) {
-      const items = subcategoryGroups[subcategoryId];
-      
-      // Skip rebalancing if combo is active for this subcategory
-      if (activeCombo) {
-        const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === subcategoryId);
-        if (comboSubcategory) {
-          rebalancedItems.push(...items);
-          continue;
-        }
-      }
-
-      // Get discount tiers for this subcategory
-      const { data: discountTiers } = await supabase
-        .from('discount_tiers')
-        .select('*')
-        .eq('subcategory_id', subcategoryId)
-        .order('min_quantity', { ascending: true });
-
-      if (!discountTiers || discountTiers.length === 0) {
-        rebalancedItems.push(...items);
-        continue;
-      }
-
-      // Group items by product+color+size combination
-      const productGroups: { [key: string]: CartItem[] } = {};
-      items.forEach(item => {
-        const key = `${item.productId}-${item.colorVariantId || 'no-color'}-${item.sizeVariantId || 'no-size'}`;
-        if (!productGroups[key]) {
-          productGroups[key] = [];
-        }
-        productGroups[key].push(item);
-      });
-
-      // Process each product group
-      for (const productKey of Object.keys(productGroups)) {
-        const productItems = productGroups[productKey];
-        const totalQuantity = productItems.reduce((sum, item) => sum + item.quantity, 0);
-
-        // Skip if quantity is 0 or negative
-        if (totalQuantity <= 0) continue;
-
-        // Find applicable discount tier
-        const applicableTier = discountTiers.find(tier => 
-          totalQuantity >= tier.min_quantity && 
-          (!tier.max_quantity || totalQuantity <= tier.max_quantity)
-        );
-
-        const basePrice = subcategoriesData[subcategoryId].selling_price;
-        const sampleItem = productItems[0];
-
-        if (applicableTier) {
-          const discountedPrice = basePrice - applicableTier.discount_amount;
-          const moq = applicableTier.min_quantity;
-          
-          // Split into normal price (up to MOQ) and discount price (above MOQ)
-          if (totalQuantity > moq) {
-            // Normal price item (quantity = MOQ)
-            const normalItemId = `${sampleItem.productId}-${sampleItem.colorVariantId || 'no-color'}-${sampleItem.sizeVariantId || 'no-size'}-normal`;
-            rebalancedItems.push({
-              ...sampleItem,
-              id: normalItemId,
-              quantity: moq,
-              price: basePrice
-            });
-
-            // Discount price item (quantity = total - MOQ)
-            const discountItemId = `${sampleItem.productId}-${sampleItem.colorVariantId || 'no-color'}-${sampleItem.sizeVariantId || 'no-size'}-discount`;
-            rebalancedItems.push({
-              ...sampleItem,
-              id: discountItemId,
-              quantity: totalQuantity - moq,
-              price: discountedPrice
-            });
-          } else {
-            // All quantity at discount price (total = MOQ exactly)
-            const discountItemId = `${sampleItem.productId}-${sampleItem.colorVariantId || 'no-color'}-${sampleItem.sizeVariantId || 'no-size'}-discount`;
-            rebalancedItems.push({
-              ...sampleItem,
-              id: discountItemId,
-              quantity: totalQuantity,
-              price: discountedPrice
-            });
-          }
-        } else {
-          // All quantity at normal price
-          const normalItemId = `${sampleItem.productId}-${sampleItem.colorVariantId || 'no-color'}-${sampleItem.sizeVariantId || 'no-size'}-normal`;
-          rebalancedItems.push({
-            ...sampleItem,
-            id: normalItemId,
-            quantity: totalQuantity,
-            price: basePrice
-          });
-        }
+    // Check if combo is active for this subcategory
+    if (activeCombo) {
+      const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === item.subcategoryId);
+      if (comboSubcategory) {
+        return `Combo Price: Rs. ${comboSubcategory.price.toFixed(2)}`;
       }
     }
 
-    return rebalancedItems;
+    // Get discount tiers for this subcategory
+    const { data: discountTiers } = await supabase
+      .from('discount_tiers')
+      .select('*')
+      .eq('subcategory_id', item.subcategoryId)
+      .order('min_quantity', { ascending: true });
+
+    if (!discountTiers || discountTiers.length === 0) {
+      return `Regular Price: Rs. ${subcategoryData.selling_price.toFixed(2)}`;
+    }
+
+    // Find applicable tier based on subcategory total
+    const applicableTier = discountTiers.find(tier => 
+      subcategoryTotal >= tier.min_quantity && 
+      (!tier.max_quantity || subcategoryTotal <= tier.max_quantity)
+    );
+
+    if (applicableTier) {
+      const discountedPrice = subcategoryData.selling_price - applicableTier.discount_amount;
+      const moq = applicableTier.min_quantity;
+      
+      if (subcategoryTotal === moq) {
+        return `First ${moq} items: Rs. ${discountedPrice.toFixed(2)}`;
+      } else {
+        const regularCount = moq;
+        const discountCount = subcategoryTotal - moq;
+        return `First ${regularCount} items: Rs. ${subcategoryData.selling_price.toFixed(2)}, Next ${discountCount} items: Rs. ${discountedPrice.toFixed(2)}`;
+      }
+    }
+
+    return `Regular Price: Rs. ${subcategoryData.selling_price.toFixed(2)}`;
+  };
+
+  const calculateItemSubtotal = async (item: CartItem, subcategoryTotal: number) => {
+    const subcategoryData = subcategoriesData[item.subcategoryId];
+    if (!subcategoryData) return 0;
+
+    // Check if combo is active for this subcategory
+    if (activeCombo) {
+      const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === item.subcategoryId);
+      if (comboSubcategory) {
+        return comboSubcategory.price * item.quantity;
+      }
+    }
+
+    // Get discount tiers for this subcategory
+    const { data: discountTiers } = await supabase
+      .from('discount_tiers')
+      .select('*')
+      .eq('subcategory_id', item.subcategoryId)
+      .order('min_quantity', { ascending: true });
+
+    if (!discountTiers || discountTiers.length === 0) {
+      return subcategoryData.selling_price * item.quantity;
+    }
+
+    // Find applicable tier based on subcategory total
+    const applicableTier = discountTiers.find(tier => 
+      subcategoryTotal >= tier.min_quantity && 
+      (!tier.max_quantity || subcategoryTotal <= tier.max_quantity)
+    );
+
+    if (applicableTier) {
+      const basePrice = subcategoryData.selling_price;
+      const discountedPrice = basePrice - applicableTier.discount_amount;
+      const moq = applicableTier.min_quantity;
+      
+      if (subcategoryTotal === moq) {
+        // All items at discount price
+        return discountedPrice * item.quantity;
+      } else {
+        // Calculate mixed pricing for this specific item's portion
+        const itemStartIndex = subcategoryTotal - item.quantity;
+        const itemEndIndex = subcategoryTotal;
+        
+        let itemTotal = 0;
+        for (let i = itemStartIndex; i < itemEndIndex; i++) {
+          if (i < moq) {
+            itemTotal += basePrice;
+          } else {
+            itemTotal += discountedPrice;
+          }
+        }
+        return itemTotal;
+      }
+    }
+
+    return subcategoryData.selling_price * item.quantity;
+  };
+
+  const recalculateCartPricing = async () => {
+    if (cartItems.length === 0) return;
+
+    // Calculate subcategory totals
+    const subcategoryTotals: { [key: string]: number } = {};
+    cartItems.forEach(item => {
+      subcategoryTotals[item.subcategoryId] = (subcategoryTotals[item.subcategoryId] || 0) + item.quantity;
+    });
+
+    // Update each item's pricing description and subtotal
+    const updatedItems = await Promise.all(
+      cartItems.map(async (item) => {
+        const subcategoryTotal = subcategoryTotals[item.subcategoryId];
+        const pricingDescription = await calculatePricingDescription(item, subcategoryTotal);
+        const subtotal = await calculateItemSubtotal(item, subcategoryTotal);
+        
+        return {
+          ...item,
+          pricingDescription,
+          subtotal
+        };
+      })
+    );
+
+    setCartItems(updatedItems);
   };
 
   const addToCart = async (params: AddToCartParams) => {
@@ -310,168 +329,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
         sizeName = sizeVariant?.size_name || '';
       }
 
-      // Get current total quantity for this subcategory
-      const currentSubcategoryQuantity = cartItems
-        .filter(item => item.subcategoryId === product.subcategory_id)
-        .reduce((total, item) => total + item.quantity, 0);
-
-      // Check if combo is active (highest priority)
-      if (activeCombo) {
-        const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === product.subcategory_id);
-        if (comboSubcategory) {
-          // Add as combo item
-          const comboItemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}-combo`;
-          
-          const existingItemIndex = cartItems.findIndex(item => item.id === comboItemId);
-          
-          if (existingItemIndex >= 0) {
-            const updatedItems = [...cartItems];
-            updatedItems[existingItemIndex].quantity += params.quantity;
-            setCartItems(updatedItems);
-          } else {
-            const newItem: CartItem = {
-              id: comboItemId,
-              productId: params.productId,
-              productName: product.name,
-              colorVariantId: params.colorVariantId,
-              sizeVariantId: params.sizeVariantId,
-              colorName,
-              sizeName,
-              quantity: params.quantity,
-              price: comboSubcategory.price,
-              subcategoryId: product.subcategory_id,
-              image_url: product.image_url
-            };
-            setCartItems(prev => [...prev, newItem]);
-          }
-          return;
-        }
-      }
-
-      // Check for discount tiers
-      const { data: discountTiers } = await supabase
-        .from('discount_tiers')
-        .select('*')
-        .eq('subcategory_id', product.subcategory_id)
-        .order('min_quantity', { ascending: true });
-
-      if (discountTiers && discountTiers.length > 0) {
-        const applicableTier = discountTiers.find(tier => 
-          currentSubcategoryQuantity >= tier.min_quantity && 
-          (!tier.max_quantity || currentSubcategoryQuantity <= tier.max_quantity)
-        );
-
-        if (applicableTier) {
-          // MOQ already met, add new items at discount price
-          const discountedPrice = subcategoriesData[product.subcategory_id].selling_price - applicableTier.discount_amount;
-          const discountItemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}-discount`;
-          
-          const existingDiscountIndex = cartItems.findIndex(item => item.id === discountItemId);
-          
-          if (existingDiscountIndex >= 0) {
-            const updatedItems = [...cartItems];
-            updatedItems[existingDiscountIndex].quantity += params.quantity;
-            setCartItems(updatedItems);
-          } else {
-            const discountItem: CartItem = {
-              id: discountItemId,
-              productId: params.productId,
-              productName: product.name,
-              colorVariantId: params.colorVariantId,
-              sizeVariantId: params.sizeVariantId,
-              colorName,
-              sizeName,
-              quantity: params.quantity,
-              price: discountedPrice,
-              subcategoryId: product.subcategory_id,
-              image_url: product.image_url
-            };
-            setCartItems(prev => [...prev, discountItem]);
-          }
-          return;
-        }
-
-        // Check if adding these items would cross MOQ threshold
-        const newTotal = currentSubcategoryQuantity + params.quantity;
-        const crossesTier = discountTiers.find(tier => 
-          currentSubcategoryQuantity < tier.min_quantity && newTotal >= tier.min_quantity
-        );
-
-        if (crossesTier) {
-          const basePrice = subcategoriesData[product.subcategory_id].selling_price;
-          const discountedPrice = basePrice - crossesTier.discount_amount;
-          
-          // Items at normal price (up to MOQ)
-          const normalPriceQuantity = crossesTier.min_quantity - currentSubcategoryQuantity;
-          if (normalPriceQuantity > 0) {
-            const normalItemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}-normal`;
-            
-            const existingNormalIndex = cartItems.findIndex(item => item.id === normalItemId);
-            if (existingNormalIndex >= 0) {
-              const updatedItems = [...cartItems];
-              updatedItems[existingNormalIndex].quantity += normalPriceQuantity;
-              setCartItems(updatedItems);
-            } else {
-              const normalItem: CartItem = {
-                id: normalItemId,
-                productId: params.productId,
-                productName: product.name,
-                colorVariantId: params.colorVariantId,
-                sizeVariantId: params.sizeVariantId,
-                colorName,
-                sizeName,
-                quantity: normalPriceQuantity,
-                price: basePrice,
-                subcategoryId: product.subcategory_id,
-                image_url: product.image_url
-              };
-              setCartItems(prev => [...prev, normalItem]);
-            }
-          }
-
-          // Items at discounted price (above MOQ)
-          const discountQuantity = params.quantity - normalPriceQuantity;
-          if (discountQuantity > 0) {
-            const discountItemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}-discount`;
-            
-            const existingDiscountIndex = cartItems.findIndex(item => item.id === discountItemId);
-            if (existingDiscountIndex >= 0) {
-              const updatedItems = [...cartItems];
-              updatedItems[existingDiscountIndex].quantity += discountQuantity;
-              setCartItems(updatedItems);
-            } else {
-              const discountItem: CartItem = {
-                id: discountItemId,
-                productId: params.productId,
-                productName: product.name,
-                colorVariantId: params.colorVariantId,
-                sizeVariantId: params.sizeVariantId,
-                colorName,
-                sizeName,
-                quantity: discountQuantity,
-                price: discountedPrice,
-                subcategoryId: product.subcategory_id,
-                image_url: product.image_url
-              };
-              setCartItems(prev => [...prev, discountItem]);
-            }
-          }
-          return;
-        }
-      }
-
-      // Add as normal item
-      const normalItemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}-normal`;
+      // Create unique item ID based on product, color, and size
+      const itemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}`;
       
-      const existingItemIndex = cartItems.findIndex(item => item.id === normalItemId);
+      const existingItemIndex = cartItems.findIndex(item => item.id === itemId);
       
       if (existingItemIndex >= 0) {
+        // Update existing item quantity
         const updatedItems = [...cartItems];
         updatedItems[existingItemIndex].quantity += params.quantity;
         setCartItems(updatedItems);
       } else {
+        // Add new item
         const newItem: CartItem = {
-          id: normalItemId,
+          id: itemId,
           productId: params.productId,
           productName: product.name,
           colorVariantId: params.colorVariantId,
@@ -479,9 +350,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
           colorName,
           sizeName,
           quantity: params.quantity,
-          price: subcategoriesData[product.subcategory_id].selling_price,
+          price: subcategoriesData[product.subcategory_id]?.selling_price || params.price,
           subcategoryId: product.subcategory_id,
-          image_url: product.image_url
+          image_url: product.image_url,
+          pricingDescription: '',
+          subtotal: 0
         };
         setCartItems(prev => [...prev, newItem]);
       }
@@ -491,24 +364,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const removeFromCart = async (itemId: string) => {
-    const updatedItems = cartItems.filter(item => item.id !== itemId);
-    const rebalanced = await rebalanceCartItems(updatedItems);
-    setCartItems(rebalanced);
+  const removeFromCart = (itemId: string) => {
+    setCartItems(cartItems.filter(item => item.id !== itemId));
   };
 
-  const updateQuantity = async (itemId: string, quantity: number) => {
+  const updateQuantity = (itemId: string, quantity: number) => {
     if (quantity <= 0) {
       removeFromCart(itemId);
       return;
     }
 
-    const updatedItems = cartItems.map(item => 
+    setCartItems(cartItems.map(item => 
       item.id === itemId ? { ...item, quantity } : item
-    );
-    
-    const rebalanced = await rebalanceCartItems(updatedItems);
-    setCartItems(rebalanced);
+    ));
   };
 
   const clearCart = () => {
@@ -519,7 +387,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const getTotalPrice = async () => {
     let total = 0;
     for (const item of cartItems) {
-      total += item.price * item.quantity;
+      total += item.subtotal || 0;
     }
     return total;
   };

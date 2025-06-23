@@ -35,31 +35,6 @@ export function CartSidebar() {
     }
   };
 
-  // Improved helper function to check if buttons should be disabled
-  const shouldDisableButtons = (item: any) => {
-    const baseProductId = item.productId;
-    const baseColorId = item.colorVariantId;
-    const baseSizeId = item.sizeVariantId;
-    
-    // Find all items with same product, color, and size
-    const sameProductItems = cartItems.filter(cartItem => 
-      cartItem.productId === baseProductId &&
-      cartItem.colorVariantId === baseColorId &&
-      cartItem.sizeVariantId === baseSizeId
-    );
-
-    // If there are multiple items of the same product, disable normal price items when discount items exist
-    if (sameProductItems.length > 1) {
-      const isNormalPriceItem = item.id.includes('-normal');
-      const hasDiscountedItem = sameProductItems.some(cartItem => cartItem.id.includes('-discount'));
-      
-      // Only disable normal price items if there are discounted items of the same product
-      return isNormalPriceItem && hasDiscountedItem;
-    }
-    
-    return false;
-  };
-
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
@@ -113,7 +88,6 @@ export function CartSidebar() {
                     item={item} 
                     onUpdateQuantity={updateQuantity}
                     onRemove={removeFromCart}
-                    buttonsDisabled={shouldDisableButtons(item)}
                   />
                 ))}
               </div>
@@ -122,7 +96,7 @@ export function CartSidebar() {
               <div className="border-t pt-4">
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span>${cartTotal.toFixed(2)}</span>
+                  <span>Rs. {cartTotal.toFixed(2)}</span>
                 </div>
                 {activeCombo && (
                   <p className="text-sm text-green-600 mt-1">🎉 Combo pricing applied!</p>
@@ -149,75 +123,43 @@ export function CartSidebar() {
 function CartItemCard({ 
   item, 
   onUpdateQuantity, 
-  onRemove,
-  buttonsDisabled = false
+  onRemove
 }: { 
   item: any;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onRemove: (id: string) => void;
-  buttonsDisabled?: boolean;
 }) {
-  const getPricingMode = (itemId: string) => {
-    if (itemId.includes('-combo')) return 'combo';
-    if (itemId.includes('-discount')) return 'discount';
-    return 'normal';
-  };
-
-  const pricingMode = getPricingMode(item.id);
-  
-  const getPriceLabel = () => {
-    switch (pricingMode) {
-      case 'combo':
-        return 'Combo Price';
-      case 'discount':
-        return 'Discount Applied';
-      case 'normal':
-      default:
-        return 'Normal Price';
+  const getPricingBadgeStyle = () => {
+    if (item.pricingDescription?.includes('Combo')) {
+      return 'border-green-500 text-green-700 bg-green-50';
+    } else if (item.pricingDescription?.includes('Next')) {
+      return 'border-blue-500 text-blue-700 bg-blue-50';
+    } else {
+      return 'border-gray-500 text-gray-700 bg-gray-50';
     }
   };
 
   const getPriceColor = () => {
-    switch (pricingMode) {
-      case 'combo':
-        return 'text-green-600';
-      case 'discount':
-        return 'text-blue-600';
-      case 'normal':
-      default:
-        return buttonsDisabled ? 'text-gray-500' : 'text-gray-900';
-    }
-  };
-
-  const getBadgeColor = () => {
-    switch (pricingMode) {
-      case 'combo':
-        return 'border-green-500 text-green-700 bg-green-50';
-      case 'discount':
-        return 'border-blue-500 text-blue-700 bg-blue-50';
-      case 'normal':
-      default:
-        return buttonsDisabled 
-          ? 'border-gray-300 text-gray-500 bg-gray-100' 
-          : 'border-gray-500 text-gray-700 bg-gray-50';
+    if (item.pricingDescription?.includes('Combo')) {
+      return 'text-green-600';
+    } else if (item.pricingDescription?.includes('Next')) {
+      return 'text-blue-600';
+    } else {
+      return 'text-gray-900';
     }
   };
 
   return (
-    <div className={`flex items-center space-x-3 p-3 rounded-lg ${
-      buttonsDisabled ? 'bg-gray-100 opacity-75' : 'bg-gray-50'
-    }`}>
+    <div className="flex items-start space-x-3 p-3 rounded-lg bg-gray-50">
       {item.image_url && (
         <img 
           src={item.image_url} 
           alt={item.productName}
-          className="w-12 h-12 object-cover rounded-md"
+          className="w-12 h-12 object-cover rounded-md flex-shrink-0"
         />
       )}
       <div className="flex-1 min-w-0">
-        <h3 className={`text-sm font-medium truncate ${
-          buttonsDisabled ? 'text-gray-500' : 'text-gray-900'
-        }`}>
+        <h3 className="text-sm font-medium text-gray-900 truncate">
           {item.productName}
         </h3>
         {item.colorName && (
@@ -226,55 +168,59 @@ function CartItemCard({
         {item.sizeName && (
           <p className="text-xs text-gray-500">Size: {item.sizeName}</p>
         )}
-        <div className="flex items-center gap-2 mt-1">
-          <p className={`text-sm font-bold ${getPriceColor()}`}>
-            ${item.price.toFixed(2)}
-          </p>
-          <Badge 
-            variant="outline" 
-            className={`text-xs px-2 py-0 ${getBadgeColor()}`}
-          >
-            {getPriceLabel()}
-          </Badge>
-        </div>
-        {buttonsDisabled && (
-          <p className="text-xs text-gray-500 mt-1">
-            Quantity controlled by discounted items
-          </p>
+        
+        {/* Pricing Description */}
+        {item.pricingDescription && (
+          <div className="mt-2">
+            <Badge 
+              variant="outline" 
+              className={`text-xs px-2 py-1 ${getPricingBadgeStyle()}`}
+            >
+              {item.pricingDescription}
+            </Badge>
+          </div>
         )}
-      </div>
-      <div className="flex items-center space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-          disabled={item.quantity <= 1 || buttonsDisabled}
-          className="h-7 w-7 p-0"
-        >
-          <Minus className="h-3 w-3" />
-        </Button>
-        <span className={`text-sm font-medium w-6 text-center ${
-          buttonsDisabled ? 'text-gray-500' : ''
-        }`}>
-          {item.quantity}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-          disabled={buttonsDisabled}
-          className="h-7 w-7 p-0"
-        >
-          <Plus className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onRemove(item.id)}
-          className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
-        >
-          <X className="h-3 w-3" />
-        </Button>
+        
+        {/* Quantity Controls */}
+        <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+              disabled={item.quantity <= 1}
+              className="h-7 w-7 p-0"
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+            <span className="text-sm font-medium w-6 text-center">
+              {item.quantity}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+              className="h-7 w-7 p-0"
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
+          
+          {/* Subtotal and Remove */}
+          <div className="flex items-center space-x-2">
+            <p className={`text-sm font-bold ${getPriceColor()}`}>
+              Rs. {item.subtotal?.toFixed(2) || '0.00'}
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onRemove(item.id)}
+              className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
