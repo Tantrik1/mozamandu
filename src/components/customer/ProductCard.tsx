@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,16 +66,20 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
     }
   }, [selectedColor, product.has_size_variants]);
 
-  // Reset quantity when color changes or load existing cart quantity
+  // Reset quantity and update pricing when variants change
   useEffect(() => {
-    const existingItem = cartItems.find(item => 
-      item.productId === product.id &&
-      item.colorVariantId === selectedColor &&
-      item.sizeVariantId === selectedSize
-    );
+    const existingItem = cartItems.find(item => {
+      // Check for items with same product and variants but different pricing modes
+      const baseMatch = item.productId === product.id &&
+        item.colorVariantId === selectedColor &&
+        item.sizeVariantId === selectedSize;
+      
+      return baseMatch;
+    });
     
     setQuantity(existingItem ? existingItem.quantity : 1);
-  }, [selectedColor, selectedSize, cartItems]);
+    updateDynamicPrice();
+  }, [selectedColor, selectedSize, cartItems, activeCombo]);
 
   // Update image when color changes
   useEffect(() => {
@@ -92,10 +95,10 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
     }
   }, [selectedColor, colorVariants, product.image_url]);
 
-  // Update dynamic pricing
+  // Update dynamic pricing based on current mode
   useEffect(() => {
     updateDynamicPrice();
-  }, [quantity, product.subcategory_id, activeCombo]);
+  }, [quantity, product.subcategory_id, activeCombo, selectedColor, selectedSize]);
 
   const updateDynamicPrice = async () => {
     try {
@@ -105,7 +108,7 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
       if (pricing.inCombo) {
         setPriceLabel('Combo Price');
       } else if (pricing.appliedDiscount) {
-        setPriceLabel(`Discount Applied (${pricing.appliedDiscount.discount_amount} off)`);
+        setPriceLabel(`Discount (-$${pricing.appliedDiscount.discount_amount})`);
       } else {
         setPriceLabel('Normal Price');
       }
@@ -203,7 +206,7 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
 
       toast({
         title: "Added to Cart",
-        description: `${product.name} has been added to your cart`,
+        description: `${product.name} has been added to your cart with ${priceLabel.toLowerCase()}`,
       });
     } catch (error) {
       console.error('Error adding to cart:', error);
@@ -243,16 +246,28 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
           </Badge>
         )}
 
-        {/* Price Badge with dynamic pricing */}
+        {/* Price Badge with dynamic pricing and mode indicator */}
         <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1">
           <div className="text-center">
-            <span className="text-sm font-bold text-red-600">
+            <span className={`text-sm font-bold ${
+              priceLabel.includes('Combo') ? 'text-green-600' :
+              priceLabel.includes('Discount') ? 'text-blue-600' :
+              'text-red-600'
+            }`}>
               ${dynamicPrice.toFixed(2)}
             </span>
             {priceLabel !== 'Normal Price' && (
-              <div className="flex items-center gap-1">
-                <Tag className="w-2 h-2 text-green-600" />
-                <span className="text-xs text-green-600 font-medium">
+              <div className="flex items-center gap-1 justify-center">
+                <Tag className={`w-2 h-2 ${
+                  priceLabel.includes('Combo') ? 'text-green-600' :
+                  priceLabel.includes('Discount') ? 'text-blue-600' :
+                  'text-red-600'
+                }`} />
+                <span className={`text-xs font-medium ${
+                  priceLabel.includes('Combo') ? 'text-green-600' :
+                  priceLabel.includes('Discount') ? 'text-blue-600' :
+                  'text-red-600'
+                }`}>
                   {priceLabel.includes('Combo') ? 'Combo' : 'Discount'}
                 </span>
               </div>
@@ -337,9 +352,15 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
             </Button>
           </div>
           
-          {/* Price Label */}
+          {/* Price Mode Indicator */}
           <div className="text-right">
-            <span className="text-xs text-gray-500">{priceLabel}</span>
+            <span className={`text-xs ${
+              priceLabel.includes('Combo') ? 'text-green-600' :
+              priceLabel.includes('Discount') ? 'text-blue-600' :
+              'text-gray-500'
+            }`}>
+              {priceLabel}
+            </span>
           </div>
         </div>
 

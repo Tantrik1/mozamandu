@@ -201,12 +201,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
         sizeName = sizeVariant?.size_name || '';
       }
 
-      // Check if item already exists in cart
-      const existingItemIndex = cartItems.findIndex(item => 
-        item.productId === params.productId &&
-        item.colorVariantId === params.colorVariantId &&
-        item.sizeVariantId === params.sizeVariantId
-      );
+      // Get current pricing for this item
+      const currentPricing = await getItemPrice(product.subcategory_id, params.quantity);
+
+      // Create unique ID based on product, variants, and pricing mode
+      const pricingMode = currentPricing.inCombo ? 'combo' : 
+                         currentPricing.appliedDiscount ? 'discount' : 'normal';
+      const itemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}-${pricingMode}`;
+
+      // Check if item with same pricing already exists in cart
+      const existingItemIndex = cartItems.findIndex(item => item.id === itemId);
 
       if (existingItemIndex >= 0) {
         // Update existing item quantity
@@ -216,7 +220,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       } else {
         // Add new item
         const newItem: CartItem = {
-          id: `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}`,
+          id: itemId,
           productId: params.productId,
           productName: product.name,
           colorVariantId: params.colorVariantId,
@@ -224,7 +228,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           colorName,
           sizeName,
           quantity: params.quantity,
-          price: params.price,
+          price: currentPricing.finalPrice,
           subcategoryId: product.subcategory_id,
           image_url: product.image_url
         };

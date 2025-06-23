@@ -1,4 +1,3 @@
-
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -211,7 +210,8 @@ function CartItemCard({
   getItemPrice: (subcategoryId: string, quantity: number) => Promise<any>;
 }) {
   const [itemPrice, setItemPrice] = useState(item.price);
-  const [priceLabel, setPriceLabel] = useState('');
+  const [priceLabel, setPriceLabel] = useState('Normal');
+  const [priceColor, setPriceColor] = useState('text-red-600');
 
   useEffect(() => {
     updateItemPrice();
@@ -223,16 +223,22 @@ function CartItemCard({
       setItemPrice(pricing.finalPrice);
       
       if (pricing.inCombo) {
-        setPriceLabel('Combo');
+        setPriceLabel('Combo Price');
+        setPriceColor('text-green-600');
       } else if (pricing.appliedDiscount) {
-        setPriceLabel('Discount');
+        setPriceLabel(`Discount Applied (-$${pricing.appliedDiscount.discount_amount})`);
+        setPriceColor('text-blue-600');
       } else {
-        setPriceLabel('');
+        setPriceLabel('Normal Price');
+        setPriceColor('text-red-600');
       }
     } catch (error) {
       console.error('Error updating item price:', error);
     }
   };
+
+  // Determine if this is a different pricing variant
+  const isDifferentPricing = item.id.includes('-combo') || item.id.includes('-discount');
 
   return (
     <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
@@ -254,13 +260,21 @@ function CartItemCard({
           <p className="text-xs text-gray-500">Size: {item.sizeName}</p>
         )}
         <div className="flex items-center gap-2">
-          <p className="text-sm font-bold text-red-600">${itemPrice.toFixed(2)}</p>
-          {priceLabel && (
-            <Badge variant="outline" className="text-xs px-1 py-0">
-              {priceLabel}
-            </Badge>
-          )}
+          <p className={`text-sm font-bold ${priceColor}`}>${itemPrice.toFixed(2)}</p>
+          <Badge 
+            variant="outline" 
+            className={`text-xs px-1 py-0 ${
+              priceLabel.includes('Combo') ? 'border-green-500 text-green-700' :
+              priceLabel.includes('Discount') ? 'border-blue-500 text-blue-700' :
+              'border-red-500 text-red-700'
+            }`}
+          >
+            {priceLabel}
+          </Badge>
         </div>
+        {isDifferentPricing && (
+          <p className="text-xs text-gray-400 italic">Separate pricing applied</p>
+        )}
       </div>
       <div className="flex items-center space-x-2">
         <Button
