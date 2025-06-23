@@ -132,7 +132,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         result.comboPrice = comboSubcategory.price;
         result.finalPrice = comboSubcategory.price;
         result.inCombo = true;
-        return result; // Return early if in combo
+        return result;
       }
     }
 
@@ -146,17 +146,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (discountTiers) {
       for (const tier of discountTiers) {
         if (quantity >= tier.min_quantity && (!tier.max_quantity || quantity <= tier.max_quantity)) {
-          // Apply discount only to quantities above the tier threshold
           const discountedPrice = basePrice - tier.discount_amount;
           result.discountedPrice = discountedPrice;
           result.appliedDiscount = tier;
-          
-          // Calculate weighted average: 
-          // (original price * MOQ + discounted price * extra quantity) / total quantity
-          const originalPriceItems = tier.min_quantity;
-          const discountedItems = quantity - tier.min_quantity;
-          const totalPrice = (basePrice * originalPriceItems) + (discountedPrice * discountedItems);
-          result.finalPrice = totalPrice / quantity;
+          result.finalPrice = discountedPrice;
           break;
         }
       }
@@ -201,52 +194,67 @@ export function CartProvider({ children }: { children: ReactNode }) {
         sizeName = sizeVariant?.size_name || '';
       }
 
-      // Get current pricing for this item
-      const currentPricing = await getItemPrice(product.subcategory_id, params.quantity);
-      
-      // Check if we need to split items for MOQ discount
-      if (currentPricing.appliedDiscount && !currentPricing.inCombo) {
-        const discount = currentPricing.appliedDiscount;
-        const basePrice = currentPricing.basePrice;
-        const discountedPrice = basePrice - discount.discount_amount;
+      // Get current total quantity for this subcategory
+      const currentSubcategoryQuantity = cartItems
+        .filter(item => item.subcategoryId === product.subcategory_id)
+        .reduce((total, item) => total + item.quantity, 0);
 
-        // Items at original price (up to MOQ)
-        const originalPriceQuantity = Math.min(params.quantity, discount.min_quantity);
-        if (originalPriceQuantity > 0) {
-          const originalItemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}-normal`;
+      // Check if combo is active
+      if (activeCombo) {
+        const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === product.subcategory_id);
+        if (comboSubcategory) {
+          // Add as combo item
+          const comboItemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}-combo`;
           
-          const existingOriginalIndex = cartItems.findIndex(item => item.id === originalItemId);
-          if (existingOriginalIndex >= 0) {
+          const existingItemIndex = cartItems.findIndex(item => item.id === comboItemId);
+          
+          if (existingItemIndex >= 0) {
             const updatedItems = [...cartItems];
-            updatedItems[existingOriginalIndex].quantity += originalPriceQuantity;
+            updatedItems[existingItemIndex].quantity += params.quantity;
             setCartItems(updatedItems);
           } else {
-            const originalItem: CartItem = {
-              id: originalItemId,
+            const newItem: CartItem = {
+              id: comboItemId,
               productId: params.productId,
               productName: product.name,
               colorVariantId: params.colorVariantId,
               sizeVariantId: params.sizeVariantId,
               colorName,
               sizeName,
-              quantity: originalPriceQuantity,
-              price: basePrice,
+              quantity: params.quantity,
+              price: comboSubcategory.price,
               subcategoryId: product.subcategory_id,
               image_url: product.image_url
             };
-            setCartItems(prev => [...prev, originalItem]);
+            setCartItems(prev => [...prev, newItem]);
           }
+          return;
         }
+      }
 
-        // Items at discounted price (above MOQ)
-        const discountedQuantity = params.quantity - discount.min_quantity;
-        if (discountedQuantity > 0) {
+      // Check for discount tiers
+      const { data: discountTiers } = await supabase
+        .from('discount_tiers')
+        .select('*')
+        .eq('subcategory_id', product.subcategory_id)
+        .order('min_quantity', { ascending: true });
+
+      if (discountTiers && discountTiers.length > 0) {
+        const applicableTier = discountTiers.find(tier => 
+          currentSubcategoryQuantity >= tier.min_quantity && 
+          (!tier.max_quantity || currentSubcategoryQuantity <= tier.max_quantity)
+        );
+
+        if (applicableTier) {
+          // MOQ already met, add new items at discount price
+          const discountedPrice = subcategoriesData[product.subcategory_id].selling_price - applicableTier.discount_amount;
           const discountItemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}-discount`;
           
           const existingDiscountIndex = cartItems.findIndex(item => item.id === discountItemId);
+          
           if (existingDiscountIndex >= 0) {
             const updatedItems = [...cartItems];
-            updatedItems[existingDiscountIndex].quantity += discountedQuantity;
+            updatedItems[existingDiscountIndex].quantity += params.quantity;
             setCartItems(updatedItems);
           } else {
             const discountItem: CartItem = {
@@ -257,42 +265,109 @@ export function CartProvider({ children }: { children: ReactNode }) {
               sizeVariantId: params.sizeVariantId,
               colorName,
               sizeName,
-              quantity: discountedQuantity,
+              quantity: params.quantity,
               price: discountedPrice,
               subcategoryId: product.subcategory_id,
               image_url: product.image_url
             };
             setCartItems(prev => [...prev, discountItem]);
           }
+          return;
         }
+
+        // Check if adding these items would cross MOQ threshold
+        const newTotal = currentSubcategoryQuantity + params.quantity;
+        const crossesTier = discountTiers.find(tier => 
+          currentSubcategoryQuantity < tier.min_quantity && newTotal >= tier.min_quantity
+        );
+
+        if (crossesTier) {
+          const basePrice = subcategoriesData[product.subcategory_id].selling_price;
+          const discountedPrice = basePrice - crossesTier.discount_amount;
+          
+          // Items at normal price (up to MOQ)
+          const normalPriceQuantity = crossesTier.min_quantity - currentSubcategoryQuantity;
+          if (normalPriceQuantity > 0) {
+            const normalItemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}-normal`;
+            
+            const existingNormalIndex = cartItems.findIndex(item => item.id === normalItemId);
+            if (existingNormalIndex >= 0) {
+              const updatedItems = [...cartItems];
+              updatedItems[existingNormalIndex].quantity += normalPriceQuantity;
+              setCartItems(updatedItems);
+            } else {
+              const normalItem: CartItem = {
+                id: normalItemId,
+                productId: params.productId,
+                productName: product.name,
+                colorVariantId: params.colorVariantId,
+                sizeVariantId: params.sizeVariantId,
+                colorName,
+                sizeName,
+                quantity: normalPriceQuantity,
+                price: basePrice,
+                subcategoryId: product.subcategory_id,
+                image_url: product.image_url
+              };
+              setCartItems(prev => [...prev, normalItem]);
+            }
+          }
+
+          // Items at discounted price (above MOQ)
+          const discountQuantity = params.quantity - normalPriceQuantity;
+          if (discountQuantity > 0) {
+            const discountItemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}-discount`;
+            
+            const existingDiscountIndex = cartItems.findIndex(item => item.id === discountItemId);
+            if (existingDiscountIndex >= 0) {
+              const updatedItems = [...cartItems];
+              updatedItems[existingDiscountIndex].quantity += discountQuantity;
+              setCartItems(updatedItems);
+            } else {
+              const discountItem: CartItem = {
+                id: discountItemId,
+                productId: params.productId,
+                productName: product.name,
+                colorVariantId: params.colorVariantId,
+                sizeVariantId: params.sizeVariantId,
+                colorName,
+                sizeName,
+                quantity: discountQuantity,
+                price: discountedPrice,
+                subcategoryId: product.subcategory_id,
+                image_url: product.image_url
+              };
+              setCartItems(prev => [...prev, discountItem]);
+            }
+          }
+          return;
+        }
+      }
+
+      // Add as normal item
+      const normalItemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}-normal`;
+      
+      const existingItemIndex = cartItems.findIndex(item => item.id === normalItemId);
+      
+      if (existingItemIndex >= 0) {
+        const updatedItems = [...cartItems];
+        updatedItems[existingItemIndex].quantity += params.quantity;
+        setCartItems(updatedItems);
       } else {
-        // Regular handling for combo or normal pricing
-        const pricingMode = currentPricing.inCombo ? 'combo' : 'normal';
-        const itemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}-${pricingMode}`;
-
-        const existingItemIndex = cartItems.findIndex(item => item.id === itemId);
-
-        if (existingItemIndex >= 0) {
-          const updatedItems = [...cartItems];
-          updatedItems[existingItemIndex].quantity += params.quantity;
-          setCartItems(updatedItems);
-        } else {
-          const newItem: CartItem = {
-            id: itemId,
-            productId: params.productId,
-            productName: product.name,
-            colorVariantId: params.colorVariantId,
-            sizeVariantId: params.sizeVariantId,
-            colorName,
-            sizeName,
-            quantity: params.quantity,
-            price: currentPricing.finalPrice,
-            subcategoryId: product.subcategory_id,
-            image_url: product.image_url
-          };
-
-          setCartItems(prev => [...prev, newItem]);
-        }
+        const newItem: CartItem = {
+          id: normalItemId,
+          productId: params.productId,
+          productName: product.name,
+          colorVariantId: params.colorVariantId,
+          sizeVariantId: params.sizeVariantId,
+          colorName,
+          sizeName,
+          quantity: params.quantity,
+          price: subcategoriesData[product.subcategory_id].selling_price,
+          subcategoryId: product.subcategory_id,
+          image_url: product.image_url
+        };
+        setCartItems(prev => [...prev, newItem]);
       }
     } catch (error) {
       console.error('Error adding to cart:', error);
