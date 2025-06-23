@@ -18,6 +18,7 @@ interface Subcategory {
   name: string;
   description: string;
   selling_price: number;
+  minimum_quantity: number;
   status: string;
 }
 
@@ -58,7 +59,7 @@ export default function CategoryPage() {
       // Fetch subcategories
       const { data: subcategoriesData, error: subcategoriesError } = await supabase
         .from('subcategories')
-        .select('id, name, description, selling_price, status')
+        .select('id, name, description, selling_price, minimum_quantity, status')
         .eq('category_id', categoryId)
         .eq('status', 'on')
         .order('name');
@@ -142,9 +143,16 @@ export default function CategoryPage() {
                     {subcategory.description && (
                       <p className="text-gray-600 mb-4 text-sm">{subcategory.description}</p>
                     )}
-                    <Badge variant="secondary" className="bg-red-100 text-red-700 text-lg font-semibold">
-                      ${subcategory.selling_price}
-                    </Badge>
+                    <div className="space-y-2">
+                      <Badge variant="secondary" className="bg-red-100 text-red-700 text-lg font-semibold">
+                        ${subcategory.selling_price}
+                      </Badge>
+                      {subcategory.minimum_quantity > 1 && (
+                        <Badge variant="outline" className="block text-xs text-blue-600 border-blue-300">
+                          Min. {subcategory.minimum_quantity} items required
+                        </Badge>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </Link>

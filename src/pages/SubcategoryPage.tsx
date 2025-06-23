@@ -5,12 +5,15 @@ import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { ProductCard } from '@/components/customer/ProductCard';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle } from 'lucide-react';
 
 interface Subcategory {
   id: string;
   name: string;
   description: string;
   selling_price: number;
+  minimum_quantity: number;
 }
 
 interface Product {
@@ -45,7 +48,7 @@ export default function SubcategoryPage() {
       // Fetch subcategory details
       const { data: subcategoryData, error: subcategoryError } = await supabase
         .from('subcategories')
-        .select('id, name, description, selling_price')
+        .select('id, name, description, selling_price, minimum_quantity')
         .eq('id', subcategoryId)
         .eq('status', 'on')
         .single();
@@ -119,16 +122,32 @@ export default function SubcategoryPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
-      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {/* Subcategory Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900">{subcategory.name}</h1>
-          {subcategory.description && (
-            <p className="text-gray-600 mt-2 text-lg">{subcategory.description}</p>
-          )}
-          <div className="mt-4">
-            <span className="text-2xl font-bold text-red-600">Base Price: ${subcategory.selling_price}</span>
+        <div className="mb-6">
+          <div className="flex flex-wrap items-center gap-4 mb-4">
+            <h1 className="text-3xl font-bold text-gray-900">{subcategory.name}</h1>
+            <Badge variant="outline" className="text-red-600 border-red-600">
+              Base Price: ${subcategory.selling_price}
+            </Badge>
           </div>
+          
+          {subcategory.description && (
+            <p className="text-gray-600 mb-4 text-lg">{subcategory.description}</p>
+          )}
+
+          {/* Minimum Quantity Notice */}
+          {subcategory.minimum_quantity > 1 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-blue-900">Minimum Order Requirement</h3>
+                <p className="text-blue-700 text-sm">
+                  You need to add at least <span className="font-semibold">{subcategory.minimum_quantity} items</span> from this category to proceed to checkout.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Products Grid */}
@@ -138,7 +157,7 @@ export default function SubcategoryPage() {
             <p className="text-gray-500">Products will appear here once they are added.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {products.map((product) => (
               <ProductCard 
                 key={product.id} 

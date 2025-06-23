@@ -1,128 +1,95 @@
 
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { useCart } from '@/hooks/useCart';
+import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, User, LogOut } from 'lucide-react';
+import { User, LogOut, LayoutDashboard, ChevronDown } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { CartSidebar } from './CartSidebar';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-} from '@/components/ui/navigation-menu';
+
+interface Category {
+  id: string;
+  name: string;
+  subcategories: Subcategory[];
+}
+
+interface Subcategory {
+  id: string;
+  name: string;
+}
 
 interface TopBarText {
   text: string;
   is_active: boolean;
 }
 
-interface Category {
-  id: string;
-  name: string;
-  status: 'on' | 'off';
-  subcategories?: Subcategory[];
-}
-
-interface Subcategory {
-  id: string;
-  name: string;
-  status: 'on' | 'off';
-}
-
 export function CustomerHeader() {
-  const { user, signOut } = useAuth();
-  const { getTotalItems } = useCart();
-  const navigate = useNavigate();
-  const [topBarText, setTopBarText] = useState<TopBarText | null>(null);
+  const { user, userProfile, signOut } = useAuth();
+  const location = useLocation();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [topBarText, setTopBarText] = useState<TopBarText | null>(null);
 
   useEffect(() => {
-    fetchTopBarText();
     fetchCategories();
+    fetchTopBarText();
   }, []);
 
-  const fetchTopBarText = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('top_bar_text')
-        .select('text, is_active')
-        .eq('is_active', true)
-        .limit(1)
-        .single();
+  const fetchCategories = async () => {
+    const { data: categoriesData, error: categoriesError } = await supabase
+      .from('categories')
+      .select(`
+        id,
+        name,
+        subcategories (
+          id,
+          name
+        )
+      `)
+      .eq('status', 'on');
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching top bar text:', error);
-        return;
-      }
-
-      if (data) {
-        setTopBarText(data);
-      }
-    } catch (error) {
-      console.error('Error fetching top bar text:', error);
+    if (categoriesError) {
+      console.error('Error fetching categories:', categoriesError);
+    } else {
+      setCategories(categoriesData || []);
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const { data: categoriesData, error } = await supabase
-        .from('categories')
-        .select(`
-          id,
-          name,
-          status,
-          subcategories (
-            id,
-            name,
-            status
-          )
-        `)
-        .eq('status', 'on')
-        .order('name');
+  const fetchTopBarText = async () => {
+    const { data, error } = await supabase
+      .from('top_bar_text')
+      .select('text, is_active')
+      .eq('is_active', true)
+      .single();
 
-      if (error) {
-        console.error('Error fetching categories:', error);
-        return;
-      }
-
-      // Filter active subcategories
-      const activeCategories = categoriesData?.map(category => ({
-        ...category,
-        subcategories: category.subcategories?.filter(sub => sub.status === 'on') || []
-      })) || [];
-
-      setCategories(activeCategories);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
+    if (error) {
+      console.error('Error fetching top bar text:', error);
+    } else {
+      setTopBarText(data);
     }
   };
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/');
   };
 
-  const cartItemCount = getTotalItems();
+  const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="w-full">
+    <>
       {/* Top Bar */}
-      {topBarText?.is_active && (
-        <div className="bg-red-600 text-white py-2 px-4">
-          <div className="max-w-7xl mx-auto text-center">
-            <span className="animate-blink font-medium">
-              🔥 {topBarText.text} 🔥
-            </span>
-          </div>
+      {topBarText && topBarText.is_active && (
+        <div className="bg-red-600 text-white text-center py-2 text-sm animate-pulse">
+          {topBarText.text}
         </div>
       )}
 
@@ -130,95 +97,80 @@ export function CustomerHeader() {
       <header className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
             <Link to="/" className="flex items-center space-x-2">
               <div className="text-2xl font-bold text-red-600">Mozamandu</div>
               <div className="text-sm text-gray-500">Gear Shop</div>
             </Link>
 
-            {/* Navigation */}
-            <NavigationMenu className="hidden lg:flex">
-              <NavigationMenuList className="space-x-8">
-                <NavigationMenuItem>
+            <nav className="hidden md:flex space-x-6">
+              <Link 
+                to="/" 
+                className={`transition-colors ${
+                  isActive('/') 
+                    ? 'text-red-600 font-medium border-b-2 border-red-600 pb-1' 
+                    : 'text-gray-700 hover:text-red-600'
+                }`}
+              >
+                Home
+              </Link>
+
+              {categories.map((category) => (
+                category.subcategories && category.subcategories.length > 0 ? (
+                  <DropdownMenu key={category.id}>
+                    <DropdownMenuTrigger className="flex items-center space-x-1 text-gray-700 hover:text-red-600 transition-colors">
+                      <span>{category.name}</span>
+                      <ChevronDown className="h-4 w-4" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem asChild>
+                        <Link to={`/categories/${category.id}`} className="w-full">
+                          View All {category.name}
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {category.subcategories.map((subcategory) => (
+                        <DropdownMenuItem key={subcategory.id} asChild>
+                          <Link to={`/subcategories/${subcategory.id}`} className="w-full">
+                            {subcategory.name}
+                          </Link>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
                   <Link 
-                    to="/" 
-                    className="text-gray-700 hover:text-red-600 font-medium transition-colors"
+                    key={category.id}
+                    to={`/categories/${category.id}`}
+                    className={`transition-colors ${
+                      isActive(`/categories/${category.id}`) 
+                        ? 'text-red-600 font-medium border-b-2 border-red-600 pb-1' 
+                        : 'text-gray-700 hover:text-red-600'
+                    }`}
                   >
-                    Home
+                    {category.name}
                   </Link>
-                </NavigationMenuItem>
+                )
+              ))}
+            </nav>
 
-                {categories.map((category) => (
-                  <NavigationMenuItem key={category.id}>
-                    {category.subcategories && category.subcategories.length > 0 ? (
-                      <>
-                        <NavigationMenuTrigger className="text-gray-700 hover:text-red-600 font-medium">
-                          {category.name}
-                        </NavigationMenuTrigger>
-                        <NavigationMenuContent>
-                          <div className="grid gap-3 p-6 w-[300px]">
-                            <Link
-                              to={`/categories/${category.id}`}
-                              className="block text-sm font-medium text-gray-900 hover:text-red-600 border-b pb-2 mb-2"
-                            >
-                              All {category.name}
-                            </Link>
-                            {category.subcategories.map((subcategory) => (
-                              <Link
-                                key={subcategory.id}
-                                to={`/subcategories/${subcategory.id}`}
-                                className="block text-sm text-gray-600 hover:text-red-600"
-                              >
-                                {subcategory.name}
-                              </Link>
-                            ))}
-                          </div>
-                        </NavigationMenuContent>
-                      </>
-                    ) : (
-                      <Link
-                        to={`/categories/${category.id}`}
-                        className="text-gray-700 hover:text-red-600 font-medium transition-colors"
-                      >
-                        {category.name}
-                      </Link>
-                    )}
-                  </NavigationMenuItem>
-                ))}
-
-                <NavigationMenuItem>
-                  <Link 
-                    to="/contact" 
-                    className="text-gray-700 hover:text-red-600 font-medium transition-colors"
-                  >
-                    Contact Us
-                  </Link>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-
-            {/* Right Side Actions */}
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" className="hover:text-red-600 relative">
-                <ShoppingCart className="h-5 w-5" />
-                {cartItemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {cartItemCount}
-                  </span>
-                )}
-              </Button>
+              <CartSidebar />
 
               {user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="hover:text-red-600">
+                    <Button variant="ghost" size="sm">
                       <User className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-white">
-                    <DropdownMenuItem onClick={() => navigate('/customer-dashboard')}>
-                      Dashboard
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link to={userProfile?.role === 'admin' ? '/admin' : '/customer-dashboard'}>
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        {userProfile?.role === 'admin' ? 'Admin Panel' : 'Dashboard'}
+                      </Link>
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleSignOut}>
                       <LogOut className="mr-2 h-4 w-4" />
                       Sign Out
@@ -227,15 +179,13 @@ export function CustomerHeader() {
                 </DropdownMenu>
               ) : (
                 <Link to="/auth">
-                  <Button size="sm" className="bg-red-600 hover:bg-red-700">
-                    Sign In
-                  </Button>
+                  <Button size="sm" className="bg-red-600 hover:bg-red-700">Sign In</Button>
                 </Link>
               )}
             </div>
           </div>
         </div>
       </header>
-    </div>
+    </>
   );
 }

@@ -520,6 +520,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          minimum_quantity: number
           name: string
           selling_price: number
           status: Database["public"]["Enums"]["category_status"]
@@ -530,6 +531,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          minimum_quantity?: number
           name: string
           selling_price: number
           status?: Database["public"]["Enums"]["category_status"]
@@ -540,6 +542,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          minimum_quantity?: number
           name?: string
           selling_price?: number
           status?: Database["public"]["Enums"]["category_status"]
