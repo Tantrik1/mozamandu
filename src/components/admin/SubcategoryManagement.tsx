@@ -24,6 +24,7 @@ interface Subcategory {
   selling_price: number;
   discount_amount: number;
   discount_unit: string;
+  minimum_quantity_for_discount: number;
   status: 'on' | 'off';
   category_id: string;
   categories: { name: string };
@@ -42,6 +43,7 @@ export function SubcategoryManagement() {
     selling_price: '',
     discount_amount: '',
     discount_unit: 'percentage',
+    minimum_quantity_for_discount: '1',
     status: true,
   });
 
@@ -97,6 +99,7 @@ export function SubcategoryManagement() {
       selling_price: parseFloat(formData.selling_price),
       discount_amount: parseFloat(formData.discount_amount) || 0,
       discount_unit: formData.discount_unit,
+      minimum_quantity_for_discount: parseInt(formData.minimum_quantity_for_discount) || 1,
       status: formData.status ? 'on' : 'off' as 'on' | 'off',
     };
 
@@ -140,6 +143,7 @@ export function SubcategoryManagement() {
       selling_price: subcategory.selling_price.toString(),
       discount_amount: subcategory.discount_amount.toString(),
       discount_unit: subcategory.discount_unit,
+      minimum_quantity_for_discount: (subcategory.minimum_quantity_for_discount || 1).toString(),
       status: subcategory.status === 'on',
     });
     setIsCreateModalOpen(true);
@@ -176,6 +180,7 @@ export function SubcategoryManagement() {
       selling_price: '',
       discount_amount: '',
       discount_unit: 'percentage',
+      minimum_quantity_for_discount: '1',
       status: true,
     });
     setEditingSubcategory(null);
@@ -238,7 +243,7 @@ export function SubcategoryManagement() {
                 />
               </div>
               
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="selling_price">Selling Price ($)</Label>
                   <Input
@@ -260,6 +265,9 @@ export function SubcategoryManagement() {
                     onChange={(e) => setFormData({ ...formData, discount_amount: e.target.value })}
                   />
                 </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="discount_unit">Discount Type</Label>
                   <Select 
@@ -274,6 +282,20 @@ export function SubcategoryManagement() {
                       <SelectItem value="fixed">Fixed Amount ($)</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div>
+                  <Label htmlFor="minimum_quantity_for_discount">Minimum Quantity for Discount</Label>
+                  <Input
+                    id="minimum_quantity_for_discount"
+                    type="number"
+                    min="1"
+                    value={formData.minimum_quantity_for_discount}
+                    onChange={(e) => setFormData({ ...formData, minimum_quantity_for_discount: e.target.value })}
+                    placeholder="e.g., 3"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Discount applies only after this quantity
+                  </p>
                 </div>
               </div>
               
@@ -329,13 +351,21 @@ export function SubcategoryManagement() {
                   <span className="font-semibold">${subcategory.selling_price}</span>
                 </div>
                 {subcategory.discount_amount > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-sm">Discount:</span>
-                    <span className="text-green-600">
-                      {subcategory.discount_amount}
-                      {subcategory.discount_unit === 'percentage' ? '%' : '$'}
-                    </span>
-                  </div>
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Discount:</span>
+                      <span className="text-green-600">
+                        {subcategory.discount_amount}
+                        {subcategory.discount_unit === 'percentage' ? '%' : '$'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Min Qty for Discount:</span>
+                      <span className="text-blue-600 font-medium">
+                        {subcategory.minimum_quantity_for_discount || 1}
+                      </span>
+                    </div>
+                  </>
                 )}
                 <div className="flex justify-between items-center">
                   <span className={`px-2 py-1 rounded text-sm ${
