@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Upload, X, Palette, Ruler, Plus } from 'lucide-react';
+import { Upload, X, Palette, Ruler, Plus, Package } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -27,8 +27,17 @@ interface ColorVariant {
   id?: string;
   color_name: string;
   image_url?: string;
+  imageFile?: File;
   has_sizes: boolean;
-  sizes: string[];
+  stock_quantity: number;
+  sizes: SizeVariant[];
+}
+
+interface SizeVariant {
+  id?: string;
+  size_name: string;
+  size_code: string;
+  stock_quantity: number;
 }
 
 interface Product {
@@ -44,6 +53,7 @@ interface Product {
   category_id: string;
   subcategory_id: string;
   image_url: string;
+  stock_quantity: number;
 }
 
 interface ProductFormProps {
@@ -60,6 +70,7 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
   const [imagePreview, setImagePreview] = useState<string>(product?.image_url || '');
   const [isUploading, setIsUploading] = useState(false);
   const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
+  const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   const [formData, setFormData] = useState({
     name: product?.name || '',
     description: product?.description || '',
@@ -67,6 +78,7 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
     subcategory_id: product?.subcategory_id || '',
     cost_price: product?.cost_price?.toString() || '',
     selling_price: product?.selling_price?.toString() || '',
+    stock_quantity: product?.stock_quantity?.toString() || '0',
     is_featured: product?.is_featured || false,
     has_color_variants: product?.has_color_variants || false,
     has_size_variants: product?.has_size_variants || false,
@@ -91,25 +103,52 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
     }
   };
 
+  const handleColorImageChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const newVariants = [...colorVariants];
+      newVariants[index].imageFile = file;
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        newVariants[index].image_url = e.target?.result as string;
+        setColorVariants(newVariants);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const removeImage = () => {
     setImageFile(null);
     setImagePreview('');
   };
 
-  const uploadImage = async (): Promise<string | null> => {
-    if (!imageFile) return imagePreview || null;
+  const removeColorImage = (index: number) => {
+    const newVariants = [...colorVariants];
+    newVariants[index].imageFile = undefined;
+    newVariants[index].image_url = '';
+    setColorVariants(newVariants);
+    
+    if (fileInputRefs.current[index]) {
+      fileInputRefs.current[index]!.value = '';
+    }
+  };
 
-    setIsUploading(true);
+  const createProductFolder = (productName: string) => {
+    return productName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+  };
+
+  const uploadImage = async (file: File, folderPath: string, fileName: string): Promise<string | null> => {
     try {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `products/${fileName}`;
+      const fileExt = file.name.split('.').pop();
+      const fullFileName = `${fileName}.${fileExt}`;
+      const filePath = `${folderPath}/${fullFileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(filePath, imageFile, {
+        .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: false
+          upsert: true
         });
 
       if (uploadError) {
@@ -124,14 +163,7 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
       return data.publicUrl;
     } catch (error) {
       console.error('Image upload failed:', error);
-      toast({
-        title: "Error",
-        description: "Failed to upload image. Please try again.",
-        variant: "destructive",
-      });
       return null;
-    } finally {
-      setIsUploading(false);
     }
   };
 
@@ -165,15 +197,43 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
       return;
     }
 
+    // Validate stock quantities based on variant settings
+    if (!formData.has_color_variants && (!formData.stock_quantity || parseInt(formData.stock_quantity) < 0)) {
+      toast({
+        title: "Error",
+        description: "Valid stock quantity is required for products without variants",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.has_color_variants && colorVariants.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please add at least one color variant",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+
     try {
-      let imageUrl = product?.image_url || '';
+      const productFolder = createProductFolder(formData.name);
+      let mainImageUrl = product?.image_url || '';
       
+      // Upload main product image
       if (imageFile) {
-        const uploadedImageUrl = await uploadImage();
+        const uploadedImageUrl = await uploadImage(imageFile, productFolder, 'main');
         if (uploadedImageUrl) {
-          imageUrl = uploadedImageUrl;
+          mainImageUrl = uploadedImageUrl;
         } else {
-          return; // Upload failed, stop here
+          toast({
+            title: "Error",
+            description: "Failed to upload main image",
+            variant: "destructive",
+          });
+          return;
         }
       }
       
@@ -188,7 +248,8 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
         has_color_variants: formData.has_color_variants,
         has_size_variants: formData.has_size_variants,
         status: formData.status ? 'active' : 'inactive' as 'active' | 'inactive',
-        image_url: imageUrl,
+        image_url: mainImageUrl,
+        stock_quantity: formData.has_color_variants ? 0 : parseInt(formData.stock_quantity),
       };
 
       let error;
@@ -221,18 +282,48 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
         return;
       }
 
+      // Save main product image to product_images table
+      if (mainImageUrl && productId) {
+        await supabase
+          .from('product_images')
+          .upsert({
+            product_id: productId,
+            image_url: mainImageUrl,
+            image_type: 'main',
+            storage_path: `${productFolder}/main`,
+            is_primary: true
+          });
+      }
+
       // Handle color variants if enabled
       if (formData.has_color_variants && colorVariants.length > 0 && productId) {
-        for (const variant of colorVariants) {
+        // Delete existing variants if updating
+        if (product?.id) {
+          await supabase.from('color_variants').delete().eq('product_id', productId);
+        }
+
+        for (const [index, variant] of colorVariants.entries()) {
           if (variant.color_name.trim()) {
-            const { data: colorVariantData, error: colorError } = await supabase
+            let variantImageUrl = '';
+            
+            // Upload color variant image
+            if (variant.imageFile) {
+              const colorFolder = `${productFolder}/colors`;
+              const colorFileName = variant.color_name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+              variantImageUrl = await uploadImage(variant.imageFile, colorFolder, colorFileName) || '';
+            }
+
+            const colorVariantData = {
+              product_id: productId,
+              color_name: variant.color_name.trim(),
+              image_url: variantImageUrl,
+              has_sizes: variant.has_sizes,
+              stock_quantity: variant.has_sizes ? 0 : variant.stock_quantity
+            };
+
+            const { data: colorVariantResult, error: colorError } = await supabase
               .from('color_variants')
-              .insert({
-                product_id: productId,
-                color_name: variant.color_name.trim(),
-                image_url: variant.image_url,
-                has_sizes: variant.has_sizes
-              })
+              .insert(colorVariantData)
               .select('id')
               .single();
 
@@ -241,20 +332,39 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
               continue;
             }
 
+            // Save variant image to product_images table
+            if (variantImageUrl && colorVariantResult?.id) {
+              await supabase
+                .from('product_images')
+                .insert({
+                  product_id: productId,
+                  color_variant_id: colorVariantResult.id,
+                  image_url: variantImageUrl,
+                  image_type: 'variant',
+                  storage_path: `${productFolder}/colors/${variant.color_name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+                  is_primary: false
+                });
+            }
+
             // Handle sizes if variant has sizes
-            if (variant.has_sizes && variant.sizes.length > 0 && colorVariantData?.id) {
-              const sizeInserts = variant.sizes.map(size => ({
-                color_variant_id: colorVariantData.id,
-                size_name: size.trim(),
-                size_code: size.trim()
-              }));
+            if (variant.has_sizes && variant.sizes.length > 0 && colorVariantResult?.id) {
+              const sizeInserts = variant.sizes
+                .filter(size => size.size_name.trim())
+                .map(size => ({
+                  color_variant_id: colorVariantResult.id,
+                  size_name: size.size_name.trim(),
+                  size_code: size.size_code.trim() || size.size_name.trim(),
+                  stock_quantity: size.stock_quantity
+                }));
 
-              const { error: sizeError } = await supabase
-                .from('size_variants')
-                .insert(sizeInserts);
+              if (sizeInserts.length > 0) {
+                const { error: sizeError } = await supabase
+                  .from('size_variants')
+                  .insert(sizeInserts);
 
-              if (sizeError) {
-                console.error('Error creating size variants:', sizeError);
+                if (sizeError) {
+                  console.error('Error creating size variants:', sizeError);
+                }
               }
             }
           }
@@ -274,6 +384,8 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
         description: "An unexpected error occurred",
         variant: "destructive",
       });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -281,6 +393,7 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
     setColorVariants([...colorVariants, {
       color_name: '',
       has_sizes: false,
+      stock_quantity: 0,
       sizes: []
     }]);
   };
@@ -288,6 +401,7 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
   const removeColorVariant = (index: number) => {
     const newVariants = colorVariants.filter((_, i) => i !== index);
     setColorVariants(newVariants);
+    delete fileInputRefs.current[index];
   };
 
   const updateColorVariant = (index: number, field: keyof ColorVariant, value: any) => {
@@ -300,17 +414,25 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
     setColorVariants(newVariants);
   };
 
-  const addSize = (variantIndex: number, size: string) => {
-    if (size.trim()) {
-      const newVariants = [...colorVariants];
-      newVariants[variantIndex].sizes.push(size.trim());
-      setColorVariants(newVariants);
-    }
+  const addSize = (variantIndex: number) => {
+    const newVariants = [...colorVariants];
+    newVariants[variantIndex].sizes.push({
+      size_name: '',
+      size_code: '',
+      stock_quantity: 0
+    });
+    setColorVariants(newVariants);
   };
 
   const removeSize = (variantIndex: number, sizeIndex: number) => {
     const newVariants = [...colorVariants];
     newVariants[variantIndex].sizes.splice(sizeIndex, 1);
+    setColorVariants(newVariants);
+  };
+
+  const updateSize = (variantIndex: number, sizeIndex: number, field: keyof SizeVariant, value: any) => {
+    const newVariants = [...colorVariants];
+    (newVariants[variantIndex].sizes[sizeIndex] as any)[field] = value;
     setColorVariants(newVariants);
   };
 
@@ -326,7 +448,7 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
     <Tabs defaultValue="details" className="w-full">
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="details">Details</TabsTrigger>
-        <TabsTrigger value="variants">Variants</TabsTrigger>
+        <TabsTrigger value="variants">Variants & Stock</TabsTrigger>
       </TabsList>
       
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -391,7 +513,7 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
           </div>
 
           <div>
-            <Label>Product Image</Label>
+            <Label>Main Product Image</Label>
             <div className="mt-2">
               {imagePreview ? (
                 <div className="relative inline-block">
@@ -415,7 +537,7 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
                   <Upload className="mx-auto h-12 w-12 text-gray-400" />
                   <div className="mt-2">
                     <Label htmlFor="image-upload" className="cursor-pointer">
-                      <span className="text-blue-600 hover:text-blue-500">Upload an image</span>
+                      <span className="text-blue-600 hover:text-blue-500">Upload main image</span>
                       <Input
                         id="image-upload"
                         type="file"
@@ -454,6 +576,23 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
               />
             </div>
           </div>
+
+          {!formData.has_color_variants && (
+            <div>
+              <Label htmlFor="stock_quantity" className="flex items-center">
+                <Package className="h-4 w-4 mr-1" />
+                Stock Quantity *
+              </Label>
+              <Input
+                id="stock_quantity"
+                type="number"
+                min="0"
+                value={formData.stock_quantity}
+                onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
+                required
+              />
+            </div>
+          )}
           
           <div className="grid grid-cols-2 gap-4">
             <div className="flex items-center space-x-2">
@@ -511,19 +650,82 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Color Name *</Label>
+                        <Input
+                          value={variant.color_name}
+                          onChange={(e) => updateColorVariant(index, 'color_name', e.target.value)}
+                          placeholder="e.g., Red, Blue, Green"
+                          required
+                        />
+                      </div>
+                      {!variant.has_sizes && (
+                        <div>
+                          <Label className="flex items-center">
+                            <Package className="h-4 w-4 mr-1" />
+                            Stock Quantity
+                          </Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={variant.stock_quantity}
+                            onChange={(e) => updateColorVariant(index, 'stock_quantity', parseInt(e.target.value) || 0)}
+                          />
+                        </div>
+                      )}
+                    </div>
+
                     <div>
-                      <Label>Color Name</Label>
-                      <Input
-                        value={variant.color_name}
-                        onChange={(e) => updateColorVariant(index, 'color_name', e.target.value)}
-                        placeholder="e.g., Red, Blue, Green"
-                      />
+                      <Label>Color Image *</Label>
+                      <div className="mt-2">
+                        {variant.image_url ? (
+                          <div className="relative inline-block">
+                            <img 
+                              src={variant.image_url} 
+                              alt={`${variant.color_name} preview`} 
+                              className="w-24 h-24 object-cover rounded-lg border"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="absolute -top-2 -right-2 rounded-full w-5 h-5 p-0"
+                              onClick={() => removeColorImage(index)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="border border-dashed border-gray-300 rounded-lg p-4 text-center w-24 h-24 flex items-center justify-center">
+                            <div>
+                              <Upload className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                              <Label htmlFor={`color-image-${index}`} className="cursor-pointer">
+                                <span className="text-xs text-blue-600">Upload</span>
+                                <Input
+                                  ref={(el) => fileInputRefs.current[index] = el}
+                                  id={`color-image-${index}`}
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleColorImageChange(index, e)}
+                                  className="hidden"
+                                />
+                              </Label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="flex items-center space-x-2">
                       <Switch
                         checked={variant.has_sizes}
-                        onCheckedChange={(checked) => updateColorVariant(index, 'has_sizes', checked)}
+                        onCheckedChange={(checked) => {
+                          updateColorVariant(index, 'has_sizes', checked);
+                          if (!checked) {
+                            updateColorVariant(index, 'sizes', []);
+                          }
+                        }}
                       />
                       <Label className="flex items-center">
                         <Ruler className="h-4 w-4 mr-1" />
@@ -533,46 +735,56 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
 
                     {variant.has_sizes && (
                       <div>
-                        <Label>Sizes</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
+                        <Label>Size Variants</Label>
+                        <div className="space-y-2 mt-2">
                           {variant.sizes.map((size, sizeIndex) => (
-                            <div key={sizeIndex} className="flex items-center bg-gray-100 rounded px-2 py-1">
-                              <span className="text-sm">{size}</span>
+                            <div key={sizeIndex} className="grid grid-cols-4 gap-2 items-end">
+                              <div>
+                                <Label className="text-xs">Size Name</Label>
+                                <Input
+                                  placeholder="S, M, L, XL"
+                                  value={size.size_name}
+                                  onChange={(e) => updateSize(index, sizeIndex, 'size_name', e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Size Code</Label>
+                                <Input
+                                  placeholder="Code"
+                                  value={size.size_code}
+                                  onChange={(e) => updateSize(index, sizeIndex, 'size_code', e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs flex items-center">
+                                  <Package className="h-3 w-3 mr-1" />
+                                  Stock
+                                </Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={size.stock_quantity}
+                                  onChange={(e) => updateSize(index, sizeIndex, 'stock_quantity', parseInt(e.target.value) || 0)}
+                                />
+                              </div>
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="ml-1 h-4 w-4 p-0"
                                 onClick={() => removeSize(index, sizeIndex)}
                               >
-                                <X className="h-3 w-3" />
+                                <X className="h-4 w-4" />
                               </Button>
                             </div>
                           ))}
-                        </div>
-                        <div className="flex gap-2 mt-2">
-                          <Input
-                            placeholder="Add size (e.g., S, M, L, XL)"
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const input = e.target as HTMLInputElement;
-                                addSize(index, input.value);
-                                input.value = '';
-                              }
-                            }}
-                          />
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={(e) => {
-                              const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                              addSize(index, input.value);
-                              input.value = '';
-                            }}
+                            onClick={() => addSize(index)}
                           >
-                            Add
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Size
                           </Button>
                         </div>
                       </div>
@@ -596,7 +808,7 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
         
         <div className="flex gap-2">
           <Button type="submit" className="flex-1" disabled={isUploading}>
-            {isUploading ? 'Uploading...' : product ? 'Update' : 'Create'} Product
+            {isUploading ? 'Saving...' : product ? 'Update' : 'Create'} Product
           </Button>
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel

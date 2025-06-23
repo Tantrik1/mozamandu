@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Palette, Ruler } from 'lucide-react';
+import { Plus, Edit, Trash2, Palette, Ruler, Package } from 'lucide-react';
 import { ProductForm } from './ProductForm';
 
 interface Category {
@@ -33,9 +32,11 @@ interface Product {
   category_id: string;
   subcategory_id: string;
   image_url: string;
+  stock_quantity: number;
   categories: { name: string };
   subcategories: { name: string; selling_price: number };
   created_at: string;
+  total_stock?: number;
 }
 
 export function ProductManagement() {
@@ -81,7 +82,20 @@ export function ProductManagement() {
           variant: "destructive",
         });
       } else {
-        setProducts(data || []);
+        // Calculate total stock for each product
+        const productsWithStock = await Promise.all(
+          (data || []).map(async (product) => {
+            const { data: stockData } = await supabase
+              .rpc('calculate_product_stock', { product_uuid: product.id });
+            
+            return {
+              ...product,
+              total_stock: stockData || 0
+            };
+          })
+        );
+        
+        setProducts(productsWithStock);
       }
     } catch (error) {
       console.error('Unexpected error fetching products:', error);
@@ -140,7 +154,7 @@ export function ProductManagement() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this product? This will also delete all associated variants.')) return;
+    if (!confirm('Are you sure you want to delete this product? This will also delete all associated variants and images.')) return;
 
     try {
       const { error } = await supabase
@@ -185,6 +199,13 @@ export function ProductManagement() {
 
   const getProductPrice = (product: Product) => {
     return product.selling_price || product.subcategories?.selling_price || 0;
+  };
+
+  const getStockStatus = (product: Product) => {
+    const stock = product.total_stock || 0;
+    if (stock === 0) return { text: 'Out of Stock', color: 'text-red-600 bg-red-100' };
+    if (stock < 10) return { text: `Low Stock (${stock})`, color: 'text-yellow-600 bg-yellow-100' };
+    return { text: `In Stock (${stock})`, color: 'text-green-600 bg-green-100' };
   };
 
   if (loading) {
@@ -237,87 +258,99 @@ export function ProductManagement() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.map((product) => (
-            <Card key={product.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">{product.name}</CardTitle>
-                    <p className="text-sm text-gray-500">
-                      {product.categories?.name} → {product.subcategories?.name}
-                    </p>
+          {products.map((product) => {
+            const stockStatus = getStockStatus(product);
+            return (
+              <Card key={product.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-lg">{product.name}</CardTitle>
+                      <p className="text-sm text-gray-500">
+                        {product.categories?.name} → {product.subcategories?.name}
+                      </p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(product)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(product.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(product)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(product.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {product.image_url && (
-                  <img 
-                    src={product.image_url} 
-                    alt={product.name}
-                    className="w-full h-48 object-cover rounded-lg mb-3"
-                  />
-                )}
-                <p className="text-gray-600 mb-3 text-sm line-clamp-2">{product.description}</p>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm">Cost Price:</span>
-                    <span>${product.cost_price}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Selling Price:</span>
-                    <span className="font-semibold text-blue-600">${getProductPrice(product)}</span>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    {product.is_featured && (
-                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
-                        Featured
+                </CardHeader>
+                <CardContent>
+                  {product.image_url && (
+                    <img 
+                      src={product.image_url} 
+                      alt={product.name}
+                      className="w-full h-48 object-cover rounded-lg mb-3"
+                    />
+                  )}
+                  <p className="text-gray-600 mb-3 text-sm line-clamp-2">{product.description}</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm">Cost Price:</span>
+                      <span>${product.cost_price}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Selling Price:</span>
+                      <span className="font-semibold text-blue-600">${getProductPrice(product)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm flex items-center">
+                        <Package className="h-3 w-3 mr-1" />
+                        Stock:
                       </span>
-                    )}
-                    {product.has_color_variants && (
-                      <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs flex items-center">
-                        <Palette className="h-3 w-3 mr-1" />
-                        Colors
+                      <span className={`px-2 py-1 rounded text-xs ${stockStatus.color}`}>
+                        {stockStatus.text}
                       </span>
-                    )}
-                    {product.has_size_variants && (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs flex items-center">
-                        <Ruler className="h-3 w-3 mr-1" />
-                        Sizes
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {product.is_featured && (
+                        <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
+                          Featured
+                        </span>
+                      )}
+                      {product.has_color_variants && (
+                        <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs flex items-center">
+                          <Palette className="h-3 w-3 mr-1" />
+                          Colors
+                        </span>
+                      )}
+                      {product.has_size_variants && (
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs flex items-center">
+                          <Ruler className="h-3 w-3 mr-1" />
+                          Sizes
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex justify-between items-center pt-2">
+                      <span className={`px-2 py-1 rounded text-sm ${
+                        product.status === 'active' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {product.status === 'active' ? 'Active' : 'Inactive'}
                       </span>
-                    )}
+                      <span className="text-sm text-gray-500">
+                        {new Date(product.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center pt-2">
-                    <span className={`px-2 py-1 rounded text-sm ${
-                      product.status === 'active' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {product.status === 'active' ? 'Active' : 'Inactive'}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {new Date(product.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

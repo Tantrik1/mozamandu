@@ -44,6 +44,7 @@ export type Database = {
           id: string
           image_url: string | null
           product_id: string
+          stock_quantity: number | null
         }
         Insert: {
           color_name: string
@@ -52,6 +53,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           product_id: string
+          stock_quantity?: number | null
         }
         Update: {
           color_name?: string
@@ -60,6 +62,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           product_id?: string
+          stock_quantity?: number | null
         }
         Relationships: [
           {
@@ -114,25 +117,31 @@ export type Database = {
           color_variant_id: string | null
           created_at: string | null
           id: string
+          image_type: string | null
           image_url: string
           is_primary: boolean | null
           product_id: string
+          storage_path: string | null
         }
         Insert: {
           color_variant_id?: string | null
           created_at?: string | null
           id?: string
+          image_type?: string | null
           image_url: string
           is_primary?: boolean | null
           product_id: string
+          storage_path?: string | null
         }
         Update: {
           color_variant_id?: string | null
           created_at?: string | null
           id?: string
+          image_type?: string | null
           image_url?: string
           is_primary?: boolean | null
           product_id?: string
+          storage_path?: string | null
         }
         Relationships: [
           {
@@ -165,6 +174,7 @@ export type Database = {
           name: string
           selling_price: number | null
           status: Database["public"]["Enums"]["product_status"] | null
+          stock_quantity: number | null
           subcategory_id: string
           updated_at: string | null
         }
@@ -181,6 +191,7 @@ export type Database = {
           name: string
           selling_price?: number | null
           status?: Database["public"]["Enums"]["product_status"] | null
+          stock_quantity?: number | null
           subcategory_id: string
           updated_at?: string | null
         }
@@ -197,6 +208,7 @@ export type Database = {
           name?: string
           selling_price?: number | null
           status?: Database["public"]["Enums"]["product_status"] | null
+          stock_quantity?: number | null
           subcategory_id?: string
           updated_at?: string | null
         }
@@ -251,7 +263,7 @@ export type Database = {
           id: string
           size_code: string | null
           size_name: string
-          stock_quantity: number | null
+          stock_quantity: number
         }
         Insert: {
           color_variant_id: string
@@ -259,7 +271,7 @@ export type Database = {
           id?: string
           size_code?: string | null
           size_name: string
-          stock_quantity?: number | null
+          stock_quantity?: number
         }
         Update: {
           color_variant_id?: string
@@ -267,7 +279,7 @@ export type Database = {
           id?: string
           size_code?: string | null
           size_name?: string
-          stock_quantity?: number | null
+          stock_quantity?: number
         }
         Relationships: [
           {
@@ -325,6 +337,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_product_stock: {
+        Args: { product_uuid: string }
+        Returns: number
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
