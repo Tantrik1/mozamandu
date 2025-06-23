@@ -1,4 +1,3 @@
-
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
 import { useNavigate, Routes, Route } from 'react-router-dom';
@@ -12,10 +11,8 @@ import { DeliveryChargeManagement } from '@/components/admin/DeliveryChargeManag
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { supabase } from '@/integrations/supabase/client';
-
 function AdminDashboard() {
-  return (
-    <div className="p-8">
+  return <div className="p-8">
       <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-lg shadow-md border">
@@ -35,61 +32,50 @@ function AdminDashboard() {
           <p className="text-gray-600">Manage payment methods</p>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 }
-
 export default function Admin() {
-  const { user, isLoading } = useAuth();
+  const {
+    user,
+    isLoading
+  } = useAuth();
   const navigate = useNavigate();
   const [userProfile, setUserProfile] = useState<any>(null);
-
   useEffect(() => {
     if (!isLoading && !user) {
       navigate('/auth');
       return;
     }
-
     if (user) {
       fetchUserProfile();
     }
   }, [user, isLoading, navigate]);
-
   const fetchUserProfile = async () => {
     if (!user) return;
-    
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
+    const {
+      data,
+      error
+    } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (error) {
       console.error('Error fetching user profile:', error);
       return;
     }
-
     setUserProfile(data);
-    
     if (data?.role !== 'admin') {
       navigate('/');
     }
   };
-
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
-
   if (!user || userProfile?.role !== 'admin') {
     return <div className="min-h-screen flex items-center justify-center">Access denied. Admin only.</div>;
   }
-
-  return (
-    <SidebarProvider>
+  return <SidebarProvider>
       <div className="min-h-screen flex w-full bg-gray-50">
         <AdminSidebar />
         <SidebarInset className="flex-1">
-          <main className="h-screen overflow-auto bg-white">
+          <main className="h-screen overflow-auto bg-white px-[40px] py-[15px]">
             <Routes>
               <Route path="/" element={<AdminDashboard />} />
               <Route path="/categories" element={<CategoryManagement />} />
@@ -103,6 +89,5 @@ export default function Admin() {
           </main>
         </SidebarInset>
       </div>
-    </SidebarProvider>
-  );
+    </SidebarProvider>;
 }
