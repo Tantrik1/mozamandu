@@ -2,7 +2,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, User, LogOut, Settings } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -15,6 +15,7 @@ import {
 export function Header() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -45,6 +46,8 @@ export function Header() {
     navigate('/');
   };
 
+  const isActive = (path: string) => location.pathname === path;
+
   return (
     <header className="bg-white shadow-sm border-b">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -55,13 +58,34 @@ export function Header() {
           </Link>
 
           <nav className="hidden md:flex space-x-8">
-            <Link to="/" className="text-gray-700 hover:text-blue-600 transition-colors">
+            <Link 
+              to="/" 
+              className={`transition-colors ${
+                isActive('/') 
+                  ? 'text-blue-600 font-medium' 
+                  : 'text-gray-700 hover:text-blue-600'
+              }`}
+            >
               Home
             </Link>
-            <Link to="/products" className="text-gray-700 hover:text-blue-600 transition-colors">
+            <Link 
+              to="/products" 
+              className={`transition-colors ${
+                isActive('/products') 
+                  ? 'text-blue-600 font-medium' 
+                  : 'text-gray-700 hover:text-blue-600'
+              }`}
+            >
               Products
             </Link>
-            <Link to="/categories" className="text-gray-700 hover:text-blue-600 transition-colors">
+            <Link 
+              to="/categories" 
+              className={`transition-colors ${
+                isActive('/categories') 
+                  ? 'text-blue-600 font-medium' 
+                  : 'text-gray-700 hover:text-blue-600'
+              }`}
+            >
               Categories
             </Link>
           </nav>
