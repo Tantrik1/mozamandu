@@ -160,7 +160,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return result;
   };
 
-  // Helper function to rebalance cart items after quantity changes
+  // Fixed rebalanceCartItems function to properly maintain MOQ-based pricing split
   const rebalanceCartItems = async (updatedItems: CartItem[]) => {
     const subcategoryGroups: { [key: string]: CartItem[] } = {};
     
@@ -177,7 +177,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     for (const subcategoryId of Object.keys(subcategoryGroups)) {
       const items = subcategoryGroups[subcategoryId];
       
-      // Skip if combo is active for this subcategory
+      // Skip rebalancing if combo is active for this subcategory
       if (activeCombo) {
         const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === subcategoryId);
         if (comboSubcategory) {
@@ -213,6 +213,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const productItems = productGroups[productKey];
         const totalQuantity = productItems.reduce((sum, item) => sum + item.quantity, 0);
 
+        // Skip if quantity is 0 or negative
+        if (totalQuantity <= 0) continue;
+
         // Find applicable discount tier
         const applicableTier = discountTiers.find(tier => 
           totalQuantity >= tier.min_quantity && 
@@ -223,20 +226,41 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const sampleItem = productItems[0];
 
         if (applicableTier) {
-          // All quantity should be at discount price
           const discountedPrice = basePrice - applicableTier.discount_amount;
-          const discountItemId = `${sampleItem.productId}-${sampleItem.colorVariantId || 'no-color'}-${sampleItem.sizeVariantId || 'no-size'}-discount`;
+          const moq = applicableTier.min_quantity;
           
-          rebalancedItems.push({
-            ...sampleItem,
-            id: discountItemId,
-            quantity: totalQuantity,
-            price: discountedPrice
-          });
+          // Split into normal price (up to MOQ) and discount price (above MOQ)
+          if (totalQuantity > moq) {
+            // Normal price item (quantity = MOQ)
+            const normalItemId = `${sampleItem.productId}-${sampleItem.colorVariantId || 'no-color'}-${sampleItem.sizeVariantId || 'no-size'}-normal`;
+            rebalancedItems.push({
+              ...sampleItem,
+              id: normalItemId,
+              quantity: moq,
+              price: basePrice
+            });
+
+            // Discount price item (quantity = total - MOQ)
+            const discountItemId = `${sampleItem.productId}-${sampleItem.colorVariantId || 'no-color'}-${sampleItem.sizeVariantId || 'no-size'}-discount`;
+            rebalancedItems.push({
+              ...sampleItem,
+              id: discountItemId,
+              quantity: totalQuantity - moq,
+              price: discountedPrice
+            });
+          } else {
+            // All quantity at discount price (total = MOQ exactly)
+            const discountItemId = `${sampleItem.productId}-${sampleItem.colorVariantId || 'no-color'}-${sampleItem.sizeVariantId || 'no-size'}-discount`;
+            rebalancedItems.push({
+              ...sampleItem,
+              id: discountItemId,
+              quantity: totalQuantity,
+              price: discountedPrice
+            });
+          }
         } else {
-          // All quantity should be at normal price
+          // All quantity at normal price
           const normalItemId = `${sampleItem.productId}-${sampleItem.colorVariantId || 'no-color'}-${sampleItem.sizeVariantId || 'no-size'}-normal`;
-          
           rebalancedItems.push({
             ...sampleItem,
             id: normalItemId,

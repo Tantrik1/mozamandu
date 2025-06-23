@@ -35,7 +35,7 @@ export function CartSidebar() {
     }
   };
 
-  // Helper function to check if buttons should be disabled
+  // Improved helper function to check if buttons should be disabled
   const shouldDisableButtons = (item: any) => {
     const baseProductId = item.productId;
     const baseColorId = item.colorVariantId;
@@ -48,11 +48,12 @@ export function CartSidebar() {
       cartItem.sizeVariantId === baseSizeId
     );
 
-    // If there are multiple items of the same product, disable normal price items
+    // If there are multiple items of the same product, disable normal price items when discount items exist
     if (sameProductItems.length > 1) {
       const isNormalPriceItem = item.id.includes('-normal');
       const hasDiscountedItem = sameProductItems.some(cartItem => cartItem.id.includes('-discount'));
       
+      // Only disable normal price items if there are discounted items of the same product
       return isNormalPriceItem && hasDiscountedItem;
     }
     
