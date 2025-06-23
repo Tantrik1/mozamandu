@@ -160,6 +160,96 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return result;
   };
 
+  // Helper function to rebalance cart items after quantity changes
+  const rebalanceCartItems = async (updatedItems: CartItem[]) => {
+    const subcategoryGroups: { [key: string]: CartItem[] } = {};
+    
+    // Group items by subcategory
+    updatedItems.forEach(item => {
+      if (!subcategoryGroups[item.subcategoryId]) {
+        subcategoryGroups[item.subcategoryId] = [];
+      }
+      subcategoryGroups[item.subcategoryId].push(item);
+    });
+
+    let rebalancedItems: CartItem[] = [];
+
+    for (const subcategoryId of Object.keys(subcategoryGroups)) {
+      const items = subcategoryGroups[subcategoryId];
+      
+      // Skip if combo is active for this subcategory
+      if (activeCombo) {
+        const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === subcategoryId);
+        if (comboSubcategory) {
+          rebalancedItems.push(...items);
+          continue;
+        }
+      }
+
+      // Get discount tiers for this subcategory
+      const { data: discountTiers } = await supabase
+        .from('discount_tiers')
+        .select('*')
+        .eq('subcategory_id', subcategoryId)
+        .order('min_quantity', { ascending: true });
+
+      if (!discountTiers || discountTiers.length === 0) {
+        rebalancedItems.push(...items);
+        continue;
+      }
+
+      // Group items by product+color+size combination
+      const productGroups: { [key: string]: CartItem[] } = {};
+      items.forEach(item => {
+        const key = `${item.productId}-${item.colorVariantId || 'no-color'}-${item.sizeVariantId || 'no-size'}`;
+        if (!productGroups[key]) {
+          productGroups[key] = [];
+        }
+        productGroups[key].push(item);
+      });
+
+      // Process each product group
+      for (const productKey of Object.keys(productGroups)) {
+        const productItems = productGroups[productKey];
+        const totalQuantity = productItems.reduce((sum, item) => sum + item.quantity, 0);
+
+        // Find applicable discount tier
+        const applicableTier = discountTiers.find(tier => 
+          totalQuantity >= tier.min_quantity && 
+          (!tier.max_quantity || totalQuantity <= tier.max_quantity)
+        );
+
+        const basePrice = subcategoriesData[subcategoryId].selling_price;
+        const sampleItem = productItems[0];
+
+        if (applicableTier) {
+          // All quantity should be at discount price
+          const discountedPrice = basePrice - applicableTier.discount_amount;
+          const discountItemId = `${sampleItem.productId}-${sampleItem.colorVariantId || 'no-color'}-${sampleItem.sizeVariantId || 'no-size'}-discount`;
+          
+          rebalancedItems.push({
+            ...sampleItem,
+            id: discountItemId,
+            quantity: totalQuantity,
+            price: discountedPrice
+          });
+        } else {
+          // All quantity should be at normal price
+          const normalItemId = `${sampleItem.productId}-${sampleItem.colorVariantId || 'no-color'}-${sampleItem.sizeVariantId || 'no-size'}-normal`;
+          
+          rebalancedItems.push({
+            ...sampleItem,
+            id: normalItemId,
+            quantity: totalQuantity,
+            price: basePrice
+          });
+        }
+      }
+    }
+
+    return rebalancedItems;
+  };
+
   const addToCart = async (params: AddToCartParams) => {
     try {
       // Fetch product details
@@ -377,19 +467,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const removeFromCart = (itemId: string) => {
-    setCartItems(prev => prev.filter(item => item.id !== itemId));
+  const removeFromCart = async (itemId: string) => {
+    const updatedItems = cartItems.filter(item => item.id !== itemId);
+    const rebalanced = await rebalanceCartItems(updatedItems);
+    setCartItems(rebalanced);
   };
 
-  const updateQuantity = (itemId: string, quantity: number) => {
+  const updateQuantity = async (itemId: string, quantity: number) => {
     if (quantity <= 0) {
       removeFromCart(itemId);
       return;
     }
 
-    setCartItems(prev => prev.map(item => 
+    const updatedItems = cartItems.map(item => 
       item.id === itemId ? { ...item, quantity } : item
-    ));
+    );
+    
+    const rebalanced = await rebalanceCartItems(updatedItems);
+    setCartItems(rebalanced);
   };
 
   const clearCart = () => {

@@ -35,6 +35,30 @@ export function CartSidebar() {
     }
   };
 
+  // Helper function to check if buttons should be disabled
+  const shouldDisableButtons = (item: any) => {
+    const baseProductId = item.productId;
+    const baseColorId = item.colorVariantId;
+    const baseSizeId = item.sizeVariantId;
+    
+    // Find all items with same product, color, and size
+    const sameProductItems = cartItems.filter(cartItem => 
+      cartItem.productId === baseProductId &&
+      cartItem.colorVariantId === baseColorId &&
+      cartItem.sizeVariantId === baseSizeId
+    );
+
+    // If there are multiple items of the same product, disable normal price items
+    if (sameProductItems.length > 1) {
+      const isNormalPriceItem = item.id.includes('-normal');
+      const hasDiscountedItem = sameProductItems.some(cartItem => cartItem.id.includes('-discount'));
+      
+      return isNormalPriceItem && hasDiscountedItem;
+    }
+    
+    return false;
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
@@ -88,6 +112,7 @@ export function CartSidebar() {
                     item={item} 
                     onUpdateQuantity={updateQuantity}
                     onRemove={removeFromCart}
+                    buttonsDisabled={shouldDisableButtons(item)}
                   />
                 ))}
               </div>
@@ -123,11 +148,13 @@ export function CartSidebar() {
 function CartItemCard({ 
   item, 
   onUpdateQuantity, 
-  onRemove
+  onRemove,
+  buttonsDisabled = false
 }: { 
   item: any;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onRemove: (id: string) => void;
+  buttonsDisabled?: boolean;
 }) {
   const getPricingMode = (itemId: string) => {
     if (itemId.includes('-combo')) return 'combo';
@@ -157,7 +184,7 @@ function CartItemCard({
         return 'text-blue-600';
       case 'normal':
       default:
-        return 'text-gray-900';
+        return buttonsDisabled ? 'text-gray-500' : 'text-gray-900';
     }
   };
 
@@ -169,12 +196,16 @@ function CartItemCard({
         return 'border-blue-500 text-blue-700 bg-blue-50';
       case 'normal':
       default:
-        return 'border-gray-500 text-gray-700 bg-gray-50';
+        return buttonsDisabled 
+          ? 'border-gray-300 text-gray-500 bg-gray-100' 
+          : 'border-gray-500 text-gray-700 bg-gray-50';
     }
   };
 
   return (
-    <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+    <div className={`flex items-center space-x-3 p-3 rounded-lg ${
+      buttonsDisabled ? 'bg-gray-100 opacity-75' : 'bg-gray-50'
+    }`}>
       {item.image_url && (
         <img 
           src={item.image_url} 
@@ -183,7 +214,9 @@ function CartItemCard({
         />
       )}
       <div className="flex-1 min-w-0">
-        <h3 className="text-sm font-medium text-gray-900 truncate">
+        <h3 className={`text-sm font-medium truncate ${
+          buttonsDisabled ? 'text-gray-500' : 'text-gray-900'
+        }`}>
           {item.productName}
         </h3>
         {item.colorName && (
@@ -203,22 +236,32 @@ function CartItemCard({
             {getPriceLabel()}
           </Badge>
         </div>
+        {buttonsDisabled && (
+          <p className="text-xs text-gray-500 mt-1">
+            Quantity controlled by discounted items
+          </p>
+        )}
       </div>
       <div className="flex items-center space-x-2">
         <Button
           variant="outline"
           size="sm"
           onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-          disabled={item.quantity <= 1}
+          disabled={item.quantity <= 1 || buttonsDisabled}
           className="h-7 w-7 p-0"
         >
           <Minus className="h-3 w-3" />
         </Button>
-        <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
+        <span className={`text-sm font-medium w-6 text-center ${
+          buttonsDisabled ? 'text-gray-500' : ''
+        }`}>
+          {item.quantity}
+        </span>
         <Button
           variant="outline"
           size="sm"
           onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+          disabled={buttonsDisabled}
           className="h-7 w-7 p-0"
         >
           <Plus className="h-3 w-3" />
