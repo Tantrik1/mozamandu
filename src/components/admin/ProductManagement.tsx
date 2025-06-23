@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { EnhancedProductForm } from './EnhancedProductForm';
+import { CreateProductForm } from './CreateProductForm';
+import { EditProductForm } from './EditProductForm';
 import { ProductDetailView } from './ProductDetailView';
 import { Pencil, Trash2, Plus, Search, Package, Eye } from 'lucide-react';
 import { getProductStockSummary } from '@/utils/stockCalculation';
@@ -33,7 +34,7 @@ export function ProductManagement() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [viewingProductId, setViewingProductId] = useState<string | null>(null);
   const [productStocks, setProductStocks] = useState<Record<string, number>>({});
@@ -96,7 +97,6 @@ export function ProductManagement() {
 
   const handleEdit = (productId: string) => {
     setEditingProductId(productId);
-    setIsFormOpen(true);
   };
 
   const handleDelete = async (productId: string, productName: string) => {
@@ -126,14 +126,21 @@ export function ProductManagement() {
     }
   };
 
-  const handleFormSave = () => {
-    setIsFormOpen(false);
+  const handleCreateSave = () => {
+    setIsCreateFormOpen(false);
+    fetchProducts();
+  };
+
+  const handleCreateCancel = () => {
+    setIsCreateFormOpen(false);
+  };
+
+  const handleEditSave = () => {
     setEditingProductId(null);
     fetchProducts();
   };
 
-  const handleFormCancel = () => {
-    setIsFormOpen(false);
+  const handleEditCancel = () => {
     setEditingProductId(null);
   };
 
@@ -141,7 +148,6 @@ export function ProductManagement() {
     if (viewingProductId) {
       setEditingProductId(viewingProductId);
       setViewingProductId(null);
-      setIsFormOpen(true);
     }
   };
 
@@ -175,12 +181,21 @@ export function ProductManagement() {
     );
   }
 
-  if (isFormOpen) {
+  if (isCreateFormOpen) {
     return (
-      <EnhancedProductForm
-        productId={editingProductId || undefined}
-        onSave={handleFormSave}
-        onCancel={handleFormCancel}
+      <CreateProductForm
+        onSave={handleCreateSave}
+        onCancel={handleCreateCancel}
+      />
+    );
+  }
+
+  if (editingProductId) {
+    return (
+      <EditProductForm
+        productId={editingProductId}
+        onSave={handleEditSave}
+        onCancel={handleEditCancel}
       />
     );
   }
@@ -189,7 +204,7 @@ export function ProductManagement() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Product Management</h2>
-        <Button onClick={() => setIsFormOpen(true)}>
+        <Button onClick={() => setIsCreateFormOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Product
         </Button>
