@@ -81,6 +81,33 @@ export type Database = {
           },
         ]
       }
+      delivery_charges: {
+        Row: {
+          created_at: string | null
+          delivery_price: number
+          id: string
+          is_active: boolean | null
+          place_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          delivery_price: number
+          id?: string
+          is_active?: boolean | null
+          place_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          delivery_price?: number
+          id?: string
+          is_active?: boolean | null
+          place_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       discount_tiers: {
         Row: {
           created_at: string | null
@@ -274,6 +301,54 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      promocodes: {
+        Row: {
+          code: string
+          created_at: string | null
+          description: string | null
+          discount_percentage: number
+          id: string
+          is_active: boolean | null
+          maximum_discount_amount: number | null
+          minimum_order_amount: number | null
+          updated_at: string | null
+          usage_limit: number | null
+          used_count: number | null
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          description?: string | null
+          discount_percentage: number
+          id?: string
+          is_active?: boolean | null
+          maximum_discount_amount?: number | null
+          minimum_order_amount?: number | null
+          updated_at?: string | null
+          usage_limit?: number | null
+          used_count?: number | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          discount_percentage?: number
+          id?: string
+          is_active?: boolean | null
+          maximum_discount_amount?: number | null
+          minimum_order_amount?: number | null
+          updated_at?: string | null
+          usage_limit?: number | null
+          used_count?: number | null
+          valid_from?: string | null
+          valid_until?: string | null
         }
         Relationships: []
       }
