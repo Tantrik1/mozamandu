@@ -8,21 +8,21 @@ const sockTypes = [
     id: 1,
     name: 'Full Socks',
     description: 'Complete coverage and comfort',
-    image: '/placeholder.svg',
+    image: '/lovable-uploads/fd4fd25e-ccf5-42d0-a176-49b63583881b.png',
     color: 'from-red-500 to-red-700'
   },
   {
     id: 2,
-    name: 'Ankle Socks',
+    name: 'Half Socks',
     description: 'Perfect for casual wear',
-    image: '/placeholder.svg',
+    image: '/lovable-uploads/237dafb7-830d-417a-bbb5-1a22d7c3a115.png',
     color: 'from-red-600 to-red-800'
   },
   {
     id: 3,
-    name: 'Half Socks',
+    name: 'Ankle Socks',
     description: 'Minimal and stylish',
-    image: '/placeholder.svg',
+    image: '/lovable-uploads/c75106db-4b85-4396-a9eb-c802f441793b.png',
     color: 'from-red-700 to-red-900'
   }
 ];
@@ -103,9 +103,9 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* Right Side - 3D Model Showcase */}
+          {/* Right Side - Sock Images Showcase */}
           <div className="relative h-[600px] flex items-center justify-center">
-            {/* 3D Model Container */}
+            {/* Sock Images Container */}
             <div className="relative w-full h-full">
               {sockTypes.map((sock, index) => (
                 <div
@@ -118,22 +118,28 @@ export function HeroSection() {
                       : 'opacity-0 scale-50 -rotate-12 -translate-x-20'
                   }`}
                 >
-                  {/* 3D Model Placeholder */}
-                  <div className={`w-full h-full bg-gradient-to-br ${sock.color} rounded-3xl shadow-2xl flex items-center justify-center relative overflow-hidden`}>
-                    {/* Floating Animation */}
+                  {/* Sock Image Container */}
+                  <div className={`w-full h-full bg-gradient-to-br ${sock.color} rounded-3xl shadow-2xl flex items-center justify-center relative overflow-hidden animate-float`}>
+                    {/* Floating Animation Background */}
                     <div className="absolute inset-0 animate-pulse">
                       <div className="w-full h-full bg-gradient-to-t from-black/20 to-transparent"></div>
                     </div>
                     
-                    {/* Sock Representation */}
-                    <div className="relative z-10 text-center text-white">
-                      <div className="text-8xl mb-4">🧦</div>
-                      <h3 className="text-2xl font-bold mb-2">{sock.name}</h3>
-                      <p className="text-lg opacity-90">{sock.description}</p>
+                    {/* Actual Sock Image */}
+                    <div className="relative z-10 flex flex-col items-center justify-center h-full p-8">
+                      <div className="mb-6 transform transition-transform duration-300 hover:scale-110">
+                        <img 
+                          src={sock.image} 
+                          alt={sock.name}
+                          className="max-w-full max-h-80 object-contain drop-shadow-2xl"
+                        />
+                      </div>
+                      <h3 className="text-2xl font-bold mb-2 text-white">{sock.name}</h3>
+                      <p className="text-lg opacity-90 text-white text-center">{sock.description}</p>
                     </div>
 
                     {/* Glow Effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 to-transparent blur-xl"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 to-transparent blur-xl animate-glow"></div>
                   </div>
                 </div>
               ))}

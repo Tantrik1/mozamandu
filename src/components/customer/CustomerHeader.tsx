@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useCart } from '@/hooks/useCart';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, User, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,6 +40,7 @@ interface Subcategory {
 
 export function CustomerHeader() {
   const { user, signOut } = useAuth();
+  const { getTotalItems } = useCart();
   const navigate = useNavigate();
   const [topBarText, setTopBarText] = useState<TopBarText | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -108,6 +110,8 @@ export function CustomerHeader() {
     await signOut();
     navigate('/');
   };
+
+  const cartItemCount = getTotalItems();
 
   return (
     <div className="w-full">
@@ -195,8 +199,13 @@ export function CustomerHeader() {
 
             {/* Right Side Actions */}
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" className="hover:text-red-600">
+              <Button variant="ghost" size="sm" className="hover:text-red-600 relative">
                 <ShoppingCart className="h-5 w-5" />
+                {cartItemCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {cartItemCount}
+                  </span>
+                )}
               </Button>
 
               {user ? (
