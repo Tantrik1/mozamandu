@@ -150,7 +150,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
           const discountedPrice = basePrice - tier.discount_amount;
           result.discountedPrice = discountedPrice;
           result.appliedDiscount = tier;
-          result.finalPrice = discountedPrice;
+          
+          // Calculate weighted average: 
+          // (original price * MOQ + discounted price * extra quantity) / total quantity
+          const originalPriceItems = tier.min_quantity;
+          const discountedItems = quantity - tier.min_quantity;
+          const totalPrice = (basePrice * originalPriceItems) + (discountedPrice * discountedItems);
+          result.finalPrice = totalPrice / quantity;
           break;
         }
       }
