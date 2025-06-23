@@ -1,7 +1,8 @@
+
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, Plus, Minus, X, AlertTriangle, Gift } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, Gift } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,7 +23,6 @@ export function CartSidebar() {
     removeFromCart, 
     getTotalPrice, 
     getTotalItems, 
-    getItemPrice, 
     activeCombo 
   } = useCart();
   const [isOpen, setIsOpen] = useState(false);
@@ -132,36 +132,9 @@ export function CartSidebar() {
                     item={item} 
                     onUpdateQuantity={updateQuantity}
                     onRemove={removeFromCart}
-                    getItemPrice={getItemPrice}
                   />
                 ))}
               </div>
-
-              {/* Subcategory Requirements */}
-              {subcategoryRequirements.length > 0 && (
-                <div className="border-t pt-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-3">Minimum Requirements</h4>
-                  <div className="space-y-2">
-                    {subcategoryRequirements.map((req) => (
-                      <div key={req.subcategoryId} className="flex items-center justify-between text-xs">
-                        <span className={req.fulfilled ? 'text-green-600' : 'text-red-600'}>
-                          {req.subcategoryName}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <span className={req.fulfilled ? 'text-green-600' : 'text-red-600'}>
-                            {req.currentQuantity}/{req.minimumQuantity}
-                          </span>
-                          {req.fulfilled ? (
-                            <div className="w-2 h-2 bg-green-500 rounded-full" />
-                          ) : (
-                            <AlertTriangle className="w-3 h-3 text-red-500" />
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Total */}
               <div className="border-t pt-4">
@@ -201,44 +174,56 @@ export function CartSidebar() {
 function CartItemCard({ 
   item, 
   onUpdateQuantity, 
-  onRemove, 
-  getItemPrice 
+  onRemove
 }: { 
   item: any;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onRemove: (id: string) => void;
-  getItemPrice: (subcategoryId: string, quantity: number) => Promise<any>;
 }) {
-  const [itemPrice, setItemPrice] = useState(item.price);
-  const [priceLabel, setPriceLabel] = useState('Normal');
-  const [priceColor, setPriceColor] = useState('text-red-600');
+  // Determine pricing mode from item ID
+  const getPricingMode = (itemId: string) => {
+    if (itemId.includes('-combo')) return 'combo';
+    if (itemId.includes('-discount')) return 'discount';
+    return 'normal';
+  };
 
-  useEffect(() => {
-    updateItemPrice();
-  }, [item.quantity, item.subcategoryId]);
-
-  const updateItemPrice = async () => {
-    try {
-      const pricing = await getItemPrice(item.subcategoryId, item.quantity);
-      setItemPrice(pricing.finalPrice);
-      
-      if (pricing.inCombo) {
-        setPriceLabel('Combo Price');
-        setPriceColor('text-green-600');
-      } else if (pricing.appliedDiscount) {
-        setPriceLabel(`Discount Applied (-$${pricing.appliedDiscount.discount_amount})`);
-        setPriceColor('text-blue-600');
-      } else {
-        setPriceLabel('Normal Price');
-        setPriceColor('text-red-600');
-      }
-    } catch (error) {
-      console.error('Error updating item price:', error);
+  const pricingMode = getPricingMode(item.id);
+  
+  const getPriceLabel = () => {
+    switch (pricingMode) {
+      case 'combo':
+        return 'Combo Price';
+      case 'discount':
+        return 'Discount Applied';
+      case 'normal':
+      default:
+        return 'Normal Price';
     }
   };
 
-  // Determine if this is a different pricing variant
-  const isDifferentPricing = item.id.includes('-combo') || item.id.includes('-discount');
+  const getPriceColor = () => {
+    switch (pricingMode) {
+      case 'combo':
+        return 'text-green-600';
+      case 'discount':
+        return 'text-blue-600';
+      case 'normal':
+      default:
+        return 'text-red-600';
+    }
+  };
+
+  const getBadgeColor = () => {
+    switch (pricingMode) {
+      case 'combo':
+        return 'border-green-500 text-green-700';
+      case 'discount':
+        return 'border-blue-500 text-blue-700';
+      case 'normal':
+      default:
+        return 'border-red-500 text-red-700';
+    }
+  };
 
   return (
     <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
@@ -260,20 +245,16 @@ function CartItemCard({
           <p className="text-xs text-gray-500">Size: {item.sizeName}</p>
         )}
         <div className="flex items-center gap-2">
-          <p className={`text-sm font-bold ${priceColor}`}>${itemPrice.toFixed(2)}</p>
+          <p className={`text-sm font-bold ${getPriceColor()}`}>${item.price.toFixed(2)}</p>
           <Badge 
             variant="outline" 
-            className={`text-xs px-1 py-0 ${
-              priceLabel.includes('Combo') ? 'border-green-500 text-green-700' :
-              priceLabel.includes('Discount') ? 'border-blue-500 text-blue-700' :
-              'border-red-500 text-red-700'
-            }`}
+            className={`text-xs px-1 py-0 ${getBadgeColor()}`}
           >
-            {priceLabel}
+            {getPriceLabel()}
           </Badge>
         </div>
-        {isDifferentPricing && (
-          <p className="text-xs text-gray-400 italic">Separate pricing applied</p>
+        {pricingMode === 'discount' && (
+          <p className="text-xs text-blue-600 italic">Discount tier pricing</p>
         )}
       </div>
       <div className="flex items-center space-x-2">
