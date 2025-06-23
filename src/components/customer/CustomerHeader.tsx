@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, User, LogOut, ChevronDown } from 'lucide-react';
+import { ShoppingCart, User, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   DropdownMenu,
@@ -27,12 +27,14 @@ interface TopBarText {
 interface Category {
   id: string;
   name: string;
+  status: 'on' | 'off';
   subcategories?: Subcategory[];
 }
 
 interface Subcategory {
   id: string;
   name: string;
+  status: 'on' | 'off';
 }
 
 export function CustomerHeader() {
@@ -75,11 +77,14 @@ export function CustomerHeader() {
         .select(`
           id,
           name,
+          status,
           subcategories (
             id,
-            name
+            name,
+            status
           )
         `)
+        .eq('status', 'on')
         .order('name');
 
       if (error) {
@@ -87,7 +92,13 @@ export function CustomerHeader() {
         return;
       }
 
-      setCategories(categoriesData || []);
+      // Filter active subcategories
+      const activeCategories = categoriesData?.map(category => ({
+        ...category,
+        subcategories: category.subcategories?.filter(sub => sub.status === 'on') || []
+      })) || [];
+
+      setCategories(activeCategories);
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
@@ -104,7 +115,7 @@ export function CustomerHeader() {
       {topBarText?.is_active && (
         <div className="bg-red-600 text-white py-2 px-4">
           <div className="max-w-7xl mx-auto text-center">
-            <span className="animate-pulse font-medium">
+            <span className="animate-blink font-medium">
               🔥 {topBarText.text} 🔥
             </span>
           </div>
@@ -133,38 +144,43 @@ export function CustomerHeader() {
                   </Link>
                 </NavigationMenuItem>
 
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger className="text-gray-700 hover:text-red-600 font-medium">
-                    Categories
-                  </NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <div className="grid gap-3 p-6 w-[400px]">
-                      {categories.map((category) => (
-                        <div key={category.id} className="space-y-2">
-                          <Link
-                            to={`/categories/${category.id}`}
-                            className="block text-sm font-medium text-gray-900 hover:text-red-600"
-                          >
-                            {category.name}
-                          </Link>
-                          {category.subcategories && category.subcategories.length > 0 && (
-                            <div className="ml-4 space-y-1">
-                              {category.subcategories.map((subcategory) => (
-                                <Link
-                                  key={subcategory.id}
-                                  to={`/subcategories/${subcategory.id}`}
-                                  className="block text-xs text-gray-600 hover:text-red-600"
-                                >
-                                  {subcategory.name}
-                                </Link>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
+                {categories.map((category) => (
+                  <NavigationMenuItem key={category.id}>
+                    {category.subcategories && category.subcategories.length > 0 ? (
+                      <>
+                        <NavigationMenuTrigger className="text-gray-700 hover:text-red-600 font-medium">
+                          {category.name}
+                        </NavigationMenuTrigger>
+                        <NavigationMenuContent>
+                          <div className="grid gap-3 p-6 w-[300px]">
+                            <Link
+                              to={`/categories/${category.id}`}
+                              className="block text-sm font-medium text-gray-900 hover:text-red-600 border-b pb-2 mb-2"
+                            >
+                              All {category.name}
+                            </Link>
+                            {category.subcategories.map((subcategory) => (
+                              <Link
+                                key={subcategory.id}
+                                to={`/subcategories/${subcategory.id}`}
+                                className="block text-sm text-gray-600 hover:text-red-600"
+                              >
+                                {subcategory.name}
+                              </Link>
+                            ))}
+                          </div>
+                        </NavigationMenuContent>
+                      </>
+                    ) : (
+                      <Link
+                        to={`/categories/${category.id}`}
+                        className="text-gray-700 hover:text-red-600 font-medium transition-colors"
+                      >
+                        {category.name}
+                      </Link>
+                    )}
+                  </NavigationMenuItem>
+                ))}
 
                 <NavigationMenuItem>
                   <Link 
