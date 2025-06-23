@@ -92,7 +92,12 @@ export function ComboManagement() {
         variant: "destructive",
       });
     } else {
-      setCombos(data || []);
+      // Type cast the status field to ensure proper typing
+      const typedCombos = (data || []).map(combo => ({
+        ...combo,
+        status: combo.status as 'active' | 'inactive'
+      }));
+      setCombos(typedCombos);
     }
   };
 
