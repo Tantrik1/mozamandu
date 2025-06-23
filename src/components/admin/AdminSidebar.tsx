@@ -27,6 +27,7 @@ import {
   CreditCard,
   Bell,
   Type,
+  Settings,
 } from 'lucide-react';
 
 const menuItems = [
@@ -80,6 +81,11 @@ const menuItems = [
     title: 'Top Bar Text',
     url: '/admin/top-bar-text',
     icon: Type,
+  },
+  {
+    title: 'Settings',
+    url: '/admin/settings',
+    icon: Settings,
   },
 ];
 

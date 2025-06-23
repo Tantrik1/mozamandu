@@ -11,6 +11,7 @@ import { PaymentMethodManagement } from '@/components/admin/PaymentMethodManagem
 import { DeliveryChargeManagement } from '@/components/admin/DeliveryChargeManagement';
 import { NoticeManagement } from '@/components/admin/NoticeManagement';
 import { TopBarTextManagement } from '@/components/admin/TopBarTextManagement';
+import { AdminSettings } from '@/components/admin/AdminSettings';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { supabase } from '@/integrations/supabase/client';
@@ -110,6 +111,7 @@ export default function Admin() {
               <Route path="/delivery-charges" element={<DeliveryChargeManagement />} />
               <Route path="/notices" element={<NoticeManagement />} />
               <Route path="/top-bar-text" element={<TopBarTextManagement />} />
+              <Route path="/settings" element={<AdminSettings />} />
             </Routes>
           </main>
         </SidebarInset>
