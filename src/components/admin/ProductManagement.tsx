@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { EnhancedProductForm } from './EnhancedProductForm';
-import { Pencil, Trash2, Plus, Search, Package } from 'lucide-react';
+import { ProductDetailView } from './ProductDetailView';
+import { Pencil, Trash2, Plus, Search, Package, Eye } from 'lucide-react';
 
 interface Product {
   id: string;
@@ -33,6 +34,7 @@ export function ProductManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [viewingProductId, setViewingProductId] = useState<string | null>(null);
   const [productStocks, setProductStocks] = useState<Record<string, number>>({});
   const { toast } = useToast();
 
@@ -90,6 +92,10 @@ export function ProductManagement() {
     setProductStocks(stocks);
   };
 
+  const handleView = (productId: string) => {
+    setViewingProductId(productId);
+  };
+
   const handleEdit = (productId: string) => {
     setEditingProductId(productId);
     setIsFormOpen(true);
@@ -133,6 +139,23 @@ export function ProductManagement() {
     setEditingProductId(null);
   };
 
+  const handleDetailViewEdit = () => {
+    if (viewingProductId) {
+      setEditingProductId(viewingProductId);
+      setViewingProductId(null);
+      setIsFormOpen(true);
+    }
+  };
+
+  const handleDetailViewDelete = () => {
+    setViewingProductId(null);
+    fetchProducts();
+  };
+
+  const handleDetailViewBack = () => {
+    setViewingProductId(null);
+  };
+
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.categories?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -141,6 +164,17 @@ export function ProductManagement() {
 
   if (loading) {
     return <div className="flex justify-center p-8">Loading products...</div>;
+  }
+
+  if (viewingProductId) {
+    return (
+      <ProductDetailView
+        productId={viewingProductId}
+        onEdit={handleDetailViewEdit}
+        onDelete={handleDetailViewDelete}
+        onBack={handleDetailViewBack}
+      />
+    );
   }
 
   if (isFormOpen) {
@@ -243,6 +277,13 @@ export function ProductManagement() {
                   </div>
                   
                   <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleView(product.id)}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
