@@ -1,16 +1,14 @@
 
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { HeroSection } from '@/components/customer/HeroSection';
 
 const Index = () => {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // Redirect to home page
-    navigate('/');
-  }, [navigate]);
-
-  return null;
+  return (
+    <div className="min-h-screen">
+      <CustomerHeader />
+      <HeroSection />
+    </div>
+  );
 };
 
 export default Index;
