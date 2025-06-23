@@ -14,6 +14,7 @@ interface Subcategory {
   description: string;
   selling_price: number;
   minimum_quantity: number;
+  image_url?: string;
 }
 
 interface Product {
@@ -48,7 +49,7 @@ export default function SubcategoryPage() {
       // Fetch subcategory details
       const { data: subcategoryData, error: subcategoryError } = await supabase
         .from('subcategories')
-        .select('id, name, description, selling_price, minimum_quantity')
+        .select('id, name, description, selling_price, minimum_quantity, image_url')
         .eq('id', subcategoryId)
         .eq('status', 'on')
         .single();
@@ -125,6 +126,17 @@ export default function SubcategoryPage() {
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {/* Subcategory Header */}
         <div className="mb-6">
+          {/* Subcategory Image */}
+          {subcategory.image_url && (
+            <div className="mb-6">
+              <img 
+                src={subcategory.image_url} 
+                alt={subcategory.name}
+                className="w-full h-64 sm:h-80 object-cover rounded-lg shadow-lg"
+              />
+            </div>
+          )}
+          
           <div className="flex flex-wrap items-center gap-4 mb-4">
             <h1 className="text-3xl font-bold text-gray-900">{subcategory.name}</h1>
             <Badge variant="outline" className="text-red-600 border-red-600">

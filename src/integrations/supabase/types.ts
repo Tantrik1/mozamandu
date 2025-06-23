@@ -520,6 +520,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          image_url: string | null
           minimum_quantity: number
           name: string
           selling_price: number
@@ -531,6 +532,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          image_url?: string | null
           minimum_quantity?: number
           name: string
           selling_price: number
@@ -542,6 +544,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          image_url?: string | null
           minimum_quantity?: number
           name?: string
           selling_price?: number

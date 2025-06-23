@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -64,7 +63,7 @@ interface CartContextType {
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
-  getTotalPrice: () => Promise<number>; // Fixed: Changed from () => number to () => Promise<number>
+  getTotalPrice: () => Promise<number>;
   getTotalItems: () => number;
   getItemPrice: (subcategoryId: string, quantity: number) => Promise<PriceCalculation>;
   activeCombo: ComboData | null;
@@ -126,7 +125,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const basePrice = subcategoryData.selling_price;
     let result: PriceCalculation = { basePrice, finalPrice: basePrice };
 
-    // Check for discount tiers
+    // Check for combo pricing first (highest priority)
+    if (activeCombo) {
+      const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === subcategoryId);
+      if (comboSubcategory) {
+        result.comboPrice = comboSubcategory.price;
+        result.finalPrice = comboSubcategory.price;
+        result.inCombo = true;
+        return result; // Return early if in combo
+      }
+    }
+
+    // Check for discount tiers (only if not in combo)
     const { data: discountTiers } = await supabase
       .from('discount_tiers')
       .select('*')
@@ -136,21 +146,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (discountTiers) {
       for (const tier of discountTiers) {
         if (quantity >= tier.min_quantity && (!tier.max_quantity || quantity <= tier.max_quantity)) {
-          result.discountedPrice = basePrice - tier.discount_amount;
+          // Apply discount only to quantities above the tier threshold
+          const discountedPrice = basePrice - tier.discount_amount;
+          result.discountedPrice = discountedPrice;
           result.appliedDiscount = tier;
-          result.finalPrice = result.discountedPrice;
+          result.finalPrice = discountedPrice;
           break;
         }
-      }
-    }
-
-    // Check for combo pricing
-    if (activeCombo) {
-      const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === subcategoryId);
-      if (comboSubcategory) {
-        result.comboPrice = comboSubcategory.price;
-        result.finalPrice = comboSubcategory.price;
-        result.inCombo = true;
       }
     }
 

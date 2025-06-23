@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, X } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Upload } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -32,6 +32,7 @@ interface Subcategory {
   minimum_quantity: number;
   status: 'on' | 'off';
   category_id: string;
+  image_url?: string;
   categories: { name: string };
   created_at: string;
 }
@@ -42,6 +43,8 @@ export function SubcategoryManagement() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingSubcategory, setEditingSubcategory] = useState<Subcategory | null>(null);
   const [discountTiers, setDiscountTiers] = useState<DiscountTier[]>([]);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -111,6 +114,44 @@ export function SubcategoryManagement() {
     return data || [];
   };
 
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('subcategory-images')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        return null;
+      }
+
+      const { data } = supabase.storage
+        .from('subcategory-images')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      return null;
+    }
+  };
+
   const addDiscountTier = () => {
     setDiscountTiers([...discountTiers, {
       min_quantity: 1,
@@ -133,6 +174,23 @@ export function SubcategoryManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    let imageUrl = editingSubcategory?.image_url || null;
+    
+    // Upload new image if selected
+    if (selectedImage) {
+      const uploadedUrl = await uploadImage(selectedImage);
+      if (uploadedUrl) {
+        imageUrl = uploadedUrl;
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to upload image",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     const subcategoryData = {
       name: formData.name,
       description: formData.description,
@@ -140,6 +198,7 @@ export function SubcategoryManagement() {
       selling_price: parseFloat(formData.selling_price),
       minimum_quantity: parseInt(formData.minimum_quantity),
       status: formData.status ? 'on' : 'off' as 'on' | 'off',
+      image_url: imageUrl,
     };
 
     let error;
@@ -222,6 +281,11 @@ export function SubcategoryManagement() {
       status: subcategory.status === 'on',
     });
     
+    // Set existing image preview
+    if (subcategory.image_url) {
+      setImagePreview(subcategory.image_url);
+    }
+    
     // Fetch existing discount tiers
     const tiers = await fetchDiscountTiers(subcategory.id);
     setDiscountTiers(tiers);
@@ -263,6 +327,8 @@ export function SubcategoryManagement() {
     });
     setEditingSubcategory(null);
     setDiscountTiers([]);
+    setSelectedImage(null);
+    setImagePreview(null);
   };
 
   return (
@@ -322,6 +388,33 @@ export function SubcategoryManagement() {
                 />
               </div>
               
+              {/* Image Upload Section */}
+              <div className="space-y-2">
+                <Label htmlFor="image">Subcategory Image</Label>
+                <div className="flex items-center space-x-4">
+                  <Input
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"
+                  />
+                  <Button type="button" variant="outline" size="sm">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Choose Image
+                  </Button>
+                </div>
+                {imagePreview && (
+                  <div className="mt-2">
+                    <img 
+                      src={imagePreview} 
+                      alt="Preview" 
+                      className="w-32 h-32 object-cover rounded-lg border"
+                    />
+                  </div>
+                )}
+              </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="selling_price">Selling Price ($)</Label>
@@ -362,7 +455,7 @@ export function SubcategoryManagement() {
                 </div>
                 <p className="text-sm text-gray-600">
                   Discount tiers are separate from the minimum order quantity above. Customers must meet the MOQ to checkout, 
-                  but can get discounts based on these tiers.
+                  but can get discounts based on these tiers. The discount applies to ALL items when the tier quantity is reached.
                 </p>
                 
                 {discountTiers.map((tier, index) => (
@@ -416,7 +509,7 @@ export function SubcategoryManagement() {
                       </div>
                       <p className="text-xs text-gray-500">
                         Quantities {tier.min_quantity} {tier.max_quantity ? `to ${tier.max_quantity}` : 'and above'}: 
-                        ${tier.discount_amount} discount per item
+                        ${tier.discount_amount} discount per item for ALL items in this quantity range
                       </p>
                     </CardContent>
                   </Card>
@@ -489,7 +582,14 @@ function SubcategoryCard({
     <Card>
       <CardHeader>
         <div className="flex justify-between items-start">
-          <div>
+          <div className="flex-1">
+            {subcategory.image_url && (
+              <img 
+                src={subcategory.image_url} 
+                alt={subcategory.name}
+                className="w-full h-32 object-cover rounded-lg mb-3"
+              />
+            )}
             <CardTitle className="text-lg">{subcategory.name}</CardTitle>
             <p className="text-sm text-gray-500">{subcategory.categories?.name}</p>
           </div>
@@ -532,7 +632,7 @@ function SubcategoryCard({
                   <span className="font-medium">
                     {tier.min_quantity}{tier.max_quantity ? `-${tier.max_quantity}` : '+'} qty:
                   </span>
-                  <span className="text-green-600 ml-2">${tier.discount_amount} off</span>
+                  <span className="text-green-600 ml-2">${tier.discount_amount} off each</span>
                 </div>
               ))}
             </div>
