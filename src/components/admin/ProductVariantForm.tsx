@@ -40,16 +40,24 @@ export function ProductVariantForm({
   onVariantsChange,
   initialVariants = []
 }: ProductVariantFormProps) {
-  const [colorVariants, setColorVariants] = useState<ColorVariant[]>(initialVariants);
+  const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
   const [uploadingImages, setUploadingImages] = useState<{[key: number]: boolean}>({});
+  const [isLoading, setIsLoading] = useState(false);
 
+  // Initialize with provided initial variants
   useEffect(() => {
-    if (productId && (hasColorVariants || hasSizeVariants)) {
+    if (initialVariants && initialVariants.length > 0) {
+      console.log('Setting initial variants:', initialVariants);
+      setColorVariants(initialVariants);
+    } else if (productId && (hasColorVariants || hasSizeVariants)) {
       fetchExistingVariants();
+    } else {
+      setColorVariants([]);
     }
-  }, [productId, hasColorVariants, hasSizeVariants]);
+  }, [productId, hasColorVariants, hasSizeVariants, initialVariants]);
 
   useEffect(() => {
+    console.log('Color variants changed, notifying parent:', colorVariants);
     onVariantsChange(colorVariants);
   }, [colorVariants, onVariantsChange]);
 
@@ -57,6 +65,9 @@ export function ProductVariantForm({
     if (!productId) return;
 
     try {
+      setIsLoading(true);
+      console.log('Fetching variants for product:', productId);
+      
       // Fetch color variants
       const { data: colorData, error: colorError } = await supabase
         .from('color_variants')
@@ -69,12 +80,20 @@ export function ProductVariantForm({
         return;
       }
 
+      console.log('Fetched color variants:', colorData);
+
+      if (!colorData || colorData.length === 0) {
+        setColorVariants([]);
+        return;
+      }
+
       // For each color variant, fetch its size variants
       const variantsWithSizes = await Promise.all(
-        (colorData || []).map(async (colorVariant) => {
+        colorData.map(async (colorVariant) => {
           let sizeVariants: SizeVariant[] = [];
           
           if (hasSizeVariants && colorVariant.has_sizes) {
+            console.log('Fetching size variants for color variant:', colorVariant.id);
             const { data: sizeData, error: sizeError } = await supabase
               .from('size_variants')
               .select('*')
@@ -85,19 +104,32 @@ export function ProductVariantForm({
               console.error('Error fetching size variants:', sizeError);
             } else {
               sizeVariants = sizeData || [];
+              console.log('Fetched size variants for color', colorVariant.color_name, ':', sizeVariants);
             }
           }
 
           return {
-            ...colorVariant,
+            id: colorVariant.id,
+            color_name: colorVariant.color_name,
+            image_url: colorVariant.image_url,
+            has_sizes: Boolean(colorVariant.has_sizes),
+            stock_quantity: colorVariant.stock_quantity || 0,
             size_variants: sizeVariants
           };
         })
       );
 
+      console.log('Final variants with sizes:', variantsWithSizes);
       setColorVariants(variantsWithSizes);
     } catch (error) {
       console.error('Error in fetchExistingVariants:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load existing variants',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -207,6 +239,10 @@ export function ProductVariantForm({
 
   if (!hasColorVariants && !hasSizeVariants) {
     return null;
+  }
+
+  if (isLoading) {
+    return <div className="text-center py-4">Loading variants...</div>;
   }
 
   return (
@@ -322,52 +358,52 @@ export function ProductVariantForm({
                   </div>
 
                   <div className="space-y-2">
-                    {variant.size_variants.map((sizeVariant, sizeIndex) => (
-                      <div key={sizeIndex} className="grid grid-cols-12 gap-2 items-center p-3 border rounded">
-                        <div className="col-span-3">
-                          <Input
-                            placeholder="Size name (S, M, L)"
-                            value={sizeVariant.size_name}
-                            onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_name', e.target.value)}
-                            required
-                          />
+                    {variant.size_variants && variant.size_variants.length > 0 ? (
+                      variant.size_variants.map((sizeVariant, sizeIndex) => (
+                        <div key={sizeIndex} className="grid grid-cols-12 gap-2 items-center p-3 border rounded">
+                          <div className="col-span-3">
+                            <Input
+                              placeholder="Size name (S, M, L)"
+                              value={sizeVariant.size_name}
+                              onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_name', e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Input
+                              placeholder="Code"
+                              value={sizeVariant.size_code || ''}
+                              onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_code', e.target.value)}
+                            />
+                          </div>
+                          <div className="col-span-3">
+                            <Input
+                              type="number"
+                              min="0"
+                              placeholder="Stock"
+                              value={sizeVariant.stock_quantity}
+                              onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'stock_quantity', parseInt(e.target.value) || 0)}
+                            />
+                          </div>
+                          <div className="col-span-4 flex justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeSizeVariant(colorIndex, sizeIndex)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="col-span-2">
-                          <Input
-                            placeholder="Code"
-                            value={sizeVariant.size_code || ''}
-                            onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_code', e.target.value)}
-                          />
-                        </div>
-                        <div className="col-span-3">
-                          <Input
-                            type="number"
-                            min="0"
-                            placeholder="Stock"
-                            value={sizeVariant.stock_quantity}
-                            onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'stock_quantity', parseInt(e.target.value) || 0)}
-                          />
-                        </div>
-                        <div className="col-span-4 flex justify-end">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeSizeVariant(colorIndex, sizeIndex)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500 text-center py-4">
+                        No sizes added yet. Click "Add Size" to get started.
+                      </p>
+                    )}
                   </div>
-
-                  {variant.size_variants.length === 0 && (
-                    <p className="text-sm text-gray-500 text-center py-4">
-                      No sizes added yet. Click "Add Size" to get started.
-                    </p>
-                  )}
                 </div>
               )}
             </CardContent>
