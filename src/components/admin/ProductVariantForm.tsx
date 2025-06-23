@@ -44,17 +44,25 @@ export function ProductVariantForm({
   const [uploadingImages, setUploadingImages] = useState<{[key: number]: boolean}>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // Initialize with provided initial variants
   useEffect(() => {
+    console.log('ProductVariantForm useEffect triggered', {
+      productId,
+      hasColorVariants,
+      hasSizeVariants,
+      initialVariants: initialVariants.length
+    });
+
     if (initialVariants && initialVariants.length > 0) {
-      console.log('Setting initial variants:', initialVariants);
+      console.log('Using provided initial variants:', initialVariants);
       setColorVariants(initialVariants);
     } else if (productId && (hasColorVariants || hasSizeVariants)) {
+      console.log('Fetching variants for productId:', productId);
       fetchExistingVariants();
     } else {
+      console.log('Clearing variants - no conditions met');
       setColorVariants([]);
     }
-  }, [productId, hasColorVariants, hasSizeVariants, initialVariants]);
+  }, [productId, hasColorVariants, hasSizeVariants]);
 
   useEffect(() => {
     console.log('Color variants changed, notifying parent:', colorVariants);
@@ -62,7 +70,10 @@ export function ProductVariantForm({
   }, [colorVariants, onVariantsChange]);
 
   const fetchExistingVariants = async () => {
-    if (!productId) return;
+    if (!productId) {
+      console.log('No productId provided, skipping fetch');
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -77,12 +88,14 @@ export function ProductVariantForm({
 
       if (colorError) {
         console.error('Error fetching color variants:', colorError);
+        setColorVariants([]);
         return;
       }
 
       console.log('Fetched color variants:', colorData);
 
       if (!colorData || colorData.length === 0) {
+        console.log('No color variants found');
         setColorVariants([]);
         return;
       }
@@ -128,6 +141,7 @@ export function ProductVariantForm({
         description: 'Failed to load existing variants',
         variant: 'destructive',
       });
+      setColorVariants([]);
     } finally {
       setIsLoading(false);
     }
@@ -181,13 +195,13 @@ export function ProductVariantForm({
   };
 
   const handleImageUpload = async (file: File, colorIndex: number) => {
-    if (!file || !productId) return;
+    if (!file) return;
 
     setUploadingImages(prev => ({ ...prev, [colorIndex]: true }));
 
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${productId}-color-${colorIndex}-${Date.now()}.${fileExt}`;
+      const fileName = `color-variant-${Date.now()}-${colorIndex}.${fileExt}`;
       
       const { data, error: uploadError } = await supabase.storage
         .from('product-images')

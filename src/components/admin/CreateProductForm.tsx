@@ -67,6 +67,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -135,15 +136,51 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
+    if (!file) return;
+
+    console.log('Starting image upload for file:', file.name);
+    setUploadingImage(true);
+    
+    try {
+      // Create preview immediately
       const reader = new FileReader();
       reader.onload = (e) => {
         setImagePreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
+
+      // Upload to Supabase storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `product-${Date.now()}.${fileExt}`;
+      
+      const { data, error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      setImageFile(file);
+      
+      console.log('Image uploaded successfully:', urlData.publicUrl);
+      toast({
+        title: 'Success',
+        description: 'Image uploaded successfully',
+      });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to upload image',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -152,25 +189,24 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     setImagePreview(null);
   };
 
-  const uploadImage = async (): Promise<string | null> => {
+  const uploadImageAndGetUrl = async (): Promise<string | null> => {
     if (!imageFile) return null;
 
     try {
       const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `product-images/${fileName}`;
+      const fileName = `product-${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('products')
-        .upload(filePath, imageFile);
+      const { data, error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, imageFile);
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage
-        .from('products')
-        .getPublicUrl(filePath);
+      const { data: urlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
 
-      return data.publicUrl;
+      return urlData.publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
       toast({
@@ -190,7 +226,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
 
       let imageUrl = null;
       if (imageFile) {
-        imageUrl = await uploadImage();
+        imageUrl = await uploadImageAndGetUrl();
       }
 
       const productData = {
@@ -490,13 +526,14 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                       accept="image/*"
                       onChange={handleImageUpload}
                       className="hidden"
+                      disabled={uploadingImage}
                     />
                     <label
                       htmlFor="image-upload"
-                      className="cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      Upload Image
+                      {uploadingImage ? 'Uploading...' : 'Upload Image'}
                     </label>
                   </div>
 
