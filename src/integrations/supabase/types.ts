@@ -81,6 +81,75 @@ export type Database = {
           },
         ]
       }
+      combo_subcategories: {
+        Row: {
+          combo_id: string
+          created_at: string | null
+          id: string
+          min_units: number
+          price: number
+          subcategory_id: string
+        }
+        Insert: {
+          combo_id: string
+          created_at?: string | null
+          id?: string
+          min_units: number
+          price: number
+          subcategory_id: string
+        }
+        Update: {
+          combo_id?: string
+          created_at?: string | null
+          id?: string
+          min_units?: number
+          price?: number
+          subcategory_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "combo_subcategories_combo_id_fkey"
+            columns: ["combo_id"]
+            isOneToOne: false
+            referencedRelation: "combos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combo_subcategories_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      combos: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       delivery_charges: {
         Row: {
           created_at: string | null
@@ -145,6 +214,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payment_methods: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          qr_code_url: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          qr_code_url: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          qr_code_url?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       product_images: {
         Row: {
@@ -312,10 +408,8 @@ export type Database = {
           discount_percentage: number
           id: string
           is_active: boolean | null
-          maximum_discount_amount: number | null
           minimum_order_amount: number | null
           updated_at: string | null
-          usage_limit: number | null
           used_count: number | null
           valid_from: string | null
           valid_until: string | null
@@ -327,10 +421,8 @@ export type Database = {
           discount_percentage: number
           id?: string
           is_active?: boolean | null
-          maximum_discount_amount?: number | null
           minimum_order_amount?: number | null
           updated_at?: string | null
-          usage_limit?: number | null
           used_count?: number | null
           valid_from?: string | null
           valid_until?: string | null
@@ -342,10 +434,8 @@ export type Database = {
           discount_percentage?: number
           id?: string
           is_active?: boolean | null
-          maximum_discount_amount?: number | null
           minimum_order_amount?: number | null
           updated_at?: string | null
-          usage_limit?: number | null
           used_count?: number | null
           valid_from?: string | null
           valid_until?: string | null

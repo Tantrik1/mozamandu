@@ -24,6 +24,7 @@ import {
   LayoutDashboard,
   LogOut,
   Store,
+  CreditCard,
 } from 'lucide-react';
 
 const menuItems = [
@@ -57,6 +58,11 @@ const menuItems = [
     title: 'Promocodes',
     url: '/admin/promocodes',
     icon: Percent,
+  },
+  {
+    title: 'Payments',
+    url: '/admin/payments',
+    icon: CreditCard,
   },
   {
     title: 'Delivery Charges',

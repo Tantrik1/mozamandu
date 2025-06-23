@@ -5,7 +5,9 @@ import { useNavigate, Routes, Route } from 'react-router-dom';
 import { CategoryManagement } from '@/components/admin/CategoryManagement';
 import { SubcategoryManagement } from '@/components/admin/SubcategoryManagement';
 import { ProductManagement } from '@/components/admin/ProductManagement';
+import { ComboManagement } from '@/components/admin/ComboManagement';
 import { PromocodeManagement } from '@/components/admin/PromocodeManagement';
+import { PaymentMethodManagement } from '@/components/admin/PaymentMethodManagement';
 import { DeliveryChargeManagement } from '@/components/admin/DeliveryChargeManagement';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -25,23 +27,14 @@ function AdminDashboard() {
           <p className="text-gray-600">Manage your products</p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow-md border">
-          <h3 className="text-lg font-semibold mb-2 text-gray-800">Promocodes</h3>
-          <p className="text-gray-600">Manage discount codes</p>
+          <h3 className="text-lg font-semibold mb-2 text-gray-800">Combos</h3>
+          <p className="text-gray-600">Manage product combos</p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow-md border">
-          <h3 className="text-lg font-semibold mb-2 text-gray-800">Delivery</h3>
-          <p className="text-gray-600">Manage delivery charges</p>
+          <h3 className="text-lg font-semibold mb-2 text-gray-800">Payments</h3>
+          <p className="text-gray-600">Manage payment methods</p>
         </div>
       </div>
-    </div>
-  );
-}
-
-function CombosPlaceholder() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-8">Combos Management</h1>
-      <p className="text-gray-600">Combo management feature coming soon...</p>
     </div>
   );
 }
@@ -102,8 +95,9 @@ export default function Admin() {
               <Route path="/categories" element={<CategoryManagement />} />
               <Route path="/subcategories" element={<SubcategoryManagement />} />
               <Route path="/products" element={<ProductManagement />} />
-              <Route path="/combos" element={<CombosPlaceholder />} />
+              <Route path="/combos" element={<ComboManagement />} />
               <Route path="/promocodes" element={<PromocodeManagement />} />
+              <Route path="/payments" element={<PaymentMethodManagement />} />
               <Route path="/delivery-charges" element={<DeliveryChargeManagement />} />
             </Routes>
           </main>
