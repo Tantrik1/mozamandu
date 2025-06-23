@@ -7,9 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, FolderOpen } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -21,6 +22,7 @@ interface Category {
 
 export function CategoryManagement() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState({
@@ -78,17 +80,17 @@ export function CategoryManagement() {
         description: error.message,
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Success",
-        description: `Category ${editingCategory ? 'updated' : 'created'} successfully`,
-      });
-      
-      setFormData({ name: '', description: '', status: true });
-      setIsCreateModalOpen(false);
-      setEditingCategory(null);
-      fetchCategories();
+      return;
     }
+
+    toast({
+      title: "Success",
+      description: `Category ${editingCategory ? 'updated' : 'created'} successfully`,
+    });
+    
+    resetForm();
+    setIsCreateModalOpen(false);
+    fetchCategories();
   };
 
   const handleEdit = (category: Category) => {
@@ -125,22 +127,34 @@ export function CategoryManagement() {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', description: '', status: true });
+    setFormData({
+      name: '',
+      description: '',
+      status: true,
+    });
     setEditingCategory(null);
   };
 
+  const filteredCategories = categories.filter(category =>
+    category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    category.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Category Management</h2>
+        <div>
+          <h2 className="text-3xl font-bold">Category Management</h2>
+          <p className="text-gray-600 mt-1">Organize your products into categories</p>
+        </div>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm}>
+            <Button onClick={resetForm} className="bg-blue-600 hover:bg-blue-700">
               <Plus className="h-4 w-4 mr-2" />
               Add Category
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>
                 {editingCategory ? 'Edit Category' : 'Create Category'}
@@ -154,16 +168,21 @@ export function CategoryManagement() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
+                  placeholder="Enter category name"
                 />
               </div>
+              
               <div>
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Enter category description"
+                  rows={3}
                 />
               </div>
+              
               <div className="flex items-center space-x-2">
                 <Switch
                   id="status"
@@ -172,56 +191,87 @@ export function CategoryManagement() {
                 />
                 <Label htmlFor="status">Active</Label>
               </div>
-              <Button type="submit" className="w-full">
-                {editingCategory ? 'Update' : 'Create'} Category
-              </Button>
+              
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  {editingCategory ? 'Update' : 'Create'} Category
+                </Button>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {categories.map((category) => (
-          <Card key={category.id}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <CardTitle className="text-lg">{category.name}</CardTitle>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(category)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(category.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600 mb-2">{category.description}</p>
-              <div className="flex justify-between items-center">
-                <span className={`px-2 py-1 rounded text-sm ${
-                  category.status === 'on' 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {category.status === 'on' ? 'Active' : 'Inactive'}
-                </span>
-                <span className="text-sm text-gray-500">
-                  {new Date(category.created_at).toLocaleDateString()}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="flex items-center space-x-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            placeholder="Search categories..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="text-sm text-gray-600">
+          {filteredCategories.length} of {categories.length} categories
+        </div>
       </div>
+
+      {filteredCategories.length === 0 ? (
+        <div className="text-center py-12">
+          <FolderOpen className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No categories found</h3>
+          <p className="text-gray-500">
+            {searchTerm ? 'Try adjusting your search terms' : 'Get started by creating your first category'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredCategories.map((category) => (
+            <Card key={category.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg font-semibold">{category.name}</CardTitle>
+                    <Badge 
+                      variant={category.status === 'on' ? 'default' : 'secondary'}
+                      className="mt-2"
+                    >
+                      {category.status === 'on' ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                  <div className="flex space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(category)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(category.id)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 text-sm mb-3">{category.description}</p>
+                <div className="text-xs text-gray-500">
+                  Created: {new Date(category.created_at).toLocaleDateString()}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -111,8 +111,10 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
       if (!filtered.find(sub => sub.id === form.getValues('subcategory_id'))) {
         form.setValue('subcategory_id', '');
       }
+    } else {
+      setFilteredSubcategories([]);
     }
-  }, [watchedCategoryId, subcategories]);
+  }, [watchedCategoryId, subcategories, form]);
 
   const fetchCategories = async () => {
     try {
@@ -238,9 +240,24 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
     }
   };
 
+  const handleVariantImageUpload = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        updateColorVariant(index, 'image_url', e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
+  };
+
+  const removeVariantImage = (index: number) => {
+    updateColorVariant(index, 'image_url', '');
   };
 
   const uploadImage = async (): Promise<string | null> => {
@@ -292,6 +309,29 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
   const removeColorVariant = (index: number) => {
     const updated = colorVariants.filter((_, i) => i !== index);
     setColorVariants(updated);
+  };
+
+  const addSizeVariant = (colorVariantIndex: number) => {
+    const colorVariantId = colorVariants[colorVariantIndex].id;
+    const newSize: SizeVariant = {
+      id: `temp-${Date.now()}`,
+      size_name: '',
+      size_code: '',
+      stock_quantity: 0,
+      color_variant_id: colorVariantId,
+    };
+    setSizeVariants([...sizeVariants, newSize]);
+  };
+
+  const updateSizeVariant = (index: number, field: keyof SizeVariant, value: any) => {
+    const updated = [...sizeVariants];
+    updated[index] = { ...updated[index], [field]: value };
+    setSizeVariants(updated);
+  };
+
+  const removeSizeVariant = (index: number) => {
+    const updated = sizeVariants.filter((_, i) => i !== index);
+    setSizeVariants(updated);
   };
 
   const onSubmit = async (data: z.infer<typeof productSchema>) => {
@@ -397,7 +437,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
           <Button variant="outline" onClick={onCancel}>
@@ -412,123 +452,177 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
 
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="basic">Basic Info</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="basic">Product Information</TabsTrigger>
             <TabsTrigger value="pricing">Pricing & Stock</TabsTrigger>
             <TabsTrigger value="variants">Variants</TabsTrigger>
-            <TabsTrigger value="images">Images</TabsTrigger>
           </TabsList>
 
           <TabsContent value="basic" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Product Information</CardTitle>
+                <CardTitle>Basic Information</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Product Name</Label>
-                  <Input
-                    id="name"
-                    {...form.register('name')}
-                    placeholder="Enter product name"
-                  />
-                  {form.formState.errors.name && (
-                    <p className="text-red-500 text-sm mt-1">{form.formState.errors.name.message}</p>
-                  )}
-                </div>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="name">Product Name</Label>
+                      <Input
+                        id="name"
+                        {...form.register('name')}
+                        placeholder="Enter product name"
+                      />
+                      {form.formState.errors.name && (
+                        <p className="text-red-500 text-sm mt-1">{form.formState.errors.name.message}</p>
+                      )}
+                    </div>
 
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    {...form.register('description')}
-                    placeholder="Enter product description"
-                    rows={3}
-                  />
-                </div>
+                    <div>
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        {...form.register('description')}
+                        placeholder="Enter product description"
+                        rows={4}
+                      />
+                    </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="category">Category</Label>
-                    <Select
-                      value={form.watch('category_id')}
-                      onValueChange={(value) => form.setValue('category_id', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {form.formState.errors.category_id && (
-                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.category_id.message}</p>
-                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="category">Category</Label>
+                        <Select
+                          value={form.watch('category_id')}
+                          onValueChange={(value) => form.setValue('category_id', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((category) => (
+                              <SelectItem key={category.id} value={category.id}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {form.formState.errors.category_id && (
+                          <p className="text-red-500 text-sm mt-1">{form.formState.errors.category_id.message}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="subcategory">Subcategory</Label>
+                        <Select
+                          value={form.watch('subcategory_id')}
+                          onValueChange={(value) => form.setValue('subcategory_id', value)}
+                          disabled={!watchedCategoryId}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select subcategory" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {filteredSubcategories.map((subcategory) => (
+                              <SelectItem key={subcategory.id} value={subcategory.id}>
+                                {subcategory.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {form.formState.errors.subcategory_id && (
+                          <p className="text-red-500 text-sm mt-1">{form.formState.errors.subcategory_id.message}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="is_featured"
+                          checked={form.watch('is_featured')}
+                          onCheckedChange={(checked) => form.setValue('is_featured', checked)}
+                        />
+                        <Label htmlFor="is_featured">Featured Product</Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="has_color_variants"
+                          checked={form.watch('has_color_variants')}
+                          onCheckedChange={(checked) => {
+                            form.setValue('has_color_variants', checked);
+                            if (!checked) {
+                              setColorVariants([]);
+                            }
+                          }}
+                        />
+                        <Label htmlFor="has_color_variants">Color Variants</Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="has_size_variants"
+                          checked={form.watch('has_size_variants')}
+                          onCheckedChange={(checked) => {
+                            form.setValue('has_size_variants', checked);
+                            if (!checked) {
+                              setSizeVariants([]);
+                            }
+                          }}
+                        />
+                        <Label htmlFor="has_size_variants">Size Variants</Label>
+                      </div>
+                    </div>
                   </div>
 
                   <div>
-                    <Label htmlFor="subcategory">Subcategory</Label>
-                    <Select
-                      value={form.watch('subcategory_id')}
-                      onValueChange={(value) => form.setValue('subcategory_id', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select subcategory" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filteredSubcategories.map((subcategory) => (
-                          <SelectItem key={subcategory.id} value={subcategory.id}>
-                            {subcategory.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {form.formState.errors.subcategory_id && (
-                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.subcategory_id.message}</p>
-                    )}
-                  </div>
-                </div>
+                    <Label>Product Image</Label>
+                    <div className="mt-2 space-y-4">
+                      <div>
+                        <input
+                          id="image-upload"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor="image-upload"
+                          className="cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload Image
+                        </label>
+                      </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="is_featured"
-                      checked={form.watch('is_featured')}
-                      onCheckedChange={(checked) => form.setValue('is_featured', checked)}
-                    />
-                    <Label htmlFor="is_featured">Featured Product</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="has_color_variants"
-                      checked={form.watch('has_color_variants')}
-                      onCheckedChange={(checked) => {
-                        form.setValue('has_color_variants', checked);
-                        if (!checked) {
-                          setColorVariants([]);
-                        }
-                      }}
-                    />
-                    <Label htmlFor="has_color_variants">Color Variants</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="has_size_variants"
-                      checked={form.watch('has_size_variants')}
-                      onCheckedChange={(checked) => {
-                        form.setValue('has_size_variants', checked);
-                        if (!checked) {
-                          setSizeVariants([]);
-                        }
-                      }}
-                    />
-                    <Label htmlFor="has_size_variants">Size Variants</Label>
+                      {imagePreview && (
+                        <div className="relative">
+                          <img
+                            src={imagePreview}
+                            alt="Product preview"
+                            className="w-full max-w-sm h-48 object-cover rounded-lg border"
+                          />
+                          <div className="absolute top-2 right-2 space-x-1">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => window.open(imagePreview, '_blank')}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              onClick={removeImage}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -604,7 +698,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>Color Variants</CardTitle>
+                    <CardTitle>Color & Size Variants</CardTitle>
                     <Button type="button" onClick={addColorVariant} variant="outline">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Color
@@ -615,11 +709,11 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
                   {colorVariants.length === 0 ? (
                     <p className="text-gray-500 text-center py-4">No color variants added yet</p>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                       {colorVariants.map((variant, index) => (
-                        <div key={variant.id} className="border rounded-lg p-4">
+                        <div key={variant.id} className="border rounded-lg p-6">
                           <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-medium">Color Variant {index + 1}</h4>
+                            <h4 className="font-medium text-lg">Color Variant {index + 1}</h4>
                             <Button
                               type="button"
                               variant="outline"
@@ -629,23 +723,127 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Color Name</Label>
-                              <Input
-                                value={variant.color_name}
-                                onChange={(e) => updateColorVariant(index, 'color_name', e.target.value)}
-                                placeholder="e.g., Red, Blue, Green"
-                              />
+                          
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label>Color Name</Label>
+                                  <Input
+                                    value={variant.color_name}
+                                    onChange={(e) => updateColorVariant(index, 'color_name', e.target.value)}
+                                    placeholder="e.g., Red, Blue, Green"
+                                  />
+                                </div>
+                                <div>
+                                  <Label>Stock Quantity</Label>
+                                  <Input
+                                    type="number"
+                                    value={variant.stock_quantity}
+                                    onChange={(e) => updateColorVariant(index, 'stock_quantity', parseInt(e.target.value) || 0)}
+                                    placeholder="0"
+                                  />
+                                </div>
+                              </div>
+
+                              {watchedHasSizeVariants && (
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <Label>Size Variants</Label>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => addSizeVariant(index)}
+                                    >
+                                      <Plus className="h-3 w-3 mr-1" />
+                                      Add Size
+                                    </Button>
+                                  </div>
+                                  {sizeVariants
+                                    .filter(sv => sv.color_variant_id === variant.id)
+                                    .map((size, sizeIndex) => (
+                                      <div key={size.id} className="grid grid-cols-3 gap-2 mb-2">
+                                        <Input
+                                          placeholder="Size (S, M, L)"
+                                          value={size.size_name}
+                                          onChange={(e) => updateSizeVariant(sizeIndex, 'size_name', e.target.value)}
+                                        />
+                                        <Input
+                                          placeholder="Code (optional)"
+                                          value={size.size_code || ''}
+                                          onChange={(e) => updateSizeVariant(sizeIndex, 'size_code', e.target.value)}
+                                        />
+                                        <div className="flex space-x-1">
+                                          <Input
+                                            type="number"
+                                            placeholder="Stock"
+                                            value={size.stock_quantity}
+                                            onChange={(e) => updateSizeVariant(sizeIndex, 'stock_quantity', parseInt(e.target.value) || 0)}
+                                          />
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => removeSizeVariant(sizeIndex)}
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                </div>
+                              )}
                             </div>
+
                             <div>
-                              <Label>Stock Quantity</Label>
-                              <Input
-                                type="number"
-                                value={variant.stock_quantity}
-                                onChange={(e) => updateColorVariant(index, 'stock_quantity', parseInt(e.target.value) || 0)}
-                                placeholder="0"
-                              />
+                              <Label>Variant Image</Label>
+                              <div className="mt-2 space-y-4">
+                                <div>
+                                  <input
+                                    id={`variant-image-${index}`}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => handleVariantImageUpload(e, index)}
+                                    className="hidden"
+                                  />
+                                  <label
+                                    htmlFor={`variant-image-${index}`}
+                                    className="cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                  >
+                                    <Upload className="h-4 w-4 mr-2" />
+                                    Upload Variant Image
+                                  </label>
+                                </div>
+
+                                {variant.image_url && (
+                                  <div className="relative">
+                                    <img
+                                      src={variant.image_url}
+                                      alt={`${variant.color_name} variant`}
+                                      className="w-full h-32 object-cover rounded-lg border"
+                                    />
+                                    <div className="absolute top-2 right-2 space-x-1">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={() => window.open(variant.image_url, '_blank')}
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => removeVariantImage(index)}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -657,69 +855,10 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
             ) : (
               <Card>
                 <CardContent className="text-center py-8">
-                  <p className="text-gray-500">Enable color variants to manage different colors</p>
+                  <p className="text-gray-500">Enable color variants to manage different colors and sizes</p>
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-
-          <TabsContent value="images" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Product Images</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="image-upload">Main Product Image</Label>
-                    <div className="mt-2">
-                      <input
-                        id="image-upload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                      />
-                      <label
-                        htmlFor="image-upload"
-                        className="cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload Image
-                      </label>
-                    </div>
-                  </div>
-
-                  {imagePreview && (
-                    <div className="relative">
-                      <img
-                        src={imagePreview}
-                        alt="Product preview"
-                        className="w-48 h-48 object-cover rounded-lg border"
-                      />
-                      <div className="absolute top-2 right-2 space-x-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => window.open(imagePreview, '_blank')}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="destructive"
-                          onClick={removeImage}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
 
