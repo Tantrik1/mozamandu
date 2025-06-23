@@ -23,7 +23,6 @@ interface Subcategory {
   description: string;
   selling_price: number;
   discount_amount: number;
-  discount_unit: string;
   minimum_quantity_for_discount: number;
   status: 'on' | 'off';
   category_id: string;
@@ -42,7 +41,6 @@ export function SubcategoryManagement() {
     category_id: '',
     selling_price: '',
     discount_amount: '',
-    discount_unit: 'percentage',
     minimum_quantity_for_discount: '1',
     status: true,
   });
@@ -98,7 +96,6 @@ export function SubcategoryManagement() {
       category_id: formData.category_id,
       selling_price: parseFloat(formData.selling_price),
       discount_amount: parseFloat(formData.discount_amount) || 0,
-      discount_unit: formData.discount_unit,
       minimum_quantity_for_discount: parseInt(formData.minimum_quantity_for_discount) || 1,
       status: formData.status ? 'on' : 'off' as 'on' | 'off',
     };
@@ -141,8 +138,7 @@ export function SubcategoryManagement() {
       description: subcategory.description,
       category_id: subcategory.category_id,
       selling_price: subcategory.selling_price.toString(),
-      discount_amount: subcategory.discount_amount.toString(),
-      discount_unit: subcategory.discount_unit,
+      discount_amount: subcategory.discount_amount?.toString() || '0',
       minimum_quantity_for_discount: (subcategory.minimum_quantity_for_discount || 1).toString(),
       status: subcategory.status === 'on',
     });
@@ -179,7 +175,6 @@ export function SubcategoryManagement() {
       category_id: '',
       selling_price: '',
       discount_amount: '',
-      discount_unit: 'percentage',
       minimum_quantity_for_discount: '1',
       status: true,
     });
@@ -256,7 +251,7 @@ export function SubcategoryManagement() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="discount_amount">Discount Amount</Label>
+                  <Label htmlFor="discount_amount">Discount Amount ($)</Label>
                   <Input
                     id="discount_amount"
                     type="number"
@@ -267,36 +262,19 @@ export function SubcategoryManagement() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="discount_unit">Discount Type</Label>
-                  <Select 
-                    value={formData.discount_unit} 
-                    onValueChange={(value) => setFormData({ ...formData, discount_unit: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="percentage">Percentage (%)</SelectItem>
-                      <SelectItem value="fixed">Fixed Amount ($)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="minimum_quantity_for_discount">Minimum Quantity for Discount</Label>
-                  <Input
-                    id="minimum_quantity_for_discount"
-                    type="number"
-                    min="1"
-                    value={formData.minimum_quantity_for_discount}
-                    onChange={(e) => setFormData({ ...formData, minimum_quantity_for_discount: e.target.value })}
-                    placeholder="e.g., 3"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Discount applies only after this quantity
-                  </p>
-                </div>
+              <div>
+                <Label htmlFor="minimum_quantity_for_discount">Minimum Quantity for Discount</Label>
+                <Input
+                  id="minimum_quantity_for_discount"
+                  type="number"
+                  min="1"
+                  value={formData.minimum_quantity_for_discount}
+                  onChange={(e) => setFormData({ ...formData, minimum_quantity_for_discount: e.target.value })}
+                  placeholder="e.g., 3"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Discount applies only after this quantity
+                </p>
               </div>
               
               <div className="flex items-center space-x-2">
@@ -355,8 +333,7 @@ export function SubcategoryManagement() {
                     <div className="flex justify-between">
                       <span className="text-sm">Discount:</span>
                       <span className="text-green-600">
-                        {subcategory.discount_amount}
-                        {subcategory.discount_unit === 'percentage' ? '%' : '$'}
+                        ${subcategory.discount_amount}
                       </span>
                     </div>
                     <div className="flex justify-between">
