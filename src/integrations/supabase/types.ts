@@ -71,48 +71,6 @@ export type Database = {
           },
         ]
       }
-      product_images: {
-        Row: {
-          color_variant_id: string | null
-          created_at: string | null
-          id: string
-          image_url: string
-          is_primary: boolean | null
-          product_id: string
-        }
-        Insert: {
-          color_variant_id?: string | null
-          created_at?: string | null
-          id?: string
-          image_url: string
-          is_primary?: boolean | null
-          product_id: string
-        }
-        Update: {
-          color_variant_id?: string | null
-          created_at?: string | null
-          id?: string
-          image_url?: string
-          is_primary?: boolean | null
-          product_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "product_images_color_variant_id_fkey"
-            columns: ["color_variant_id"]
-            isOneToOne: false
-            referencedRelation: "color_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_images_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       products: {
         Row: {
           category_id: string
@@ -122,6 +80,7 @@ export type Database = {
           has_color_variants: boolean | null
           has_size_variants: boolean | null
           id: string
+          image_url: string | null
           is_featured: boolean | null
           name: string
           selling_price: number | null
@@ -137,6 +96,7 @@ export type Database = {
           has_color_variants?: boolean | null
           has_size_variants?: boolean | null
           id?: string
+          image_url?: string | null
           is_featured?: boolean | null
           name: string
           selling_price?: number | null
@@ -152,6 +112,7 @@ export type Database = {
           has_color_variants?: boolean | null
           has_size_variants?: boolean | null
           id?: string
+          image_url?: string | null
           is_featured?: boolean | null
           name?: string
           selling_price?: number | null

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Palette, Ruler } from 'lucide-react';
+import { Plus, Edit, Trash2, Palette, Ruler, Upload, X } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -36,6 +36,7 @@ interface Product {
   status: 'active' | 'inactive';
   category_id: string;
   subcategory_id: string;
+  image_url: string;
   categories: { name: string };
   subcategories: { name: string; selling_price: number };
   created_at: string;
@@ -48,6 +49,9 @@ export function ProductManagement() {
   const [filteredSubcategories, setFilteredSubcategories] = useState<Subcategory[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -131,8 +135,66 @@ export function ProductManagement() {
     }
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview('');
+  };
+
+  const uploadImage = async (): Promise<string | null> => {
+    if (!imageFile) return null;
+
+    setIsUploading(true);
+    const fileExt = imageFile.name.split('.').pop();
+    const fileName = `${Date.now()}.${fileExt}`;
+    const filePath = `products/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('product-images')
+      .upload(filePath, imageFile);
+
+    setIsUploading(false);
+
+    if (uploadError) {
+      toast({
+        title: "Error",
+        description: "Failed to upload image",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    const { data } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    let imageUrl = editingProduct?.image_url || '';
+    
+    if (imageFile) {
+      const uploadedImageUrl = await uploadImage();
+      if (uploadedImageUrl) {
+        imageUrl = uploadedImageUrl;
+      } else {
+        return; // Stop if image upload failed
+      }
+    }
     
     const productData = {
       name: formData.name,
@@ -145,6 +207,7 @@ export function ProductManagement() {
       has_color_variants: formData.has_color_variants,
       has_size_variants: formData.has_size_variants,
       status: formData.status ? 'active' : 'inactive' as 'active' | 'inactive',
+      image_url: imageUrl,
     };
 
     let error;
@@ -192,6 +255,9 @@ export function ProductManagement() {
       has_size_variants: product.has_size_variants,
       status: product.status === 'active',
     });
+    if (product.image_url) {
+      setImagePreview(product.image_url);
+    }
     setIsCreateModalOpen(true);
   };
 
@@ -232,6 +298,8 @@ export function ProductManagement() {
       status: true,
     });
     setEditingProduct(null);
+    setImageFile(null);
+    setImagePreview('');
   };
 
   const getProductPrice = (product: Product) => {
@@ -314,6 +382,46 @@ export function ProductManagement() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
+
+              <div>
+                <Label>Product Image</Label>
+                <div className="mt-2">
+                  {imagePreview ? (
+                    <div className="relative inline-block">
+                      <img 
+                        src={imagePreview} 
+                        alt="Preview" 
+                        className="w-32 h-32 object-cover rounded-lg border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute -top-2 -right-2 rounded-full w-6 h-6 p-0"
+                        onClick={removeImage}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                      <div className="mt-2">
+                        <Label htmlFor="image-upload" className="cursor-pointer">
+                          <span className="text-blue-600 hover:text-blue-500">Upload an image</span>
+                          <Input
+                            id="image-upload"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageChange}
+                            className="hidden"
+                          />
+                        </Label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -384,8 +492,8 @@ export function ProductManagement() {
                 </div>
               </div>
               
-              <Button type="submit" className="w-full">
-                {editingProduct ? 'Update' : 'Create'} Product
+              <Button type="submit" className="w-full" disabled={isUploading}>
+                {isUploading ? 'Uploading...' : editingProduct ? 'Update' : 'Create'} Product
               </Button>
             </form>
           </DialogContent>
@@ -422,6 +530,13 @@ export function ProductManagement() {
               </div>
             </CardHeader>
             <CardContent>
+              {product.image_url && (
+                <img 
+                  src={product.image_url} 
+                  alt={product.name}
+                  className="w-full h-48 object-cover rounded-lg mb-3"
+                />
+              )}
               <p className="text-gray-600 mb-3 text-sm">{product.description}</p>
               <div className="space-y-2">
                 <div className="flex justify-between">
