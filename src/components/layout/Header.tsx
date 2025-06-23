@@ -1,7 +1,7 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, User, LogOut, Settings } from 'lucide-react';
+import { ShoppingCart, User, LogOut, Settings, LayoutDashboard } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,41 +9,26 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
 export function Header() {
-  const { user, signOut } = useAuth();
+  const { user, userProfile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [userProfile, setUserProfile] = useState<any>(null);
-
-  useEffect(() => {
-    if (user) {
-      fetchUserProfile();
-    }
-  }, [user]);
-
-  const fetchUserProfile = async () => {
-    if (!user) return;
-    
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (error) {
-      console.error('Error fetching user profile:', error);
-      return;
-    }
-
-    setUserProfile(data);
-  };
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
+  };
+
+  const handleDashboardClick = () => {
+    if (userProfile?.role === 'admin') {
+      navigate('/admin');
+    } else {
+      navigate('/');
+    }
   };
 
   const isActive = (path: string) => location.pathname === path;
@@ -103,12 +88,11 @@ export function Header() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {userProfile?.role === 'admin' && (
-                    <DropdownMenuItem onClick={() => navigate('/admin')}>
-                      <Settings className="mr-2 h-4 w-4" />
-                      Admin Panel
-                    </DropdownMenuItem>
-                  )}
+                  <DropdownMenuItem onClick={handleDashboardClick}>
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    {userProfile?.role === 'admin' ? 'Admin Panel' : 'Dashboard'}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign Out

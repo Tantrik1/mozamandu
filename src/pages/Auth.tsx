@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 
 export default function Auth() {
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, userProfile } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [signInData, setSignInData] = useState({
@@ -24,20 +23,21 @@ export default function Auth() {
   });
 
   useEffect(() => {
-    if (user) {
-      navigate('/');
+    if (user && userProfile) {
+      // Redirect based on user role
+      if (userProfile.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     }
-  }, [user, navigate]);
+  }, [user, userProfile, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    const { error } = await signIn(signInData.email, signInData.password);
-    
-    if (!error) {
-      navigate('/');
-    }
+    await signIn(signInData.email, signInData.password);
     
     setIsLoading(false);
   };
