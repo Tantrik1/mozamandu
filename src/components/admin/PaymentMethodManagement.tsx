@@ -83,8 +83,8 @@ export function PaymentMethodManagement() {
 
     setUploading(true);
     const fileExt = qrCodeFile.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `qr-codes/${fileName}`;
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = fileName;
 
     try {
       const { error: uploadError } = await supabase.storage
@@ -95,7 +95,7 @@ export function PaymentMethodManagement() {
         throw uploadError;
       }
 
-      const { data } = await supabase.storage
+      const { data } = supabase.storage
         .from('payment-qr-codes')
         .getPublicUrl(filePath);
 
