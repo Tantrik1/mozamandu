@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Trash2, Upload, X, Eye } from 'lucide-react';
+import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
+import { ProductVariantForm } from './ProductVariantForm';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -41,20 +40,20 @@ interface Subcategory {
   category_id: string;
 }
 
-interface ColorVariant {
-  id: string;
-  color_name: string;
-  stock_quantity: number;
-  image_url?: string;
-  has_sizes: boolean;
-}
-
 interface SizeVariant {
-  id: string;
+  id?: string;
   size_name: string;
   size_code?: string;
   stock_quantity: number;
-  color_variant_id: string;
+}
+
+interface ColorVariant {
+  id?: string;
+  color_name: string;
+  image_url?: string;
+  has_sizes: boolean;
+  stock_quantity?: number;
+  size_variants: SizeVariant[];
 }
 
 interface ProductFormProps {
@@ -68,7 +67,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [filteredSubcategories, setFilteredSubcategories] = useState<Subcategory[]>([]);
   const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
-  const [sizeVariants, setSizeVariants] = useState<SizeVariant[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -173,11 +171,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
       if (product.image_url) {
         setImagePreview(product.image_url);
       }
-
-      // Fetch color variants if they exist
-      if (product.has_color_variants) {
-        await fetchColorVariants();
-      }
     } catch (error) {
       console.error('Error fetching product:', error);
       toast({
@@ -185,46 +178,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
         description: 'Failed to fetch product details',
         variant: 'destructive',
       });
-    }
-  };
-
-  const fetchColorVariants = async () => {
-    if (!productId) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('color_variants')
-        .select('*')
-        .eq('product_id', productId)
-        .order('color_name');
-
-      if (error) throw error;
-      setColorVariants(data || []);
-
-      // If product has size variants, fetch them too
-      if (watchedHasSizeVariants && data && data.length > 0) {
-        await fetchSizeVariants();
-      }
-    } catch (error) {
-      console.error('Error fetching color variants:', error);
-    }
-  };
-
-  const fetchSizeVariants = async () => {
-    if (!productId || colorVariants.length === 0) return;
-
-    try {
-      const colorVariantIds = colorVariants.map(cv => cv.id);
-      const { data, error } = await supabase
-        .from('size_variants')
-        .select('*')
-        .in('color_variant_id', colorVariantIds)
-        .order('size_name');
-
-      if (error) throw error;
-      setSizeVariants(data || []);
-    } catch (error) {
-      console.error('Error fetching size variants:', error);
     }
   };
 
@@ -240,24 +193,9 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
     }
   };
 
-  const handleVariantImageUpload = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        updateColorVariant(index, 'image_url', e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
-  };
-
-  const removeVariantImage = (index: number) => {
-    updateColorVariant(index, 'image_url', '');
   };
 
   const uploadImage = async (): Promise<string | null> => {
@@ -290,50 +228,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
     }
   };
 
-  const addColorVariant = () => {
-    const newVariant: ColorVariant = {
-      id: `temp-${Date.now()}`,
-      color_name: '',
-      stock_quantity: 0,
-      has_sizes: watchedHasSizeVariants,
-    };
-    setColorVariants([...colorVariants, newVariant]);
-  };
-
-  const updateColorVariant = (index: number, field: keyof ColorVariant, value: any) => {
-    const updated = [...colorVariants];
-    updated[index] = { ...updated[index], [field]: value };
-    setColorVariants(updated);
-  };
-
-  const removeColorVariant = (index: number) => {
-    const updated = colorVariants.filter((_, i) => i !== index);
-    setColorVariants(updated);
-  };
-
-  const addSizeVariant = (colorVariantIndex: number) => {
-    const colorVariantId = colorVariants[colorVariantIndex].id;
-    const newSize: SizeVariant = {
-      id: `temp-${Date.now()}`,
-      size_name: '',
-      size_code: '',
-      stock_quantity: 0,
-      color_variant_id: colorVariantId,
-    };
-    setSizeVariants([...sizeVariants, newSize]);
-  };
-
-  const updateSizeVariant = (index: number, field: keyof SizeVariant, value: any) => {
-    const updated = [...sizeVariants];
-    updated[index] = { ...updated[index], [field]: value };
-    setSizeVariants(updated);
-  };
-
-  const removeSizeVariant = (index: number) => {
-    const updated = sizeVariants.filter((_, i) => i !== index);
-    setSizeVariants(updated);
-  };
-
   const onSubmit = async (data: z.infer<typeof productSchema>) => {
     setLoading(true);
     try {
@@ -344,7 +238,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
         imageUrl = await uploadImage();
       }
 
-      // Ensure all required fields are present and properly typed
       const productData = {
         name: data.name,
         description: data.description || null,
@@ -384,7 +277,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
 
       // Save color variants if enabled
       if (data.has_color_variants && colorVariants.length > 0 && currentProductId) {
-        await saveColorVariants(currentProductId);
+        await saveColorVariants(currentProductId, data.has_size_variants);
       }
 
       toast({
@@ -405,30 +298,71 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
     }
   };
 
-  const saveColorVariants = async (currentProductId: string) => {
+  const saveColorVariants = async (currentProductId: string, hasSizeVariants: boolean) => {
     try {
-      // Delete existing variants
+      // Delete existing variants and their size variants
+      const { data: existingColors } = await supabase
+        .from('color_variants')
+        .select('id')
+        .eq('product_id', currentProductId);
+
+      if (existingColors) {
+        for (const color of existingColors) {
+          await supabase
+            .from('size_variants')
+            .delete()
+            .eq('color_variant_id', color.id);
+        }
+      }
+
       await supabase
         .from('color_variants')
         .delete()
         .eq('product_id', currentProductId);
 
-      // Insert new variants
+      // Insert new color variants
       const validVariants = colorVariants.filter(cv => cv.color_name.trim());
       if (validVariants.length > 0) {
-        const { error } = await supabase
+        const { data: insertedColors, error: colorError } = await supabase
           .from('color_variants')
           .insert(
             validVariants.map(cv => ({
               product_id: currentProductId,
               color_name: cv.color_name,
-              stock_quantity: cv.stock_quantity,
+              stock_quantity: hasSizeVariants ? 0 : (cv.stock_quantity || 0),
               image_url: cv.image_url || null,
-              has_sizes: cv.has_sizes,
+              has_sizes: hasSizeVariants,
             }))
-          );
+          )
+          .select('id, color_name');
 
-        if (error) throw error;
+        if (colorError) throw colorError;
+
+        // Insert size variants if applicable
+        if (hasSizeVariants && insertedColors) {
+          for (let i = 0; i < validVariants.length; i++) {
+            const variant = validVariants[i];
+            const insertedColor = insertedColors[i];
+            
+            if (variant.size_variants && variant.size_variants.length > 0) {
+              const validSizes = variant.size_variants.filter(sv => sv.size_name.trim());
+              if (validSizes.length > 0) {
+                const { error: sizeError } = await supabase
+                  .from('size_variants')
+                  .insert(
+                    validSizes.map(sv => ({
+                      color_variant_id: insertedColor.id,
+                      size_name: sv.size_name,
+                      size_code: sv.size_code || null,
+                      stock_quantity: sv.stock_quantity,
+                    }))
+                  );
+
+                if (sizeError) throw sizeError;
+              }
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Error saving color variants:', error);
@@ -565,9 +499,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
                           checked={form.watch('has_size_variants')}
                           onCheckedChange={(checked) => {
                             form.setValue('has_size_variants', checked);
-                            if (!checked) {
-                              setSizeVariants([]);
-                            }
                           }}
                         />
                         <Label htmlFor="has_size_variants">Size Variants</Label>
@@ -694,171 +625,13 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
           </TabsContent>
 
           <TabsContent value="variants" className="space-y-6">
-            {watchedHasColorVariants ? (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Color & Size Variants</CardTitle>
-                    <Button type="button" onClick={addColorVariant} variant="outline">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Color
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {colorVariants.length === 0 ? (
-                    <p className="text-gray-500 text-center py-4">No color variants added yet</p>
-                  ) : (
-                    <div className="space-y-6">
-                      {colorVariants.map((variant, index) => (
-                        <div key={variant.id} className="border rounded-lg p-6">
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-medium text-lg">Color Variant {index + 1}</h4>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeColorVariant(index)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <Label>Color Name</Label>
-                                  <Input
-                                    value={variant.color_name}
-                                    onChange={(e) => updateColorVariant(index, 'color_name', e.target.value)}
-                                    placeholder="e.g., Red, Blue, Green"
-                                  />
-                                </div>
-                                <div>
-                                  <Label>Stock Quantity</Label>
-                                  <Input
-                                    type="number"
-                                    value={variant.stock_quantity}
-                                    onChange={(e) => updateColorVariant(index, 'stock_quantity', parseInt(e.target.value) || 0)}
-                                    placeholder="0"
-                                  />
-                                </div>
-                              </div>
-
-                              {watchedHasSizeVariants && (
-                                <div>
-                                  <div className="flex items-center justify-between mb-2">
-                                    <Label>Size Variants</Label>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => addSizeVariant(index)}
-                                    >
-                                      <Plus className="h-3 w-3 mr-1" />
-                                      Add Size
-                                    </Button>
-                                  </div>
-                                  {sizeVariants
-                                    .filter(sv => sv.color_variant_id === variant.id)
-                                    .map((size, sizeIndex) => (
-                                      <div key={size.id} className="grid grid-cols-3 gap-2 mb-2">
-                                        <Input
-                                          placeholder="Size (S, M, L)"
-                                          value={size.size_name}
-                                          onChange={(e) => updateSizeVariant(sizeIndex, 'size_name', e.target.value)}
-                                        />
-                                        <Input
-                                          placeholder="Code (optional)"
-                                          value={size.size_code || ''}
-                                          onChange={(e) => updateSizeVariant(sizeIndex, 'size_code', e.target.value)}
-                                        />
-                                        <div className="flex space-x-1">
-                                          <Input
-                                            type="number"
-                                            placeholder="Stock"
-                                            value={size.stock_quantity}
-                                            onChange={(e) => updateSizeVariant(sizeIndex, 'stock_quantity', parseInt(e.target.value) || 0)}
-                                          />
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => removeSizeVariant(sizeIndex)}
-                                          >
-                                            <X className="h-3 w-3" />
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    ))}
-                                </div>
-                              )}
-                            </div>
-
-                            <div>
-                              <Label>Variant Image</Label>
-                              <div className="mt-2 space-y-4">
-                                <div>
-                                  <input
-                                    id={`variant-image-${index}`}
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => handleVariantImageUpload(e, index)}
-                                    className="hidden"
-                                  />
-                                  <label
-                                    htmlFor={`variant-image-${index}`}
-                                    className="cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-                                  >
-                                    <Upload className="h-4 w-4 mr-2" />
-                                    Upload Variant Image
-                                  </label>
-                                </div>
-
-                                {variant.image_url && (
-                                  <div className="relative">
-                                    <img
-                                      src={variant.image_url}
-                                      alt={`${variant.color_name} variant`}
-                                      className="w-full h-32 object-cover rounded-lg border"
-                                    />
-                                    <div className="absolute top-2 right-2 space-x-1">
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="secondary"
-                                        onClick={() => window.open(variant.image_url, '_blank')}
-                                      >
-                                        <Eye className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={() => removeVariantImage(index)}
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-500">Enable color variants to manage different colors and sizes</p>
-                </CardContent>
-              </Card>
-            )}
+            <ProductVariantForm
+              productId={productId}
+              hasColorVariants={watchedHasColorVariants}
+              hasSizeVariants={watchedHasSizeVariants}
+              onVariantsChange={setColorVariants}
+              initialVariants={colorVariants}
+            />
           </TabsContent>
         </Tabs>
 

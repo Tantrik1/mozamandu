@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { EnhancedProductForm } from './EnhancedProductForm';
 import { ProductDetailView } from './ProductDetailView';
 import { Pencil, Trash2, Plus, Search, Package, Eye } from 'lucide-react';
+import { getProductStockSummary } from '@/utils/stockCalculation';
 
 interface Product {
   id: string;
@@ -78,11 +79,8 @@ export function ProductManagement() {
     
     for (const product of products) {
       try {
-        const { data, error } = await supabase
-          .rpc('calculate_product_stock', { product_uuid: product.id });
-        
-        if (error) throw error;
-        stocks[product.id] = data || 0;
+        const stock = await getProductStockSummary(product.id);
+        stocks[product.id] = stock;
       } catch (error) {
         console.error('Error calculating stock for product:', product.id, error);
         stocks[product.id] = product.stock_quantity || 0;
@@ -258,12 +256,21 @@ export function ProductManagement() {
                           )}
                         </p>
                         <p>
-                          <span className="font-medium">Stock:</span> {productStocks[product.id] ?? 'Loading...'}
-                          {product.has_color_variants && ' (Total across all variants)'}
+                          <span className="font-medium">Stock:</span> 
+                          <Badge variant="outline" className="ml-2">
+                            {productStocks[product.id] !== undefined ? productStocks[product.id] : 'Loading...'}
+                          </Badge>
+                          {(product.has_color_variants || product.has_size_variants) && (
+                            <span className="text-xs text-gray-500 ml-2">
+                              (Calculated from variants)
+                            </span>
+                          )}
                         </p>
-                        {product.has_color_variants && (
+                        {(product.has_color_variants || product.has_size_variants) && (
                           <div className="flex items-center space-x-1">
-                            <Badge variant="outline" className="text-xs">Color Variants</Badge>
+                            {product.has_color_variants && (
+                              <Badge variant="outline" className="text-xs">Color Variants</Badge>
+                            )}
                             {product.has_size_variants && (
                               <Badge variant="outline" className="text-xs">Size Variants</Badge>
                             )}

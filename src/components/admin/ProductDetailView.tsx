@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Edit, Trash2, Package, Palette, Ruler } from 'lucide-react';
+import { calculateProductStock, StockCalculationResult } from '@/utils/stockCalculation';
 
 interface Product {
   id: string;
@@ -25,22 +26,6 @@ interface Product {
   subcategories: { name: string } | null;
 }
 
-interface ColorVariant {
-  id: string;
-  color_name: string;
-  image_url: string | null;
-  stock_quantity: number;
-  has_sizes: boolean;
-  size_variants: SizeVariant[];
-}
-
-interface SizeVariant {
-  id: string;
-  size_name: string;
-  size_code: string | null;
-  stock_quantity: number;
-}
-
 interface ProductDetailViewProps {
   productId: string;
   onEdit: () => void;
@@ -50,9 +35,8 @@ interface ProductDetailViewProps {
 
 export function ProductDetailView({ productId, onEdit, onDelete, onBack }: ProductDetailViewProps) {
   const [product, setProduct] = useState<Product | null>(null);
-  const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
+  const [stockDetails, setStockDetails] = useState<StockCalculationResult>({ totalStock: 0 });
   const [loading, setLoading] = useState(true);
-  const [totalStock, setTotalStock] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -77,44 +61,9 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
       if (productError) throw productError;
       setProduct(productData);
 
-      // Fetch color variants if product has them
-      if (productData.has_color_variants) {
-        const { data: colorData, error: colorError } = await supabase
-          .from('color_variants')
-          .select('*')
-          .eq('product_id', productId)
-          .order('color_name');
-
-        if (colorError) throw colorError;
-
-        // Fetch size variants for each color variant
-        const colorVariantsWithSizes = await Promise.all(
-          (colorData || []).map(async (colorVariant) => {
-            let sizeVariants: SizeVariant[] = [];
-            
-            if (productData.has_size_variants && colorVariant.has_sizes) {
-              const { data: sizeData, error: sizeError } = await supabase
-                .from('size_variants')
-                .select('*')
-                .eq('color_variant_id', colorVariant.id)
-                .order('size_name');
-
-              if (sizeError) throw sizeError;
-              sizeVariants = sizeData || [];
-            }
-
-            return {
-              ...colorVariant,
-              size_variants: sizeVariants
-            };
-          })
-        );
-
-        setColorVariants(colorVariantsWithSizes);
-      }
-
-      // Calculate total stock
-      calculateTotalStock(productData);
+      // Calculate detailed stock information
+      const stockResult = await calculateProductStock(productId);
+      setStockDetails(stockResult);
       
     } catch (error) {
       console.error('Error fetching product details:', error);
@@ -125,19 +74,6 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const calculateTotalStock = async (productData: Product) => {
-    try {
-      const { data: stockData, error } = await supabase
-        .rpc('calculate_product_stock', { product_uuid: productData.id });
-      
-      if (error) throw error;
-      setTotalStock(stockData || 0);
-    } catch (error) {
-      console.error('Error calculating stock:', error);
-      setTotalStock(productData.stock_quantity || 0);
     }
   };
 
@@ -267,7 +203,7 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-600">Total Stock</h4>
-                  <p className="text-lg font-semibold">{totalStock}</p>
+                  <p className="text-lg font-semibold text-green-600">{stockDetails.totalStock}</p>
                 </div>
               </div>
               
@@ -280,13 +216,62 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
             </CardContent>
           </Card>
 
+          {/* Stock Details */}
+          {stockDetails.colorBreakdown && stockDetails.colorBreakdown.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Palette className="h-5 w-5" />
+                  <span>Stock Breakdown</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {stockDetails.colorBreakdown.map((color, index) => (
+                    <div key={index} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <h4 className="font-medium text-lg">{color.colorName}</h4>
+                          <Badge variant="secondary">
+                            Total: {color.stock}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {color.sizeBreakdown && color.sizeBreakdown.length > 0 && (
+                        <div>
+                          <div className="flex items-center space-x-2 mb-2">
+                            <Ruler className="h-4 w-4" />
+                            <h5 className="font-medium text-gray-600">Size Breakdown:</h5>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                            {color.sizeBreakdown.map((size, sizeIndex) => (
+                              <div key={sizeIndex} className="bg-gray-50 p-2 rounded border">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">{size.sizeName}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {size.stock}
+                                  </Badge>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Variant Information */}
           {(product.has_color_variants || product.has_size_variants) && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Palette className="h-5 w-5" />
-                  <span>Product Variants</span>
+                  <span>Variant Configuration</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -294,69 +279,26 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
                   {product.has_color_variants && (
                     <Badge variant="outline" className="flex items-center space-x-1">
                       <Palette className="h-3 w-3" />
-                      <span>Color Variants</span>
+                      <span>Color Variants Enabled</span>
                     </Badge>
                   )}
                   {product.has_size_variants && (
                     <Badge variant="outline" className="flex items-center space-x-1">
                       <Ruler className="h-3 w-3" />
-                      <span>Size Variants</span>
+                      <span>Size Variants Enabled</span>
                     </Badge>
                   )}
                 </div>
-
-                {product.has_color_variants && colorVariants.length > 0 && (
-                  <div className="space-y-4">
-                    {colorVariants.map((colorVariant) => (
-                      <div key={colorVariant.id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            <h4 className="font-medium text-lg">{colorVariant.color_name}</h4>
-                            {!product.has_size_variants && (
-                              <Badge variant="secondary">
-                                Stock: {colorVariant.stock_quantity}
-                              </Badge>
-                            )}
-                          </div>
-                          {colorVariant.image_url && (
-                            <img
-                              src={colorVariant.image_url}
-                              alt={colorVariant.color_name}
-                              className="w-12 h-12 object-cover rounded border"
-                            />
-                          )}
-                        </div>
-
-                        {product.has_size_variants && colorVariant.has_sizes && colorVariant.size_variants.length > 0 && (
-                          <div>
-                            <h5 className="font-medium text-gray-600 mb-2">Size Variants:</h5>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                              {colorVariant.size_variants.map((sizeVariant) => (
-                                <div key={sizeVariant.id} className="bg-gray-50 p-2 rounded border">
-                                  <div className="flex justify-between items-center">
-                                    <span className="font-medium">{sizeVariant.size_name}</span>
-                                    <Badge variant="outline" className="text-xs">
-                                      {sizeVariant.stock_quantity}
-                                    </Badge>
-                                  </div>
-                                  {sizeVariant.size_code && (
-                                    <div className="text-xs text-gray-500">
-                                      Code: {sizeVariant.size_code}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {product.has_color_variants && colorVariants.length === 0 && (
-                  <p className="text-gray-500">No color variants found</p>
-                )}
+                <p className="text-sm text-gray-600">
+                  {product.has_color_variants && product.has_size_variants 
+                    ? "This product supports both color and size variations."
+                    : product.has_color_variants
+                    ? "This product supports color variations only."
+                    : product.has_size_variants
+                    ? "This product supports size variations only."
+                    : "This product has no variants."
+                  }
+                </p>
               </CardContent>
             </Card>
           )}

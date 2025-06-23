@@ -9,20 +9,20 @@ import { Trash2, Plus, Upload, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
+interface SizeVariant {
+  id?: string;
+  size_name: string;
+  size_code?: string;
+  stock_quantity: number;
+}
+
 interface ColorVariant {
   id?: string;
   color_name: string;
   image_url?: string;
   has_sizes: boolean;
   stock_quantity?: number;
-  size_variants?: SizeVariant[];
-}
-
-interface SizeVariant {
-  id?: string;
-  size_name: string;
-  size_code?: string;
-  stock_quantity: number;
+  size_variants: SizeVariant[];
 }
 
 interface ProductVariantFormProps {
@@ -56,25 +56,49 @@ export function ProductVariantForm({
   const fetchExistingVariants = async () => {
     if (!productId) return;
 
-    const { data: colorData, error: colorError } = await supabase
-      .from('color_variants')
-      .select(`
-        *,
-        size_variants(*)
-      `)
-      .eq('product_id', productId);
+    try {
+      // Fetch color variants
+      const { data: colorData, error: colorError } = await supabase
+        .from('color_variants')
+        .select('*')
+        .eq('product_id', productId)
+        .order('color_name');
 
-    if (colorError) {
-      console.error('Error fetching variants:', colorError);
-      return;
+      if (colorError) {
+        console.error('Error fetching color variants:', colorError);
+        return;
+      }
+
+      // For each color variant, fetch its size variants
+      const variantsWithSizes = await Promise.all(
+        (colorData || []).map(async (colorVariant) => {
+          let sizeVariants: SizeVariant[] = [];
+          
+          if (hasSizeVariants && colorVariant.has_sizes) {
+            const { data: sizeData, error: sizeError } = await supabase
+              .from('size_variants')
+              .select('*')
+              .eq('color_variant_id', colorVariant.id)
+              .order('size_name');
+
+            if (sizeError) {
+              console.error('Error fetching size variants:', sizeError);
+            } else {
+              sizeVariants = sizeData || [];
+            }
+          }
+
+          return {
+            ...colorVariant,
+            size_variants: sizeVariants
+          };
+        })
+      );
+
+      setColorVariants(variantsWithSizes);
+    } catch (error) {
+      console.error('Error in fetchExistingVariants:', error);
     }
-
-    const variants = colorData.map(variant => ({
-      ...variant,
-      size_variants: variant.size_variants || []
-    }));
-
-    setColorVariants(variants);
   };
 
   const addColorVariant = () => {
@@ -82,7 +106,7 @@ export function ProductVariantForm({
       color_name: '',
       has_sizes: hasSizeVariants,
       stock_quantity: hasSizeVariants ? 0 : 0,
-      size_variants: hasSizeVariants ? [] : undefined
+      size_variants: []
     };
     setColorVariants([...colorVariants, newVariant]);
   };
@@ -100,34 +124,28 @@ export function ProductVariantForm({
 
   const addSizeVariant = (colorIndex: number) => {
     const updated = [...colorVariants];
-    if (!updated[colorIndex].size_variants) {
-      updated[colorIndex].size_variants = [];
-    }
-    updated[colorIndex].size_variants!.push({
+    const newSizeVariant: SizeVariant = {
       size_name: '',
       size_code: '',
       stock_quantity: 0
-    });
+    };
+    updated[colorIndex].size_variants.push(newSizeVariant);
     setColorVariants(updated);
   };
 
   const updateSizeVariant = (colorIndex: number, sizeIndex: number, field: keyof SizeVariant, value: any) => {
     const updated = [...colorVariants];
-    if (updated[colorIndex].size_variants) {
-      updated[colorIndex].size_variants![sizeIndex] = {
-        ...updated[colorIndex].size_variants![sizeIndex],
-        [field]: value
-      };
-      setColorVariants(updated);
-    }
+    updated[colorIndex].size_variants[sizeIndex] = {
+      ...updated[colorIndex].size_variants[sizeIndex],
+      [field]: value
+    };
+    setColorVariants(updated);
   };
 
   const removeSizeVariant = (colorIndex: number, sizeIndex: number) => {
     const updated = [...colorVariants];
-    if (updated[colorIndex].size_variants) {
-      updated[colorIndex].size_variants = updated[colorIndex].size_variants!.filter((_, i) => i !== sizeIndex);
-      setColorVariants(updated);
-    }
+    updated[colorIndex].size_variants = updated[colorIndex].size_variants.filter((_, i) => i !== sizeIndex);
+    setColorVariants(updated);
   };
 
   const handleImageUpload = async (file: File, colorIndex: number) => {
@@ -171,11 +189,20 @@ export function ProductVariantForm({
 
   const calculateTotalStock = () => {
     return colorVariants.reduce((total, variant) => {
-      if (hasSizeVariants && variant.size_variants) {
+      if (hasSizeVariants && variant.size_variants.length > 0) {
+        // Sum all size variant stocks within this color
         return total + variant.size_variants.reduce((sum, size) => sum + size.stock_quantity, 0);
       }
+      // Use color variant stock if no size variants
       return total + (variant.stock_quantity || 0);
     }, 0);
+  };
+
+  const calculateColorStock = (variant: ColorVariant) => {
+    if (hasSizeVariants && variant.size_variants.length > 0) {
+      return variant.size_variants.reduce((sum, size) => sum + size.stock_quantity, 0);
+    }
+    return variant.stock_quantity || 0;
   };
 
   if (!hasColorVariants && !hasSizeVariants) {
@@ -204,9 +231,14 @@ export function ProductVariantForm({
           <Card key={colorIndex} className="p-4">
             <CardHeader className="pb-3">
               <div className="flex justify-between items-center">
-                <CardTitle className="text-base">
-                  {hasColorVariants ? `Color Variant ${colorIndex + 1}` : 'Sizes'}
-                </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <CardTitle className="text-base">
+                    {hasColorVariants ? `${variant.color_name || `Color ${colorIndex + 1}`}` : 'Sizes'}
+                  </CardTitle>
+                  <Badge variant="secondary">
+                    Stock: {calculateColorStock(variant)}
+                  </Badge>
+                </div>
                 {hasColorVariants && (
                   <Button
                     type="button"
@@ -290,11 +322,11 @@ export function ProductVariantForm({
                   </div>
 
                   <div className="space-y-2">
-                    {variant.size_variants?.map((sizeVariant, sizeIndex) => (
+                    {variant.size_variants.map((sizeVariant, sizeIndex) => (
                       <div key={sizeIndex} className="grid grid-cols-12 gap-2 items-center p-3 border rounded">
                         <div className="col-span-3">
                           <Input
-                            placeholder="Size name"
+                            placeholder="Size name (S, M, L)"
                             value={sizeVariant.size_name}
                             onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_name', e.target.value)}
                             required
@@ -331,7 +363,7 @@ export function ProductVariantForm({
                     ))}
                   </div>
 
-                  {variant.size_variants?.length === 0 && (
+                  {variant.size_variants.length === 0 && (
                     <p className="text-sm text-gray-500 text-center py-4">
                       No sizes added yet. Click "Add Size" to get started.
                     </p>
