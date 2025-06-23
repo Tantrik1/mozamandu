@@ -105,7 +105,7 @@ export function HeroSection() {
                     </div>
 
                     {/* Glow Effect */}
-                    <div className="absolute inset-0 blur-xl animate-glow"></div>
+                    <div className="absolute inset-0 blur-xl animate-glow bg-[#000a00]"></div>
                   </div>
                 </div>)}
             </div>
