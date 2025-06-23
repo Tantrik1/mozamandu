@@ -71,6 +71,8 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const [dataLoading, setDataLoading] = useState(true);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -96,6 +98,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   useEffect(() => {
     const initializeData = async () => {
+      console.log('Initializing data for product:', productId);
       await Promise.all([fetchCategories(), fetchSubcategories()]);
       await fetchProduct();
       setDataLoading(false);
@@ -149,6 +152,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   const fetchProduct = async () => {
     try {
+      console.log('Fetching product data for ID:', productId);
       const { data: product, error } = await supabase
         .from('products')
         .select('*')
@@ -159,6 +163,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
       console.log('Fetched product for editing:', product);
 
+      // Set form values
       form.reset({
         name: product.name,
         description: product.description || '',
@@ -173,8 +178,11 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         status: product.status,
       });
 
+      // Set image preview and current URL
       if (product.image_url) {
         setImagePreview(product.image_url);
+        setCurrentImageUrl(product.image_url);
+        console.log('Set product image:', product.image_url);
       }
     } catch (error) {
       console.error('Error fetching product:', error);
@@ -186,42 +194,44 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
+    if (!file) return;
+
+    console.log('Starting image upload for file:', file.name);
+    setUploadingImage(true);
+    
+    try {
+      // Create preview immediately
       const reader = new FileReader();
       reader.onload = (e) => {
         setImagePreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
-    }
-  };
 
-  const removeImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
-  };
-
-  const uploadImage = async (): Promise<string | null> => {
-    if (!imageFile) return null;
-
-    try {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `product-images/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('products')
-        .upload(filePath, imageFile);
+      // Upload to Supabase storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `product-${productId}-${Date.now()}.${fileExt}`;
+      
+      const { data, error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file);
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage
-        .from('products')
-        .getPublicUrl(filePath);
+      const { data: urlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
 
-      return data.publicUrl;
+      const newImageUrl = urlData.publicUrl;
+      setCurrentImageUrl(newImageUrl);
+      setImageFile(file);
+      
+      console.log('Image uploaded successfully:', newImageUrl);
+      toast({
+        title: 'Success',
+        description: 'Image uploaded successfully',
+      });
     } catch (error) {
       console.error('Error uploading image:', error);
       toast({
@@ -229,19 +239,22 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         description: 'Failed to upload image',
         variant: 'destructive',
       });
-      return null;
+    } finally {
+      setUploadingImage(false);
     }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setCurrentImageUrl(null);
   };
 
   const onSubmit = async (data: z.infer<typeof productSchema>) => {
     setLoading(true);
     try {
       console.log('Updating product with data:', data);
-
-      let imageUrl = imagePreview;
-      if (imageFile) {
-        imageUrl = await uploadImage();
-      }
+      console.log('Current image URL:', currentImageUrl);
 
       const productData = {
         name: data.name,
@@ -255,8 +268,10 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         has_size_variants: data.has_size_variants,
         stock_quantity: (!data.has_color_variants && !data.has_size_variants) ? data.stock_quantity || null : null,
         status: data.status,
-        image_url: imageUrl,
+        image_url: currentImageUrl,
       };
+
+      console.log('Submitting product data:', productData);
 
       const { error } = await supabase
         .from('products')
@@ -268,6 +283,9 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       // Save color variants if enabled
       if (data.has_color_variants && colorVariants.length > 0) {
         await saveColorVariants(data.has_size_variants);
+      } else if (!data.has_color_variants) {
+        // Delete existing variants if color variants are disabled
+        await deleteExistingVariants();
       }
 
       toast({
@@ -288,27 +306,40 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     }
   };
 
-  const saveColorVariants = async (hasSizeVariants: boolean) => {
+  const deleteExistingVariants = async () => {
     try {
-      // Delete existing variants
+      // Get existing color variants
       const { data: existingColors } = await supabase
         .from('color_variants')
         .select('id')
         .eq('product_id', productId);
 
-      if (existingColors) {
+      if (existingColors && existingColors.length > 0) {
+        // Delete size variants first
         for (const color of existingColors) {
           await supabase
             .from('size_variants')
             .delete()
             .eq('color_variant_id', color.id);
         }
-      }
 
-      await supabase
-        .from('color_variants')
-        .delete()
-        .eq('product_id', productId);
+        // Delete color variants
+        await supabase
+          .from('color_variants')
+          .delete()
+          .eq('product_id', productId);
+      }
+    } catch (error) {
+      console.error('Error deleting existing variants:', error);
+    }
+  };
+
+  const saveColorVariants = async (hasSizeVariants: boolean) => {
+    try {
+      console.log('Saving color variants:', colorVariants);
+      
+      // Delete existing variants first
+      await deleteExistingVariants();
 
       // Insert new color variants
       const validVariants = colorVariants.filter(cv => cv.color_name.trim());
@@ -555,13 +586,14 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                       accept="image/*"
                       onChange={handleImageUpload}
                       className="hidden"
+                      disabled={uploadingImage}
                     />
                     <label
                       htmlFor="image-upload"
-                      className="cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      Upload Image
+                      {uploadingImage ? 'Uploading...' : 'Upload Image'}
                     </label>
                   </div>
 
