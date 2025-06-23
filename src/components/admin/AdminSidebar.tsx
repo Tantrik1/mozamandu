@@ -1,6 +1,6 @@
 
-import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import {
   Sidebar,
   SidebarContent,
@@ -10,9 +10,10 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
+  SidebarHeader,
+  SidebarFooter,
 } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
 import {
   Package,
   FolderTree,
@@ -21,6 +22,8 @@ import {
   Percent,
   Truck,
   LayoutDashboard,
+  LogOut,
+  Store,
 } from 'lucide-react';
 
 const menuItems = [
@@ -64,6 +67,7 @@ const menuItems = [
 
 export function AdminSidebar() {
   const location = useLocation();
+  const { signOut } = useAuth();
 
   const isActiveRoute = (item: typeof menuItems[0]) => {
     if (item.exact) {
@@ -72,18 +76,34 @@ export function AdminSidebar() {
     return location.pathname.startsWith(item.url);
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
   return (
-    <Sidebar>
-      <SidebarContent>
+    <Sidebar className="border-r border-gray-200">
+      <SidebarHeader className="border-b border-gray-200 p-6">
+        <div className="flex items-center space-x-2">
+          <Store className="h-8 w-8 text-blue-600" />
+          <div>
+            <div className="text-xl font-bold text-blue-600">Mozamandu</div>
+            <div className="text-sm text-gray-500">Admin Panel</div>
+          </div>
+        </div>
+      </SidebarHeader>
+      
+      <SidebarContent className="p-4">
         <SidebarGroup>
-          <SidebarGroupLabel>Admin Panel</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-gray-500 font-medium mb-2">
+            Management
+          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActiveRoute(item)}>
-                    <Link to={item.url}>
-                      <item.icon />
+                  <SidebarMenuButton asChild isActive={isActiveRoute(item)} className="w-full">
+                    <Link to={item.url} className="flex items-center space-x-3 px-3 py-2 rounded-lg">
+                      <item.icon className="h-5 w-5" />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -93,6 +113,17 @@ export function AdminSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      <SidebarFooter className="p-4 border-t border-gray-200">
+        <Button
+          variant="outline"
+          onClick={handleSignOut}
+          className="w-full justify-start space-x-2"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Sign Out</span>
+        </Button>
+      </SidebarFooter>
     </Sidebar>
   );
 }

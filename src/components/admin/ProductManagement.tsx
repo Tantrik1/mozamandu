@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ProductForm } from './ProductForm';
+import { EnhancedProductForm } from './EnhancedProductForm';
 import { Pencil, Trash2, Plus, Search, Package } from 'lucide-react';
 
 interface Product {
@@ -145,7 +145,7 @@ export function ProductManagement() {
 
   if (isFormOpen) {
     return (
-      <ProductForm
+      <EnhancedProductForm
         productId={editingProductId || undefined}
         onSave={handleFormSave}
         onCancel={handleFormCancel}
@@ -191,7 +191,7 @@ export function ProductManagement() {
                       <img
                         src={product.image_url}
                         alt={product.name}
-                        className="w-16 h-16 object-cover rounded-lg"
+                        className="w-16 h-16 object-cover rounded-lg border"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
                         }}
@@ -228,12 +228,12 @@ export function ProductManagement() {
                           {product.has_color_variants && ' (Total across all variants)'}
                         </p>
                         {product.has_color_variants && (
-                          <p className="text-xs">
-                            <Badge variant="outline" className="mr-1">Color Variants</Badge>
+                          <div className="flex items-center space-x-1">
+                            <Badge variant="outline" className="text-xs">Color Variants</Badge>
                             {product.has_size_variants && (
-                              <Badge variant="outline">Size Variants</Badge>
+                              <Badge variant="outline" className="text-xs">Size Variants</Badge>
                             )}
-                          </p>
+                          </div>
                         )}
                         {product.description && (
                           <p className="text-gray-500 mt-2 line-clamp-2">{product.description}</p>

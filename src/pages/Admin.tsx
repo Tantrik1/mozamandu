@@ -2,14 +2,13 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
 import { useNavigate, Routes, Route } from 'react-router-dom';
-import { Header } from '@/components/layout/Header';
 import { CategoryManagement } from '@/components/admin/CategoryManagement';
 import { SubcategoryManagement } from '@/components/admin/SubcategoryManagement';
 import { ProductManagement } from '@/components/admin/ProductManagement';
 import { PromocodeManagement } from '@/components/admin/PromocodeManagement';
 import { DeliveryChargeManagement } from '@/components/admin/DeliveryChargeManagement';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { supabase } from '@/integrations/supabase/client';
 
 function AdminDashboard() {
@@ -17,20 +16,20 @@ function AdminDashboard() {
     <div className="p-8">
       <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold mb-2">Categories</h3>
+        <div className="bg-white p-6 rounded-lg shadow-md border">
+          <h3 className="text-lg font-semibold mb-2 text-gray-800">Categories</h3>
           <p className="text-gray-600">Manage product categories</p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold mb-2">Products</h3>
+        <div className="bg-white p-6 rounded-lg shadow-md border">
+          <h3 className="text-lg font-semibold mb-2 text-gray-800">Products</h3>
           <p className="text-gray-600">Manage your products</p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold mb-2">Promocodes</h3>
+        <div className="bg-white p-6 rounded-lg shadow-md border">
+          <h3 className="text-lg font-semibold mb-2 text-gray-800">Promocodes</h3>
           <p className="text-gray-600">Manage discount codes</p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold mb-2">Delivery</h3>
+        <div className="bg-white p-6 rounded-lg shadow-md border">
+          <h3 className="text-lg font-semibold mb-2 text-gray-800">Delivery</h3>
           <p className="text-gray-600">Manage delivery charges</p>
         </div>
       </div>
@@ -94,28 +93,20 @@ export default function Admin() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gray-50">
         <AdminSidebar />
-        <SidebarInset>
-          <Header />
-          <div className="flex-1 flex flex-col">
-            <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-              <div className="flex h-14 items-center px-4">
-                <SidebarTrigger className="-ml-1" />
-              </div>
-            </div>
-            <main className="flex-1 overflow-auto">
-              <Routes>
-                <Route path="/" element={<AdminDashboard />} />
-                <Route path="/categories" element={<CategoryManagement />} />
-                <Route path="/subcategories" element={<SubcategoryManagement />} />
-                <Route path="/products" element={<ProductManagement />} />
-                <Route path="/combos" element={<CombosPlaceholder />} />
-                <Route path="/promocodes" element={<PromocodeManagement />} />
-                <Route path="/delivery-charges" element={<DeliveryChargeManagement />} />
-              </Routes>
-            </main>
-          </div>
+        <SidebarInset className="flex-1">
+          <main className="h-screen overflow-auto bg-white">
+            <Routes>
+              <Route path="/" element={<AdminDashboard />} />
+              <Route path="/categories" element={<CategoryManagement />} />
+              <Route path="/subcategories" element={<SubcategoryManagement />} />
+              <Route path="/products" element={<ProductManagement />} />
+              <Route path="/combos" element={<CombosPlaceholder />} />
+              <Route path="/promocodes" element={<PromocodeManagement />} />
+              <Route path="/delivery-charges" element={<DeliveryChargeManagement />} />
+            </Routes>
+          </main>
         </SidebarInset>
       </div>
     </SidebarProvider>
