@@ -71,6 +71,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
   const [activeTab, setActiveTab] = useState('basic');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -95,24 +96,30 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
   const watchedHasSizeVariants = form.watch('has_size_variants');
 
   useEffect(() => {
-    fetchCategories();
-    fetchSubcategories();
-    if (productId) {
-      fetchProduct();
-    }
+    const initializeData = async () => {
+      await Promise.all([fetchCategories(), fetchSubcategories()]);
+      if (productId) {
+        await fetchProduct();
+      }
+      setDataLoaded(true);
+    };
+    initializeData();
   }, [productId]);
 
   useEffect(() => {
-    if (watchedCategoryId) {
+    if (dataLoaded && watchedCategoryId) {
       const filtered = subcategories.filter(sub => sub.category_id === watchedCategoryId);
       setFilteredSubcategories(filtered);
-      if (!filtered.find(sub => sub.id === form.getValues('subcategory_id'))) {
+      
+      // Only reset subcategory if the current one doesn't belong to the selected category
+      const currentSubcategoryId = form.getValues('subcategory_id');
+      if (currentSubcategoryId && !filtered.find(sub => sub.id === currentSubcategoryId)) {
         form.setValue('subcategory_id', '');
       }
     } else {
       setFilteredSubcategories([]);
     }
-  }, [watchedCategoryId, subcategories, form]);
+  }, [watchedCategoryId, subcategories, form, dataLoaded]);
 
   const fetchCategories = async () => {
     try {
@@ -145,7 +152,11 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
   };
 
   const fetchProduct = async () => {
+    if (!productId) return;
+
     try {
+      setLoading(true);
+      
       const { data: product, error } = await supabase
         .from('products')
         .select('*')
@@ -154,22 +165,30 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
 
       if (error) throw error;
 
+      console.log('Fetched product data:', product);
+
+      // Set form values with proper type conversion
       form.reset({
         name: product.name,
         description: product.description || '',
-        cost_price: product.cost_price,
-        selling_price: product.selling_price || 0,
+        cost_price: Number(product.cost_price),
+        selling_price: product.selling_price ? Number(product.selling_price) : 0,
         category_id: product.category_id,
         subcategory_id: product.subcategory_id,
-        is_featured: product.is_featured,
-        has_color_variants: product.has_color_variants,
-        has_size_variants: product.has_size_variants,
-        stock_quantity: product.stock_quantity || 0,
+        is_featured: Boolean(product.is_featured),
+        has_color_variants: Boolean(product.has_color_variants),
+        has_size_variants: Boolean(product.has_size_variants),
+        stock_quantity: product.stock_quantity ? Number(product.stock_quantity) : 0,
         status: product.status,
       });
 
       if (product.image_url) {
         setImagePreview(product.image_url);
+      }
+
+      // Fetch color variants if product has them
+      if (product.has_color_variants) {
+        await fetchColorVariants();
       }
     } catch (error) {
       console.error('Error fetching product:', error);
@@ -178,6 +197,56 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
         description: 'Failed to fetch product details',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchColorVariants = async () => {
+    if (!productId) return;
+
+    try {
+      const { data: colorData, error: colorError } = await supabase
+        .from('color_variants')
+        .select('*')
+        .eq('product_id', productId)
+        .order('color_name');
+
+      if (colorError) throw colorError;
+
+      const variantsWithSizes = await Promise.all(
+        (colorData || []).map(async (colorVariant) => {
+          let sizeVariants: SizeVariant[] = [];
+          
+          if (colorVariant.has_sizes) {
+            const { data: sizeData, error: sizeError } = await supabase
+              .from('size_variants')
+              .select('*')
+              .eq('color_variant_id', colorVariant.id)
+              .order('size_name');
+
+            if (sizeError) {
+              console.error('Error fetching size variants:', sizeError);
+            } else {
+              sizeVariants = sizeData || [];
+            }
+          }
+
+          return {
+            id: colorVariant.id,
+            color_name: colorVariant.color_name,
+            image_url: colorVariant.image_url,
+            has_sizes: Boolean(colorVariant.has_sizes),
+            stock_quantity: colorVariant.stock_quantity || 0,
+            size_variants: sizeVariants
+          };
+        })
+      );
+
+      console.log('Fetched color variants with sizes:', variantsWithSizes);
+      setColorVariants(variantsWithSizes);
+    } catch (error) {
+      console.error('Error in fetchColorVariants:', error);
     }
   };
 
@@ -248,7 +317,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
         is_featured: data.is_featured,
         has_color_variants: data.has_color_variants,
         has_size_variants: data.has_size_variants,
-        stock_quantity: data.stock_quantity || null,
+        stock_quantity: (!data.has_color_variants && !data.has_size_variants) ? data.stock_quantity || null : null,
         status: data.status,
         image_url: imageUrl,
       };
@@ -369,6 +438,10 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
       throw error;
     }
   };
+
+  if (loading && productId) {
+    return <div className="flex justify-center p-8">Loading product data...</div>;
+  }
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -593,7 +666,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
                   </div>
                 </div>
 
-                {!watchedHasColorVariants && (
+                {!watchedHasColorVariants && !watchedHasSizeVariants && (
                   <div>
                     <Label htmlFor="stock_quantity">Stock Quantity</Label>
                     <Input
