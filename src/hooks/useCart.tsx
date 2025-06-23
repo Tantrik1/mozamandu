@@ -13,6 +13,7 @@ interface CartItem {
   sizeName?: string;
   quantity: number;
   price: number;
+  subcategoryId: string;
   image_url?: string;
 }
 
@@ -24,6 +25,39 @@ interface AddToCartParams {
   price: number;
 }
 
+interface SubcategoryData {
+  id: string;
+  name: string;
+  selling_price: number;
+  minimum_quantity: number;
+}
+
+interface ComboData {
+  id: string;
+  name: string;
+  description: string;
+  combo_subcategories: {
+    subcategory_id: string;
+    min_units: number;
+    price: number;
+  }[];
+}
+
+interface DiscountTier {
+  min_quantity: number;
+  max_quantity: number | null;
+  discount_amount: number;
+}
+
+interface PriceCalculation {
+  basePrice: number;
+  discountedPrice?: number;
+  comboPrice?: number;
+  finalPrice: number;
+  appliedDiscount?: DiscountTier;
+  inCombo?: boolean;
+}
+
 interface CartContextType {
   cartItems: CartItem[];
   addToCart: (params: AddToCartParams) => Promise<void>;
@@ -32,21 +66,41 @@ interface CartContextType {
   clearCart: () => void;
   getTotalPrice: () => number;
   getTotalItems: () => number;
-  checkComboEligibility: () => Promise<void>;
+  getItemPrice: (subcategoryId: string, quantity: number) => Promise<PriceCalculation>;
+  activeCombo: ComboData | null;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [activeCombo, setActiveCombo] = useState<ComboData | null>(null);
+  const [subcategoriesData, setSubcategoriesData] = useState<{ [key: string]: SubcategoryData }>({});
 
   useEffect(() => {
     loadCartFromStorage();
+    fetchSubcategoriesData();
   }, []);
 
   useEffect(() => {
     saveCartToStorage();
+    checkComboEligibility();
   }, [cartItems]);
+
+  const fetchSubcategoriesData = async () => {
+    const { data, error } = await supabase
+      .from('subcategories')
+      .select('id, name, selling_price, minimum_quantity')
+      .eq('status', 'on');
+
+    if (!error && data) {
+      const subcategoriesMap = data.reduce((acc, sub) => {
+        acc[sub.id] = sub;
+        return acc;
+      }, {} as { [key: string]: SubcategoryData });
+      setSubcategoriesData(subcategoriesMap);
+    }
+  };
 
   const loadCartFromStorage = () => {
     const savedCart = localStorage.getItem('cart');
@@ -63,12 +117,52 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('cart', JSON.stringify(cartItems));
   };
 
+  const getItemPrice = async (subcategoryId: string, quantity: number): Promise<PriceCalculation> => {
+    const subcategoryData = subcategoriesData[subcategoryId];
+    if (!subcategoryData) {
+      return { basePrice: 0, finalPrice: 0 };
+    }
+
+    const basePrice = subcategoryData.selling_price;
+    let result: PriceCalculation = { basePrice, finalPrice: basePrice };
+
+    // Check for discount tiers
+    const { data: discountTiers } = await supabase
+      .from('discount_tiers')
+      .select('*')
+      .eq('subcategory_id', subcategoryId)
+      .order('min_quantity', { ascending: true });
+
+    if (discountTiers) {
+      for (const tier of discountTiers) {
+        if (quantity >= tier.min_quantity && (!tier.max_quantity || quantity <= tier.max_quantity)) {
+          result.discountedPrice = basePrice - tier.discount_amount;
+          result.appliedDiscount = tier;
+          result.finalPrice = result.discountedPrice;
+          break;
+        }
+      }
+    }
+
+    // Check for combo pricing
+    if (activeCombo) {
+      const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === subcategoryId);
+      if (comboSubcategory) {
+        result.comboPrice = comboSubcategory.price;
+        result.finalPrice = comboSubcategory.price;
+        result.inCombo = true;
+      }
+    }
+
+    return result;
+  };
+
   const addToCart = async (params: AddToCartParams) => {
     try {
       // Fetch product details
       const { data: product, error: productError } = await supabase
         .from('products')
-        .select('name, image_url')
+        .select('name, image_url, subcategory_id')
         .eq('id', params.productId)
         .single();
 
@@ -123,14 +217,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
           sizeName,
           quantity: params.quantity,
           price: params.price,
+          subcategoryId: product.subcategory_id,
           image_url: product.image_url
         };
 
         setCartItems(prev => [...prev, newItem]);
       }
-
-      // Check for combo eligibility after adding to cart
-      await checkComboEligibility();
     } catch (error) {
       console.error('Error adding to cart:', error);
       throw error;
@@ -154,10 +246,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = () => {
     setCartItems([]);
+    setActiveCombo(null);
   };
 
-  const getTotalPrice = () => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+  const getTotalPrice = async () => {
+    let total = 0;
+    for (const item of cartItems) {
+      const pricing = await getItemPrice(item.subcategoryId, item.quantity);
+      total += pricing.finalPrice * item.quantity;
+    }
+    return total;
   };
 
   const getTotalItems = () => {
@@ -190,19 +288,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const subcategoryCounts: { [key: string]: number } = {};
       
       for (const cartItem of cartItems) {
-        const { data: product, error } = await supabase
-          .from('products')
-          .select('subcategory_id')
-          .eq('id', cartItem.productId)
-          .single();
-
-        if (!error && product) {
-          const subcategoryId = product.subcategory_id;
-          subcategoryCounts[subcategoryId] = (subcategoryCounts[subcategoryId] || 0) + cartItem.quantity;
-        }
+        const subcategoryId = cartItem.subcategoryId;
+        subcategoryCounts[subcategoryId] = (subcategoryCounts[subcategoryId] || 0) + cartItem.quantity;
       }
 
       // Check each combo for eligibility
+      let newActiveCombo: ComboData | null = null;
+      
       for (const combo of combos || []) {
         let isEligible = true;
         
@@ -217,13 +309,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
 
         if (isEligible) {
-          toast({
-            title: "🎉 Combo Activated!",
-            description: `${combo.name}: ${combo.description}`,
-            duration: 5000,
-          });
+          if (!activeCombo || activeCombo.id !== combo.id) {
+            toast({
+              title: "🎉 Combo Applied!",
+              description: `${combo.name}: ${combo.description}`,
+              duration: 5000,
+            });
+          }
+          newActiveCombo = combo;
+          break;
         }
       }
+
+      // Check if combo was removed
+      if (activeCombo && !newActiveCombo) {
+        toast({
+          title: "💰 Normal Prices Applied",
+          description: "Combo requirements no longer met",
+          duration: 3000,
+        });
+      }
+
+      setActiveCombo(newActiveCombo);
     } catch (error) {
       console.error('Error checking combo eligibility:', error);
     }
@@ -237,7 +344,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     clearCart,
     getTotalPrice,
     getTotalItems,
-    checkComboEligibility
+    getItemPrice,
+    activeCombo
   };
 
   return (

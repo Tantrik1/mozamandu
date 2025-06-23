@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Minus, ShoppingCart, Star } from 'lucide-react';
+import { Plus, Minus, ShoppingCart, Star, Tag } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useCart } from '@/hooks/useCart';
@@ -51,7 +51,9 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);
   const [currentImage, setCurrentImage] = useState(product.image_url);
-  const { addToCart, cartItems } = useCart();
+  const [dynamicPrice, setDynamicPrice] = useState(subcategoryPrice);
+  const [priceLabel, setPriceLabel] = useState('Normal Price');
+  const { addToCart, cartItems, getItemPrice, activeCombo } = useCart();
 
   useEffect(() => {
     if (product.has_color_variants) {
@@ -90,6 +92,30 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
     }
   }, [selectedColor, colorVariants, product.image_url]);
 
+  // Update dynamic pricing
+  useEffect(() => {
+    updateDynamicPrice();
+  }, [quantity, product.subcategory_id, activeCombo]);
+
+  const updateDynamicPrice = async () => {
+    try {
+      const pricing = await getItemPrice(product.subcategory_id, quantity);
+      setDynamicPrice(pricing.finalPrice);
+      
+      if (pricing.inCombo) {
+        setPriceLabel('Combo Price');
+      } else if (pricing.appliedDiscount) {
+        setPriceLabel(`Discount Applied (${pricing.appliedDiscount.discount_amount} off)`);
+      } else {
+        setPriceLabel('Normal Price');
+      }
+    } catch (error) {
+      console.error('Error updating dynamic price:', error);
+      setDynamicPrice(subcategoryPrice);
+      setPriceLabel('Normal Price');
+    }
+  };
+
   const fetchColorVariants = async () => {
     const { data, error } = await supabase
       .from('color_variants')
@@ -122,10 +148,6 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
         setSelectedSize(data[0].id);
       }
     }
-  };
-
-  const getCurrentPrice = () => {
-    return product.selling_price || subcategoryPrice;
   };
 
   const getAvailableStock = () => {
@@ -176,7 +198,7 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
         colorVariantId: selectedColor || null,
         sizeVariantId: selectedSize || null,
         quantity,
-        price: getCurrentPrice()
+        price: dynamicPrice
       });
 
       toast({
@@ -205,34 +227,44 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
           <img 
             src={currentImage} 
             alt={product.name}
-            className="w-full h-40 sm:h-48 object-cover group-hover:scale-110 transition-transform duration-300"
+            className="w-full h-36 sm:h-40 object-cover group-hover:scale-110 transition-transform duration-300"
           />
         ) : (
-          <div className="w-full h-40 sm:h-48 bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
-            <span className="text-4xl">🧦</span>
+          <div className="w-full h-36 sm:h-40 bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
+            <span className="text-3xl">🧦</span>
           </div>
         )}
         
         {/* Featured Badge */}
         {product.is_featured && (
-          <Badge className="absolute top-2 left-2 bg-yellow-500 text-black">
-            <Star className="w-3 h-3 mr-1" />
+          <Badge className="absolute top-2 left-2 bg-yellow-500 text-black text-xs">
+            <Star className="w-2 h-2 mr-1" />
             Featured
           </Badge>
         )}
 
-        {/* Price Badge */}
-        <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1">
-          <span className="text-lg font-bold text-red-600">
-            ${getCurrentPrice()}
-          </span>
+        {/* Price Badge with dynamic pricing */}
+        <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1">
+          <div className="text-center">
+            <span className="text-sm font-bold text-red-600">
+              ${dynamicPrice.toFixed(2)}
+            </span>
+            {priceLabel !== 'Normal Price' && (
+              <div className="flex items-center gap-1">
+                <Tag className="w-2 h-2 text-green-600" />
+                <span className="text-xs text-green-600 font-medium">
+                  {priceLabel.includes('Combo') ? 'Combo' : 'Discount'}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
-      <CardContent className="p-3 flex-1 flex flex-col">
+      <CardContent className="p-2 flex-1 flex flex-col">
         {/* Product Info */}
-        <div className="mb-3">
-          <h3 className="font-semibold text-sm text-gray-900 truncate mb-1">
+        <div className="mb-2">
+          <h3 className="font-semibold text-xs text-gray-900 truncate mb-1">
             {product.name}
           </h3>
           {product.description && (
@@ -244,10 +276,10 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
 
         {/* Color Selection */}
         {product.has_color_variants && colorVariants.length > 0 && (
-          <div className="mb-3">
+          <div className="mb-2">
             <label className="text-xs font-medium text-gray-700 mb-1 block">Color:</label>
             <Select value={selectedColor} onValueChange={setSelectedColor}>
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className="h-7 text-xs">
                 <SelectValue placeholder="Select color" />
               </SelectTrigger>
               <SelectContent>
@@ -263,10 +295,10 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
 
         {/* Size Selection */}
         {product.has_size_variants && sizeVariants.length > 0 && (
-          <div className="mb-3">
+          <div className="mb-2">
             <label className="text-xs font-medium text-gray-700 mb-1 block">Size:</label>
             <Select value={selectedSize} onValueChange={setSelectedSize}>
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className="h-7 text-xs">
                 <SelectValue placeholder="Select size" />
               </SelectTrigger>
               <SelectContent>
@@ -281,7 +313,7 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
         )}
 
         {/* Color and Quantity Row */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2">
           {/* Quantity Selection */}
           <div className="flex items-center space-x-1">
             <Button
@@ -289,20 +321,25 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
               size="sm"
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
               disabled={quantity <= 1}
-              className="h-7 w-7 p-0"
+              className="h-6 w-6 p-0"
             >
-              <Minus className="h-3 w-3" />
+              <Minus className="h-2 w-2" />
             </Button>
-            <span className="px-2 py-1 border rounded text-xs min-w-[2rem] text-center">{quantity}</span>
+            <span className="px-2 py-1 border rounded text-xs min-w-[1.5rem] text-center">{quantity}</span>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setQuantity(Math.min(availableStock, quantity + 1))}
               disabled={quantity >= availableStock}
-              className="h-7 w-7 p-0"
+              className="h-6 w-6 p-0"
             >
-              <Plus className="h-3 w-3" />
+              <Plus className="h-2 w-2" />
             </Button>
+          </div>
+          
+          {/* Price Label */}
+          <div className="text-right">
+            <span className="text-xs text-gray-500">{priceLabel}</span>
           </div>
         </div>
 
@@ -310,7 +347,7 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
         <Button 
           onClick={handleAddToCart}
           disabled={loading || availableStock === 0}
-          className="w-full bg-red-600 hover:bg-red-700 text-xs h-8 mt-auto"
+          className="w-full bg-red-600 hover:bg-red-700 text-xs h-7 mt-auto"
         >
           {loading ? (
             "Adding..."
@@ -318,7 +355,7 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
             "Out of Stock"
           ) : (
             <>
-              <ShoppingCart className="mr-1 h-3 w-3" />
+              <ShoppingCart className="mr-1 h-2 w-2" />
               Add to Cart
             </>
           )}

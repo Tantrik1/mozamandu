@@ -29,6 +29,7 @@ interface Subcategory {
   name: string;
   description: string;
   selling_price: number;
+  minimum_quantity: number;
   status: 'on' | 'off';
   category_id: string;
   categories: { name: string };
@@ -46,6 +47,7 @@ export function SubcategoryManagement() {
     description: '',
     category_id: '',
     selling_price: '',
+    minimum_quantity: '',
     status: true,
   });
 
@@ -136,6 +138,7 @@ export function SubcategoryManagement() {
       description: formData.description,
       category_id: formData.category_id,
       selling_price: parseFloat(formData.selling_price),
+      minimum_quantity: parseInt(formData.minimum_quantity),
       status: formData.status ? 'on' : 'off' as 'on' | 'off',
     };
 
@@ -215,6 +218,7 @@ export function SubcategoryManagement() {
       description: subcategory.description,
       category_id: subcategory.category_id,
       selling_price: subcategory.selling_price.toString(),
+      minimum_quantity: subcategory.minimum_quantity.toString(),
       status: subcategory.status === 'on',
     });
     
@@ -254,6 +258,7 @@ export function SubcategoryManagement() {
       description: '',
       category_id: '',
       selling_price: '',
+      minimum_quantity: '',
       status: true,
     });
     setEditingSubcategory(null);
@@ -317,33 +322,54 @@ export function SubcategoryManagement() {
                 />
               </div>
               
-              <div>
-                <Label htmlFor="selling_price">Selling Price ($)</Label>
-                <Input
-                  id="selling_price"
-                  type="number"
-                  step="0.01"
-                  value={formData.selling_price}
-                  onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                  required
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="selling_price">Selling Price ($)</Label>
+                  <Input
+                    id="selling_price"
+                    type="number"
+                    step="0.01"
+                    value={formData.selling_price}
+                    onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="minimum_quantity">Minimum Order Quantity (MOQ)</Label>
+                  <Input
+                    id="minimum_quantity"
+                    type="number"
+                    min="1"
+                    value={formData.minimum_quantity}
+                    onChange={(e) => setFormData({ ...formData, minimum_quantity: e.target.value })}
+                    placeholder="e.g., 3"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Minimum items from this subcategory required for checkout
+                  </p>
+                </div>
               </div>
 
               {/* Discount Tiers Section */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <Label className="text-lg font-semibold">Discount Tiers (MOQ Based)</Label>
+                  <Label className="text-lg font-semibold">Discount Tiers (Separate from MOQ)</Label>
                   <Button type="button" variant="outline" size="sm" onClick={addDiscountTier}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Tier
+                    Add Discount Tier
                   </Button>
                 </div>
+                <p className="text-sm text-gray-600">
+                  Discount tiers are separate from the minimum order quantity above. Customers must meet the MOQ to checkout, 
+                  but can get discounts based on these tiers.
+                </p>
                 
                 {discountTiers.map((tier, index) => (
                   <Card key={index}>
                     <CardHeader>
                       <div className="flex justify-between items-center">
-                        <CardTitle className="text-sm">Tier {index + 1}</CardTitle>
+                        <CardTitle className="text-sm">Discount Tier {index + 1}</CardTitle>
                         <Button
                           type="button"
                           variant="ghost"
@@ -357,13 +383,13 @@ export function SubcategoryManagement() {
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-3 gap-4">
                         <div>
-                          <Label>Min Quantity</Label>
+                          <Label>Min Quantity for Discount</Label>
                           <Input
                             type="number"
                             min="1"
                             value={tier.min_quantity}
                             onChange={(e) => updateDiscountTier(index, 'min_quantity', parseInt(e.target.value) || 1)}
-                            placeholder="e.g., 3"
+                            placeholder="e.g., 5"
                           />
                         </div>
                         <div>
@@ -384,7 +410,7 @@ export function SubcategoryManagement() {
                             min="0"
                             value={tier.discount_amount}
                             onChange={(e) => updateDiscountTier(index, 'discount_amount', parseFloat(e.target.value) || 0)}
-                            placeholder="e.g., 20"
+                            placeholder="e.g., 2"
                           />
                         </div>
                       </div>
@@ -398,7 +424,7 @@ export function SubcategoryManagement() {
                 
                 {discountTiers.length === 0 && (
                   <p className="text-sm text-gray-500 text-center py-4">
-                    No discount tiers added. Click "Add Tier" to create quantity-based discounts.
+                    No discount tiers added. Click "Add Discount Tier" to create quantity-based discounts.
                   </p>
                 )}
               </div>
@@ -491,6 +517,11 @@ function SubcategoryCard({
           <div className="flex justify-between">
             <span className="text-sm">Selling Price:</span>
             <span className="font-semibold">${subcategory.selling_price}</span>
+          </div>
+          
+          <div className="flex justify-between">
+            <span className="text-sm">Minimum Order Qty:</span>
+            <span className="font-semibold text-blue-600">{subcategory.minimum_quantity}</span>
           </div>
           
           {discountTiers.length > 0 && (
