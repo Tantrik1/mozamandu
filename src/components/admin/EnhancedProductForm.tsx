@@ -304,10 +304,23 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
         imageUrl = await uploadImage();
       }
 
+      // Ensure all required fields are present and properly typed
       const productData = {
-        ...data,
+        name: data.name,
+        description: data.description || null,
+        cost_price: data.cost_price,
+        selling_price: data.selling_price || null,
+        category_id: data.category_id,
+        subcategory_id: data.subcategory_id,
+        is_featured: data.is_featured,
+        has_color_variants: data.has_color_variants,
+        has_size_variants: data.has_size_variants,
+        stock_quantity: data.stock_quantity || null,
+        status: data.status,
         image_url: imageUrl,
       };
+
+      let currentProductId = productId;
 
       if (productId) {
         // Update existing product
@@ -326,15 +339,12 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
           .single();
 
         if (error) throw error;
-        // Set productId for variants
-        if (newProduct) {
-          productId = newProduct.id;
-        }
+        currentProductId = newProduct.id;
       }
 
       // Save color variants if enabled
-      if (data.has_color_variants && colorVariants.length > 0) {
-        await saveColorVariants();
+      if (data.has_color_variants && colorVariants.length > 0 && currentProductId) {
+        await saveColorVariants(currentProductId);
       }
 
       toast({
@@ -355,15 +365,13 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
     }
   };
 
-  const saveColorVariants = async () => {
-    if (!productId) return;
-
+  const saveColorVariants = async (currentProductId: string) => {
     try {
       // Delete existing variants
       await supabase
         .from('color_variants')
         .delete()
-        .eq('product_id', productId);
+        .eq('product_id', currentProductId);
 
       // Insert new variants
       const validVariants = colorVariants.filter(cv => cv.color_name.trim());
@@ -372,10 +380,10 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
           .from('color_variants')
           .insert(
             validVariants.map(cv => ({
-              product_id: productId,
+              product_id: currentProductId,
               color_name: cv.color_name,
               stock_quantity: cv.stock_quantity,
-              image_url: cv.image_url,
+              image_url: cv.image_url || null,
               has_sizes: cv.has_sizes,
             }))
           );
@@ -457,6 +465,9 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
                         ))}
                       </SelectContent>
                     </Select>
+                    {form.formState.errors.category_id && (
+                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.category_id.message}</p>
+                    )}
                   </div>
 
                   <div>
@@ -476,6 +487,9 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
                         ))}
                       </SelectContent>
                     </Select>
+                    {form.formState.errors.subcategory_id && (
+                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.subcategory_id.message}</p>
+                    )}
                   </div>
                 </div>
 
@@ -537,6 +551,9 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
                       {...form.register('cost_price', { valueAsNumber: true })}
                       placeholder="0.00"
                     />
+                    {form.formState.errors.cost_price && (
+                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.cost_price.message}</p>
+                    )}
                   </div>
 
                   <div>
