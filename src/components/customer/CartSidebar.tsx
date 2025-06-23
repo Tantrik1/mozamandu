@@ -5,16 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, Plus, Minus, X, Gift } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-
-interface SubcategoryRequirement {
-  subcategoryId: string;
-  subcategoryName: string;
-  minimumQuantity: number;
-  currentQuantity: number;
-  fulfilled: boolean;
-}
 
 export function CartSidebar() {
   const { 
@@ -26,12 +16,10 @@ export function CartSidebar() {
     activeCombo 
   } = useCart();
   const [isOpen, setIsOpen] = useState(false);
-  const [subcategoryRequirements, setSubcategoryRequirements] = useState<SubcategoryRequirement[]>([]);
   const [cartTotal, setCartTotal] = useState(0);
 
   useEffect(() => {
     if (cartItems.length > 0) {
-      checkSubcategoryRequirements();
       updateCartTotal();
     } else {
       setCartTotal(0);
@@ -46,38 +34,6 @@ export function CartSidebar() {
       console.error('Error calculating total:', error);
     }
   };
-
-  const checkSubcategoryRequirements = async () => {
-    const subcategoryTotals: { [key: string]: number } = {};
-    
-    // Calculate totals per subcategory
-    for (const item of cartItems) {
-      subcategoryTotals[item.subcategoryId] = (subcategoryTotals[item.subcategoryId] || 0) + item.quantity;
-    }
-
-    // Get subcategory requirements
-    const subcategoryIds = Object.keys(subcategoryTotals);
-    if (subcategoryIds.length > 0) {
-      const { data: subcategories } = await supabase
-        .from('subcategories')
-        .select('id, name, minimum_quantity')
-        .in('id', subcategoryIds);
-
-      if (subcategories) {
-        const requirements = subcategories.map(sub => ({
-          subcategoryId: sub.id,
-          subcategoryName: sub.name,
-          minimumQuantity: sub.minimum_quantity,
-          currentQuantity: subcategoryTotals[sub.id] || 0,
-          fulfilled: (subcategoryTotals[sub.id] || 0) >= sub.minimum_quantity
-        }));
-
-        setSubcategoryRequirements(requirements);
-      }
-    }
-  };
-
-  const canCheckout = subcategoryRequirements.every(req => req.fulfilled);
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -149,19 +105,12 @@ export function CartSidebar() {
 
               {/* Checkout Button */}
               <Button 
-                className="w-full bg-red-600 hover:bg-red-700" 
-                disabled={!canCheckout}
+                className="w-full bg-red-600 hover:bg-red-700"
                 onClick={() => {
-                  if (!canCheckout) {
-                    toast({
-                      title: "Minimum requirements not met",
-                      description: "Please add more items to meet minimum quantity requirements",
-                      variant: "destructive",
-                    });
-                  }
+                  // Checkout logic here
                 }}
               >
-                {canCheckout ? 'Proceed to Checkout' : 'Minimum Requirements Not Met'}
+                Proceed to Checkout
               </Button>
             </>
           )}
@@ -180,7 +129,6 @@ function CartItemCard({
   onUpdateQuantity: (id: string, quantity: number) => void;
   onRemove: (id: string) => void;
 }) {
-  // Determine pricing mode from item ID
   const getPricingMode = (itemId: string) => {
     if (itemId.includes('-combo')) return 'combo';
     if (itemId.includes('-discount')) return 'discount';
@@ -209,19 +157,19 @@ function CartItemCard({
         return 'text-blue-600';
       case 'normal':
       default:
-        return 'text-red-600';
+        return 'text-gray-900';
     }
   };
 
   const getBadgeColor = () => {
     switch (pricingMode) {
       case 'combo':
-        return 'border-green-500 text-green-700';
+        return 'border-green-500 text-green-700 bg-green-50';
       case 'discount':
-        return 'border-blue-500 text-blue-700';
+        return 'border-blue-500 text-blue-700 bg-blue-50';
       case 'normal':
       default:
-        return 'border-red-500 text-red-700';
+        return 'border-gray-500 text-gray-700 bg-gray-50';
     }
   };
 
@@ -244,18 +192,17 @@ function CartItemCard({
         {item.sizeName && (
           <p className="text-xs text-gray-500">Size: {item.sizeName}</p>
         )}
-        <div className="flex items-center gap-2">
-          <p className={`text-sm font-bold ${getPriceColor()}`}>${item.price.toFixed(2)}</p>
+        <div className="flex items-center gap-2 mt-1">
+          <p className={`text-sm font-bold ${getPriceColor()}`}>
+            ${item.price.toFixed(2)}
+          </p>
           <Badge 
             variant="outline" 
-            className={`text-xs px-1 py-0 ${getBadgeColor()}`}
+            className={`text-xs px-2 py-0 ${getBadgeColor()}`}
           >
             {getPriceLabel()}
           </Badge>
         </div>
-        {pricingMode === 'discount' && (
-          <p className="text-xs text-blue-600 italic">Discount tier pricing</p>
-        )}
       </div>
       <div className="flex items-center space-x-2">
         <Button

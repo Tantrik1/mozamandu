@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { ComboCongratsModal } from '@/components/customer/ComboCongratsModal';
 
 interface CartItem {
   id: string;
@@ -75,6 +75,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [activeCombo, setActiveCombo] = useState<ComboData | null>(null);
   const [subcategoriesData, setSubcategoriesData] = useState<{ [key: string]: SubcategoryData }>({});
+  const [showComboModal, setShowComboModal] = useState(false);
+  const [newCombo, setNewCombo] = useState<ComboData | null>(null);
 
   useEffect(() => {
     loadCartFromStorage();
@@ -199,7 +201,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         .filter(item => item.subcategoryId === product.subcategory_id)
         .reduce((total, item) => total + item.quantity, 0);
 
-      // Check if combo is active
+      // Check if combo is active (highest priority)
       if (activeCombo) {
         const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === product.subcategory_id);
         if (comboSubcategory) {
@@ -455,24 +457,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
         if (isEligible) {
           if (!activeCombo || activeCombo.id !== combo.id) {
-            toast({
-              title: "🎉 Combo Applied!",
-              description: `${combo.name}: ${combo.description}`,
-              duration: 5000,
-            });
+            setNewCombo(combo);
+            setShowComboModal(true);
           }
           newActiveCombo = combo;
           break;
         }
-      }
-
-      // Check if combo was removed
-      if (activeCombo && !newActiveCombo) {
-        toast({
-          title: "💰 Normal Prices Applied",
-          description: "Combo requirements no longer met",
-          duration: 3000,
-        });
       }
 
       setActiveCombo(newActiveCombo);
@@ -496,6 +486,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
   return (
     <CartContext.Provider value={value}>
       {children}
+      {newCombo && (
+        <ComboCongratsModal
+          isOpen={showComboModal}
+          onClose={() => {
+            setShowComboModal(false);
+            setNewCombo(null);
+          }}
+          combo={newCombo}
+          subcategoriesData={subcategoriesData}
+        />
+      )}
     </CartContext.Provider>
   );
 }
