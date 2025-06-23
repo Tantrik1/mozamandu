@@ -204,6 +204,7 @@ export type Database = {
           discount_amount: number | null
           discount_unit: string | null
           id: string
+          minimum_quantity_for_discount: number
           name: string
           selling_price: number
           status: Database["public"]["Enums"]["category_status"]
@@ -216,6 +217,7 @@ export type Database = {
           discount_amount?: number | null
           discount_unit?: string | null
           id?: string
+          minimum_quantity_for_discount?: number
           name: string
           selling_price: number
           status?: Database["public"]["Enums"]["category_status"]
@@ -228,6 +230,7 @@ export type Database = {
           discount_amount?: number | null
           discount_unit?: string | null
           id?: string
+          minimum_quantity_for_discount?: number
           name?: string
           selling_price?: number
           status?: Database["public"]["Enums"]["category_status"]
