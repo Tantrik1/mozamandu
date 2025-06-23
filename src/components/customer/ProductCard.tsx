@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,6 @@ import { Plus, Minus, ShoppingCart, Star, Tag } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useCart } from '@/hooks/useCart';
-
 interface Product {
   id: string;
   name: string;
@@ -23,7 +21,6 @@ interface Product {
   category_id: string;
   subcategory_id: string;
 }
-
 interface ColorVariant {
   id: string;
   color_name: string;
@@ -31,19 +28,19 @@ interface ColorVariant {
   has_sizes: boolean;
   image_url: string;
 }
-
 interface SizeVariant {
   id: string;
   size_name: string;
   stock_quantity: number;
 }
-
 interface ProductCardProps {
   product: Product;
   subcategoryPrice: number;
 }
-
-export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
+export function ProductCard({
+  product,
+  subcategoryPrice
+}: ProductCardProps) {
   const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
   const [sizeVariants, setSizeVariants] = useState<SizeVariant[]>([]);
   const [selectedColor, setSelectedColor] = useState<string>('');
@@ -53,14 +50,17 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
   const [currentImage, setCurrentImage] = useState(product.image_url);
   const [priceMode, setPriceMode] = useState<'normal' | 'discount' | 'combo'>('normal');
   const [effectivePrice, setEffectivePrice] = useState(subcategoryPrice);
-  const { addToCart, cartItems, getItemPrice, activeCombo } = useCart();
-
+  const {
+    addToCart,
+    cartItems,
+    getItemPrice,
+    activeCombo
+  } = useCart();
   useEffect(() => {
     if (product.has_color_variants) {
       fetchColorVariants();
     }
   }, [product.id, product.has_color_variants]);
-
   useEffect(() => {
     if (selectedColor && product.has_size_variants) {
       fetchSizeVariants();
@@ -70,11 +70,8 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
   // Reset quantity when variants change
   useEffect(() => {
     const existingItem = cartItems.find(item => {
-      return item.productId === product.id &&
-        item.colorVariantId === selectedColor &&
-        item.sizeVariantId === selectedSize;
+      return item.productId === product.id && item.colorVariantId === selectedColor && item.sizeVariantId === selectedSize;
     });
-    
     setQuantity(existingItem ? existingItem.quantity : 1);
   }, [selectedColor, selectedSize, cartItems]);
 
@@ -96,19 +93,14 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
   useEffect(() => {
     updatePricingMode();
   }, [cartItems, activeCombo, product.subcategory_id]);
-
   const updatePricingMode = async () => {
     try {
       // Get current quantity in cart for this subcategory
-      const currentSubcategoryQuantity = cartItems
-        .filter(item => item.subcategoryId === product.subcategory_id)
-        .reduce((total, item) => total + item.quantity, 0);
+      const currentSubcategoryQuantity = cartItems.filter(item => item.subcategoryId === product.subcategory_id).reduce((total, item) => total + item.quantity, 0);
 
       // Check if combo is active
       if (activeCombo) {
-        const comboSubcategory = activeCombo.combo_subcategories.find(
-          cs => cs.subcategory_id === product.subcategory_id
-        );
+        const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === product.subcategory_id);
         if (comboSubcategory) {
           setPriceMode('combo');
           setEffectivePrice(comboSubcategory.price);
@@ -117,18 +109,13 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
       }
 
       // Check for discount eligibility
-      const { data: discountTiers } = await supabase
-        .from('discount_tiers')
-        .select('*')
-        .eq('subcategory_id', product.subcategory_id)
-        .order('min_quantity', { ascending: true });
-
+      const {
+        data: discountTiers
+      } = await supabase.from('discount_tiers').select('*').eq('subcategory_id', product.subcategory_id).order('min_quantity', {
+        ascending: true
+      });
       if (discountTiers && discountTiers.length > 0) {
-        const applicableTier = discountTiers.find(tier => 
-          currentSubcategoryQuantity >= tier.min_quantity && 
-          (!tier.max_quantity || currentSubcategoryQuantity <= tier.max_quantity)
-        );
-
+        const applicableTier = discountTiers.find(tier => currentSubcategoryQuantity >= tier.min_quantity && (!tier.max_quantity || currentSubcategoryQuantity <= tier.max_quantity));
         if (applicableTier) {
           setPriceMode('discount');
           setEffectivePrice(subcategoryPrice - applicableTier.discount_amount);
@@ -145,13 +132,11 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
       setEffectivePrice(subcategoryPrice);
     }
   };
-
   const fetchColorVariants = async () => {
-    const { data, error } = await supabase
-      .from('color_variants')
-      .select('id, color_name, stock_quantity, has_sizes, image_url')
-      .eq('product_id', product.id);
-
+    const {
+      data,
+      error
+    } = await supabase.from('color_variants').select('id, color_name, stock_quantity, has_sizes, image_url').eq('product_id', product.id);
     if (error) {
       console.error('Error fetching color variants:', error);
     } else {
@@ -161,15 +146,12 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
       }
     }
   };
-
   const fetchSizeVariants = async () => {
     if (!selectedColor) return;
-
-    const { data, error } = await supabase
-      .from('size_variants')
-      .select('id, size_name, stock_quantity')
-      .eq('color_variant_id', selectedColor);
-
+    const {
+      data,
+      error
+    } = await supabase.from('size_variants').select('id, size_name, stock_quantity').eq('color_variant_id', selectedColor);
     if (error) {
       console.error('Error fetching size variants:', error);
     } else {
@@ -179,7 +161,6 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
       }
     }
   };
-
   const getAvailableStock = () => {
     if (product.has_size_variants && selectedSize) {
       const sizeVariant = sizeVariants.find(s => s.id === selectedSize);
@@ -190,38 +171,33 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
     }
     return product.stock_quantity || 0;
   };
-
   const handleAddToCart = async () => {
     if (product.has_color_variants && !selectedColor) {
       toast({
         title: "Selection Required",
         description: "Please select a color",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
     if (product.has_size_variants && !selectedSize) {
       toast({
         title: "Selection Required",
         description: "Please select a size",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
     const availableStock = getAvailableStock();
     if (quantity > availableStock) {
       toast({
         title: "Insufficient Stock",
         description: `Only ${availableStock} items available`,
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
     setLoading(true);
-
     try {
       await addToCart({
         productId: product.id,
@@ -230,28 +206,23 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
         quantity,
         price: effectivePrice
       });
-
-      const modeText = priceMode === 'combo' ? 'combo price' : 
-                     priceMode === 'discount' ? 'discount price' : 'normal price';
-
+      const modeText = priceMode === 'combo' ? 'combo price' : priceMode === 'discount' ? 'discount price' : 'normal price';
       toast({
         title: "Added to Cart",
-        description: `${product.name} has been added to your cart at ${modeText}`,
+        description: `${product.name} has been added to your cart at ${modeText}`
       });
     } catch (error) {
       console.error('Error adding to cart:', error);
       toast({
         title: "Error",
         description: "Failed to add item to cart",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
-
   const availableStock = getAvailableStock();
-
   const getPriceLabel = () => {
     switch (priceMode) {
       case 'combo':
@@ -263,7 +234,6 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
         return 'Normal Price';
     }
   };
-
   const getPriceColor = () => {
     switch (priceMode) {
       case 'combo':
@@ -275,30 +245,18 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
         return 'text-red-600';
     }
   };
-
-  return (
-    <Card className="group hover:shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer h-full flex flex-col overflow-hidden">
+  return <Card className="group hover:shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer h-full flex flex-col overflow-hidden">
       {/* Image Section */}
       <div className="relative overflow-hidden">
-        {currentImage ? (
-          <img 
-            src={currentImage} 
-            alt={product.name}
-            className="w-full h-36 sm:h-40 object-cover group-hover:scale-110 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-36 sm:h-40 bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
+        {currentImage ? <img src={currentImage} alt={product.name} className="w-full h-36 sm:h-40 object-cover group-hover:scale-110 transition-transform duration-300" /> : <div className="w-full h-36 sm:h-40 bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
             <span className="text-3xl">🧦</span>
-          </div>
-        )}
+          </div>}
         
         {/* Featured Badge */}
-        {product.is_featured && (
-          <Badge className="absolute top-2 left-2 bg-yellow-500 text-black text-xs">
+        {product.is_featured && <Badge className="absolute top-2 left-2 bg-yellow-500 text-black text-xs">
             <Star className="w-2 h-2 mr-1" />
             Featured
-          </Badge>
-        )}
+          </Badge>}
 
         {/* Price Badge - Always show product selling price */}
         <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1">
@@ -306,14 +264,10 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
             <span className="text-sm font-bold text-gray-900">
               ${subcategoryPrice.toFixed(2)}
             </span>
-            {priceMode !== 'normal' && (
-              <div className="flex items-center gap-1 justify-center">
+            {priceMode !== 'normal' && <div className="flex items-center gap-1 justify-center">
                 <Tag className={`w-2 h-2 ${getPriceColor()}`} />
-                <span className={`text-xs font-medium ${getPriceColor()}`}>
-                  {priceMode === 'combo' ? 'Combo Available' : 'Discount Available'}
-                </span>
-              </div>
-            )}
+                
+              </div>}
           </div>
         </div>
       </div>
@@ -324,105 +278,65 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
           <h3 className="font-semibold text-xs text-gray-900 truncate mb-1">
             {product.name}
           </h3>
-          {product.description && (
-            <p className="text-xs text-gray-600 line-clamp-2">
+          {product.description && <p className="text-xs text-gray-600 line-clamp-2">
               {product.description}
-            </p>
-          )}
+            </p>}
         </div>
 
         {/* Color Selection */}
-        {product.has_color_variants && colorVariants.length > 0 && (
-          <div className="mb-2">
+        {product.has_color_variants && colorVariants.length > 0 && <div className="mb-2">
             <label className="text-xs font-medium text-gray-700 mb-1 block">Color:</label>
             <Select value={selectedColor} onValueChange={setSelectedColor}>
               <SelectTrigger className="h-7 text-xs">
                 <SelectValue placeholder="Select color" />
               </SelectTrigger>
               <SelectContent>
-                {colorVariants.map((color) => (
-                  <SelectItem key={color.id} value={color.id}>
+                {colorVariants.map(color => <SelectItem key={color.id} value={color.id}>
                     {color.color_name}
-                  </SelectItem>
-                ))}
+                  </SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-        )}
+          </div>}
 
         {/* Size Selection */}
-        {product.has_size_variants && sizeVariants.length > 0 && (
-          <div className="mb-2">
+        {product.has_size_variants && sizeVariants.length > 0 && <div className="mb-2">
             <label className="text-xs font-medium text-gray-700 mb-1 block">Size:</label>
             <Select value={selectedSize} onValueChange={setSelectedSize}>
               <SelectTrigger className="h-7 text-xs">
                 <SelectValue placeholder="Select size" />
               </SelectTrigger>
               <SelectContent>
-                {sizeVariants.map((size) => (
-                  <SelectItem key={size.id} value={size.id}>
+                {sizeVariants.map(size => <SelectItem key={size.id} value={size.id}>
                     {size.size_name}
-                  </SelectItem>
-                ))}
+                  </SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-        )}
+          </div>}
 
         {/* Quantity and Current Price Row */}
         <div className="flex items-center justify-between mb-2">
           {/* Quantity Selection */}
           <div className="flex items-center space-x-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              disabled={quantity <= 1}
-              className="h-6 w-6 p-0"
-            >
+            <Button variant="outline" size="sm" onClick={() => setQuantity(Math.max(1, quantity - 1))} disabled={quantity <= 1} className="h-6 w-6 p-0">
               <Minus className="h-2 w-2" />
             </Button>
             <span className="px-2 py-1 border rounded text-xs min-w-[1.5rem] text-center">{quantity}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setQuantity(Math.min(availableStock, quantity + 1))}
-              disabled={quantity >= availableStock}
-              className="h-6 w-6 p-0"
-            >
+            <Button variant="outline" size="sm" onClick={() => setQuantity(Math.min(availableStock, quantity + 1))} disabled={quantity >= availableStock} className="h-6 w-6 p-0">
               <Plus className="h-2 w-2" />
             </Button>
           </div>
           
           {/* Current Effective Price */}
-          <div className="text-right">
-            <div className={`text-xs font-bold ${getPriceColor()}`}>
-              ${effectivePrice.toFixed(2)}
-            </div>
-            <span className={`text-xs ${getPriceColor()}`}>
-              {getPriceLabel()}
-            </span>
-          </div>
+          
         </div>
 
         {/* Add to Cart Button */}
-        <Button 
-          onClick={handleAddToCart}
-          disabled={loading || availableStock === 0}
-          className="w-full bg-red-600 hover:bg-red-700 text-xs h-7 mt-auto"
-        >
-          {loading ? (
-            "Adding..."
-          ) : availableStock === 0 ? (
-            "Out of Stock"
-          ) : (
-            <>
+        <Button onClick={handleAddToCart} disabled={loading || availableStock === 0} className="w-full bg-red-600 hover:bg-red-700 text-xs h-7 mt-auto">
+          {loading ? "Adding..." : availableStock === 0 ? "Out of Stock" : <>
               <ShoppingCart className="mr-1 h-2 w-2" />
               Add to Cart
-            </>
-          )}
+            </>}
         </Button>
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }
