@@ -64,7 +64,7 @@ interface CartContextType {
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
-  getTotalPrice: () => number;
+  getTotalPrice: () => Promise<number>; // Fixed: Changed from () => number to () => Promise<number>
   getTotalItems: () => number;
   getItemPrice: (subcategoryId: string, quantity: number) => Promise<PriceCalculation>;
   activeCombo: ComboData | null;
