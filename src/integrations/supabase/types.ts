@@ -72,6 +72,13 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_color_variants_product_id"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
         ]
       }
       discount_tiers: {
@@ -144,6 +151,20 @@ export type Database = {
           storage_path?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_product_images_color_variant_id"
+            columns: ["color_variant_id"]
+            isOneToOne: false
+            referencedRelation: "color_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_product_images_product_id"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "product_images_color_variant_id_fkey"
             columns: ["color_variant_id"]
@@ -282,6 +303,13 @@ export type Database = {
           stock_quantity?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_size_variants_color_variant_id"
+            columns: ["color_variant_id"]
+            isOneToOne: false
+            referencedRelation: "color_variants"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "size_variants_color_variant_id_fkey"
             columns: ["color_variant_id"]

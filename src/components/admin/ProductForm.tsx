@@ -169,6 +169,9 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submission started');
+    console.log('Form data:', formData);
+    console.log('Color variants:', colorVariants);
     
     if (!formData.name.trim()) {
       toast({
@@ -216,6 +219,27 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
       return;
     }
 
+    // Validate color variants
+    for (const variant of colorVariants) {
+      if (!variant.color_name.trim()) {
+        toast({
+          title: "Error",
+          description: "All color variants must have a name",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (variant.has_sizes && variant.sizes.length === 0) {
+        toast({
+          title: "Error",
+          description: `Color variant "${variant.color_name}" has sizes enabled but no sizes defined`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setIsUploading(true);
 
     try {
@@ -224,9 +248,11 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
       
       // Upload main product image
       if (imageFile) {
+        console.log('Uploading main image...');
         const uploadedImageUrl = await uploadImage(imageFile, productFolder, 'main');
         if (uploadedImageUrl) {
           mainImageUrl = uploadedImageUrl;
+          console.log('Main image uploaded:', mainImageUrl);
         } else {
           toast({
             title: "Error",
@@ -252,6 +278,8 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
         stock_quantity: formData.has_color_variants ? 0 : parseInt(formData.stock_quantity),
       };
 
+      console.log('Saving product data:', productData);
+
       let error;
       let productId;
       
@@ -262,6 +290,7 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
           .eq('id', product.id);
         error = updateError;
         productId = product.id;
+        console.log('Product updated, ID:', productId);
       } else {
         const { data, error: insertError } = await supabase
           .from('products')
@@ -270,6 +299,7 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
           .single();
         error = insertError;
         productId = data?.id;
+        console.log('Product created, ID:', productId);
       }
 
       if (error) {
@@ -284,7 +314,8 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
 
       // Save main product image to product_images table
       if (mainImageUrl && productId) {
-        await supabase
+        console.log('Saving main image to product_images table...');
+        const { error: imageError } = await supabase
           .from('product_images')
           .upsert({
             product_id: productId,
@@ -293,33 +324,53 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
             storage_path: `${productFolder}/main`,
             is_primary: true
           });
+        
+        if (imageError) {
+          console.error('Error saving main image:', imageError);
+        }
       }
 
       // Handle color variants if enabled
       if (formData.has_color_variants && colorVariants.length > 0 && productId) {
+        console.log('Processing color variants...');
+        
         // Delete existing variants if updating
         if (product?.id) {
-          await supabase.from('color_variants').delete().eq('product_id', productId);
+          console.log('Deleting existing color variants...');
+          const { error: deleteError } = await supabase
+            .from('color_variants')
+            .delete()
+            .eq('product_id', productId);
+          
+          if (deleteError) {
+            console.error('Error deleting existing variants:', deleteError);
+          }
         }
 
         for (const [index, variant] of colorVariants.entries()) {
           if (variant.color_name.trim()) {
+            console.log(`Processing color variant ${index + 1}:`, variant.color_name);
+            
             let variantImageUrl = '';
             
             // Upload color variant image
             if (variant.imageFile) {
+              console.log('Uploading color variant image...');
               const colorFolder = `${productFolder}/colors`;
               const colorFileName = variant.color_name.toLowerCase().replace(/[^a-z0-9]/g, '-');
               variantImageUrl = await uploadImage(variant.imageFile, colorFolder, colorFileName) || '';
+              console.log('Color variant image uploaded:', variantImageUrl);
             }
 
             const colorVariantData = {
               product_id: productId,
               color_name: variant.color_name.trim(),
-              image_url: variantImageUrl,
+              image_url: variantImageUrl || null,
               has_sizes: variant.has_sizes,
               stock_quantity: variant.has_sizes ? 0 : variant.stock_quantity
             };
+
+            console.log('Saving color variant:', colorVariantData);
 
             const { data: colorVariantResult, error: colorError } = await supabase
               .from('color_variants')
@@ -329,12 +380,20 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
 
             if (colorError) {
               console.error('Error creating color variant:', colorError);
+              toast({
+                title: "Error",
+                description: `Failed to save color variant: ${variant.color_name}`,
+                variant: "destructive",
+              });
               continue;
             }
 
+            console.log('Color variant saved with ID:', colorVariantResult?.id);
+
             // Save variant image to product_images table
             if (variantImageUrl && colorVariantResult?.id) {
-              await supabase
+              console.log('Saving color variant image to product_images table...');
+              const { error: variantImageError } = await supabase
                 .from('product_images')
                 .insert({
                   product_id: productId,
@@ -344,10 +403,16 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
                   storage_path: `${productFolder}/colors/${variant.color_name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
                   is_primary: false
                 });
+
+              if (variantImageError) {
+                console.error('Error saving variant image:', variantImageError);
+              }
             }
 
             // Handle sizes if variant has sizes
             if (variant.has_sizes && variant.sizes.length > 0 && colorVariantResult?.id) {
+              console.log('Processing size variants for color:', variant.color_name);
+              
               const sizeInserts = variant.sizes
                 .filter(size => size.size_name.trim())
                 .map(size => ({
@@ -357,6 +422,8 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
                   stock_quantity: size.stock_quantity
                 }));
 
+              console.log('Size variants to insert:', sizeInserts);
+
               if (sizeInserts.length > 0) {
                 const { error: sizeError } = await supabase
                   .from('size_variants')
@@ -364,6 +431,13 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
 
                 if (sizeError) {
                   console.error('Error creating size variants:', sizeError);
+                  toast({
+                    title: "Warning",
+                    description: `Some size variants for ${variant.color_name} could not be saved`,
+                    variant: "destructive",
+                  });
+                } else {
+                  console.log(`${sizeInserts.length} size variants saved for ${variant.color_name}`);
                 }
               }
             }
@@ -371,6 +445,7 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
         }
       }
 
+      console.log('Product submission completed successfully');
       toast({
         title: "Success",
         description: `Product ${product ? 'updated' : 'created'} successfully`,
@@ -677,7 +752,7 @@ export function ProductForm({ product, categories, subcategories, onSuccess, onC
                     </div>
 
                     <div>
-                      <Label>Color Image *</Label>
+                      <Label>Color Image</Label>
                       <div className="mt-2">
                         {variant.image_url ? (
                           <div className="relative inline-block">
