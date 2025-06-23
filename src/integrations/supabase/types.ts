@@ -71,6 +71,44 @@ export type Database = {
           },
         ]
       }
+      discount_tiers: {
+        Row: {
+          created_at: string | null
+          discount_amount: number
+          id: string
+          max_quantity: number | null
+          min_quantity: number
+          subcategory_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          discount_amount?: number
+          id?: string
+          max_quantity?: number | null
+          min_quantity: number
+          subcategory_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          discount_amount?: number
+          id?: string
+          max_quantity?: number | null
+          min_quantity?: number
+          subcategory_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discount_tiers_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_images: {
         Row: {
           color_variant_id: string | null
@@ -246,9 +284,7 @@ export type Database = {
           category_id: string
           created_at: string | null
           description: string | null
-          discount_amount: number | null
           id: string
-          minimum_quantity_for_discount: number
           name: string
           selling_price: number
           status: Database["public"]["Enums"]["category_status"]
@@ -258,9 +294,7 @@ export type Database = {
           category_id: string
           created_at?: string | null
           description?: string | null
-          discount_amount?: number | null
           id?: string
-          minimum_quantity_for_discount?: number
           name: string
           selling_price: number
           status?: Database["public"]["Enums"]["category_status"]
@@ -270,9 +304,7 @@ export type Database = {
           category_id?: string
           created_at?: string | null
           description?: string | null
-          discount_amount?: number | null
           id?: string
-          minimum_quantity_for_discount?: number
           name?: string
           selling_price?: number
           status?: Database["public"]["Enums"]["category_status"]

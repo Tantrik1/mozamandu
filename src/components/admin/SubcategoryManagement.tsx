@@ -10,11 +10,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, X } from 'lucide-react';
 
 interface Category {
   id: string;
   name: string;
+}
+
+interface DiscountTier {
+  id?: string;
+  min_quantity: number;
+  max_quantity: number | null;
+  discount_amount: number;
 }
 
 interface Subcategory {
@@ -22,8 +29,6 @@ interface Subcategory {
   name: string;
   description: string;
   selling_price: number;
-  discount_amount: number;
-  minimum_quantity_for_discount: number;
   status: 'on' | 'off';
   category_id: string;
   categories: { name: string };
@@ -35,13 +40,12 @@ export function SubcategoryManagement() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingSubcategory, setEditingSubcategory] = useState<Subcategory | null>(null);
+  const [discountTiers, setDiscountTiers] = useState<DiscountTier[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     category_id: '',
     selling_price: '',
-    discount_amount: '',
-    minimum_quantity_for_discount: '1',
     status: true,
   });
 
@@ -87,6 +91,43 @@ export function SubcategoryManagement() {
     }
   };
 
+  const fetchDiscountTiers = async (subcategoryId: string) => {
+    const { data, error } = await supabase
+      .from('discount_tiers')
+      .select('*')
+      .eq('subcategory_id', subcategoryId)
+      .order('min_quantity', { ascending: true });
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch discount tiers",
+        variant: "destructive",
+      });
+      return [];
+    }
+    return data || [];
+  };
+
+  const addDiscountTier = () => {
+    setDiscountTiers([...discountTiers, {
+      min_quantity: 1,
+      max_quantity: null,
+      discount_amount: 0
+    }]);
+  };
+
+  const removeDiscountTier = (index: number) => {
+    const newTiers = discountTiers.filter((_, i) => i !== index);
+    setDiscountTiers(newTiers);
+  };
+
+  const updateDiscountTier = (index: number, field: keyof DiscountTier, value: any) => {
+    const newTiers = [...discountTiers];
+    (newTiers[index] as any)[field] = value;
+    setDiscountTiers(newTiers);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -95,22 +136,26 @@ export function SubcategoryManagement() {
       description: formData.description,
       category_id: formData.category_id,
       selling_price: parseFloat(formData.selling_price),
-      discount_amount: parseFloat(formData.discount_amount) || 0,
-      minimum_quantity_for_discount: parseInt(formData.minimum_quantity_for_discount) || 1,
       status: formData.status ? 'on' : 'off' as 'on' | 'off',
     };
 
     let error;
+    let subcategoryId;
     
     if (editingSubcategory) {
       ({ error } = await supabase
         .from('subcategories')
         .update(subcategoryData)
         .eq('id', editingSubcategory.id));
+      subcategoryId = editingSubcategory.id;
     } else {
-      ({ error } = await supabase
+      const { data, error: insertError } = await supabase
         .from('subcategories')
-        .insert([subcategoryData]));
+        .insert([subcategoryData])
+        .select('id')
+        .single();
+      error = insertError;
+      subcategoryId = data?.id;
     }
 
     if (error) {
@@ -119,29 +164,64 @@ export function SubcategoryManagement() {
         description: error.message,
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Success",
-        description: `Subcategory ${editingSubcategory ? 'updated' : 'created'} successfully`,
-      });
-      
-      resetForm();
-      setIsCreateModalOpen(false);
-      fetchSubcategories();
+      return;
     }
+
+    // Handle discount tiers
+    if (subcategoryId && discountTiers.length > 0) {
+      // Delete existing tiers if editing
+      if (editingSubcategory) {
+        await supabase
+          .from('discount_tiers')
+          .delete()
+          .eq('subcategory_id', subcategoryId);
+      }
+
+      // Insert new tiers
+      const tiersToInsert = discountTiers.map(tier => ({
+        subcategory_id: subcategoryId,
+        min_quantity: tier.min_quantity,
+        max_quantity: tier.max_quantity,
+        discount_amount: tier.discount_amount
+      }));
+
+      const { error: tiersError } = await supabase
+        .from('discount_tiers')
+        .insert(tiersToInsert);
+
+      if (tiersError) {
+        toast({
+          title: "Warning",
+          description: "Subcategory saved but discount tiers failed to save",
+          variant: "destructive",
+        });
+      }
+    }
+
+    toast({
+      title: "Success",
+      description: `Subcategory ${editingSubcategory ? 'updated' : 'created'} successfully`,
+    });
+    
+    resetForm();
+    setIsCreateModalOpen(false);
+    fetchSubcategories();
   };
 
-  const handleEdit = (subcategory: Subcategory) => {
+  const handleEdit = async (subcategory: Subcategory) => {
     setEditingSubcategory(subcategory);
     setFormData({
       name: subcategory.name,
       description: subcategory.description,
       category_id: subcategory.category_id,
       selling_price: subcategory.selling_price.toString(),
-      discount_amount: subcategory.discount_amount?.toString() || '0',
-      minimum_quantity_for_discount: (subcategory.minimum_quantity_for_discount || 1).toString(),
       status: subcategory.status === 'on',
     });
+    
+    // Fetch existing discount tiers
+    const tiers = await fetchDiscountTiers(subcategory.id);
+    setDiscountTiers(tiers);
+    
     setIsCreateModalOpen(true);
   };
 
@@ -174,11 +254,10 @@ export function SubcategoryManagement() {
       description: '',
       category_id: '',
       selling_price: '',
-      discount_amount: '',
-      minimum_quantity_for_discount: '1',
       status: true,
     });
     setEditingSubcategory(null);
+    setDiscountTiers([]);
   };
 
   return (
@@ -192,7 +271,7 @@ export function SubcategoryManagement() {
               Add Subcategory
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingSubcategory ? 'Edit Subcategory' : 'Create Subcategory'}
@@ -238,43 +317,90 @@ export function SubcategoryManagement() {
                 />
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="selling_price">Selling Price ($)</Label>
-                  <Input
-                    id="selling_price"
-                    type="number"
-                    step="0.01"
-                    value={formData.selling_price}
-                    onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="discount_amount">Discount Amount ($)</Label>
-                  <Input
-                    id="discount_amount"
-                    type="number"
-                    step="0.01"
-                    value={formData.discount_amount}
-                    onChange={(e) => setFormData({ ...formData, discount_amount: e.target.value })}
-                  />
-                </div>
-              </div>
-              
               <div>
-                <Label htmlFor="minimum_quantity_for_discount">Minimum Quantity for Discount</Label>
+                <Label htmlFor="selling_price">Selling Price ($)</Label>
                 <Input
-                  id="minimum_quantity_for_discount"
+                  id="selling_price"
                   type="number"
-                  min="1"
-                  value={formData.minimum_quantity_for_discount}
-                  onChange={(e) => setFormData({ ...formData, minimum_quantity_for_discount: e.target.value })}
-                  placeholder="e.g., 3"
+                  step="0.01"
+                  value={formData.selling_price}
+                  onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                  required
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Discount applies only after this quantity
-                </p>
+              </div>
+
+              {/* Discount Tiers Section */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label className="text-lg font-semibold">Discount Tiers (MOQ Based)</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addDiscountTier}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Tier
+                  </Button>
+                </div>
+                
+                {discountTiers.map((tier, index) => (
+                  <Card key={index}>
+                    <CardHeader>
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="text-sm">Tier {index + 1}</CardTitle>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeDiscountTier(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <Label>Min Quantity</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={tier.min_quantity}
+                            onChange={(e) => updateDiscountTier(index, 'min_quantity', parseInt(e.target.value) || 1)}
+                            placeholder="e.g., 3"
+                          />
+                        </div>
+                        <div>
+                          <Label>Max Quantity</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={tier.max_quantity || ''}
+                            onChange={(e) => updateDiscountTier(index, 'max_quantity', e.target.value ? parseInt(e.target.value) : null)}
+                            placeholder="Leave empty for no limit"
+                          />
+                        </div>
+                        <div>
+                          <Label>Discount Amount ($)</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={tier.discount_amount}
+                            onChange={(e) => updateDiscountTier(index, 'discount_amount', parseFloat(e.target.value) || 0)}
+                            placeholder="e.g., 20"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Quantities {tier.min_quantity} {tier.max_quantity ? `to ${tier.max_quantity}` : 'and above'}: 
+                        ${tier.discount_amount} discount per item
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+                
+                {discountTiers.length === 0 && (
+                  <p className="text-sm text-gray-500 text-center py-4">
+                    No discount tiers added. Click "Add Tier" to create quantity-based discounts.
+                  </p>
+                )}
               </div>
               
               <div className="flex items-center space-x-2">
@@ -296,71 +422,105 @@ export function SubcategoryManagement() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {subcategories.map((subcategory) => (
-          <Card key={subcategory.id}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">{subcategory.name}</CardTitle>
-                  <p className="text-sm text-gray-500">{subcategory.categories?.name}</p>
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(subcategory)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(subcategory.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600 mb-3">{subcategory.description}</p>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm">Selling Price:</span>
-                  <span className="font-semibold">${subcategory.selling_price}</span>
-                </div>
-                {subcategory.discount_amount > 0 && (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Discount:</span>
-                      <span className="text-green-600">
-                        ${subcategory.discount_amount}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Min Qty for Discount:</span>
-                      <span className="text-blue-600 font-medium">
-                        {subcategory.minimum_quantity_for_discount || 1}
-                      </span>
-                    </div>
-                  </>
-                )}
-                <div className="flex justify-between items-center">
-                  <span className={`px-2 py-1 rounded text-sm ${
-                    subcategory.status === 'on' 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {subcategory.status === 'on' ? 'Active' : 'Inactive'}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {new Date(subcategory.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <SubcategoryCard 
+            key={subcategory.id} 
+            subcategory={subcategory}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         ))}
       </div>
     </div>
+  );
+}
+
+function SubcategoryCard({ 
+  subcategory, 
+  onEdit, 
+  onDelete 
+}: { 
+  subcategory: Subcategory;
+  onEdit: (subcategory: Subcategory) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [discountTiers, setDiscountTiers] = useState<DiscountTier[]>([]);
+
+  useEffect(() => {
+    fetchDiscountTiers();
+  }, [subcategory.id]);
+
+  const fetchDiscountTiers = async () => {
+    const { data } = await supabase
+      .from('discount_tiers')
+      .select('*')
+      .eq('subcategory_id', subcategory.id)
+      .order('min_quantity', { ascending: true });
+    
+    setDiscountTiers(data || []);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="text-lg">{subcategory.name}</CardTitle>
+            <p className="text-sm text-gray-500">{subcategory.categories?.name}</p>
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onEdit(subcategory)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(subcategory.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-gray-600 mb-3">{subcategory.description}</p>
+        <div className="space-y-2">
+          <div className="flex justify-between">
+            <span className="text-sm">Selling Price:</span>
+            <span className="font-semibold">${subcategory.selling_price}</span>
+          </div>
+          
+          {discountTiers.length > 0 && (
+            <div className="space-y-1">
+              <span className="text-sm font-medium">Discount Tiers:</span>
+              {discountTiers.map((tier, index) => (
+                <div key={index} className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                  <span className="font-medium">
+                    {tier.min_quantity}{tier.max_quantity ? `-${tier.max_quantity}` : '+'} qty:
+                  </span>
+                  <span className="text-green-600 ml-2">${tier.discount_amount} off</span>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <div className="flex justify-between items-center">
+            <span className={`px-2 py-1 rounded text-sm ${
+              subcategory.status === 'on' 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-red-100 text-red-800'
+            }`}>
+              {subcategory.status === 'on' ? 'Active' : 'Inactive'}
+            </span>
+            <span className="text-sm text-gray-500">
+              {new Date(subcategory.created_at).toLocaleDateString()}
+            </span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
