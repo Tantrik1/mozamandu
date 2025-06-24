@@ -605,28 +605,34 @@ export type Database = {
       }
       profiles: {
         Row: {
+          contact_number: string | null
           created_at: string | null
           email: string
           full_name: string | null
           id: string
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string | null
+          whatsapp_number: string | null
         }
         Insert: {
+          contact_number?: string | null
           created_at?: string | null
           email: string
           full_name?: string | null
           id: string
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string | null
+          whatsapp_number?: string | null
         }
         Update: {
+          contact_number?: string | null
           created_at?: string | null
           email?: string
           full_name?: string | null
           id?: string
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string | null
+          whatsapp_number?: string | null
         }
         Relationships: []
       }

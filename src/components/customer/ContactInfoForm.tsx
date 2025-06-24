@@ -44,6 +44,7 @@ export function ContactInfoForm({ userId, onComplete }: ContactInfoFormProps) {
         .eq('id', userId);
 
       if (error) {
+        console.error('Update error:', error);
         toast({
           title: "Error",
           description: "Failed to save contact information",
