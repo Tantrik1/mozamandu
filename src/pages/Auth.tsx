@@ -9,16 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Mail } from 'lucide-react';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 export default function Auth() {
-  const { signIn, signUp, verifyOTP, user, userProfile, isLoading } = useAuth();
+  const { signIn, signUp, verifyToken, user, userProfile, isLoading } = useAuth();
   const navigate = useNavigate();
   
   const [authLoading, setAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
   const [showPassword, setShowPassword] = useState(false);
-  const [showOTPField, setShowOTPField] = useState(false);
+  const [showTokenField, setShowTokenField] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   
   const [signInData, setSignInData] = useState({
@@ -33,7 +32,7 @@ export default function Auth() {
     confirmPassword: '',
   });
 
-  const [otpCode, setOtpCode] = useState('');
+  const [verificationToken, setVerificationToken] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -69,8 +68,8 @@ export default function Auth() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (showOTPField) {
-      return handleOTPVerification();
+    if (showTokenField) {
+      return handleTokenVerification();
     }
 
     // Validate form
@@ -114,37 +113,53 @@ export default function Auth() {
         variant: "destructive",
       });
     } else {
-      setShowOTPField(true);
+      setShowTokenField(true);
       toast({
         title: "Check Your Email!",
-        description: "We've sent a verification code to your email address.",
+        description: "We've sent a confirmation token to your email address.",
       });
     }
 
     setAuthLoading(false);
   };
 
-  const handleOTPVerification = async () => {
-    if (otpCode.length !== 6) {
-      setErrors({ otp: 'Please enter the complete 6-digit code' });
+  const handleTokenVerification = async () => {
+    if (!verificationToken.trim()) {
+      setErrors({ token: 'Please enter the confirmation token' });
       return;
     }
 
     setAuthLoading(true);
     setErrors({});
 
-    const { error } = await verifyOTP(signUpData.email, otpCode);
+    const { error } = await verifyToken(signUpData.email, verificationToken);
 
     if (error) {
-      setErrors({ otp: error.message });
+      setErrors({ token: error.message });
       toast({
         title: "Verification Failed",
         description: error.message,
         variant: "destructive",
       });
     } else {
-      // Success will be handled by the auth state change
-      // which will redirect to the appropriate page
+      // Success - user should be automatically signed in
+      toast({
+        title: "Account Activated!",
+        description: "Please sign in with your credentials.",
+      });
+      setActiveTab('signin');
+      setShowTokenField(false);
+      setVerificationToken('');
+      setSignUpData({
+        fullName: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+      });
+      setSignInData({
+        email: signUpData.email,
+        password: '',
+      });
     }
 
     setAuthLoading(false);
@@ -247,7 +262,7 @@ export default function Auth() {
                     </div>
                   )}
 
-                  {!showOTPField ? (
+                  {!showTokenField ? (
                     <>
                       <div>
                         <Label htmlFor="signup-name">Full Name</Label>
@@ -324,23 +339,22 @@ export default function Auth() {
                       <Mail className="w-16 h-16 mx-auto text-blue-600" />
                       <h3 className="text-xl font-semibold">Verify Your Email</h3>
                       <p className="text-gray-600">
-                        We've sent a verification code to<br />
+                        We've sent a confirmation token to<br />
                         <span className="font-medium">{signUpData.email}</span>
                       </p>
 
-                      <div className="flex justify-center">
-                        <InputOTP value={otpCode} onChange={setOtpCode} maxLength={6}>
-                          <InputOTPGroup>
-                            <InputOTPSlot index={0} />
-                            <InputOTPSlot index={1} />
-                            <InputOTPSlot index={2} />
-                            <InputOTPSlot index={3} />
-                            <InputOTPSlot index={4} />
-                            <InputOTPSlot index={5} />
-                          </InputOTPGroup>
-                        </InputOTP>
+                      <div>
+                        <Label htmlFor="verification-token">Confirmation Token</Label>
+                        <Input
+                          id="verification-token"
+                          type="text"
+                          value={verificationToken}
+                          onChange={(e) => setVerificationToken(e.target.value)}
+                          placeholder="Enter the token from your email"
+                          className="font-mono text-center"
+                        />
+                        {errors.token && <p className="text-sm text-red-600 mt-1">{errors.token}</p>}
                       </div>
-                      {errors.otp && <p className="text-sm text-red-600">{errors.otp}</p>}
                     </div>
                   )}
 
@@ -350,18 +364,18 @@ export default function Auth() {
                     disabled={authLoading}
                   >
                     {authLoading 
-                      ? (showOTPField ? 'Verifying...' : 'Creating Account...') 
-                      : (showOTPField ? 'Verify & Create Account' : 'Create Account')
+                      ? (showTokenField ? 'Verifying...' : 'Creating Account...') 
+                      : (showTokenField ? 'Verify Email' : 'Create Account')
                     }
                   </Button>
 
-                  {showOTPField && (
+                  {showTokenField && (
                     <Button 
                       type="button"
                       variant="ghost" 
                       onClick={() => {
-                        setShowOTPField(false);
-                        setOtpCode('');
+                        setShowTokenField(false);
+                        setVerificationToken('');
                         setErrors({});
                       }}
                       className="w-full"

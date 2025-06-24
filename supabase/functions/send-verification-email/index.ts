@@ -20,7 +20,7 @@ interface VerificationRequest {
   email: string;
   name?: string;
   password?: string;
-  otp?: string;
+  token?: string;
   verify?: boolean;
 }
 
@@ -30,129 +30,98 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, name, password, otp, verify }: VerificationRequest = await req.json();
+    const { email, name, password, token, verify }: VerificationRequest = await req.json();
 
-    console.log('Request received:', { email, verify, otp: otp ? `${otp.substring(0, 2)}****` : 'none', hasName: !!name, hasPassword: !!password });
+    console.log('Request received:', { email, verify, hasToken: !!token, hasName: !!name, hasPassword: !!password });
 
-    // If this is a verification request
-    if (verify && otp) {
-      console.log('Verifying OTP for email:', email);
+    // If this is a verification request with token
+    if (verify && token) {
+      console.log('Verifying email confirmation token for:', email);
       
-      // Get the stored OTP from database - make sure to trim and compare properly
-      const { data: storedOTP, error: fetchError } = await supabase
-        .from('email_verification_codes')
-        .select('*')
-        .eq('email', email.toLowerCase().trim())
-        .eq('code', otp.trim())
-        .eq('verified', false)
-        .gt('expires_at', new Date().toISOString())
-        .single();
-
-      console.log('Database query result:', { found: !!storedOTP, error: fetchError });
-
-      if (fetchError || !storedOTP) {
-        console.log('No valid OTP found for email:', email, 'Error:', fetchError);
-        return new Response(JSON.stringify({ 
-          success: false,
-          error: "Invalid or expired verification code. Please try requesting a new code."
-        }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        });
-      }
-
-      console.log('OTP verified successfully for email:', email);
-
-      // Mark the OTP as verified
-      const { error: updateError } = await supabase
-        .from('email_verification_codes')
-        .update({ verified: true })
-        .eq('id', storedOTP.id);
-
-      if (updateError) {
-        console.error('Error updating OTP status:', updateError);
-      }
-
-      // Get user data from stored OTP
-      const userData = storedOTP.user_data || {};
-      
-      console.log('Creating user with verified email...');
-      
-      // Create user with email_confirm: true to bypass email verification
-      const { data: signUpData, error: signUpError } = await supabase.auth.admin.createUser({
+      // Verify the email confirmation token using Supabase auth
+      const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
         email: email.toLowerCase().trim(),
-        password: userData.password || password,
-        email_confirm: true, // This bypasses email verification
-        user_metadata: {
-          full_name: userData.name || name,
-          role: 'customer',
-        }
+        token: token.trim(),
+        type: 'signup'
       });
 
-      if (signUpError) {
-        console.error('Error creating user:', signUpError);
+      console.log('Token verification result:', { success: !!verifyData.user, error: verifyError });
+
+      if (verifyError || !verifyData.user) {
+        console.log('Token verification failed:', verifyError);
         return new Response(JSON.stringify({ 
           success: false,
-          error: signUpError.message || "Failed to create user account"
+          error: "Invalid or expired verification token. Please try requesting a new one."
         }), {
           status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders },
         });
       }
 
-      console.log('User created successfully:', signUpData.user?.email);
+      console.log('Email verified successfully for user:', verifyData.user.email);
 
       return new Response(JSON.stringify({ 
         success: true,
-        message: "Email verified and account created successfully",
-        user: signUpData.user
+        message: "Email verified successfully",
+        user: verifyData.user,
+        session: verifyData.session
       }), {
         status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
 
-    // Generate and send OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log('Generated OTP:', otpCode, 'for email:', email);
+    // Create user with email confirmation required
+    console.log('Creating user account with email confirmation for:', email);
     
-    // Store OTP in database with 10-minute expiry
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-    
-    // First, clean up any existing unverified codes for this email
-    await supabase
-      .from('email_verification_codes')
-      .delete()
-      .eq('email', email.toLowerCase().trim())
-      .eq('verified', false);
+    const { data: signUpData, error: signUpError } = await supabase.auth.admin.createUser({
+      email: email.toLowerCase().trim(),
+      password: password,
+      email_confirm: false, // Require email confirmation
+      user_metadata: {
+        full_name: name || '',
+        role: 'customer',
+      }
+    });
 
-    // Store new OTP in database
-    const { error: insertError } = await supabase
-      .from('email_verification_codes')
-      .insert({
-        email: email.toLowerCase().trim(),
-        code: otpCode.trim(),
-        expires_at: expiresAt,
-        user_data: { name, password }
-      });
-
-    if (insertError) {
-      console.error('Error storing OTP:', insertError);
+    if (signUpError) {
+      console.error('Error creating user:', signUpError);
       return new Response(JSON.stringify({ 
         success: false,
-        error: "Failed to generate verification code"
+        error: signUpError.message || "Failed to create user account"
+      }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    console.log('User created successfully, now generating confirmation token');
+
+    // Generate email confirmation link
+    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+      type: 'signup',
+      email: email.toLowerCase().trim(),
+    });
+
+    if (linkError || !linkData.properties?.hashed_token) {
+      console.error('Error generating confirmation link:', linkError);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: "Failed to generate confirmation link"
       }), {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
 
-    console.log("Sending verification email to:", email, "with OTP:", otpCode);
+    const confirmationToken = linkData.properties.hashed_token;
+    console.log('Generated confirmation token for email verification');
 
+    // Send custom confirmation email with the token
     const emailResponse = await resend.emails.send({
       from: "Mozamandu <onboarding@resend.dev>",
       to: [email.trim()],
-      subject: "Verify Your Email - Mozamandu",
+      subject: "Confirm Your Email - Mozamandu",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 30px;">
@@ -163,19 +132,19 @@ const handler = async (req: Request): Promise<Response> => {
           <h2 style="color: #333; text-align: center;">Welcome ${name || 'there'}!</h2>
           
           <p style="color: #333; font-size: 16px;">
-            Thank you for signing up! Please use the verification code below to complete your registration:
+            Thank you for signing up! Please use the confirmation token below to activate your account:
           </p>
           
           <div style="background: #f8f9fa; padding: 20px; text-align: center; margin: 30px 0; border-radius: 8px; border: 2px dashed #dc2626;">
-            <h1 style="color: #dc2626; font-size: 32px; margin: 0; letter-spacing: 8px; font-family: monospace;">${otpCode}</h1>
+            <h1 style="color: #dc2626; font-size: 24px; margin: 0; letter-spacing: 2px; font-family: monospace; word-break: break-all;">${confirmationToken}</h1>
           </div>
           
           <p style="color: #666; font-size: 14px;">
-            This code will expire in 10 minutes for security reasons.
+            This token will expire in 24 hours for security reasons.
           </p>
           
           <p style="color: #666; font-size: 14px;">
-            If you didn't request this verification, please ignore this email.
+            If you didn't request this account creation, please ignore this email.
           </p>
           
           <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
@@ -187,11 +156,11 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Email sent successfully:", emailResponse);
+    console.log("Confirmation email sent successfully:", emailResponse);
 
     return new Response(JSON.stringify({ 
       success: true,
-      message: "Verification email sent successfully"
+      message: "Account created! Please check your email for the confirmation token."
     }), {
       status: 200,
       headers: {
