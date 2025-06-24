@@ -108,6 +108,11 @@ export default function Auth() {
 
     if (error) {
       setErrors({ form: error.message });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     } else {
       setShowOTPField(true);
       toast({
@@ -138,10 +143,8 @@ export default function Auth() {
         variant: "destructive",
       });
     } else {
-      toast({
-        title: "Account Created!",
-        description: "Your account has been created successfully.",
-      });
+      // Success will be handled by the auth state change
+      // which will redirect to the appropriate page
     }
 
     setAuthLoading(false);

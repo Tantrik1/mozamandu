@@ -1,3 +1,4 @@
+
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -169,21 +170,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       console.log('OTP verified and user created successfully');
 
-      // Since the user is created via admin.createUser, we need to sign them in
+      // Now sign in the user with a generated session
       if (verificationData.user) {
-        // The user is already created, we just need to refresh the session
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
+        // Sign in with the created user's email
+        const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
+          email: emailKey,
+          password: '', // Password is already verified in the edge function
+        });
+
+        // If password sign-in fails (which is expected), try admin sign-in
         if (sessionError) {
-          console.error('Session error:', sessionError);
-          // If no session, try to sign in with the credentials
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email: emailKey,
-            password: '', // We don't have the password here, but the user should be created
-          });
+          console.log('Creating session for newly created user...');
           
-          if (signInError) {
-            console.log('Sign in after creation needed');
+          // Use admin to create a session for the new user
+          const { data: adminSessionData, error: adminSessionError } = await supabase.auth.admin.generateLink({
+            type: 'magiclink',
+            email: emailKey,
+          });
+
+          if (adminSessionError) {
+            console.error('Admin session error:', adminSessionError);
+            // Force refresh the session
+            await supabase.auth.refreshSession();
           }
         }
       }
