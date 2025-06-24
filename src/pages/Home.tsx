@@ -1,7 +1,6 @@
 
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
-import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
+import { HeroSection } from '@/components/customer/HeroSection';
 import { FeaturedProductsCarousel } from '@/components/customer/FeaturedProductsCarousel';
 import { SubcategoryProductTabs } from '@/components/customer/SubcategoryProductTabs';
 import { LatestProducts } from '@/components/customer/LatestProducts';
@@ -14,20 +13,8 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
       
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-red-600 to-red-700 text-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-5xl font-bold mb-6">Welcome to Mozamandu</h1>
-          <p className="text-xl mb-8 max-w-2xl mx-auto">
-            Discover premium quality socks, boxers, and caps. Comfort meets style in every product.
-          </p>
-          <Link to="/">
-            <Button size="lg" className="bg-white text-red-600 hover:bg-gray-100">
-              Shop Now
-            </Button>
-          </Link>
-        </div>
-      </section>
+      {/* Hero Section - Full viewport height */}
+      <HeroSection />
 
       {/* Featured Products Carousel */}
       <FeaturedProductsCarousel />
@@ -69,7 +56,7 @@ export default function Home() {
                 <li>Contact Us</li>
                 <li>Shipping Info</li>
                 <li>Returns</li>
-                <li><Link to="/faq">FAQ</Link></li>
+                <li>FAQ</li>
               </ul>
             </div>
             <div>
