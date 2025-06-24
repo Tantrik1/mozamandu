@@ -20,8 +20,8 @@ export function usePricing() {
       if (!tiers || tiers.length === 0 || totalQuantity === 0) {
         return {
           finalPrice: basePrice,
-          description: `$${basePrice.toFixed(2)} each`,
-          breakdown: [`${totalQuantity} × $${basePrice.toFixed(2)}`],
+          description: `Rs.${basePrice.toFixed(2)} each`,
+          breakdown: [`${totalQuantity} × Rs.${basePrice.toFixed(2)}`],
           totalCost: basePrice * totalQuantity
         };
       }
@@ -58,7 +58,7 @@ export function usePricing() {
           const tierCost = qtyInTier * discountedPrice;
           
           totalCost += tierCost;
-          breakdown.push(`${qtyInTier} × $${discountedPrice.toFixed(2)}`);
+          breakdown.push(`${qtyInTier} × Rs.${discountedPrice.toFixed(2)}`);
           remainingQty -= qtyInTier;
           currentPosition += qtyInTier;
         }
@@ -73,7 +73,7 @@ export function usePricing() {
       const avgPrice = totalCost / totalQuantity;
       const description = breakdown.length > 1 
         ? `Tiered: ${breakdown.join(' + ')}`
-        : breakdown[0] || `$${basePrice.toFixed(2)} each`;
+        : breakdown[0] || `Rs. ${basePrice.toFixed(2)} each`;
 
       return {
         finalPrice: avgPrice,
