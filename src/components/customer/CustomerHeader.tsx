@@ -22,11 +22,7 @@ interface Subcategory {
 }
 
 export function CustomerHeader() {
-  const {
-    user,
-    userProfile,
-    signOut
-  } = useAuth();
+  const { user, userProfile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -39,10 +35,9 @@ export function CustomerHeader() {
 
   const fetchCategoriesAndSubcategories = async () => {
     try {
-      const {
-        data: categoriesData,
-        error: categoriesError
-      } = await supabase.from('categories').select(`
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select(`
           id,
           name,
           subcategories (
@@ -51,7 +46,9 @@ export function CustomerHeader() {
             selling_price,
             image_url
           )
-        `).eq('status', 'on').order('name');
+        `)
+        .eq('status', 'on')
+        .order('name');
 
       if (categoriesError) throw categoriesError;
 
@@ -114,7 +111,7 @@ export function CustomerHeader() {
                           )}
                           <div>
                             <h4 className="font-medium text-gray-900">{subcategory.name}</h4>
-                            <p className="text-sm text-red-600">${subcategory.selling_price}</p>
+                            <p className="text-sm text-red-600">Rs. {subcategory.selling_price}</p>
                           </div>
                         </Link>
                       ))}
@@ -185,7 +182,7 @@ export function CustomerHeader() {
                   </Link>
                   {category.subcategories.map(subcategory => (
                     <Link key={subcategory.id} to={`/subcategories/${subcategory.id}`} className="block px-6 py-1 text-sm text-gray-600 hover:text-red-600" onClick={() => setMobileMenuOpen(false)}>
-                      {subcategory.name} - ${subcategory.selling_price}
+                      {subcategory.name} - Rs. {subcategory.selling_price}
                     </Link>
                   ))}
                 </div>

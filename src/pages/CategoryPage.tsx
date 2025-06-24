@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { Package } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -20,6 +21,7 @@ interface Subcategory {
   selling_price: number;
   minimum_quantity: number;
   status: string;
+  image_url?: string;
 }
 
 export default function CategoryPage() {
@@ -56,10 +58,10 @@ export default function CategoryPage() {
 
       setCategory(categoryData);
 
-      // Fetch subcategories
+      // Fetch subcategories with image_url
       const { data: subcategoriesData, error: subcategoriesError } = await supabase
         .from('subcategories')
-        .select('id, name, description, selling_price, minimum_quantity, status')
+        .select('id, name, description, selling_price, minimum_quantity, status, image_url')
         .eq('category_id', categoryId)
         .eq('status', 'on')
         .order('name');
@@ -134,8 +136,29 @@ export default function CategoryPage() {
               <Link key={subcategory.id} to={`/subcategories/${subcategory.id}`}>
                 <Card className="hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer h-full">
                   <CardHeader className="text-center">
-                    <div className="w-full h-48 bg-gradient-to-br from-red-500 to-red-700 rounded-lg mb-4 flex items-center justify-center">
-                      <span className="text-6xl">🧦</span>
+                    <div className="w-full h-48 bg-gradient-to-br from-red-500 to-red-700 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                      {subcategory.image_url ? (
+                        <img 
+                          src={subcategory.image_url} 
+                          alt={subcategory.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              const placeholder = document.createElement('div');
+                              placeholder.className = 'w-full h-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center';
+                              placeholder.innerHTML = '<div class="w-16 h-16 bg-red-100 rounded-lg flex items-center justify-center"><svg class="w-8 h-8 text-red-300" fill="currentColor" viewBox="0 0 24 24"><path d="M20 6h-2.18l-1.41-1.41C16.05 4.23 15.55 4 15 4H9c-.55 0-1.05.23-1.41.59L6.18 6H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg></div>';
+                              parent.appendChild(placeholder);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-red-100 rounded-lg flex items-center justify-center">
+                          <Package className="w-8 h-8 text-red-300" />
+                        </div>
+                      )}
                     </div>
                     <CardTitle className="text-xl text-gray-900">{subcategory.name}</CardTitle>
                   </CardHeader>
@@ -145,7 +168,7 @@ export default function CategoryPage() {
                     )}
                     <div className="space-y-2">
                       <Badge variant="secondary" className="bg-red-100 text-red-700 text-lg font-semibold">
-                        ${subcategory.selling_price}
+                        Rs. {subcategory.selling_price}
                       </Badge>
                       {subcategory.minimum_quantity > 1 && (
                         <Badge variant="outline" className="block text-xs text-blue-600 border-blue-300">

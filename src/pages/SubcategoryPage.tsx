@@ -33,11 +33,7 @@ interface Product {
 }
 
 export default function SubcategoryPage() {
-  const {
-    subcategoryId
-  } = useParams<{
-    subcategoryId: string;
-  }>();
+  const { subcategoryId } = useParams<{ subcategoryId: string }>();
   const [subcategory, setSubcategory] = useState<Subcategory | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,17 +47,19 @@ export default function SubcategoryPage() {
   const fetchSubcategoryData = async () => {
     try {
       // Fetch subcategory details
-      const {
-        data: subcategoryData,
-        error: subcategoryError
-      } = await supabase.from('subcategories').select('id, name, description, selling_price, minimum_quantity, image_url').eq('id', subcategoryId).eq('status', 'on').single();
+      const { data: subcategoryData, error: subcategoryError } = await supabase
+        .from('subcategories')
+        .select('id, name, description, selling_price, minimum_quantity, image_url')
+        .eq('id', subcategoryId)
+        .eq('status', 'on')
+        .single();
 
       if (subcategoryError) {
         console.error('Error fetching subcategory:', subcategoryError);
         toast({
           title: "Error",
           description: "Subcategory not found",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
@@ -69,19 +67,19 @@ export default function SubcategoryPage() {
       setSubcategory(subcategoryData);
 
       // Fetch products in this subcategory
-      const {
-        data: productsData,
-        error: productsError
-      } = await supabase.from('products').select('*').eq('subcategory_id', subcategoryId).eq('status', 'active').order('created_at', {
-        ascending: false
-      });
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('subcategory_id', subcategoryId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
 
       if (productsError) {
         console.error('Error fetching products:', productsError);
         toast({
           title: "Error",
           description: "Failed to fetch products",
-          variant: "destructive"
+          variant: "destructive",
         });
       } else {
         setProducts(productsData || []);
@@ -91,7 +89,7 @@ export default function SubcategoryPage() {
       toast({
         title: "Error",
         description: "Something went wrong",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -131,7 +129,7 @@ export default function SubcategoryPage() {
           <div className="flex flex-wrap items-center gap-4 mb-4">
             <h1 className="text-3xl font-bold text-gray-900">{subcategory.name}</h1>
             <Badge variant="outline" className="text-red-600 border-red-600">
-              Base Price: ${subcategory.selling_price}
+              Base Price: Rs. {subcategory.selling_price}
             </Badge>
           </div>
           

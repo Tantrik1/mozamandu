@@ -110,7 +110,7 @@ export default function Categories() {
                                     if (parent) {
                                       const placeholder = document.createElement('div');
                                       placeholder.className = 'w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center';
-                                      placeholder.innerHTML = '<svg class="w-5 h-5 text-red-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>';
+                                      placeholder.innerHTML = '<svg class="w-5 h-5 text-red-300" fill="currentColor" viewBox="0 0 24 24"><path d="M20 6h-2.18l-1.41-1.41C16.05 4.23 15.55 4 15 4H9c-.55 0-1.05.23-1.41.59L6.18 6H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>';
                                       parent.appendChild(placeholder);
                                     }
                                   }}
@@ -122,7 +122,7 @@ export default function Categories() {
                               )}
                               <span className="text-sm font-medium">{subcategory.name}</span>
                             </div>
-                            <Badge variant="outline">${subcategory.selling_price}</Badge>
+                            <Badge variant="outline">Rs. {subcategory.selling_price}</Badge>
                           </Link>
                         ))}
                       </div>
