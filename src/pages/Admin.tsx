@@ -5,6 +5,8 @@ import { useNavigate, Routes, Route } from 'react-router-dom';
 import { CategoryManagement } from '@/components/admin/CategoryManagement';
 import { SubcategoryManagement } from '@/components/admin/SubcategoryManagement';
 import { ProductManagement } from '@/components/admin/ProductManagement';
+import { OrderManagement } from '@/components/admin/OrderManagement';
+import { CustomerManagement } from '@/components/admin/CustomerManagement';
 import { ComboManagement } from '@/components/admin/ComboManagement';
 import { PromocodeManagement } from '@/components/admin/PromocodeManagement';
 import { PaymentMethodManagement } from '@/components/admin/PaymentMethodManagement';
@@ -28,6 +30,14 @@ function AdminDashboard() {
         <div className="bg-white p-6 rounded-lg shadow-md border">
           <h3 className="text-lg font-semibold mb-2 text-gray-800">Products</h3>
           <p className="text-gray-600">Manage your products</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-md border">
+          <h3 className="text-lg font-semibold mb-2 text-gray-800">Orders</h3>
+          <p className="text-gray-600">Manage customer orders</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-md border">
+          <h3 className="text-lg font-semibold mb-2 text-gray-800">Customers</h3>
+          <p className="text-gray-600">Manage customer accounts</p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow-md border">
           <h3 className="text-lg font-semibold mb-2 text-gray-800">Combos</h3>
@@ -105,6 +115,8 @@ export default function Admin() {
               <Route path="/categories" element={<CategoryManagement />} />
               <Route path="/subcategories" element={<SubcategoryManagement />} />
               <Route path="/products" element={<ProductManagement />} />
+              <Route path="/orders" element={<OrderManagement />} />
+              <Route path="/customers" element={<CustomerManagement />} />
               <Route path="/combos" element={<ComboManagement />} />
               <Route path="/promocodes" element={<PromocodeManagement />} />
               <Route path="/payments" element={<PaymentMethodManagement />} />

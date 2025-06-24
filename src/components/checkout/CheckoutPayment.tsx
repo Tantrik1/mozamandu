@@ -101,7 +101,7 @@ export function CheckoutPayment({ isGuest, onComplete, onBack }: CheckoutPayment
       .single();
 
     if (deliveryData) {
-      setDeliveryCh arge(deliveryData.delivery_price);
+      setDeliveryCharge(deliveryData.delivery_price);
     }
   };
 

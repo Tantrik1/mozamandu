@@ -1,6 +1,4 @@
 
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
 import {
   Sidebar,
   SidebarContent,
@@ -10,124 +8,106 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarHeader,
-  SidebarFooter,
-} from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
-import {
-  Package,
-  FolderTree,
-  Grid3X3,
-  Gift,
-  Percent,
-  Truck,
-  LayoutDashboard,
-  LogOut,
-  Store,
-  CreditCard,
-  Bell,
-  Type,
+} from "@/components/ui/sidebar"
+import { 
+  Home, 
+  Package, 
+  Users, 
+  Gift, 
+  Tag, 
+  CreditCard, 
+  Truck, 
+  Bell, 
+  Type, 
   Settings,
-} from 'lucide-react';
+  ShoppingCart,
+  UserCheck
+} from "lucide-react"
+import { Link, useLocation } from "react-router-dom"
 
 const menuItems = [
   {
-    title: 'Dashboard',
-    url: '/admin',
-    icon: LayoutDashboard,
-    exact: true,
+    title: "Dashboard",
+    url: "/admin",
+    icon: Home,
   },
   {
-    title: 'Categories',
-    url: '/admin/categories',
-    icon: FolderTree,
-  },
-  {
-    title: 'Subcategories',
-    url: '/admin/subcategories',
-    icon: Grid3X3,
-  },
-  {
-    title: 'Products',
-    url: '/admin/products',
+    title: "Categories",
+    url: "/admin/categories",
     icon: Package,
   },
   {
-    title: 'Combos',
-    url: '/admin/combos',
+    title: "Subcategories", 
+    url: "/admin/subcategories",
+    icon: Package,
+  },
+  {
+    title: "Products",
+    url: "/admin/products",
+    icon: Package,
+  },
+  {
+    title: "Orders",
+    url: "/admin/orders",
+    icon: ShoppingCart,
+  },
+  {
+    title: "Customers",
+    url: "/admin/customers",
+    icon: UserCheck,
+  },
+  {
+    title: "Combos",
+    url: "/admin/combos",
     icon: Gift,
   },
   {
-    title: 'Promocodes',
-    url: '/admin/promocodes',
-    icon: Percent,
+    title: "Promo Codes",
+    url: "/admin/promocodes",
+    icon: Tag,
   },
   {
-    title: 'Payments',
-    url: '/admin/payments',
+    title: "Payment Methods",
+    url: "/admin/payments",
     icon: CreditCard,
   },
   {
-    title: 'Delivery Charges',
-    url: '/admin/delivery-charges',
+    title: "Delivery Charges",
+    url: "/admin/delivery-charges",
     icon: Truck,
   },
   {
-    title: 'Notices',
-    url: '/admin/notices',
+    title: "Notices",
+    url: "/admin/notices",
     icon: Bell,
   },
   {
-    title: 'Top Bar Text',
-    url: '/admin/top-bar-text',
+    title: "Top Bar Text",
+    url: "/admin/top-bar-text",
     icon: Type,
   },
   {
-    title: 'Settings',
-    url: '/admin/settings',
+    title: "Settings",
+    url: "/admin/settings",
     icon: Settings,
   },
-];
+]
 
 export function AdminSidebar() {
-  const location = useLocation();
-  const { signOut } = useAuth();
-
-  const isActiveRoute = (item: typeof menuItems[0]) => {
-    if (item.exact) {
-      return location.pathname === item.url;
-    }
-    return location.pathname.startsWith(item.url);
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
-  };
+  const location = useLocation()
 
   return (
-    <Sidebar className="border-r border-gray-200">
-      <SidebarHeader className="border-b border-gray-200 p-6">
-        <div className="flex items-center space-x-2">
-          <Store className="h-8 w-8 text-blue-600" />
-          <div>
-            <div className="text-xl font-bold text-blue-600">Mozamandu</div>
-            <div className="text-sm text-gray-500">Admin Panel</div>
-          </div>
-        </div>
-      </SidebarHeader>
-      
-      <SidebarContent className="p-4">
+    <Sidebar>
+      <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-gray-500 font-medium mb-2">
-            Management
-          </SidebarGroupLabel>
+          <SidebarGroupLabel>Admin Panel</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="space-y-1">
+            <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActiveRoute(item)} className="w-full">
-                    <Link to={item.url} className="flex items-center space-x-3 px-3 py-2 rounded-lg">
-                      <item.icon className="h-5 w-5" />
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
+                    <Link to={item.url}>
+                      <item.icon />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -137,17 +117,6 @@ export function AdminSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-      <SidebarFooter className="p-4 border-t border-gray-200">
-        <Button
-          variant="outline"
-          onClick={handleSignOut}
-          className="w-full justify-start space-x-2"
-        >
-          <LogOut className="h-4 w-4" />
-          <span>Sign Out</span>
-        </Button>
-      </SidebarFooter>
     </Sidebar>
-  );
+  )
 }
