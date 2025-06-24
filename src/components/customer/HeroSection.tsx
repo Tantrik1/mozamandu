@@ -141,21 +141,19 @@ export function HeroSection() {
           {/* Right Side - Sock Images Showcase */}
           <div className="relative h-[600px] flex items-center justify-center">
             {/* Sock Images Container */}
-            <div className="relative w-full h-full">
+            <div className="relative w-full h-full overflow-hidden">
               {sockTypes.map((sock, index) => (
                 <div
                   key={sock.id}
                   className={`absolute inset-0 transition-all duration-1000 transform cursor-pointer ${
                     index === currentSock
-                      ? 'opacity-100 scale-100 rotate-0 z-20'
-                      : index === (currentSock + 1) % sockTypes.length
-                      ? 'opacity-30 scale-75 rotate-12 translate-x-20 z-10'
-                      : 'opacity-0 scale-50 -rotate-12 -translate-x-20 z-0'
+                      ? 'opacity-100 scale-100 z-20'
+                      : 'opacity-0 scale-95 z-0'
                   }`}
                   onClick={() => handleSockClick(sock)}
                 >
                   {/* Sock Image Container */}
-                  <div className="w-full h-full flex items-center justify-center relative overflow-hidden">
+                  <div className="w-full h-full flex items-center justify-center relative">
                     {/* Actual Sock Image */}
                     <div className="relative z-10 flex flex-col items-center justify-center h-full p-8 transition-transform duration-300 hover:scale-110">
                       <div className="mb-6 transform transition-transform duration-300">
@@ -180,25 +178,10 @@ export function HeroSection() {
                       )}
                     </div>
 
-                    {/* Glow Effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-transparent blur-xl animate-pulse"></div>
+                    {/* Subtle Glow Effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-transparent blur-xl animate-pulse"></div>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Indicator Dots */}
-            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-3">
-              {sockTypes.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentSock(index)}
-                  className={`w-3 h-3 rounded-full transition-all ${
-                    index === currentSock
-                      ? 'bg-red-500 scale-125'
-                      : 'bg-white/30 hover:bg-white/50'
-                  }`}
-                />
               ))}
             </div>
           </div>
