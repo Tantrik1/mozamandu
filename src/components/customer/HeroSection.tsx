@@ -23,43 +23,43 @@ export function HeroSection() {
   }, []);
 
   return (
-    <section className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 relative overflow-hidden">
+    <section className="bg-gradient-to-br from-gray-900 via-black to-gray-800 relative overflow-hidden py-12 lg:py-16">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,0,0,0.1),transparent_50%)]"></div>
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-screen flex items-center">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center w-full">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
           
-          {/* Left Side Content */}
-          <div className="text-center lg:text-left order-2 lg:order-1">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-white mb-6 leading-tight">
+          {/* Left Side Content - Order 1 for all devices */}
+          <div className="text-center lg:text-left order-1">
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold text-white mb-8 leading-tight">
               Premium
               <span className="block text-red-500">Sock Collection</span>
             </h1>
             
-            <p className="text-lg sm:text-xl lg:text-2xl text-gray-300 mb-8 max-w-2xl mx-auto lg:mx-0">
+            <p className="text-xl sm:text-2xl lg:text-3xl text-gray-300 mb-10 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
               Discover our exclusive range of comfortable, stylish socks crafted with premium materials for everyday luxury.
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+            <div className="flex flex-col sm:flex-row gap-6 justify-center lg:justify-start">
               <Link to="/categories">
-                <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 text-lg font-semibold rounded-lg transition-all duration-300 hover:scale-105">
+                <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white px-10 py-5 text-xl font-semibold rounded-lg transition-all duration-300 hover:scale-105">
                   Shop Now
                 </Button>
               </Link>
               
               <Link to="/about">
-                <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-gray-900 px-8 py-4 text-lg font-semibold rounded-lg transition-all duration-300">
+                <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-gray-900 px-10 py-5 text-xl font-semibold rounded-lg transition-all duration-300">
                   Learn More
                 </Button>
               </Link>
             </div>
           </div>
 
-          {/* Right Side - Sock Images */}
-          <div className="relative w-full max-w-lg mx-auto h-80 sm:h-96 lg:h-[500px] xl:h-[600px] flex items-center justify-center order-1 lg:order-2">
+          {/* Right Side - Sock Images - Order 2 for all devices */}
+          <div className="relative w-full max-w-2xl mx-auto h-96 sm:h-[450px] lg:h-[550px] xl:h-[650px] flex items-center justify-center order-2">
             <div className="relative w-full h-full overflow-hidden">
               {sockImages.map((image, index) => (
                 <div
@@ -74,25 +74,10 @@ export function HeroSection() {
                     <img 
                       src={image} 
                       alt={`Premium Sock ${index + 1}`}
-                      className="w-64 h-64 sm:w-72 sm:h-72 lg:w-80 lg:h-80 xl:w-96 xl:h-96 object-contain drop-shadow-2xl filter brightness-110 transition-transform duration-300 hover:scale-105"
+                      className="w-80 h-80 sm:w-96 sm:h-96 lg:w-[450px] lg:h-[450px] xl:w-[550px] xl:h-[550px] object-contain drop-shadow-2xl filter brightness-110 transition-transform duration-300 hover:scale-105"
                     />
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Image Indicators */}
-            <div className="absolute bottom-4 lg:bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-2">
-              {sockImages.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentImage(index)}
-                  className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${
-                    index === currentImage 
-                      ? 'bg-red-500 scale-125' 
-                      : 'bg-white/30 hover:bg-white/50'
-                  }`}
-                />
               ))}
             </div>
           </div>
