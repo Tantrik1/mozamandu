@@ -31,10 +31,6 @@ export function CheckoutLogin({ onSuccess, onBack }: CheckoutLoginProps) {
     fullName: '',
     email: '',
     password: '',
-    contactNumber: '',
-    whatsappNumber: '',
-    deliveryLocation: '',
-    deliveryAddress: '',
   });
 
   const [otpData, setOtpData] = useState({
@@ -146,10 +142,6 @@ export function CheckoutLogin({ onSuccess, onBack }: CheckoutLoginProps) {
         data: {
           full_name: signUpData.fullName,
           role: 'customer',
-          contact_number: signUpData.contactNumber,
-          whatsapp_number: signUpData.whatsappNumber,
-          delivery_location: signUpData.deliveryLocation,
-          delivery_address: signUpData.deliveryAddress,
         },
       },
     });
@@ -163,7 +155,7 @@ export function CheckoutLogin({ onSuccess, onBack }: CheckoutLoginProps) {
     } else {
       toast({
         title: "Success",
-        description: "Account created successfully! Please check your email to verify your account.",
+        description: "Account created successfully!",
       });
       onSuccess();
     }
@@ -294,23 +286,6 @@ export function CheckoutLogin({ onSuccess, onBack }: CheckoutLoginProps) {
                     value={signUpData.password}
                     onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
                     required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="signup-contact">Contact Number</Label>
-                  <Input
-                    id="signup-contact"
-                    value={signUpData.contactNumber}
-                    onChange={(e) => setSignUpData({ ...signUpData, contactNumber: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="signup-whatsapp">WhatsApp Number (Optional)</Label>
-                  <Input
-                    id="signup-whatsapp"
-                    value={signUpData.whatsappNumber}
-                    onChange={(e) => setSignUpData({ ...signUpData, whatsappNumber: e.target.value })}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>

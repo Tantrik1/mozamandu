@@ -1,8 +1,8 @@
-
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
+import { ContactInfoForm } from '@/components/customer/ContactInfoForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,7 @@ export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [needsContactInfo, setNeedsContactInfo] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -39,10 +40,15 @@ export default function CustomerDashboard() {
   }, [user, userProfile, isLoading, navigate]);
 
   useEffect(() => {
-    if (user) {
-      fetchOrders();
+    if (user && userProfile) {
+      // Check if contact information is missing
+      if (!userProfile.contact_number) {
+        setNeedsContactInfo(true);
+      } else {
+        fetchOrders();
+      }
     }
-  }, [user]);
+  }, [user, userProfile]);
 
   const fetchOrders = async () => {
     if (!user) return;
@@ -72,6 +78,12 @@ export default function CustomerDashboard() {
     }
   };
 
+  const handleContactInfoComplete = () => {
+    setNeedsContactInfo(false);
+    // Refresh user profile to get updated contact info
+    window.location.reload();
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
@@ -99,6 +111,11 @@ export default function CustomerDashboard() {
 
   if (!user) {
     return null;
+  }
+
+  // Show contact info form if needed
+  if (needsContactInfo && user) {
+    return <ContactInfoForm userId={user.id} onComplete={handleContactInfoComplete} />;
   }
 
   // Check if user needs to verify email
