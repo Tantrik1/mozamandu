@@ -222,6 +222,7 @@ export type Database = {
           email: string
           expires_at: string
           id: string
+          user_data: Json | null
           verified: boolean | null
         }
         Insert: {
@@ -230,6 +231,7 @@ export type Database = {
           email: string
           expires_at: string
           id?: string
+          user_data?: Json | null
           verified?: boolean | null
         }
         Update: {
@@ -238,6 +240,7 @@ export type Database = {
           email?: string
           expires_at?: string
           id?: string
+          user_data?: Json | null
           verified?: boolean | null
         }
         Relationships: []
