@@ -1,49 +1,80 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
-const sockTypes = [
+const defaultSockTypes = [
   {
     id: 1,
     name: 'Full Socks',
     description: 'Complete coverage and comfort',
     image: '/lovable-uploads/fd4fd25e-ccf5-42d0-a176-49b63583881b.png',
-    color: 'from-red-500 to-red-700'
+    color: 'from-red-500 to-red-700',
+    categoryId: null
   },
   {
     id: 2,
     name: 'Half Socks',
     description: 'Perfect for casual wear',
     image: '/lovable-uploads/237dafb7-830d-417a-bbb5-1a22d7c3a115.png',
-    color: 'from-red-600 to-red-800'
+    color: 'from-red-600 to-red-800',
+    categoryId: null
   },
   {
     id: 3,
     name: 'Ankle Socks',
     description: 'Minimal and stylish',
     image: '/lovable-uploads/c75106db-4b85-4396-a9eb-c802f441793b.png',
-    color: 'from-red-700 to-red-900'
+    color: 'from-red-700 to-red-900',
+    categoryId: null
   }
 ];
 
 export function HeroSection() {
   const [currentSock, setCurrentSock] = useState(0);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [sockTypes, setSockTypes] = useState(defaultSockTypes);
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentSock((prev) => (prev + 1) % sockTypes.length);
-    }, 4000);
+    }, 3500);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [sockTypes.length]);
 
-  const nextSock = () => {
-    setCurrentSock((prev) => (prev + 1) % sockTypes.length);
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, name')
+        .eq('status', 'on')
+        .limit(3);
+
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const updatedSockTypes = defaultSockTypes.map((sock, index) => ({
+          ...sock,
+          categoryId: data[index]?.id || null,
+          name: data[index]?.name || sock.name
+        }));
+        setSockTypes(updatedSockTypes);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
   };
 
-  const prevSock = () => {
-    setCurrentSock((prev) => (prev - 1 + sockTypes.length) % sockTypes.length);
+  const handleSockClick = (sock: any) => {
+    if (sock.categoryId) {
+      window.location.href = `/categories/${sock.categoryId}`;
+    }
   };
 
   return (
@@ -72,19 +103,23 @@ export function HeroSection() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button 
-                size="lg" 
-                className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-lg font-medium"
-              >
-                Shop Now
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white px-8 py-3 text-lg font-medium"
-              >
-                View Collection
-              </Button>
+              <Link to="/products">
+                <Button 
+                  size="lg" 
+                  className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-lg font-medium"
+                >
+                  Shop Now
+                </Button>
+              </Link>
+              <Link to="/categories">
+                <Button 
+                  size="lg" 
+                  variant="outline" 
+                  className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white px-8 py-3 text-lg font-medium"
+                >
+                  View Collection
+                </Button>
+              </Link>
             </div>
 
             <div className="grid grid-cols-3 gap-6 pt-8">
@@ -110,74 +145,61 @@ export function HeroSection() {
               {sockTypes.map((sock, index) => (
                 <div
                   key={sock.id}
-                  className={`absolute inset-0 transition-all duration-1000 transform ${
+                  className={`absolute inset-0 transition-all duration-1000 transform cursor-pointer ${
                     index === currentSock
-                      ? 'opacity-100 scale-100 rotate-0'
+                      ? 'opacity-100 scale-100 rotate-0 z-20'
                       : index === (currentSock + 1) % sockTypes.length
-                      ? 'opacity-30 scale-75 rotate-12 translate-x-20'
-                      : 'opacity-0 scale-50 -rotate-12 -translate-x-20'
+                      ? 'opacity-30 scale-75 rotate-12 translate-x-20 z-10'
+                      : 'opacity-0 scale-50 -rotate-12 -translate-x-20 z-0'
                   }`}
+                  onClick={() => handleSockClick(sock)}
                 >
                   {/* Sock Image Container */}
-                  <div className={`w-full h-full bg-gradient-to-br ${sock.color} rounded-3xl shadow-2xl flex items-center justify-center relative overflow-hidden animate-float`}>
-                    {/* Floating Animation Background */}
-                    <div className="absolute inset-0 animate-pulse">
-                      <div className="w-full h-full bg-gradient-to-t from-black/20 to-transparent"></div>
-                    </div>
-                    
+                  <div className="w-full h-full flex items-center justify-center relative overflow-hidden">
                     {/* Actual Sock Image */}
-                    <div className="relative z-10 flex flex-col items-center justify-center h-full p-8">
-                      <div className="mb-6 transform transition-transform duration-300 hover:scale-110">
+                    <div className="relative z-10 flex flex-col items-center justify-center h-full p-8 transition-transform duration-300 hover:scale-110">
+                      <div className="mb-6 transform transition-transform duration-300">
                         <img 
                           src={sock.image} 
                           alt={sock.name}
-                          className="max-w-full max-h-80 object-contain drop-shadow-2xl"
+                          className="max-w-full max-h-80 object-contain drop-shadow-2xl filter brightness-110"
                         />
                       </div>
                       <h3 className="text-2xl font-bold mb-2 text-white">{sock.name}</h3>
                       <p className="text-lg opacity-90 text-white text-center">{sock.description}</p>
+                      {sock.categoryId && (
+                        <Button 
+                          className="mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSockClick(sock);
+                          }}
+                        >
+                          Shop {sock.name}
+                        </Button>
+                      )}
                     </div>
 
                     {/* Glow Effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 to-transparent blur-xl animate-glow"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-transparent blur-xl animate-pulse"></div>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Navigation Controls */}
-            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-4">
-              <Button
-                onClick={prevSock}
-                size="sm"
-                variant="outline"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              
-              <div className="flex space-x-2 items-center">
-                {sockTypes.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentSock(index)}
-                    className={`w-3 h-3 rounded-full transition-all ${
-                      index === currentSock
-                        ? 'bg-red-500 scale-125'
-                        : 'bg-white/30 hover:bg-white/50'
-                    }`}
-                  />
-                ))}
-              </div>
-
-              <Button
-                onClick={nextSock}
-                size="sm"
-                variant="outline"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+            {/* Indicator Dots */}
+            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-3">
+              {sockTypes.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentSock(index)}
+                  className={`w-3 h-3 rounded-full transition-all ${
+                    index === currentSock
+                      ? 'bg-red-500 scale-125'
+                      : 'bg-white/30 hover:bg-white/50'
+                  }`}
+                />
+              ))}
             </div>
           </div>
         </div>

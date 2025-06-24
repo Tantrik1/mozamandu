@@ -1,17 +1,22 @@
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ShoppingCart, Clock } from 'lucide-react';
+import { ProductCard } from './ProductCard';
 
 interface Product {
   id: string;
   name: string;
   description: string;
   selling_price: number;
+  cost_price: number;
   created_at: string;
+  image_url: string;
+  has_color_variants: boolean;
+  has_size_variants: boolean;
+  stock_quantity: number;
+  category_id: string;
+  subcategory_id: string;
+  is_featured: boolean;
   categories: {
     name: string;
   };
@@ -38,7 +43,15 @@ export function LatestProducts() {
           name,
           description,
           selling_price,
+          cost_price,
           created_at,
+          image_url,
+          has_color_variants,
+          has_size_variants,
+          stock_quantity,
+          category_id,
+          subcategory_id,
+          is_featured,
           categories (name),
           subcategories (name, selling_price)
         `)
@@ -55,16 +68,18 @@ export function LatestProducts() {
     }
   };
 
-  const getProductPrice = (product: Product) => {
-    return product.selling_price || product.subcategories?.selling_price || 0;
-  };
-
   if (loading) {
-    return <div className="text-center py-8">Loading latest products...</div>;
+    return (
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-8">Loading latest products...</div>
+        </div>
+      </section>
+    );
   }
 
   return (
-    <section className="py-16 bg-white">
+    <section className="py-16 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-4">Latest Products</h2>
@@ -73,30 +88,11 @@ export function LatestProducts() {
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {latestProducts.map((product) => (
-            <Card key={product.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-lg">{product.name}</CardTitle>
-                  <Badge variant="secondary">
-                    <Clock className="h-3 w-3 mr-1" />
-                    New
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 mb-4 text-sm">{product.description}</p>
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-xl font-bold text-red-600">
-                    Rs. {getProductPrice(product).toFixed(2)}
-                  </span>
-                  <Badge variant="outline">{product.categories?.name}</Badge>
-                </div>
-                <Button className="w-full bg-red-600 hover:bg-red-700">
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Add to Cart
-                </Button>
-              </CardContent>
-            </Card>
+            <ProductCard 
+              key={product.id}
+              product={product} 
+              subcategoryPrice={product.subcategories?.selling_price || 0}
+            />
           ))}
         </div>
       </div>

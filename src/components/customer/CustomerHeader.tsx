@@ -107,9 +107,16 @@ export function CustomerHeader() {
       <header className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="text-2xl font-bold text-red-600">Mozamandu</div>
-              <div className="text-sm text-gray-500">Gear Shop</div>
+            <Link to="/" className="flex items-center space-x-3">
+              <img 
+                src="/lovable-uploads/2d98ffef-154e-49c8-9c1c-39e09f1ea5ae.png" 
+                alt="Mozamandu Logo" 
+                className="h-10 w-auto"
+              />
+              <div className="flex flex-col">
+                <div className="text-xl font-bold text-red-600">Mozamandu</div>
+                <div className="text-xs text-gray-500">Gentle on feet</div>
+              </div>
             </Link>
 
             <nav className="hidden md:flex space-x-6">

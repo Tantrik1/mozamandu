@@ -9,9 +9,16 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Company Info */}
           <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <img src="/lovable-uploads/7cee7b80-0a69-4726-9b2a-480e2cb523c3.png" alt="Mozamandu" className="h-8 w-auto" />
-              <span className="text-xl font-bold">Mozamandu</span>
+            <div className="flex items-center space-x-3">
+              <img 
+                src="/lovable-uploads/2d98ffef-154e-49c8-9c1c-39e09f1ea5ae.png" 
+                alt="Mozamandu Logo" 
+                className="h-10 w-auto"
+              />
+              <div className="flex flex-col">
+                <span className="text-xl font-bold">Mozamandu</span>
+                <span className="text-sm text-gray-400">Gentle on feet</span>
+              </div>
             </div>
             <p className="text-gray-300 text-sm">
               Mozamandu specializes in premium socks and caps that bring comfort to your everyday style. Our products are designed to be gentle on your feet while keeping you looking stylish.
