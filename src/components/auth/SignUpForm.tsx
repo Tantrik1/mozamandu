@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +8,6 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
 
 interface SignUpFormProps {
   onSuccess: () => void;
@@ -20,7 +18,7 @@ interface SignUpFormProps {
 
 export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: SignUpFormProps) {
   const { signUp, verifyOTP } = useAuth();
-  const [currentStep, setCurrentStep] = useState<'form' | 'otp'>('form');
+  const [showOTPField, setShowOTPField] = useState(false);
   const [signUpData, setSignUpData] = useState({
     fullName: '',
     email: '',
@@ -47,6 +45,12 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // If OTP field is showing, handle OTP verification
+    if (showOTPField) {
+      return handleOTPVerification();
+    }
+
+    // Otherwise, handle initial signup
     const newErrors: Record<string, string> = {};
 
     // Validate full name
@@ -121,9 +125,9 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
         description: "Please check your email for the verification code to complete setup.",
       });
 
-      // Move to OTP verification step
-      setCurrentStep('otp');
-      console.log('Switched to OTP step, currentStep:', 'otp');
+      // Show OTP field in the same form
+      setShowOTPField(true);
+      console.log('Showing OTP field in the same form');
     } catch (error) {
       console.error('Unexpected signup error:', error);
       toast({
@@ -136,9 +140,7 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
     }
   };
 
-  const handleOTPVerification = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleOTPVerification = async () => {
     if (otpCode.length !== 6) {
       toast({
         title: "Invalid OTP",
@@ -182,30 +184,136 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
     }
   };
 
-  const handleBackToForm = () => {
-    setCurrentStep('form');
+  const handleBackToSignup = () => {
+    setShowOTPField(false);
     setOtpCode('');
     setErrors({});
   };
 
-  console.log('Current step:', currentStep);
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Always show signup fields */}
+      <div>
+        <Label htmlFor="signup-name">Full Name *</Label>
+        <Input
+          id="signup-name"
+          type="text"
+          value={signUpData.fullName}
+          onChange={(e) => {
+            setSignUpData({ ...signUpData, fullName: e.target.value });
+            if (errors.fullName) setErrors({ ...errors, fullName: '' });
+          }}
+          placeholder="Enter your full name"
+          className={errors.fullName ? 'border-red-500' : ''}
+          disabled={isLoading || showOTPField}
+          readOnly={showOTPField}
+        />
+        {errors.fullName && (
+          <p className="text-sm text-red-600 mt-1">{errors.fullName}</p>
+        )}
+      </div>
 
-  // Show OTP verification form
-  if (currentStep === 'otp') {
-    console.log('Rendering OTP form');
-    return (
-      <div className="space-y-6 w-full">
-        <div className="text-center">
-          <h3 className="text-xl font-bold mb-4">Verify Your Email</h3>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-blue-800">
-              We've sent a verification code to<br />
-              <span className="font-semibold text-blue-900">{signUpData.email}</span>
-            </p>
-          </div>
+      <div>
+        <Label htmlFor="signup-email">Email Address *</Label>
+        <Input
+          id="signup-email"
+          type="email"
+          value={signUpData.email}
+          onChange={(e) => {
+            setSignUpData({ ...signUpData, email: e.target.value });
+            if (errors.email) setErrors({ ...errors, email: '' });
+          }}
+          placeholder="Enter your email"
+          className={errors.email ? 'border-red-500' : ''}
+          disabled={isLoading || showOTPField}
+          readOnly={showOTPField}
+        />
+        {errors.email && (
+          <p className="text-sm text-red-600 mt-1">{errors.email}</p>
+        )}
+      </div>
+
+      <div>
+        <Label htmlFor="signup-password">Password *</Label>
+        <Input
+          id="signup-password"
+          type="password"
+          value={signUpData.password}
+          onChange={(e) => {
+            setSignUpData({ ...signUpData, password: e.target.value });
+            if (errors.password) setErrors({ ...errors, password: '' });
+          }}
+          placeholder="Create a strong password"
+          className={errors.password ? 'border-red-500' : ''}
+          disabled={isLoading || showOTPField}
+          readOnly={showOTPField}
+        />
+        {errors.password && (
+          <p className="text-sm text-red-600 mt-1">{errors.password}</p>
+        )}
+        {!showOTPField && <PasswordStrengthIndicator password={signUpData.password} />}
+      </div>
+
+      <div>
+        <Label htmlFor="signup-confirm-password">Confirm Password *</Label>
+        <Input
+          id="signup-confirm-password"
+          type="password"
+          value={signUpData.confirmPassword}
+          onChange={(e) => {
+            setSignUpData({ ...signUpData, confirmPassword: e.target.value });
+            if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: '' });
+          }}
+          placeholder="Confirm your password"
+          className={errors.confirmPassword ? 'border-red-500' : ''}
+          disabled={isLoading || showOTPField}
+          readOnly={showOTPField}
+        />
+        {errors.confirmPassword && (
+          <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-start space-x-2">
+          <Checkbox
+            id="accept-terms"
+            checked={acceptedTerms}
+            onCheckedChange={(checked) => {
+              setAcceptedTerms(checked as boolean);
+              if (errors.terms) setErrors({ ...errors, terms: '' });
+            }}
+            className="mt-1"
+            disabled={isLoading || showOTPField}
+          />
+          <Label htmlFor="accept-terms" className="text-sm leading-5 cursor-pointer">
+            I accept the{' '}
+            <Link to="/terms" target="_blank" className="text-red-600 hover:text-red-700 underline">
+              Terms and Conditions
+            </Link>{' '}
+            and{' '}
+            <Link to="/privacy" target="_blank" className="text-red-600 hover:text-red-700 underline">
+              Privacy Policy
+            </Link>
+          </Label>
         </div>
+        {errors.terms && (
+          <p className="text-sm text-red-600">{errors.terms}</p>
+        )}
+      </div>
 
-        <form onSubmit={handleOTPVerification} className="space-y-6 w-full">
+      {/* OTP Verification Section - Only show after successful signup */}
+      {showOTPField && (
+        <div className="border-t pt-4 mt-6">
+          <div className="text-center mb-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800">
+                We've sent a verification code to<br />
+                <span className="font-semibold text-blue-900">{signUpData.email}</span>
+              </p>
+            </div>
+          </div>
+
           <div className="space-y-4">
             <Label className="text-center block text-sm font-medium">
               Enter the 6-digit verification code
@@ -228,149 +336,34 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
               </InputOTP>
             </div>
           </div>
-          
-          <div className="space-y-3 w-full">
-            <Button 
-              type="submit" 
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3" 
-              disabled={otpCode.length !== 6 || isLoading}
-            >
-              {isLoading ? 'Verifying...' : 'Verify & Complete Setup'}
-            </Button>
-            
-            <Button 
-              type="button"
-              variant="ghost" 
-              onClick={handleBackToForm}
-              className="w-full"
-              disabled={isLoading}
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Sign Up
-            </Button>
-          </div>
-        </form>
-      </div>
-    );
-  }
-
-  console.log('Rendering signup form');
-
-  // Show signup form
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="signup-name">Full Name *</Label>
-        <Input
-          id="signup-name"
-          type="text"
-          value={signUpData.fullName}
-          onChange={(e) => {
-            setSignUpData({ ...signUpData, fullName: e.target.value });
-            if (errors.fullName) setErrors({ ...errors, fullName: '' });
-          }}
-          placeholder="Enter your full name"
-          className={errors.fullName ? 'border-red-500' : ''}
-          disabled={isLoading}
-        />
-        {errors.fullName && (
-          <p className="text-sm text-red-600 mt-1">{errors.fullName}</p>
-        )}
-      </div>
-
-      <div>
-        <Label htmlFor="signup-email">Email Address *</Label>
-        <Input
-          id="signup-email"
-          type="email"
-          value={signUpData.email}
-          onChange={(e) => {
-            setSignUpData({ ...signUpData, email: e.target.value });
-            if (errors.email) setErrors({ ...errors, email: '' });
-          }}
-          placeholder="Enter your email"
-          className={errors.email ? 'border-red-500' : ''}
-          disabled={isLoading}
-        />
-        {errors.email && (
-          <p className="text-sm text-red-600 mt-1">{errors.email}</p>
-        )}
-      </div>
-
-      <div>
-        <Label htmlFor="signup-password">Password *</Label>
-        <Input
-          id="signup-password"
-          type="password"
-          value={signUpData.password}
-          onChange={(e) => {
-            setSignUpData({ ...signUpData, password: e.target.value });
-            if (errors.password) setErrors({ ...errors, password: '' });
-          }}
-          placeholder="Create a strong password"
-          className={errors.password ? 'border-red-500' : ''}
-          disabled={isLoading}
-        />
-        {errors.password && (
-          <p className="text-sm text-red-600 mt-1">{errors.password}</p>
-        )}
-        <PasswordStrengthIndicator password={signUpData.password} />
-      </div>
-
-      <div>
-        <Label htmlFor="signup-confirm-password">Confirm Password *</Label>
-        <Input
-          id="signup-confirm-password"
-          type="password"
-          value={signUpData.confirmPassword}
-          onChange={(e) => {
-            setSignUpData({ ...signUpData, confirmPassword: e.target.value });
-            if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: '' });
-          }}
-          placeholder="Confirm your password"
-          className={errors.confirmPassword ? 'border-red-500' : ''}
-          disabled={isLoading}
-        />
-        {errors.confirmPassword && (
-          <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-start space-x-2">
-          <Checkbox
-            id="accept-terms"
-            checked={acceptedTerms}
-            onCheckedChange={(checked) => {
-              setAcceptedTerms(checked as boolean);
-              if (errors.terms) setErrors({ ...errors, terms: '' });
-            }}
-            className="mt-1"
-            disabled={isLoading}
-          />
-          <Label htmlFor="accept-terms" className="text-sm leading-5 cursor-pointer">
-            I accept the{' '}
-            <Link to="/terms" target="_blank" className="text-red-600 hover:text-red-700 underline">
-              Terms and Conditions
-            </Link>{' '}
-            and{' '}
-            <Link to="/privacy" target="_blank" className="text-red-600 hover:text-red-700 underline">
-              Privacy Policy
-            </Link>
-          </Label>
         </div>
-        {errors.terms && (
-          <p className="text-sm text-red-600">{errors.terms}</p>
+      )}
+
+      {/* Dynamic button and back option */}
+      <div className="space-y-3">
+        <Button 
+          type="submit" 
+          className="w-full bg-red-600 hover:bg-red-700" 
+          disabled={isLoading || (!showOTPField && !acceptedTerms) || (showOTPField && otpCode.length !== 6)}
+        >
+          {isLoading 
+            ? (showOTPField ? 'Verifying...' : 'Creating Account...') 
+            : (showOTPField ? 'Verify Email and Create Account' : 'Create Account')
+          }
+        </Button>
+        
+        {showOTPField && (
+          <Button 
+            type="button"
+            variant="ghost" 
+            onClick={handleBackToSignup}
+            className="w-full"
+            disabled={isLoading}
+          >
+            Back to Sign Up Form
+          </Button>
         )}
       </div>
-
-      <Button 
-        type="submit" 
-        className="w-full bg-red-600 hover:bg-red-700" 
-        disabled={isLoading || !acceptedTerms}
-      >
-        {isLoading ? 'Creating Account...' : 'Create Account'}
-      </Button>
     </form>
   );
 }

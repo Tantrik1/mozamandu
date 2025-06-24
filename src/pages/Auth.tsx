@@ -19,7 +19,6 @@ export default function Auth() {
   
   const [authLoading, setAuthLoading] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
-  const [isInOTPFlow, setIsInOTPFlow] = useState(false); // Track OTP verification state
   const [activeTab, setActiveTab] = useState('signin');
   
   const [signInData, setSignInData] = useState({
@@ -30,8 +29,7 @@ export default function Auth() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    // Only handle redirects if we're NOT in the OTP verification flow
-    if (user && userProfile && !isLoading && !isInOTPFlow) {
+    if (user && userProfile && !isLoading) {
       console.log('User authenticated, checking profile:', userProfile);
       
       // Check if contact info is missing for first-time users
@@ -53,7 +51,7 @@ export default function Auth() {
         navigate('/dashboard');
       }
     }
-  }, [user, userProfile, isLoading, navigate, redirectTo, isInOTPFlow]);
+  }, [user, userProfile, isLoading, navigate, redirectTo]);
 
   const validateSignInForm = () => {
     const newErrors: Record<string, string> = {};
@@ -99,18 +97,9 @@ export default function Auth() {
     }
   };
 
-  const handleSignUpStart = () => {
-    // When user starts signup process, set OTP flow flag and switch to signup tab
-    setIsInOTPFlow(true);
-    setActiveTab('signup');
-    console.log('Starting signup flow, OTP flow flag set to true');
-  };
-
   const handleSignUpSuccess = () => {
-    // After successful signup and OTP verification, clear the OTP flow flag
-    setIsInOTPFlow(false);
-    console.log('Signup successful, OTP flow completed');
-    // The useEffect will handle the redirect now that isInOTPFlow is false
+    console.log('Signup successful and verified');
+    // The useEffect will handle the redirect now that the user is authenticated
   };
 
   const handleContactInfoComplete = () => {
@@ -157,7 +146,7 @@ export default function Auth() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="signin" disabled={isInOTPFlow}>Sign In</TabsTrigger>
+            <TabsTrigger value="signin">Sign In</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
           
@@ -232,7 +221,6 @@ export default function Auth() {
               <CardContent>
                 <SignUpForm 
                   onSuccess={handleSignUpSuccess}
-                  onStart={handleSignUpStart}
                   isLoading={authLoading}
                   setIsLoading={setAuthLoading}
                 />
