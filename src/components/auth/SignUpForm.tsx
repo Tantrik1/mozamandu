@@ -12,11 +12,12 @@ import { ArrowLeft } from 'lucide-react';
 
 interface SignUpFormProps {
   onSuccess: () => void;
+  onStart?: () => void; // New callback for when signup starts
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
 }
 
-export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormProps) {
+export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: SignUpFormProps) {
   const { signUp, verifyOTP } = useAuth();
   const [currentStep, setCurrentStep] = useState<'form' | 'otp'>('form');
   const [signUpData, setSignUpData] = useState({
@@ -84,6 +85,11 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
         variant: "destructive",
       });
       return;
+    }
+
+    // Call onStart callback to notify parent that signup is starting
+    if (onStart) {
+      onStart();
     }
 
     setIsLoading(true);
