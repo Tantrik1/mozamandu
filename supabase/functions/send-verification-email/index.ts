@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@4.0.0";
-import { create, verify } from "https://deno.land/x/djwt@v3.0.1/mod.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
@@ -10,13 +10,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// JWT secret for signing tokens
-const JWT_SECRET = new TextEncoder().encode(
-  Deno.env.get('JWT_SECRET') || 'your-super-secret-jwt-key-change-this-in-production'
+// Initialize Supabase client
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
-
-// Store OTP codes in memory (in production, use Redis or database)
-const otpStore = new Map<string, { code: string; expires: number; userData: any }>();
 
 interface VerificationRequest {
   email: string;
@@ -39,36 +37,22 @@ const handler = async (req: Request): Promise<Response> => {
     // If this is a verification request
     if (verify && otp) {
       console.log('Verifying OTP for email:', email);
-      const stored = otpStore.get(email.toLowerCase());
       
-      if (!stored) {
-        console.log('No OTP found for email:', email);
-        return new Response(JSON.stringify({ 
-          success: false,
-          error: "No verification code found for this email"
-        }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        });
-      }
+      // Get the stored OTP from database
+      const { data: storedOTP, error: fetchError } = await supabase
+        .from('email_verification_codes')
+        .select('*')
+        .eq('email', email.toLowerCase())
+        .eq('code', otp)
+        .eq('verified', false)
+        .gt('expires_at', new Date().toISOString())
+        .single();
 
-      if (stored.expires < Date.now()) {
-        console.log('OTP expired for email:', email);
-        otpStore.delete(email.toLowerCase());
+      if (fetchError || !storedOTP) {
+        console.log('No valid OTP found for email:', email, 'Error:', fetchError);
         return new Response(JSON.stringify({ 
           success: false,
-          error: "Verification code has expired"
-        }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        });
-      }
-
-      if (stored.code !== otp) {
-        console.log('Invalid OTP for email:', email, 'Expected:', stored.code, 'Received:', otp);
-        return new Response(JSON.stringify({ 
-          success: false,
-          error: "Invalid verification code"
+          error: "Invalid or expired verification code"
         }), {
           status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -77,24 +61,20 @@ const handler = async (req: Request): Promise<Response> => {
 
       console.log('OTP verified successfully for email:', email);
 
-      // Create JWT token for verified email
-      const payload = {
-        email: email.toLowerCase(),
-        name: stored.userData.name,
-        password: stored.userData.password,
-        verified: true,
-        exp: Math.floor(Date.now() / 1000) + (60 * 10), // 10 minutes
-      };
+      // Mark the OTP as verified
+      await supabase
+        .from('email_verification_codes')
+        .update({ verified: true })
+        .eq('id', storedOTP.id);
 
-      const token = await create({ alg: "HS256", typ: "JWT" }, payload, JWT_SECRET);
-
-      // Remove the OTP after successful verification
-      otpStore.delete(email.toLowerCase());
-      
       return new Response(JSON.stringify({ 
         success: true,
         message: "Email verified successfully",
-        token: token
+        userData: {
+          email: email.toLowerCase(),
+          name: storedOTP.user_data?.name,
+          password: storedOTP.user_data?.password
+        }
       }), {
         status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -104,13 +84,36 @@ const handler = async (req: Request): Promise<Response> => {
     // Generate and send OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // Store OTP with user data and 10-minute expiry
-    const emailKey = email.toLowerCase();
-    otpStore.set(emailKey, {
-      code: otpCode,
-      expires: Date.now() + 10 * 60 * 1000, // 10 minutes
-      userData: { name, password }
-    });
+    // Store OTP in database with 10-minute expiry
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    
+    // First, clean up any existing unverified codes for this email
+    await supabase
+      .from('email_verification_codes')
+      .delete()
+      .eq('email', email.toLowerCase())
+      .eq('verified', false);
+
+    // Store new OTP in database
+    const { error: insertError } = await supabase
+      .from('email_verification_codes')
+      .insert({
+        email: email.toLowerCase(),
+        code: otpCode,
+        expires_at: expiresAt,
+        user_data: { name, password }
+      });
+
+    if (insertError) {
+      console.error('Error storing OTP:', insertError);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: "Failed to generate verification code"
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
 
     console.log("Sending verification email to:", email, "with OTP:", otpCode);
 
