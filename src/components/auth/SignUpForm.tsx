@@ -1,9 +1,9 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
+import { OTPVerificationForm } from './OTPVerificationForm';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -20,7 +20,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
     password: '',
     confirmPassword: '',
   });
-
+  const [showOTPForm, setShowOTPForm] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validatePassword = (password: string) => {
@@ -78,37 +78,51 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
     setIsLoading(true);
     
     try {
-      console.log('Attempting signup with:', signUpData.email);
+      // Check if user already exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', signUpData.email)
+        .single();
+
+      if (existingUser) {
+        toast({
+          title: "Account Already Exists",
+          description: "An account with this email already exists. Please sign in instead.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Generate and send OTP
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
       
-      const { data, error } = await supabase.auth.signUp({
-        email: signUpData.email,
-        password: signUpData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
-          data: {
-            full_name: signUpData.fullName,
-            role: 'customer',
-          },
+      const { data, error: emailError } = await supabase.functions.invoke('send-otp-email', {
+        body: {
+          email: signUpData.email,
+          code: otpCode,
+          name: signUpData.fullName,
         },
       });
 
-      console.log('Signup response:', { data, error });
-
-      if (error) {
-        console.error('Signup error:', error);
+      if (emailError || !data?.success) {
+        console.error('OTP sending error:', emailError);
         toast({
-          title: "Sign Up Failed",
-          description: error.message,
+          title: "Error",
+          description: "Failed to send verification code. Please try again.",
           variant: "destructive",
         });
-      } else {
-        console.log('Signup successful, user created:', data.user?.id);
-        toast({
-          title: "Account Created!",
-          description: "Please check your email and click the verification link to activate your account.",
-        });
-        onSuccess();
+        setIsLoading(false);
+        return;
       }
+
+      toast({
+        title: "Verification Code Sent",
+        description: "Please check your email for the verification code.",
+      });
+
+      setShowOTPForm(true);
     } catch (error) {
       console.error('Unexpected signup error:', error);
       toast({
@@ -120,6 +134,28 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
       setIsLoading(false);
     }
   };
+
+  const handleOTPSuccess = () => {
+    setShowOTPForm(false);
+    onSuccess();
+  };
+
+  const handleBackToSignUp = () => {
+    setShowOTPForm(false);
+  };
+
+  if (showOTPForm) {
+    return (
+      <OTPVerificationForm
+        email={signUpData.email}
+        signUpData={signUpData}
+        onBack={handleBackToSignUp}
+        onSuccess={handleOTPSuccess}
+        isLoading={isLoading}
+        setIsLoading={setIsLoading}
+      />
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -205,7 +241,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
         className="w-full bg-red-600 hover:bg-red-700" 
         disabled={isLoading}
       >
-        {isLoading ? 'Creating Account...' : 'Sign Up'}
+        {isLoading ? 'Sending Verification Code...' : 'Continue'}
       </Button>
     </form>
   );

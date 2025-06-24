@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, MapPin, User, Mail, Phone, MessageSquare } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { ProfileAutoFill } from './ProfileAutoFill';
 
 interface CheckoutInfoProps {
   isGuest: boolean;
@@ -34,6 +34,7 @@ interface FormData {
 export function EnhancedCheckoutInfo({ isGuest, onComplete, onBack }: CheckoutInfoProps) {
   const [deliveryLocations, setDeliveryLocations] = useState<DeliveryLocation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [autoFillChecked, setAutoFillChecked] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     customerName: '',
     customerEmail: '',
@@ -91,6 +92,18 @@ export function EnhancedCheckoutInfo({ isGuest, onComplete, onBack }: CheckoutIn
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleAutoFill = (profileData: {
+    customerName: string;
+    customerEmail: string;
+    contactNumber: string;
+    whatsappNumber: string;
+  }) => {
+    setFormData(prev => ({
+      ...prev,
+      ...profileData,
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -161,6 +174,13 @@ export function EnhancedCheckoutInfo({ isGuest, onComplete, onBack }: CheckoutIn
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Profile Auto-Fill Component */}
+            <ProfileAutoFill
+              onAutoFill={handleAutoFill}
+              isChecked={autoFillChecked}
+              onCheckedChange={setAutoFillChecked}
+            />
+
             {/* Customer Information */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium flex items-center">
