@@ -193,7 +193,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
           </p>
         </div>
 
-        <form onSubmit={handleOTPVerification} className="space-y-4">
+        <form onSubmit={handleOTPVerification} className="space-y-6">
           <div className="flex justify-center">
             <InputOTP
               value={otpCode}
@@ -211,23 +211,26 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
             </InputOTP>
           </div>
           
-          <Button 
-            type="submit" 
-            className="w-full bg-red-600 hover:bg-red-700" 
-            disabled={otpCode.length !== 6 || isLoading}
-          >
-            {isLoading ? 'Verifying...' : 'Verify & Create Account'}
-          </Button>
-          
-          <Button 
-            type="button"
-            variant="ghost" 
-            onClick={handleBackToForm}
-            className="w-full"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Sign Up
-          </Button>
+          <div className="space-y-3">
+            <Button 
+              type="submit" 
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3" 
+              disabled={otpCode.length !== 6 || isLoading}
+            >
+              {isLoading ? 'Verifying...' : 'Verify & Create Account'}
+            </Button>
+            
+            <Button 
+              type="button"
+              variant="ghost" 
+              onClick={handleBackToForm}
+              className="w-full"
+              disabled={isLoading}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Sign Up
+            </Button>
+          </div>
         </form>
       </div>
     );
