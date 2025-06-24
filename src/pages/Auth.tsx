@@ -7,12 +7,14 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SignUpForm } from '@/components/auth/SignUpForm';
-import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 export default function Auth() {
   const { signIn, user, userProfile, isLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   const [authLoading, setAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
@@ -25,9 +27,21 @@ export default function Auth() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Check for email confirmation
+  useEffect(() => {
+    const confirmed = searchParams.get('confirmed');
+    if (confirmed === 'true') {
+      toast({
+        title: "Email Confirmed!",
+        description: "Your email has been verified. You can now sign in to your account.",
+      });
+      setActiveTab('signin');
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     if (user && userProfile && !isLoading) {
-      // Role-based redirect - only admin or customer
+      // Role-based redirect
       if (userProfile.role === 'admin') {
         navigate('/admin');
       } else {
@@ -56,8 +70,7 @@ export default function Auth() {
   };
 
   const handleSignUpSuccess = () => {
-    // User is automatically signed in after successful OTP verification
-    // The useEffect will handle the redirect
+    // User will be redirected to home by SignUpForm
   };
 
   if (isLoading) {
@@ -78,6 +91,17 @@ export default function Auth() {
           <h2 className="text-3xl font-bold text-gray-900">Mozamandu</h2>
           <p className="mt-2 text-gray-600">Your premium gear destination</p>
         </div>
+
+        {/* Show confirmation message if coming from email verification */}
+        {searchParams.get('confirmed') === 'true' && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center space-x-3">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            <div>
+              <p className="text-sm font-medium text-green-800">Email Verified!</p>
+              <p className="text-sm text-green-600">You can now sign in to your account.</p>
+            </div>
+          </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
