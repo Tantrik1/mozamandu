@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -140,97 +141,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const saveCartToStorage = () => {
     localStorage.setItem('cart', JSON.stringify(cartItems));
-  };
-
-  const getSubcategoryQuantity = (subcategoryId: string): number => {
-    return cartItems
-      .filter(item => item.subcategoryId === subcategoryId)
-      .reduce((total, item) => total + item.quantity, 0);
-  };
-
-  const calculateDiscountPricing = (basePrice: number, quantity: number, tiers: DiscountTier[]): { price: number; description: string } => {
-    if (!tiers || tiers.length === 0) {
-      return { price: basePrice, description: `${quantity} × $${basePrice.toFixed(2)}` };
-    }
-
-    let totalCost = 0;
-    let remainingQty = quantity;
-    let descriptions: string[] = [];
-    let currentTierIndex = 0;
-
-    // Sort tiers by min_quantity
-    const sortedTiers = [...tiers].sort((a, b) => a.min_quantity - b.min_quantity);
-
-    while (remainingQty > 0 && currentTierIndex < sortedTiers.length) {
-      const currentTier = sortedTiers[currentTierIndex];
-      const nextTier = sortedTiers[currentTierIndex + 1];
-      
-      const tierStart = currentTier.min_quantity;
-      const tierEnd = nextTier ? nextTier.min_quantity : Infinity;
-      
-      if (quantity >= tierStart) {
-        const qtyInThisTier = Math.min(remainingQty, tierEnd - Math.max(tierStart, quantity - remainingQty));
-        const discountedPrice = basePrice - currentTier.discount_amount;
-        
-        if (qtyInThisTier > 0) {
-          totalCost += qtyInThisTier * discountedPrice;
-          descriptions.push(`${qtyInThisTier} × $${discountedPrice.toFixed(2)}`);
-          remainingQty -= qtyInThisTier;
-        }
-      }
-      
-      currentTierIndex++;
-    }
-
-    // Handle remaining quantity at base price if no more tiers
-    if (remainingQty > 0) {
-      totalCost += remainingQty * basePrice;
-      descriptions.push(`${remainingQty} × $${basePrice.toFixed(2)}`);
-    }
-
-    const avgPrice = totalCost / quantity;
-    const description = descriptions.length > 1 ? descriptions.join(' + ') : descriptions[0] || `${quantity} × $${basePrice.toFixed(2)}`;
-
-    return { price: avgPrice, description };
-  };
-
-  const getItemPricing = (item: CartItem): PricingInfo => {
-    const subcategoryTotalQty = getSubcategoryQuantity(item.subcategoryId);
-    
-    // Check if combo is active and applies to this subcategory
-    if (activeCombo) {
-      const comboSubcategory = activeCombo.combo_subcategories.find(
-        cs => cs.subcategory_id === item.subcategoryId
-      );
-      
-      if (comboSubcategory) {
-        return {
-          finalPrice: comboSubcategory.price,
-          description: `Combo Price: $${comboSubcategory.price.toFixed(2)} each`,
-          mode: 'combo',
-          isCombo: true
-        };
-      }
-    }
-
-    // Check for discount tiers
-    const tiers = discountTiers[item.subcategoryId];
-    if (tiers && tiers.length > 0 && subcategoryTotalQty >= tiers[0].min_quantity) {
-      const { price, description } = calculateDiscountPricing(item.basePrice, item.quantity, tiers);
-      return {
-        finalPrice: price,
-        description: `Discount Applied: ${description}`,
-        mode: 'discount',
-        breakdown: description.split(' + ')
-      };
-    }
-
-    // Normal pricing
-    return {
-      finalPrice: item.basePrice,
-      description: `${item.quantity} × $${item.basePrice.toFixed(2)}`,
-      mode: 'normal'
-    };
   };
 
   const addToCart = async (params: AddToCartParams) => {
