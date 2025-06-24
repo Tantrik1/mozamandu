@@ -78,7 +78,7 @@ export function FeaturedProductsCarousel() {
                 <ProductCard product={product} subcategoryPrice={product.subcategories?.selling_price || 0} />
               </CarouselItem>)}
           </CarouselContent>
-          <CarouselPrevious />
+          
           
         </Carousel>
       </div>
