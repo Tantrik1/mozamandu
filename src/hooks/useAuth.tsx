@@ -185,31 +185,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       setIsLoading(true);
+      
+      // Clear local state first to provide immediate feedback
+      setUser(null);
+      setSession(null);
+      setUserProfile(null);
+      
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        console.error('Sign out error:', error);
-        toast({
-          title: "Sign Out Failed",
-          description: "There was an error signing you out. Please try again.",
-          variant: "destructive",
-        });
+        // Check if it's an AuthSessionMissingError - this is expected if session already expired
+        if (error.message === 'Auth session missing!' || error.name === 'AuthSessionMissingError') {
+          console.log('Session already expired, proceeding with sign out');
+          toast({
+            title: "Signed Out",
+            description: "You have been successfully signed out.",
+          });
+        } else {
+          console.error('Sign out error:', error);
+          toast({
+            title: "Sign Out Failed",
+            description: "There was an error signing you out. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
       } else {
-        // Clear local state immediately
-        setUser(null);
-        setSession(null);
-        setUserProfile(null);
-        
         toast({
           title: "Signed Out",
           description: "You have been successfully signed out.",
         });
-        
-        // Redirect to home page after sign out
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 1000);
       }
+      
+      // Redirect to home page after sign out
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
+      
     } catch (error) {
       console.error('Unexpected sign out error:', error);
       toast({
