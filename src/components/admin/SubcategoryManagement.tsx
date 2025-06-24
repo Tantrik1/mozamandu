@@ -476,7 +476,7 @@ export function SubcategoryManagement() {
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-3 gap-4">
                         <div>
-                          <Label>Min Quantity for Discount</Label>
+                          <Label>Quantity to reach to apply Discount</Label>
                           <Input
                             type="number"
                             min="1"
