@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import { Mail } from 'lucide-react';
+import { Mail, RefreshCw } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -21,6 +21,7 @@ export default function Auth() {
   const [authLoading, setAuthLoading] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
   const [signUpEmail, setSignUpEmail] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
   
   const [signInData, setSignInData] = useState({
     email: '',
@@ -37,6 +38,14 @@ export default function Auth() {
     code: '',
     email: '',
   });
+
+  // Cooldown timer effect
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
 
   useEffect(() => {
     if (user && userProfile && !isLoading) {
@@ -75,19 +84,55 @@ export default function Auth() {
     }
   };
 
-  const sendOTP = async (email: string) => {
+  const sendOTP = async (email: string, isResend: boolean = false) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    const { error } = await supabase
-      .from('email_verification_codes')
-      .insert({
-        email,
-        code,
-        expires_at: expiresAt.toISOString(),
+    try {
+      // Store OTP in database
+      const { error } = await supabase
+        .from('email_verification_codes')
+        .insert({
+          email,
+          code,
+          expires_at: expiresAt.toISOString(),
+        });
+
+      if (error) {
+        throw new Error('Failed to generate verification code');
+      }
+
+      // Send email via edge function
+      const { error: emailError } = await supabase.functions.invoke('send-otp-email', {
+        body: {
+          email,
+          code,
+          name: signUpData.fullName,
+        },
       });
 
-    if (error) {
+      if (emailError) {
+        console.error('Email sending error:', emailError);
+        // Fallback: show code in toast for demo
+        toast({
+          title: isResend ? "New Verification Code" : "Verification Code Sent",
+          description: `Your verification code is: ${code} (Note: Email service not configured, showing code here)`,
+          duration: 10000,
+        });
+      } else {
+        toast({
+          title: isResend ? "New Code Sent" : "Verification Code Sent",
+          description: `Please check your email for the verification code.`,
+        });
+      }
+
+      if (isResend) {
+        setResendCooldown(60); // 60 second cooldown
+      }
+
+      return true;
+    } catch (error) {
+      console.error('OTP sending error:', error);
       toast({
         title: "Error",
         description: "Failed to send verification code",
@@ -95,16 +140,6 @@ export default function Auth() {
       });
       return false;
     }
-
-    // In a real app, you'd send this via email service
-    // For demo purposes, we'll show it in a toast
-    toast({
-      title: "Verification Code Sent",
-      description: `Your verification code is: ${code}`,
-      duration: 10000,
-    });
-
-    return true;
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -136,69 +171,86 @@ export default function Auth() {
     }
   };
 
+  const handleResendOTP = async () => {
+    if (resendCooldown > 0) return;
+    
+    setAuthLoading(true);
+    await sendOTP(otpData.email, true);
+    setAuthLoading(false);
+  };
+
   const verifyOTP = async () => {
     setAuthLoading(true);
 
-    const { data: verification, error: verifyError } = await supabase
-      .from('email_verification_codes')
-      .select('*')
-      .eq('email', otpData.email)
-      .eq('code', otpData.code)
-      .gt('expires_at', new Date().toISOString())
-      .eq('verified', false)
-      .single();
+    try {
+      const { data: verification, error: verifyError } = await supabase
+        .from('email_verification_codes')
+        .select('*')
+        .eq('email', otpData.email)
+        .eq('code', otpData.code)
+        .gt('expires_at', new Date().toISOString())
+        .eq('verified', false)
+        .single();
 
-    if (verifyError || !verification) {
-      toast({
-        title: "Invalid Code",
-        description: "The verification code is invalid or expired",
-        variant: "destructive",
-      });
-      setAuthLoading(false);
-      return;
-    }
+      if (verifyError || !verification) {
+        toast({
+          title: "Invalid Code",
+          description: "The verification code is invalid or expired",
+          variant: "destructive",
+        });
+        setAuthLoading(false);
+        return;
+      }
 
-    // Mark code as verified
-    await supabase
-      .from('email_verification_codes')
-      .update({ verified: true })
-      .eq('id', verification.id);
+      // Mark code as verified
+      await supabase
+        .from('email_verification_codes')
+        .update({ verified: true })
+        .eq('id', verification.id);
 
-    // Create the user account
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: signUpData.email,
-      password: signUpData.password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: {
-          full_name: signUpData.fullName,
-          role: 'customer',
+      // Create the user account with customer role
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: signUpData.email,
+        password: signUpData.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            full_name: signUpData.fullName,
+            role: 'customer',
+          },
         },
-      },
-    });
+      });
 
-    if (signUpError) {
+      if (signUpError) {
+        toast({
+          title: "Error",
+          description: signUpError.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Account Created Successfully!",
+          description: "Welcome to Mozamandu. You can now sign in.",
+        });
+        // Reset form and go back to sign in
+        setSignUpData({
+          email: '',
+          password: '',
+          confirmPassword: '',
+          fullName: '',
+        });
+        setShowOTP(false);
+        setOtpData({ code: '', email: '' });
+      }
+    } catch (error) {
       toast({
         title: "Error",
-        description: signUpError.message,
+        description: "An unexpected error occurred",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Success",
-        description: "Account created successfully!",
-      });
-      // Reset form
-      setSignUpData({
-        email: '',
-        password: '',
-        confirmPassword: '',
-        fullName: '',
-      });
-      setShowOTP(false);
+    } finally {
+      setAuthLoading(false);
     }
-
-    setAuthLoading(false);
   };
 
   // Show loading while checking auth state
@@ -249,6 +301,24 @@ export default function Auth() {
             >
               {authLoading ? 'Verifying...' : 'Verify Code'}
             </Button>
+
+            <div className="text-center space-y-2">
+              <p className="text-sm text-gray-600">Didn't receive the code?</p>
+              <Button 
+                variant="ghost" 
+                onClick={handleResendOTP}
+                disabled={resendCooldown > 0 || authLoading}
+                className="w-full"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                {resendCooldown > 0 
+                  ? `Resend in ${resendCooldown}s` 
+                  : authLoading 
+                    ? 'Sending...' 
+                    : 'Resend Code'
+                }
+              </Button>
+            </div>
             
             <Button 
               variant="ghost" 
