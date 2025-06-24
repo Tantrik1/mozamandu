@@ -62,16 +62,22 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
     }
 
     setIsLoading(true);
+    setErrors({});
 
     const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
 
     if (error) {
       setErrors({ form: error.message });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     } else {
       setShowOTPField(true);
       toast({
         title: "Verification Code Sent!",
-        description: "Please check your email for the 6-digit verification code from Resend.",
+        description: "Please check your email for the 6-digit verification code.",
       });
     }
 
@@ -110,6 +116,7 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
   const handleResendOTP = async () => {
     setIsResending(true);
     setErrors({});
+    setOtpCode('');
 
     const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
 
@@ -207,7 +214,7 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
             <span className="font-medium">{signUpData.email}</span>
           </p>
           <p className="text-sm text-blue-600 font-medium">
-            Check your email for the code from Resend
+            Check your email for the 6-digit code
           </p>
 
           <div className="flex justify-center">

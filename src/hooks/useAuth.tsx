@@ -108,23 +108,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Store user data temporarily for OTP verification
       sessionStorage.setItem('pendingSignup', JSON.stringify({
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
         fullName: fullName.trim(),
       }));
 
-      // Send OTP email via edge function (Resend only)
+      console.log('Sending OTP request for:', email.trim().toLowerCase());
+
+      // Send OTP email via edge function
       const { data, error: emailError } = await supabase.functions.invoke('send-verification-email', {
         body: {
-          email: email.trim(),
+          email: email.trim().toLowerCase(),
           name: fullName.trim(),
           password,
         },
       });
 
+      console.log('OTP response:', data, emailError);
+
       if (emailError) {
         console.error('Email error:', emailError);
         return { error: emailError };
+      }
+
+      if (!data?.success) {
+        console.error('Email sending failed:', data);
+        return { error: { message: data?.error || 'Failed to send verification email' } };
       }
 
       return { error: null };
@@ -142,30 +151,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       const pendingData = sessionStorage.getItem('pendingSignup');
       if (!pendingData) {
-        return { error: { message: 'No pending signup found' } };
+        return { error: { message: 'No pending signup found. Please start the signup process again.' } };
       }
 
       const { password, fullName } = JSON.parse(pendingData);
+      const emailKey = email.trim().toLowerCase();
 
-      // Verify OTP with the edge function and get JWT token
+      console.log('Verifying OTP:', { email: emailKey, otp });
+
+      // Verify OTP with the edge function
       const { data: verificationData, error: verifyError } = await supabase.functions.invoke('send-verification-email', {
         body: {
-          email,
-          otp,
+          email: emailKey,
+          otp: otp.trim(),
           verify: true,
         },
       });
 
-      if (verifyError || !verificationData?.success) {
+      console.log('Verification response:', verificationData, verifyError);
+
+      if (verifyError) {
+        console.error('Verification error:', verifyError);
+        return { error: { message: 'Failed to verify code. Please try again.' } };
+      }
+
+      if (!verificationData?.success) {
+        console.error('Verification failed:', verificationData);
         return { error: { message: verificationData?.error || 'Invalid verification code' } };
       }
 
-      // Create the actual user account with email confirmation disabled
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
+      console.log('OTP verified successfully, creating user account...');
+
+      // Create the actual user account with email confirmation bypassed
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: emailKey,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/dashboard`,
           data: {
             full_name: fullName,
             role: 'customer',
@@ -174,15 +196,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (signUpError) {
+        console.error('Signup error:', signUpError);
         return { error: signUpError };
       }
+
+      console.log('User account created:', signUpData);
 
       // Clear pending data
       sessionStorage.removeItem('pendingSignup');
 
       toast({
         title: "Account created successfully!",
-        description: "Welcome to Mozamandu!",
+        description: "Welcome to Mozamandu! You are now signed in.",
       });
 
       return { error: null };

@@ -34,22 +34,52 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { email, name, password, otp, verify }: VerificationRequest = await req.json();
 
+    console.log('Request received:', { email, verify, otp, hasName: !!name, hasPassword: !!password });
+
     // If this is a verification request
     if (verify && otp) {
-      const stored = otpStore.get(email);
-      if (!stored || stored.expires < Date.now() || stored.code !== otp) {
+      console.log('Verifying OTP for email:', email);
+      const stored = otpStore.get(email.toLowerCase());
+      
+      if (!stored) {
+        console.log('No OTP found for email:', email);
         return new Response(JSON.stringify({ 
           success: false,
-          error: "Invalid or expired verification code"
+          error: "No verification code found for this email"
         }), {
           status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders },
         });
       }
 
+      if (stored.expires < Date.now()) {
+        console.log('OTP expired for email:', email);
+        otpStore.delete(email.toLowerCase());
+        return new Response(JSON.stringify({ 
+          success: false,
+          error: "Verification code has expired"
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+
+      if (stored.code !== otp) {
+        console.log('Invalid OTP for email:', email, 'Expected:', stored.code, 'Received:', otp);
+        return new Response(JSON.stringify({ 
+          success: false,
+          error: "Invalid verification code"
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+
+      console.log('OTP verified successfully for email:', email);
+
       // Create JWT token for verified email
       const payload = {
-        email: email,
+        email: email.toLowerCase(),
         name: stored.userData.name,
         password: stored.userData.password,
         verified: true,
@@ -59,7 +89,7 @@ const handler = async (req: Request): Promise<Response> => {
       const token = await create({ alg: "HS256", typ: "JWT" }, payload, JWT_SECRET);
 
       // Remove the OTP after successful verification
-      otpStore.delete(email);
+      otpStore.delete(email.toLowerCase());
       
       return new Response(JSON.stringify({ 
         success: true,
@@ -75,13 +105,14 @@ const handler = async (req: Request): Promise<Response> => {
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     
     // Store OTP with user data and 10-minute expiry
-    otpStore.set(email, {
+    const emailKey = email.toLowerCase();
+    otpStore.set(emailKey, {
       code: otpCode,
       expires: Date.now() + 10 * 60 * 1000, // 10 minutes
       userData: { name, password }
     });
 
-    console.log("Sending verification email to:", email);
+    console.log("Sending verification email to:", email, "with OTP:", otpCode);
 
     const emailResponse = await resend.emails.send({
       from: "Mozamandu <onboarding@resend.dev>",
