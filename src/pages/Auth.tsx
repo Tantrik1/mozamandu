@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -10,16 +9,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Mail } from 'lucide-react';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 export default function Auth() {
-  const { signIn, signUp, user, userProfile, isLoading } = useAuth();
+  const { signIn, signUp, verifyOTP, user, userProfile, isLoading } = useAuth();
   const navigate = useNavigate();
   
   const [authLoading, setAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
   const [showPassword, setShowPassword] = useState(false);
+  const [showOTPField, setShowOTPField] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
   
   const [signInData, setSignInData] = useState({
     email: '',
@@ -33,6 +33,7 @@ export default function Auth() {
     confirmPassword: '',
   });
 
+  const [otpCode, setOtpCode] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -67,6 +68,10 @@ export default function Auth() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (showOTPField) {
+      return handleOTPVerification();
+    }
 
     // Validate form
     const newErrors: Record<string, string> = {};
@@ -109,11 +114,37 @@ export default function Auth() {
         variant: "destructive",
       });
     } else {
-      setEmailSent(true);
+      setShowOTPField(true);
       toast({
         title: "Check Your Email!",
-        description: "We've sent a confirmation link to your email address. Please click the link to activate your account.",
+        description: "We've sent a verification code to your email address.",
       });
+    }
+
+    setAuthLoading(false);
+  };
+
+  const handleOTPVerification = async () => {
+    if (otpCode.length !== 6) {
+      setErrors({ otp: 'Please enter the complete 6-digit code' });
+      return;
+    }
+
+    setAuthLoading(true);
+    setErrors({});
+
+    const { error } = await verifyOTP(signUpData.email, otpCode);
+
+    if (error) {
+      setErrors({ otp: error.message });
+      toast({
+        title: "Verification Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      // Success will be handled by the auth state change
+      // which will redirect to the appropriate page
     }
 
     setAuthLoading(false);
@@ -209,121 +240,136 @@ export default function Auth() {
                 <CardTitle>Create Your Account</CardTitle>
               </CardHeader>
               <CardContent>
-                {!emailSent ? (
-                  <form onSubmit={handleSignUp} className="space-y-4">
-                    {errors.form && (
-                      <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
-                        {errors.form}
+                <form onSubmit={handleSignUp} className="space-y-4">
+                  {errors.form && (
+                    <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
+                      {errors.form}
+                    </div>
+                  )}
+
+                  {!showOTPField ? (
+                    <>
+                      <div>
+                        <Label htmlFor="signup-name">Full Name</Label>
+                        <Input
+                          id="signup-name"
+                          type="text"
+                          value={signUpData.fullName}
+                          onChange={(e) => setSignUpData({ ...signUpData, fullName: e.target.value })}
+                          placeholder="Enter your full name"
+                        />
+                        {errors.fullName && <p className="text-sm text-red-600 mt-1">{errors.fullName}</p>}
                       </div>
-                    )}
 
-                    <div>
-                      <Label htmlFor="signup-name">Full Name</Label>
-                      <Input
-                        id="signup-name"
-                        type="text"
-                        value={signUpData.fullName}
-                        onChange={(e) => setSignUpData({ ...signUpData, fullName: e.target.value })}
-                        placeholder="Enter your full name"
-                      />
-                      {errors.fullName && <p className="text-sm text-red-600 mt-1">{errors.fullName}</p>}
+                      <div>
+                        <Label htmlFor="signup-email">Email Address</Label>
+                        <Input
+                          id="signup-email"
+                          type="email"
+                          value={signUpData.email}
+                          onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
+                          placeholder="Enter your email"
+                        />
+                        {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="signup-password">Password</Label>
+                        <Input
+                          id="signup-password"
+                          type="password"
+                          value={signUpData.password}
+                          onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
+                          placeholder="Create a password"
+                        />
+                        {errors.password && <p className="text-sm text-red-600 mt-1">{errors.password}</p>}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="signup-confirm">Confirm Password</Label>
+                        <Input
+                          id="signup-confirm"
+                          type="password"
+                          value={signUpData.confirmPassword}
+                          onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
+                          placeholder="Confirm your password"
+                        />
+                        {errors.confirmPassword && <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>}
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="terms" 
+                          checked={agreeToTerms}
+                          onCheckedChange={(checked) => setAgreeToTerms(checked as boolean)}
+                        />
+                        <label
+                          htmlFor="terms"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          I agree to the{' '}
+                          <a href="/terms-conditions" className="text-red-600 hover:underline">
+                            Terms & Conditions
+                          </a>
+                          {' '}and{' '}
+                          <a href="/privacy-policy" className="text-red-600 hover:underline">
+                            Privacy Policy
+                          </a>
+                        </label>
+                      </div>
+                      {errors.terms && <p className="text-sm text-red-600">{errors.terms}</p>}
+                    </>
+                  ) : (
+                    <div className="text-center space-y-4">
+                      <Mail className="w-16 h-16 mx-auto text-blue-600" />
+                      <h3 className="text-xl font-semibold">Verify Your Email</h3>
+                      <p className="text-gray-600">
+                        We've sent a verification code to<br />
+                        <span className="font-medium">{signUpData.email}</span>
+                      </p>
+
+                      <div className="flex justify-center">
+                        <InputOTP value={otpCode} onChange={setOtpCode} maxLength={6}>
+                          <InputOTPGroup>
+                            <InputOTPSlot index={0} />
+                            <InputOTPSlot index={1} />
+                            <InputOTPSlot index={2} />
+                            <InputOTPSlot index={3} />
+                            <InputOTPSlot index={4} />
+                            <InputOTPSlot index={5} />
+                          </InputOTPGroup>
+                        </InputOTP>
+                      </div>
+                      {errors.otp && <p className="text-sm text-red-600">{errors.otp}</p>}
                     </div>
+                  )}
 
-                    <div>
-                      <Label htmlFor="signup-email">Email Address</Label>
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        value={signUpData.email}
-                        onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
-                        placeholder="Enter your email"
-                      />
-                      {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
-                    </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-red-600 hover:bg-red-700" 
+                    disabled={authLoading}
+                  >
+                    {authLoading 
+                      ? (showOTPField ? 'Verifying...' : 'Creating Account...') 
+                      : (showOTPField ? 'Verify & Create Account' : 'Create Account')
+                    }
+                  </Button>
 
-                    <div>
-                      <Label htmlFor="signup-password">Password</Label>
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        value={signUpData.password}
-                        onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
-                        placeholder="Create a password"
-                      />
-                      {errors.password && <p className="text-sm text-red-600 mt-1">{errors.password}</p>}
-                    </div>
-
-                    <div>
-                      <Label htmlFor="signup-confirm">Confirm Password</Label>
-                      <Input
-                        id="signup-confirm"
-                        type="password"
-                        value={signUpData.confirmPassword}
-                        onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
-                        placeholder="Confirm your password"
-                      />
-                      {errors.confirmPassword && <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>}
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="terms" 
-                        checked={agreeToTerms}
-                        onCheckedChange={(checked) => setAgreeToTerms(checked as boolean)}
-                      />
-                      <label
-                        htmlFor="terms"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        I agree to the{' '}
-                        <a href="/terms-conditions" className="text-red-600 hover:underline">
-                          Terms & Conditions
-                        </a>
-                        {' '}and{' '}
-                        <a href="/privacy-policy" className="text-red-600 hover:underline">
-                          Privacy Policy
-                        </a>
-                      </label>
-                    </div>
-                    {errors.terms && <p className="text-sm text-red-600">{errors.terms}</p>}
-
+                  {showOTPField && (
                     <Button 
-                      type="submit" 
-                      className="w-full bg-red-600 hover:bg-red-700" 
-                      disabled={authLoading}
-                    >
-                      {authLoading ? 'Creating Account...' : 'Create Account'}
-                    </Button>
-                  </form>
-                ) : (
-                  <div className="text-center space-y-4">
-                    <Mail className="w-16 h-16 mx-auto text-blue-600" />
-                    <h3 className="text-xl font-semibold">Check Your Email</h3>
-                    <p className="text-gray-600">
-                      We've sent a confirmation link to<br />
-                      <span className="font-medium">{signUpData.email}</span>
-                    </p>
-                    <p className="text-sm text-blue-600 font-medium">
-                      Click the link in your email to activate your account
-                    </p>
-                    <Button 
+                      type="button"
                       variant="ghost" 
                       onClick={() => {
-                        setEmailSent(false);
-                        setSignUpData({
-                          fullName: '',
-                          email: '',
-                          password: '',
-                          confirmPassword: '',
-                        });
+                        setShowOTPField(false);
+                        setOtpCode('');
                         setErrors({});
                       }}
                       className="w-full"
                     >
                       Back to Sign Up Form
                     </Button>
-                  </div>
-                )}
+                  )}
+                </form>
               </CardContent>
             </Card>
           </TabsContent>
