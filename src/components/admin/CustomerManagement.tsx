@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Eye, Search, Mail, Phone } from 'lucide-react';
+import { Eye, Search, Mail, Phone, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -13,6 +13,8 @@ interface Customer {
   id: string;
   email: string;
   full_name: string;
+  contact_number: string;
+  whatsapp_number: string;
   role: string;
   created_at: string;
   total_orders: number;
@@ -41,13 +43,17 @@ export function CustomerManagement() {
   const fetchCustomers = async () => {
     setLoading(true);
     
-    // First get all profiles
+    console.log('Fetching customers...');
+    
+    // Get all profiles with role 'customer'
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('role', 'customer');
+      .eq('role', 'customer')
+      .order('created_at', { ascending: false });
 
     if (profilesError) {
+      console.error('Profile fetch error:', profilesError);
       toast({
         title: "Error",
         description: "Failed to fetch customers",
@@ -57,16 +63,24 @@ export function CustomerManagement() {
       return;
     }
 
-    // Then get order statistics for each customer
+    console.log('Fetched profiles:', profiles);
+
+    // Get order statistics for each customer
     const customersWithStats = await Promise.all(
       (profiles || []).map(async (profile) => {
-        const { data: orders } = await supabase
+        const { data: orders, error: ordersError } = await supabase
           .from('orders')
           .select('total_amount')
           .eq('user_id', profile.id);
 
+        if (ordersError) {
+          console.error('Orders fetch error for user', profile.id, ':', ordersError);
+        }
+
         const totalOrders = orders?.length || 0;
         const totalSpent = orders?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
+
+        console.log(`Customer ${profile.email}: ${totalOrders} orders, Rs. ${totalSpent} spent`);
 
         return {
           ...profile,
@@ -76,19 +90,25 @@ export function CustomerManagement() {
       })
     );
 
+    console.log('Customers with stats:', customersWithStats);
     setCustomers(customersWithStats);
     setLoading(false);
   };
 
   const fetchCustomerOrders = async (customerId: string) => {
+    console.log('Fetching orders for customer:', customerId);
+    
     const { data, error } = await supabase
       .from('orders')
       .select('id, order_number, total_amount, status, created_at')
       .eq('user_id', customerId)
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setCustomerOrders(data);
+    if (error) {
+      console.error('Customer orders fetch error:', error);
+    } else {
+      console.log('Customer orders:', data);
+      setCustomerOrders(data || []);
     }
   };
 
@@ -101,7 +121,8 @@ export function CustomerManagement() {
     const searchLower = searchQuery.toLowerCase();
     return (
       customer.email.toLowerCase().includes(searchLower) ||
-      (customer.full_name && customer.full_name.toLowerCase().includes(searchLower))
+      (customer.full_name && customer.full_name.toLowerCase().includes(searchLower)) ||
+      (customer.contact_number && customer.contact_number.includes(searchQuery))
     );
   });
 
@@ -122,7 +143,7 @@ export function CustomerManagement() {
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search by name or email..."
+              placeholder="Search by name, email, or contact number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -157,7 +178,7 @@ export function CustomerManagement() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">
-              ${customers.reduce((sum, c) => sum + c.total_spent, 0).toFixed(2)}
+              Rs. {customers.reduce((sum, c) => sum + c.total_spent, 0).toFixed(2)}
             </p>
           </CardContent>
         </Card>
@@ -166,14 +187,14 @@ export function CustomerManagement() {
       {/* Customers Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Customers ({filteredCustomers.length})</CardTitle>
+          <CardTitle>Registered Customers ({filteredCustomers.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Customer</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead>Contact Info</TableHead>
                 <TableHead>Orders</TableHead>
                 <TableHead>Total Spent</TableHead>
                 <TableHead>Joined</TableHead>
@@ -184,20 +205,38 @@ export function CustomerManagement() {
               {filteredCustomers.map((customer) => (
                 <TableRow key={customer.id}>
                   <TableCell>
-                    <div>
-                      <p className="font-medium">
-                        {customer.full_name || 'Unnamed Customer'}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-gray-400" />
+                      <div>
+                        <p className="font-medium">
+                          {customer.full_name || 'Unnamed Customer'}
+                        </p>
+                        <p className="text-sm text-gray-600">{customer.email}</p>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-gray-400" />
-                      {customer.email}
+                    <div className="space-y-1">
+                      {customer.contact_number && (
+                        <div className="flex items-center gap-1 text-sm">
+                          <Phone className="h-3 w-3 text-gray-400" />
+                          {customer.contact_number}
+                        </div>
+                      )}
+                      {customer.whatsapp_number && (
+                        <div className="flex items-center gap-1 text-sm text-green-600">
+                          <Phone className="h-3 w-3" />
+                          WhatsApp: {customer.whatsapp_number}
+                        </div>
+                      )}
                     </div>
                   </TableCell>
-                  <TableCell>{customer.total_orders}</TableCell>
-                  <TableCell>${customer.total_spent.toFixed(2)}</TableCell>
+                  <TableCell>
+                    <span className="font-medium">{customer.total_orders}</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-medium">Rs. {customer.total_spent.toFixed(2)}</span>
+                  </TableCell>
                   <TableCell>
                     {new Date(customer.created_at).toLocaleDateString()}
                   </TableCell>
@@ -233,9 +272,13 @@ export function CustomerManagement() {
                                   <p><strong>Role:</strong> {selectedCustomer.role}</p>
                                 </div>
                                 <div>
+                                  <p><strong>Contact:</strong> {selectedCustomer.contact_number || 'N/A'}</p>
+                                  <p><strong>WhatsApp:</strong> {selectedCustomer.whatsapp_number || 'N/A'}</p>
                                   <p><strong>Joined:</strong> {new Date(selectedCustomer.created_at).toLocaleDateString()}</p>
+                                </div>
+                                <div className="md:col-span-2">
                                   <p><strong>Total Orders:</strong> {selectedCustomer.total_orders}</p>
-                                  <p><strong>Total Spent:</strong> ${selectedCustomer.total_spent.toFixed(2)}</p>
+                                  <p><strong>Total Spent:</strong> Rs. {selectedCustomer.total_spent.toFixed(2)}</p>
                                 </div>
                               </CardContent>
                             </Card>
@@ -262,7 +305,7 @@ export function CustomerManagement() {
                                           <TableCell className="font-medium">
                                             {order.order_number}
                                           </TableCell>
-                                          <TableCell>${order.total_amount.toFixed(2)}</TableCell>
+                                          <TableCell>Rs. {order.total_amount.toFixed(2)}</TableCell>
                                           <TableCell>
                                             <span className={`px-2 py-1 rounded text-xs ${
                                               order.status === 'delivered' 
@@ -293,6 +336,13 @@ export function CustomerManagement() {
                   </TableCell>
                 </TableRow>
               ))}
+              {filteredCustomers.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                    No customers found matching your search criteria.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

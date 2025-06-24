@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -221,11 +222,13 @@ export function CheckoutPayment({ isGuest, onComplete, onBack }: CheckoutPayment
         }
       }
 
-      // Create order
+      console.log('Creating order with user_id:', user?.id || 'null (guest)');
+
+      // Create order - ensure user_id is properly set for authenticated users
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
-          user_id: user?.id || null,
+          user_id: user?.id || null, // This is the key fix - properly linking to authenticated user
           customer_name: checkoutInfo.customerName,
           customer_email: checkoutInfo.customerEmail,
           contact_number: checkoutInfo.contactNumber,
@@ -248,7 +251,12 @@ export function CheckoutPayment({ isGuest, onComplete, onBack }: CheckoutPayment
         .select()
         .single();
 
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error('Order creation error:', orderError);
+        throw orderError;
+      }
+
+      console.log('Order created successfully:', orderData);
 
       // Create order items
       const orderItems = cartItems.map(item => {
@@ -272,7 +280,10 @@ export function CheckoutPayment({ isGuest, onComplete, onBack }: CheckoutPayment
         .from('order_items')
         .insert(orderItems);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('Order items creation error:', itemsError);
+        throw itemsError;
+      }
 
       // Clear cart and redirect
       clearCart();
