@@ -1,4 +1,3 @@
-
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +6,7 @@ import { useCart } from '@/hooks/useCart';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 interface SubcategoryRequirement {
   subcategoryId: string;
@@ -26,6 +26,7 @@ export function CartSidebar() {
     getItemPricing,
     activeCombo 
   } = useCart();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [subcategoryRequirements, setSubcategoryRequirements] = useState<SubcategoryRequirement[]>([]);
 
@@ -67,6 +68,20 @@ export function CartSidebar() {
 
   const canCheckout = subcategoryRequirements.every(req => req.fulfilled);
   const totalPrice = getTotalPrice();
+
+  const handleCheckout = () => {
+    if (!canCheckout) {
+      toast({
+        title: "Minimum requirements not met",
+        description: "Please add more items to meet minimum quantity requirements",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsOpen(false);
+    navigate('/checkout');
+  };
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -271,20 +286,7 @@ export function CartSidebar() {
               <Button 
                 className="w-full bg-red-600 hover:bg-red-700" 
                 disabled={!canCheckout}
-                onClick={() => {
-                  if (!canCheckout) {
-                    toast({
-                      title: "Minimum requirements not met",
-                      description: "Please add more items to meet minimum quantity requirements",
-                      variant: "destructive",
-                    });
-                  } else {
-                    toast({
-                      title: "Checkout",
-                      description: "Checkout functionality will be implemented soon",
-                    });
-                  }
-                }}
+                onClick={handleCheckout}
               >
                 {canCheckout ? 'Proceed to Checkout' : 'Minimum Requirements Not Met'}
               </Button>
