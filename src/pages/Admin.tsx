@@ -1,4 +1,3 @@
-
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
@@ -14,6 +13,7 @@ import { DeliveryChargeManagement } from '@/components/admin/DeliveryChargeManag
 import { NoticeManagement } from '@/components/admin/NoticeManagement';
 import { TopBarTextManagement } from '@/components/admin/TopBarTextManagement';
 import { AdminSettings } from '@/components/admin/AdminSettings';
+import { FAQManagement } from '@/components/admin/FAQManagement';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { DashboardStats } from '@/components/admin/DashboardStats';
 import { OrdersChart } from '@/components/admin/OrdersChart';
@@ -79,6 +79,7 @@ export default function Admin() {
             <Route path="delivery-charges" element={<DeliveryChargeManagement />} />
             <Route path="notices" element={<NoticeManagement />} />
             <Route path="top-bar-text" element={<TopBarTextManagement />} />
+            <Route path="faqs" element={<FAQManagement />} />
             <Route path="settings" element={<AdminSettings />} />
           </Routes>
         </main>

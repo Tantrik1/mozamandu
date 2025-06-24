@@ -1,77 +1,15 @@
 
-import { useEffect, useState } from 'react';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
-import { Star, ShoppingCart } from 'lucide-react';
-
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  selling_price: number;
-  is_featured: boolean;
-  categories: {
-    name: string;
-  };
-  subcategories: {
-    name: string;
-    selling_price: number;
-  };
-}
+import { FeaturedProductsCarousel } from '@/components/customer/FeaturedProductsCarousel';
+import { SubcategoryProductTabs } from '@/components/customer/SubcategoryProductTabs';
+import { LatestProducts } from '@/components/customer/LatestProducts';
+import { WhyChooseUs } from '@/components/customer/WhyChooseUs';
+import { DeliveryInfo } from '@/components/customer/DeliveryInfo';
+import { FAQSection } from '@/components/customer/FAQSection';
 
 export default function Home() {
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-
-  useEffect(() => {
-    fetchFeaturedProducts();
-    fetchCategories();
-  }, []);
-
-  const fetchFeaturedProducts = async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select(`
-        id,
-        name,
-        description,
-        selling_price,
-        is_featured,
-        categories (name),
-        subcategories (name, selling_price)
-      `)
-      .eq('is_featured', true)
-      .eq('status', 'active')
-      .limit(6);
-
-    if (error) {
-      console.error('Error fetching featured products:', error);
-    } else {
-      setFeaturedProducts(data || []);
-    }
-  };
-
-  const fetchCategories = async () => {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .eq('status', 'on');
-
-    if (error) {
-      console.error('Error fetching categories:', error);
-    } else {
-      setCategories(data || []);
-    }
-  };
-
-  const getProductPrice = (product: Product) => {
-    return product.selling_price || product.subcategories?.selling_price || 0;
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
@@ -91,64 +29,23 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Categories Section */}
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center mb-12">Shop by Category</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {categories.map((category) => (
-              <Card key={category.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-                <CardHeader>
-                  <CardTitle className="text-xl">{category.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600 mb-4">{category.description}</p>
-                  <Link to={`/categories/${category.id}`}>
-                    <Button variant="outline" className="w-full">
-                      Browse {category.name}
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Featured Products Carousel */}
+      <FeaturedProductsCarousel />
 
-      {/* Featured Products Section */}
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center mb-12">Featured Products</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredProducts.map((product) => (
-              <Card key={product.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">{product.name}</CardTitle>
-                    <Badge variant="secondary">
-                      <Star className="h-3 w-3 mr-1" />
-                      Featured
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600 mb-4 text-sm">{product.description}</p>
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-2xl font-bold text-red-600">
-                      ${getProductPrice(product).toFixed(2)}
-                    </span>
-                    <Badge variant="outline">{product.categories?.name}</Badge>
-                  </div>
-                  <Button className="w-full bg-red-600 hover:bg-red-700">
-                    <ShoppingCart className="h-4 w-4 mr-2" />
-                    Add to Cart
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Subcategory Product Tabs */}
+      <SubcategoryProductTabs />
+
+      {/* Latest Products */}
+      <LatestProducts />
+
+      {/* Why Choose Us */}
+      <WhyChooseUs />
+
+      {/* Delivery Info */}
+      <DeliveryInfo />
+
+      {/* FAQ Section */}
+      <FAQSection />
 
       {/* Footer */}
       <footer className="bg-gray-800 text-white py-12">
@@ -172,6 +69,7 @@ export default function Home() {
                 <li>Contact Us</li>
                 <li>Shipping Info</li>
                 <li>Returns</li>
+                <li><Link to="/faq">FAQ</Link></li>
               </ul>
             </div>
             <div>
