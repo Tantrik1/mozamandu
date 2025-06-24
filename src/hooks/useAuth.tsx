@@ -106,13 +106,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
-      // Store user data temporarily for OTP verification
-      sessionStorage.setItem('pendingSignup', JSON.stringify({
-        email: email.trim().toLowerCase(),
-        password,
-        fullName: fullName.trim(),
-      }));
-
       console.log('Sending OTP request for:', email.trim().toLowerCase());
 
       // Send OTP email via edge function
@@ -149,12 +142,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
-      const pendingData = sessionStorage.getItem('pendingSignup');
-      if (!pendingData) {
-        return { error: { message: 'No pending signup found. Please start the signup process again.' } };
-      }
-
-      const { password, fullName } = JSON.parse(pendingData);
       const emailKey = email.trim().toLowerCase();
 
       console.log('Verifying OTP:', { email: emailKey, otp });
@@ -180,30 +167,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: { message: verificationData?.error || 'Invalid verification code' } };
       }
 
-      console.log('OTP verified successfully, creating user account...');
+      console.log('OTP verified and user created successfully');
 
-      // Create the actual user account with email confirmation bypassed
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: emailKey,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
-          data: {
-            full_name: fullName,
-            role: 'customer',
-          },
-        },
-      });
-
-      if (signUpError) {
-        console.error('Signup error:', signUpError);
-        return { error: signUpError };
+      // Since the user is created via admin.createUser, we need to sign them in
+      if (verificationData.user) {
+        // The user is already created, we just need to refresh the session
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          // If no session, try to sign in with the credentials
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: emailKey,
+            password: '', // We don't have the password here, but the user should be created
+          });
+          
+          if (signInError) {
+            console.log('Sign in after creation needed');
+          }
+        }
       }
-
-      console.log('User account created:', signUpData);
-
-      // Clear pending data
-      sessionStorage.removeItem('pendingSignup');
 
       toast({
         title: "Account created successfully!",

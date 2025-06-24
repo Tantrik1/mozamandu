@@ -10,7 +10,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Initialize Supabase client
+// Initialize Supabase client with service role for admin operations
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -73,14 +73,39 @@ const handler = async (req: Request): Promise<Response> => {
         console.error('Error updating OTP status:', updateError);
       }
 
+      // Get user data from stored OTP
+      const userData = storedOTP.user_data || {};
+      
+      console.log('Creating user with verified email...');
+      
+      // Create user with email_confirm: true to bypass email verification
+      const { data: signUpData, error: signUpError } = await supabase.auth.admin.createUser({
+        email: email.toLowerCase().trim(),
+        password: userData.password || password,
+        email_confirm: true, // This bypasses email verification
+        user_metadata: {
+          full_name: userData.name || name,
+          role: 'customer',
+        }
+      });
+
+      if (signUpError) {
+        console.error('Error creating user:', signUpError);
+        return new Response(JSON.stringify({ 
+          success: false,
+          error: signUpError.message || "Failed to create user account"
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+
+      console.log('User created successfully:', signUpData.user?.email);
+
       return new Response(JSON.stringify({ 
         success: true,
-        message: "Email verified successfully",
-        userData: {
-          email: email.toLowerCase().trim(),
-          name: storedOTP.user_data?.name,
-          password: storedOTP.user_data?.password
-        }
+        message: "Email verified and account created successfully",
+        user: signUpData.user
       }), {
         status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
