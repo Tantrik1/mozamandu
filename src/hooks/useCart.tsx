@@ -1,7 +1,7 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useCartPricing } from './useCartPricing';
 
 interface CartItem {
   id: string;
@@ -53,6 +53,7 @@ interface PricingInfo {
   description: string;
   mode: 'normal' | 'discount' | 'combo';
   isCombo?: boolean;
+  breakdown?: string[];
 }
 
 interface CartContextType {
@@ -74,6 +75,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [activeCombo, setActiveCombo] = useState<ComboData | null>(null);
   const [subcategoriesData, setSubcategoriesData] = useState<{ [key: string]: SubcategoryData }>({});
   const [discountTiers, setDiscountTiers] = useState<{ [key: string]: DiscountTier[] }>({});
+
+  const { getItemPricing, getTotalPrice: calculateTotalPrice } = useCartPricing({
+    cartItems,
+    activeCombo,
+    discountTiers
+  });
 
   useEffect(() => {
     loadCartFromStorage();
@@ -213,7 +220,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return {
         finalPrice: price,
         description: `Discount Applied: ${description}`,
-        mode: 'discount'
+        mode: 'discount',
+        breakdown: description.split(' + ')
       };
     }
 
@@ -329,10 +337,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const getTotalPrice = (): number => {
-    return cartItems.reduce((total, item) => {
-      const pricing = getItemPricing(item);
-      return total + (pricing.finalPrice * item.quantity);
-    }, 0);
+    return calculateTotalPrice();
   };
 
   const getTotalItems = () => {
@@ -387,7 +392,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             toast({
               title: "🎉 Combo Applied!",
               description: `${combo.name}: ${combo.description}`,
-              duration: 5000,
+              duration: 3000,
             });
           }
           newActiveCombo = combo;

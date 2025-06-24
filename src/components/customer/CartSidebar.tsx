@@ -144,7 +144,7 @@ export function CartSidebar() {
                           )}
                         </div>
 
-                        {/* Pricing Information */}
+                        {/* Pricing Information - Improved */}
                         <div className="mt-2 space-y-1">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold text-red-600">
@@ -162,11 +162,26 @@ export function CartSidebar() {
                                 Discount
                               </Badge>
                             )}
+                            {pricing.mode === 'normal' && (
+                              <Badge variant="secondary" className="text-xs px-1 py-0 bg-gray-100 text-gray-800">
+                                Normal
+                              </Badge>
+                            )}
                           </div>
                           
                           <p className="text-xs text-gray-600">
                             {pricing.description}
                           </p>
+                          
+                          {/* Show breakdown for discount pricing */}
+                          {pricing.breakdown && pricing.breakdown.length > 1 && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              <div className="font-medium">Price breakdown:</div>
+                              {pricing.breakdown.map((line, index) => (
+                                <div key={index} className="ml-2">• {line}</div>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         {/* Quantity Controls */}
@@ -254,6 +269,11 @@ export function CartSidebar() {
                       title: "Minimum requirements not met",
                       description: "Please add more items to meet minimum quantity requirements",
                       variant: "destructive",
+                    });
+                  } else {
+                    toast({
+                      title: "Checkout",
+                      description: "Checkout functionality will be implemented soon",
                     });
                   }
                 }}
