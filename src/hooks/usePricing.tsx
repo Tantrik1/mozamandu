@@ -67,7 +67,7 @@ export function usePricing() {
       // Handle any remaining quantity at base price
       if (remainingQty > 0) {
         totalCost += remainingQty * basePrice;
-        breakdown.push(`${remainingQty} × $${basePrice.toFixed(2)}`);
+        breakdown.push(`${remainingQty} × Rs. ${basePrice.toFixed(2)}`);
       }
 
       const avgPrice = totalCost / totalQuantity;
