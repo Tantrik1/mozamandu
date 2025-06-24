@@ -83,7 +83,7 @@ export function SubcategoryCard({ subcategory }: SubcategoryCardProps) {
               <div className="flex items-center justify-between pt-2">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl font-bold text-red-600">
-                    ${subcategory.selling_price}
+                    Rs.{subcategory.selling_price}
                   </span>
                   <span className="text-sm text-gray-500">each</span>
                 </div>
