@@ -78,11 +78,13 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
     setIsLoading(true);
     
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log('Attempting signup with:', signUpData.email);
+      
+      const { data, error } = await supabase.auth.signUp({
         email: signUpData.email,
         password: signUpData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/auth`,
           data: {
             full_name: signUpData.fullName,
             role: 'customer',
@@ -90,19 +92,30 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
         },
       });
 
+      console.log('Signup response:', { data, error });
+
       if (error) {
+        console.error('Signup error:', error);
         toast({
           title: "Sign Up Failed",
           description: error.message,
           variant: "destructive",
         });
       } else {
+        console.log('Signup successful, user created:', data.user?.id);
         toast({
           title: "Account Created!",
-          description: "Please check your email to verify your account. Check your spam folder if you don't see it.",
+          description: "Please check your email and click the verification link to activate your account.",
         });
         onSuccess();
       }
+    } catch (error) {
+      console.error('Unexpected signup error:', error);
+      toast({
+        title: "Sign Up Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -122,6 +135,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
           }}
           placeholder="Enter your full name"
           className={errors.fullName ? 'border-red-500' : ''}
+          disabled={isLoading}
         />
         {errors.fullName && (
           <p className="text-sm text-red-600 mt-1">{errors.fullName}</p>
@@ -140,6 +154,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
           }}
           placeholder="Enter your email"
           className={errors.email ? 'border-red-500' : ''}
+          disabled={isLoading}
         />
         {errors.email && (
           <p className="text-sm text-red-600 mt-1">{errors.email}</p>
@@ -158,6 +173,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
           }}
           placeholder="Create a strong password"
           className={errors.password ? 'border-red-500' : ''}
+          disabled={isLoading}
         />
         {errors.password && (
           <p className="text-sm text-red-600 mt-1">{errors.password}</p>
@@ -177,6 +193,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
           }}
           placeholder="Confirm your password"
           className={errors.confirmPassword ? 'border-red-500' : ''}
+          disabled={isLoading}
         />
         {errors.confirmPassword && (
           <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>
