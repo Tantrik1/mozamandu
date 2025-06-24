@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,10 +50,28 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);
   const [currentImage, setCurrentImage] = useState(product.image_url);
-  const { addToCart, cartItems, activeCombo } = useCart();
+  const { addToCart, cartItems, activeCombo, getItemPricing } = useCart();
 
   // Get the base price for display
   const basePrice = product.selling_price || subcategoryPrice;
+
+  // Create a mock cart item to get pricing information
+  const mockCartItem = {
+    id: 'mock',
+    productId: product.id,
+    productName: product.name,
+    colorVariantId: selectedColor || null,
+    sizeVariantId: selectedSize || null,
+    colorName: '',
+    sizeName: '',
+    quantity: 1,
+    basePrice: basePrice,
+    subcategoryId: product.subcategory_id,
+    image_url: product.image_url
+  };
+
+  // Get current pricing information
+  const currentPricing = getItemPricing(mockCartItem);
 
   useEffect(() => {
     if (product.has_color_variants) {
@@ -214,12 +231,24 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
           </Badge>
         )}
 
-        {/* Price Badge */}
+        {/* Dynamic Price Badge */}
         <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1">
-          <span className="text-sm font-bold text-red-600">
-            ${basePrice.toFixed(2)}
-          </span>
-          {activeCombo && (
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-bold text-red-600">
+              ${currentPricing.finalPrice.toFixed(2)}
+            </span>
+            {currentPricing.mode === 'combo' && (
+              <Badge variant="secondary" className="text-xs px-1 py-0 bg-green-100 text-green-800 border border-green-200">
+                Combo
+              </Badge>
+            )}
+            {currentPricing.mode === 'discount' && (
+              <Badge variant="secondary" className="text-xs px-1 py-0 bg-blue-100 text-blue-800 border border-blue-200">
+                MOQ
+              </Badge>
+            )}
+          </div>
+          {activeCombo && currentPricing.mode !== 'combo' && (
             <div className="flex items-center gap-1 mt-1">
               <Tag className="w-2 h-2 text-green-600" />
               <span className="text-xs text-green-600 font-medium">Combo Available</span>
