@@ -10,7 +10,8 @@ interface AuthContextType {
   userProfile: any;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, fullName: string, role?: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
+  verifyOTP: (email: string, otp: string) => Promise<{ error: any; user?: User }>;
   signOut: () => Promise<void>;
   redirectBasedOnRole: () => void;
 }
@@ -127,19 +128,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, fullName: string, role: string = 'customer') => {
+  const signUp = async (email: string, password: string, fullName: string) => {
     try {
       setIsLoading(true);
-      const redirectUrl = `${window.location.origin}/auth`;
       
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
-          emailRedirectTo: redirectUrl,
           data: {
             full_name: fullName.trim(),
-            role: role,
           },
         },
       });
@@ -148,14 +146,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Sign up error:', error);
         return { error };
       } else {
-        toast({
-          title: "Account Created!",
-          description: "Please check your email to verify your account.",
-        });
+        console.log('User created, confirmation required:', data);
         return { error: null };
       }
     } catch (error) {
       console.error('Unexpected sign up error:', error);
+      return { error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifyOTP = async (email: string, otp: string) => {
+    try {
+      setIsLoading(true);
+      
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: otp,
+        type: 'signup'
+      });
+
+      if (error) {
+        console.error('OTP verification error:', error);
+        return { error };
+      }
+
+      console.log('OTP verified successfully:', data);
+      return { error: null, user: data.user };
+    } catch (error) {
+      console.error('Unexpected OTP verification error:', error);
       return { error };
     } finally {
       setIsLoading(false);
@@ -175,7 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           variant: "destructive",
         });
       } else {
-        // Clear local state
+        // Clear local state immediately
         setUser(null);
         setSession(null);
         setUserProfile(null);
@@ -186,7 +206,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         
         // Redirect to home page after sign out
-        window.location.href = '/';
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1000);
       }
     } catch (error) {
       console.error('Unexpected sign out error:', error);
@@ -208,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       signIn,
       signUp,
+      verifyOTP,
       signOut,
       redirectBasedOnRole,
     }}>

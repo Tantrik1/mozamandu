@@ -5,10 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
-import { OTPVerificationForm } from './OTPVerificationForm';
-import { supabase } from '@/integrations/supabase/client';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 
 interface SignUpFormProps {
   onSuccess: () => void;
@@ -17,13 +18,15 @@ interface SignUpFormProps {
 }
 
 export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormProps) {
+  const { signUp, verifyOTP } = useAuth();
+  const [currentStep, setCurrentStep] = useState<'form' | 'otp'>('form');
   const [signUpData, setSignUpData] = useState({
     fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
   });
-  const [showOTPForm, setShowOTPForm] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
@@ -87,51 +90,32 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
     setIsLoading(true);
     
     try {
-      // Check if user already exists
-      const { data: existingUser } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('email', signUpData.email)
-        .single();
+      const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
 
-      if (existingUser) {
-        toast({
-          title: "Account Already Exists",
-          description: "An account with this email already exists. Please sign in instead.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Generate and send OTP
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      const { data, error: emailError } = await supabase.functions.invoke('send-otp-email', {
-        body: {
-          email: signUpData.email,
-          code: otpCode,
-          name: signUpData.fullName,
-        },
-      });
-
-      if (emailError || !data?.success) {
-        console.error('OTP sending error:', emailError);
-        toast({
-          title: "Error",
-          description: "Failed to send verification code. Please try again.",
-          variant: "destructive",
-        });
+      if (error) {
+        if (error.message.includes('already registered')) {
+          toast({
+            title: "Account Already Exists",
+            description: "An account with this email already exists. Please sign in instead.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Sign Up Failed",
+            description: error.message || "Failed to create account. Please try again.",
+            variant: "destructive",
+          });
+        }
         setIsLoading(false);
         return;
       }
 
       toast({
-        title: "Verification Code Sent",
+        title: "OTP Sent",
         description: "Please check your email for the verification code.",
       });
 
-      setShowOTPForm(true);
+      setCurrentStep('otp');
     } catch (error) {
       console.error('Unexpected signup error:', error);
       toast({
@@ -144,25 +128,105 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
     }
   };
 
-  const handleOTPSuccess = () => {
-    setShowOTPForm(false);
-    onSuccess();
+  const handleOTPVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (otpCode.length !== 6) {
+      toast({
+        title: "Invalid OTP",
+        description: "Please enter the complete 6-digit code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { error, user } = await verifyOTP(signUpData.email, otpCode);
+
+      if (error) {
+        toast({
+          title: "Verification Failed",
+          description: error.message || "Invalid or expired OTP. Please try again.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      if (user) {
+        toast({
+          title: "Account Verified!",
+          description: "Your email has been verified successfully.",
+        });
+        onSuccess();
+      }
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      toast({
+        title: "Verification Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleBackToSignUp = () => {
-    setShowOTPForm(false);
+  const handleBackToForm = () => {
+    setCurrentStep('form');
+    setOtpCode('');
   };
 
-  if (showOTPForm) {
+  if (currentStep === 'otp') {
     return (
-      <OTPVerificationForm
-        email={signUpData.email}
-        signUpData={signUpData}
-        onBack={handleBackToSignUp}
-        onSuccess={handleOTPSuccess}
-        isLoading={isLoading}
-        setIsLoading={setIsLoading}
-      />
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold mb-2">Verify Your Email</h3>
+          <p className="text-sm text-gray-600">
+            We've sent a verification code to<br />
+            <span className="font-medium">{signUpData.email}</span>
+          </p>
+        </div>
+
+        <form onSubmit={handleOTPVerification} className="space-y-4">
+          <div className="flex justify-center">
+            <InputOTP
+              value={otpCode}
+              onChange={setOtpCode}
+              maxLength={6}
+            >
+              <InputOTPGroup>
+                <InputOTPSlot index={0} />
+                <InputOTPSlot index={1} />
+                <InputOTPSlot index={2} />
+                <InputOTPSlot index={3} />
+                <InputOTPSlot index={4} />
+                <InputOTPSlot index={5} />
+              </InputOTPGroup>
+            </InputOTP>
+          </div>
+          
+          <Button 
+            type="submit" 
+            className="w-full bg-red-600 hover:bg-red-700" 
+            disabled={otpCode.length !== 6 || isLoading}
+          >
+            {isLoading ? 'Verifying...' : 'Verify & Create Account'}
+          </Button>
+          
+          <Button 
+            type="button"
+            variant="ghost" 
+            onClick={handleBackToForm}
+            className="w-full"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Sign Up
+          </Button>
+        </form>
+      </div>
     );
   }
 
@@ -278,7 +342,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
         className="w-full bg-red-600 hover:bg-red-700" 
         disabled={isLoading || !acceptedTerms}
       >
-        {isLoading ? 'Sending Verification Code...' : 'Continue'}
+        {isLoading ? 'Sending OTP...' : 'Send OTP'}
       </Button>
     </form>
   );

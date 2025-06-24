@@ -19,7 +19,6 @@ export default function Auth() {
   
   const [authLoading, setAuthLoading] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
-  const [signUpSuccess, setSignUpSuccess] = useState(false);
   
   const [signInData, setSignInData] = useState({
     email: '',
@@ -98,7 +97,9 @@ export default function Auth() {
   };
 
   const handleSignUpSuccess = () => {
-    setSignUpSuccess(true);
+    // After successful signup and OTP verification, user will be signed in
+    // The useEffect will handle the redirect
+    console.log('Signup successful, waiting for auth state change...');
   };
 
   const handleContactInfoComplete = () => {
@@ -132,39 +133,6 @@ export default function Auth() {
         userId={user.id} 
         onComplete={handleContactInfoComplete} 
       />
-    );
-  }
-
-  // Show success message after signup
-  if (signUpSuccess) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-6 text-center">
-            <div className="mb-4">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email</h2>
-              <p className="text-gray-600">
-                We've sent you a verification link. Please check your email and click the link to verify your account.
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                Don't forget to check your spam folder!
-              </p>
-            </div>
-            <Button 
-              variant="ghost" 
-              onClick={() => setSignUpSuccess(false)}
-              className="w-full"
-            >
-              Back to Sign In
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
     );
   }
 
