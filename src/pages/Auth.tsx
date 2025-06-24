@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -5,11 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import { Mail, RefreshCw } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { SignUpForm } from '@/components/auth/SignUpForm';
+import { OTPVerificationForm } from '@/components/auth/OTPVerificationForm';
+import { ContactInfoForm } from '@/components/customer/ContactInfoForm';
 
 export default function Auth() {
   const { signIn, user, userProfile, isLoading } = useAuth();
@@ -19,37 +19,25 @@ export default function Auth() {
   
   const [authLoading, setAuthLoading] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
+  const [showContactForm, setShowContactForm] = useState(false);
   const [signUpEmail, setSignUpEmail] = useState('');
-  const [resendCooldown, setResendCooldown] = useState(0);
+  const [signUpData, setSignUpData] = useState<any>(null);
   
   const [signInData, setSignInData] = useState({
     email: '',
     password: '',
   });
-  const [signUpData, setSignUpData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    fullName: '',
-  });
-
-  const [otpData, setOtpData] = useState({
-    code: '',
-    email: '',
-  });
-
-  // Cooldown timer effect
-  useEffect(() => {
-    if (resendCooldown > 0) {
-      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [resendCooldown]);
 
   useEffect(() => {
     if (user && userProfile && !isLoading) {
-      console.log('User authenticated, redirecting based on role:', userProfile.role);
+      console.log('User authenticated, checking profile:', userProfile);
       
+      // Check if contact info is missing for first-time users
+      if (!userProfile.contact_number) {
+        setShowContactForm(true);
+        return;
+      }
+
       // Handle redirect parameter first
       if (redirectTo) {
         navigate(redirectTo);
@@ -83,167 +71,26 @@ export default function Auth() {
     }
   };
 
-  const sendOTP = async (email: string, isResend: boolean = false) => {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-    try {
-      // Send email via Supabase edge function
-      const { data, error: emailError } = await supabase.functions.invoke('send-otp-email', {
-        body: {
-          email,
-          code,
-          name: signUpData.fullName,
-        },
-      });
-
-      if (emailError) {
-        console.error('Email sending error:', emailError);
-        toast({
-          title: "Error",
-          description: "Failed to send verification code",
-          variant: "destructive",
-        });
-        return false;
-      }
-
-      // Check if we got a debug code (for testing when SMTP isn't configured)
-      if (data?.debug_code) {
-        toast({
-          title: isResend ? "New Code Generated" : "Verification Code Generated",
-          description: `For testing: Your verification code is ${data.debug_code}`,
-          duration: 10000,
-        });
-      } else {
-        toast({
-          title: isResend ? "New Code Sent" : "Verification Code Sent",
-          description: `Please check your email for the verification code.`,
-        });
-      }
-
-      if (isResend) {
-        setResendCooldown(60); // 60 second cooldown
-      }
-
-      return true;
-    } catch (error) {
-      console.error('OTP sending error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send verification code",
-        variant: "destructive",
-      });
-      return false;
-    }
+  const handleOTPSent = (email: string, formData: any) => {
+    setSignUpEmail(email);
+    setSignUpData(formData);
+    setShowOTP(true);
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!signUpData.email || !signUpData.password || !signUpData.fullName) {
-      return;
-    }
-
-    if (signUpData.password !== signUpData.confirmPassword) {
-      return;
-    }
-
-    if (signUpData.password.length < 6) {
-      return;
-    }
-    
-    setAuthLoading(true);
-    
-    try {
-      const success = await sendOTP(signUpData.email);
-      if (success) {
-        setSignUpEmail(signUpData.email);
-        setOtpData({ ...otpData, email: signUpData.email });
-        setShowOTP(true);
-      }
-    } finally {
-      setAuthLoading(false);
-    }
+  const handleVerificationSuccess = () => {
+    setShowOTP(false);
+    // The useEffect will handle the redirect once the user is authenticated
   };
 
-  const handleResendOTP = async () => {
-    if (resendCooldown > 0) return;
-    
-    setAuthLoading(true);
-    await sendOTP(otpData.email, true);
-    setAuthLoading(false);
-  };
-
-  const verifyOTP = async () => {
-    setAuthLoading(true);
-
-    try {
-      const { data: verification, error: verifyError } = await supabase
-        .from('email_verification_codes')
-        .select('*')
-        .eq('email', otpData.email)
-        .eq('code', otpData.code)
-        .gt('expires_at', new Date().toISOString())
-        .eq('verified', false)
-        .single();
-
-      if (verifyError || !verification) {
-        toast({
-          title: "Invalid Code",
-          description: "The verification code is invalid or expired",
-          variant: "destructive",
-        });
-        setAuthLoading(false);
-        return;
-      }
-
-      // Mark code as verified
-      await supabase
-        .from('email_verification_codes')
-        .update({ verified: true })
-        .eq('id', verification.id);
-
-      // Create the user account with customer role using Supabase Auth
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: signUpData.email,
-        password: signUpData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            full_name: signUpData.fullName,
-            role: 'customer',
-          },
-        },
-      });
-
-      if (signUpError) {
-        toast({
-          title: "Error",
-          description: signUpError.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Account Created Successfully!",
-          description: "Welcome to Mozamandu. You can now sign in.",
-        });
-        // Reset form and go back to sign in
-        setSignUpData({
-          email: '',
-          password: '',
-          confirmPassword: '',
-          fullName: '',
-        });
-        setShowOTP(false);
-        setOtpData({ code: '', email: '' });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setAuthLoading(false);
+  const handleContactInfoComplete = () => {
+    setShowContactForm(false);
+    // Redirect after contact info is collected
+    if (redirectTo) {
+      navigate(redirectTo);
+    } else if (userProfile?.role === 'admin') {
+      navigate('/admin');
+    } else {
+      navigate('/dashboard');
     }
   };
 
@@ -259,68 +106,30 @@ export default function Auth() {
     );
   }
 
+  // Show contact form for first-time users
+  if (showContactForm && user && userProfile) {
+    return (
+      <ContactInfoForm 
+        userId={user.id} 
+        onComplete={handleContactInfoComplete} 
+      />
+    );
+  }
+
+  // Show OTP verification
   if (showOTP) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="max-w-md mx-auto">
-          <CardHeader className="text-center">
-            <Mail className="w-12 h-12 mx-auto text-blue-600 mb-4" />
-            <CardTitle>Verify Your Email</CardTitle>
-            <p className="text-sm text-gray-600">
-              Enter the verification code sent to {signUpEmail}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-center">
-              <InputOTP
-                value={otpData.code}
-                onChange={(value) => setOtpData({ ...otpData, code: value })}
-                maxLength={6}
-              >
-                <InputOTPGroup>
-                  <InputOTPSlot index={0} />
-                  <InputOTPSlot index={1} />
-                  <InputOTPSlot index={2} />
-                  <InputOTPSlot index={3} />
-                  <InputOTPSlot index={4} />
-                  <InputOTPSlot index={5} />
-                </InputOTPGroup>
-              </InputOTP>
-            </div>
-            
-            <Button 
-              onClick={verifyOTP} 
-              disabled={otpData.code.length !== 6 || authLoading}
-              className="w-full"
-            >
-              {authLoading ? 'Verifying...' : 'Verify Code'}
-            </Button>
-
-            <div className="text-center space-y-2">
-              <p className="text-sm text-gray-600">Didn't receive the code?</p>
-              <Button 
-                variant="ghost" 
-                onClick={handleResendOTP}
-                disabled={resendCooldown > 0 || authLoading}
-                className="w-full"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                {resendCooldown > 0 
-                  ? `Resend in ${resendCooldown}s` 
-                  : authLoading 
-                    ? 'Sending...' 
-                    : 'Resend Code'
-                }
-              </Button>
-            </div>
-            
-            <Button 
-              variant="ghost" 
-              onClick={() => setShowOTP(false)}
-              className="w-full"
-            >
-              Back to Sign Up
-            </Button>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <OTPVerificationForm
+              email={signUpEmail}
+              signUpData={signUpData}
+              onBack={() => setShowOTP(false)}
+              onSuccess={handleVerificationSuccess}
+              isLoading={authLoading}
+              setIsLoading={setAuthLoading}
+            />
           </CardContent>
         </Card>
       </div>
@@ -344,7 +153,7 @@ export default function Auth() {
           <TabsContent value="signin">
             <Card>
               <CardHeader>
-                <CardTitle>Sign In to Your Account</CardTitle>
+                <CardTitle>Welcome Back</CardTitle>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSignIn} className="space-y-4">
@@ -385,75 +194,14 @@ export default function Auth() {
           <TabsContent value="signup">
             <Card>
               <CardHeader>
-                <CardTitle>Create New Account</CardTitle>
+                <CardTitle>Create Your Account</CardTitle>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div>
-                    <Label htmlFor="signup-name">Full Name</Label>
-                    <Input
-                      id="signup-name"
-                      type="text"
-                      value={signUpData.fullName}
-                      onChange={(e) => setSignUpData({ ...signUpData, fullName: e.target.value })}
-                      placeholder="Enter your full name"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="signup-email">Email Address</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      value={signUpData.email}
-                      onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
-                      placeholder="Enter your email"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="signup-password">Password</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      value={signUpData.password}
-                      onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
-                      placeholder="Minimum 6 characters"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="signup-confirm-password">Confirm Password</Label>
-                    <Input
-                      id="signup-confirm-password"
-                      type="password"
-                      value={signUpData.confirmPassword}
-                      onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
-                      placeholder="Confirm your password"
-                      required
-                    />
-                  </div>
-                  {signUpData.password && signUpData.confirmPassword && signUpData.password !== signUpData.confirmPassword && (
-                    <p className="text-sm text-red-600">Passwords do not match</p>
-                  )}
-                  {signUpData.password && signUpData.password.length < 6 && (
-                    <p className="text-sm text-red-600">Password must be at least 6 characters</p>
-                  )}
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
-                    disabled={
-                      authLoading || 
-                      !signUpData.email || 
-                      !signUpData.password || 
-                      !signUpData.fullName ||
-                      signUpData.password !== signUpData.confirmPassword ||
-                      signUpData.password.length < 6
-                    }
-                  >
-                    {authLoading ? 'Creating Account...' : 'Create Account'}
-                  </Button>
-                </form>
+                <SignUpForm 
+                  onOTPSent={handleOTPSent}
+                  isLoading={authLoading}
+                  setIsLoading={setAuthLoading}
+                />
               </CardContent>
             </Card>
           </TabsContent>

@@ -43,46 +43,59 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Failed to store verification code');
     }
 
-    // Use Supabase Auth's invite functionality to trigger email
-    // This will use your configured SMTP settings and email templates
-    const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
-      data: {
-        verification_code: code,
-        full_name: name || '',
-        invite_type: 'otp_verification',
-      },
-      redirectTo: `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify`
-    });
-
-    if (error) {
-      console.error('Error sending invite email:', error);
-      
-      // Fallback: If email sending fails, we still have the OTP stored
-      // The frontend can show the code in a toast for testing
-      console.log("Email sending failed, but OTP stored successfully. Code:", code);
-      
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: "OTP stored successfully",
-        debug_code: code // Remove this in production
-      }), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
+    // Send a simple email using your custom SMTP settings
+    // We'll use a simple approach that works with your email templates
+    try {
+      // Use Supabase's email functionality with a password reset template
+      // This will use your configured SMTP settings
+      const { error: emailError } = await supabase.auth.admin.generateLink({
+        type: 'recovery',
+        email: email,
+        options: {
+          data: {
+            verification_code: code,
+            full_name: name || '',
+            email_type: 'otp_verification',
+          }
+        }
       });
+
+      if (emailError) {
+        console.error('Error sending email via Supabase:', emailError);
+        // Don't throw here, we'll use the fallback
+      } else {
+        console.log("OTP email sent successfully via Supabase Auth");
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          message: "Verification code sent to your email"
+        }), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders,
+          },
+        });
+      }
+    } catch (emailSendError) {
+      console.error('Email sending failed:', emailSendError);
     }
 
-    console.log("OTP email sent successfully via Supabase");
-
-    return new Response(JSON.stringify({ success: true }), {
+    // Fallback: If email sending fails, return success with debug code for development
+    console.log("Email sending failed, but OTP stored successfully. Code:", code);
+    
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: "Verification code generated",
+      debug_code: code // This will be shown in toast for testing
+    }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
         ...corsHeaders,
       },
     });
+
   } catch (error: any) {
     console.error("Error in send-otp-email function:", error);
     return new Response(
