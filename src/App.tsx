@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { CartProvider } from "@/hooks/useCart";
+import { RouteGuard } from "@/components/RouteGuard";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
@@ -35,12 +37,26 @@ function App() {
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/auth" element={<Auth />} />
-                <Route path="/admin/*" element={<Admin />} />
+                <Route 
+                  path="/admin/*" 
+                  element={
+                    <RouteGuard requireAuth requireAdmin>
+                      <Admin />
+                    </RouteGuard>
+                  } 
+                />
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/categories/:categoryId" element={<CategoryPage />} />
                 <Route path="/subcategories/:subcategoryId" element={<SubcategoryPage />} />
                 <Route path="/products" element={<Products />} />
-                <Route path="/dashboard" element={<CustomerDashboard />} />
+                <Route 
+                  path="/dashboard" 
+                  element={
+                    <RouteGuard requireAuth>
+                      <CustomerDashboard />
+                    </RouteGuard>
+                  } 
+                />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/shipping" element={<ShippingPolicy />} />

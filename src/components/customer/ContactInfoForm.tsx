@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -17,6 +18,8 @@ export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
   const { user, userProfile } = useAuth();
   const navigate = useNavigate();
   const [contactNumber, setContactNumber] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [sameAsContact, setSameAsContact] = useState(true);
   const [address, setAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,6 +28,12 @@ export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
       navigate('/dashboard');
     }
   }, [userProfile, navigate]);
+
+  useEffect(() => {
+    if (sameAsContact) {
+      setWhatsappNumber(contactNumber);
+    }
+  }, [contactNumber, sameAsContact]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +47,8 @@ export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
       return;
     }
 
+    const finalWhatsappNumber = sameAsContact ? contactNumber : whatsappNumber;
+
     setIsLoading(true);
 
     try {
@@ -45,6 +56,7 @@ export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
         .from('profiles')
         .update({
           contact_number: contactNumber.trim(),
+          whatsapp_number: finalWhatsappNumber.trim(),
           address: address.trim(),
         })
         .eq('id', user?.id);
@@ -95,6 +107,30 @@ export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
                 required
               />
             </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="same-whatsapp"
+                checked={sameAsContact}
+                onCheckedChange={(checked) => setSameAsContact(checked as boolean)}
+              />
+              <Label htmlFor="same-whatsapp" className="text-sm">
+                WhatsApp number is same as contact number
+              </Label>
+            </div>
+
+            {!sameAsContact && (
+              <div>
+                <Label htmlFor="whatsapp">WhatsApp Number</Label>
+                <Input
+                  id="whatsapp"
+                  type="tel"
+                  value={whatsappNumber}
+                  onChange={(e) => setWhatsappNumber(e.target.value)}
+                  placeholder="Enter your WhatsApp number"
+                />
+              </div>
+            )}
 
             <div>
               <Label htmlFor="address">Address (Optional)</Label>

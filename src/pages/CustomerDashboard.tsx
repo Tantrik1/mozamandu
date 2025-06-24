@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { ContactInfoForm } from '@/components/customer/ContactInfoForm';
+import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { Footer } from '@/components/layout/Footer';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,6 +53,8 @@ export default function CustomerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <CustomerHeader />
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">
@@ -130,6 +134,10 @@ export default function CustomerDashboard() {
                 <p className="text-sm">{userProfile?.contact_number || 'Not provided'}</p>
               </div>
               <div>
+                <label className="text-sm font-medium text-gray-500">WhatsApp Number</label>
+                <p className="text-sm">{userProfile?.whatsapp_number || 'Not provided'}</p>
+              </div>
+              <div>
                 <label className="text-sm font-medium text-gray-500">Member Since</label>
                 <p className="text-sm">
                   {userProfile?.created_at 
@@ -142,6 +150,8 @@ export default function CustomerDashboard() {
           </Card>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 }
