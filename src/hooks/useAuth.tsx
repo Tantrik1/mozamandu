@@ -107,32 +107,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
-      // Generate OTP and send via Resend
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      
+      // Store user data temporarily for OTP verification
+      sessionStorage.setItem('pendingSignup', JSON.stringify({
+        email: email.trim(),
+        password,
+        fullName: fullName.trim(),
+      }));
+
       // Send OTP email via edge function
       const { error: emailError } = await supabase.functions.invoke('send-verification-email', {
         body: {
           email: email.trim(),
           name: fullName.trim(),
-          otp: otpCode,
         },
       });
 
       if (emailError) {
+        console.error('Email error:', emailError);
         return { error: emailError };
       }
 
-      // Store user data temporarily (not creating auth user yet)
-      sessionStorage.setItem('pendingSignup', JSON.stringify({
-        email: email.trim(),
-        password,
-        fullName: fullName.trim(),
-        otp: otpCode,
-      }));
-
       return { error: null };
     } catch (error) {
+      console.error('SignUp error:', error);
       return { error };
     } finally {
       setIsLoading(false);
@@ -148,9 +145,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: { message: 'No pending signup found' } };
       }
 
-      const { password, fullName, otp: storedOtp } = JSON.parse(pendingData);
+      const { password, fullName } = JSON.parse(pendingData);
 
-      if (otp !== storedOtp) {
+      // Verify OTP with the edge function
+      const { data: verificationData, error: verifyError } = await supabase.functions.invoke('send-verification-email', {
+        body: {
+          email,
+          otp,
+          verify: true,
+        },
+      });
+
+      if (verifyError || !verificationData?.success) {
         return { error: { message: 'Invalid verification code' } };
       }
 
@@ -181,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return { error: null };
     } catch (error) {
+      console.error('OTP verification error:', error);
       return { error };
     } finally {
       setIsLoading(false);
@@ -191,19 +198,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
-      // Clear local state immediately
+      // Clear local state first
       setUser(null);
       setSession(null);
       setUserProfile(null);
       
-      await supabase.auth.signOut();
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Sign out error:', error);
+      }
       
       toast({
         title: "Signed Out",
         description: "You have been successfully signed out.",
       });
       
-      // Redirect to home
+      // Force redirect to home page
       window.location.href = '/';
     } catch (error) {
       console.error('Sign out error:', error);

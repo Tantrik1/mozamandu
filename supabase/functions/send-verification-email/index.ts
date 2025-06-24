@@ -9,10 +9,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Store OTP codes in memory (in production, use Redis or database)
+const otpStore = new Map<string, { code: string; expires: number }>();
+
 interface VerificationEmailRequest {
   email: string;
-  name: string;
-  otp: string;
+  name?: string;
+  otp?: string;
+  verify?: boolean;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -21,7 +25,41 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, name, otp }: VerificationEmailRequest = await req.json();
+    const { email, name, otp, verify }: VerificationEmailRequest = await req.json();
+
+    // If this is a verification request
+    if (verify && otp) {
+      const stored = otpStore.get(email);
+      if (!stored || stored.expires < Date.now() || stored.code !== otp) {
+        return new Response(JSON.stringify({ 
+          success: false,
+          error: "Invalid or expired verification code"
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+
+      // Remove the OTP after successful verification
+      otpStore.delete(email);
+      
+      return new Response(JSON.stringify({ 
+        success: true,
+        message: "OTP verified successfully"
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    // Generate and send OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store OTP with 10-minute expiry
+    otpStore.set(email, {
+      code: otpCode,
+      expires: Date.now() + 10 * 60 * 1000 // 10 minutes
+    });
 
     console.log("Sending verification email to:", email);
 
@@ -36,14 +74,14 @@ const handler = async (req: Request): Promise<Response> => {
             <p style="color: #666; margin: 5px 0;">Your premium gear destination</p>
           </div>
           
-          <h2 style="color: #333; text-align: center;">Welcome ${name}!</h2>
+          <h2 style="color: #333; text-align: center;">Welcome ${name || 'there'}!</h2>
           
           <p style="color: #333; font-size: 16px;">
             Thank you for signing up! Please use the verification code below to complete your registration:
           </p>
           
           <div style="background: #f8f9fa; padding: 20px; text-align: center; margin: 30px 0; border-radius: 8px; border: 2px dashed #dc2626;">
-            <h1 style="color: #dc2626; font-size: 32px; margin: 0; letter-spacing: 8px; font-family: monospace;">${otp}</h1>
+            <h1 style="color: #dc2626; font-size: 32px; margin: 0; letter-spacing: 8px; font-family: monospace;">${otpCode}</h1>
           </div>
           
           <p style="color: #666; font-size: 14px;">
@@ -77,10 +115,11 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
   } catch (error: any) {
-    console.error("Error sending verification email:", error);
+    console.error("Error in send-verification-email function:", error);
     return new Response(
       JSON.stringify({ 
-        error: "Failed to send verification email",
+        success: false,
+        error: "Failed to process request",
         details: error.message 
       }),
       {
