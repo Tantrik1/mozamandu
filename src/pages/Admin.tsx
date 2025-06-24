@@ -18,14 +18,14 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { useLocation } from 'react-router-dom';
 
 export default function Admin() {
-  const { user, profile } = useAuth();
+  const { user, userProfile } = useAuth();
   const location = useLocation();
 
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
 
-  if (!profile || profile.role !== 'admin') {
+  if (!userProfile || userProfile.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
