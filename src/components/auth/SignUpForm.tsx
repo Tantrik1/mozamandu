@@ -184,7 +184,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
   // Show OTP verification form
   if (currentStep === 'otp') {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 w-full">
         <div className="text-center">
           <h3 className="text-lg font-semibold mb-2">Verify Your Email</h3>
           <p className="text-sm text-gray-600">
@@ -193,7 +193,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
           </p>
         </div>
 
-        <form onSubmit={handleOTPVerification} className="space-y-6">
+        <form onSubmit={handleOTPVerification} className="space-y-6 w-full">
           <div className="flex justify-center">
             <InputOTP
               value={otpCode}
@@ -211,7 +211,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
             </InputOTP>
           </div>
           
-          <div className="space-y-3">
+          <div className="space-y-3 w-full">
             <Button 
               type="submit" 
               className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3" 
