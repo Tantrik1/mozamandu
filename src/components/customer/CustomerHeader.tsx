@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,82 +5,66 @@ import { User, LogOut, LayoutDashboard, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { CartSidebar } from './CartSidebar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-} from '@/components/ui/dropdown-menu';
-
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
 interface Category {
   id: string;
   name: string;
   subcategories: Subcategory[];
 }
-
 interface Subcategory {
   id: string;
   name: string;
 }
-
 interface TopBarText {
   text: string;
   is_active: boolean;
 }
-
 export function CustomerHeader() {
-  const { user, userProfile, signOut, isLoading } = useAuth();
+  const {
+    user,
+    userProfile,
+    signOut,
+    isLoading
+  } = useAuth();
   const location = useLocation();
   const [categories, setCategories] = useState<Category[]>([]);
   const [topBarText, setTopBarText] = useState<TopBarText | null>(null);
   const [signingOut, setSigningOut] = useState(false);
-
   useEffect(() => {
     fetchCategories();
     fetchTopBarText();
   }, []);
-
   const fetchCategories = async () => {
-    const { data: categoriesData, error: categoriesError } = await supabase
-      .from('categories')
-      .select(`
+    const {
+      data: categoriesData,
+      error: categoriesError
+    } = await supabase.from('categories').select(`
         id,
         name,
         subcategories (
           id,
           name
         )
-      `)
-      .eq('status', 'on');
-
+      `).eq('status', 'on');
     if (categoriesError) {
       console.error('Error fetching categories:', categoriesError);
     } else {
       setCategories(categoriesData || []);
     }
   };
-
   const fetchTopBarText = async () => {
-    const { data, error } = await supabase
-      .from('top_bar_text')
-      .select('text, is_active')
-      .eq('is_active', true)
-      .single();
-
+    const {
+      data,
+      error
+    } = await supabase.from('top_bar_text').select('text, is_active').eq('is_active', true).single();
     if (error) {
       console.error('Error fetching top bar text:', error);
     } else {
       setTopBarText(data);
     }
   };
-
   const handleSignOut = async () => {
     if (signingOut) return;
-    
     setSigningOut(true);
     try {
       await signOut();
@@ -91,49 +74,31 @@ export function CustomerHeader() {
       setSigningOut(false);
     }
   };
-
   const isActive = (path: string) => location.pathname === path;
-
-  return (
-    <>
+  return <>
       {/* Top Bar */}
-      {topBarText && topBarText.is_active && (
-        <div className="bg-red-600 text-white text-center py-2 text-sm animate-pulse">
+      {topBarText && topBarText.is_active && <div className="bg-red-600 text-white text-center py-2 text-sm animate-pulse">
           {topBarText.text}
-        </div>
-      )}
+        </div>}
 
       {/* Main Header */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link to="/" className="flex items-center space-x-3">
-              <img 
-                src="/lovable-uploads/2d98ffef-154e-49c8-9c1c-39e09f1ea5ae.png" 
-                alt="Mozamandu Logo" 
-                className="h-10 w-auto"
-              />
+              <img src="/lovable-uploads/2d98ffef-154e-49c8-9c1c-39e09f1ea5ae.png" alt="Mozamandu Logo" className="h-14 w-auto object-fill" />
               <div className="flex flex-col">
-                <div className="text-xl font-bold text-red-600">Mozamandu</div>
-                <div className="text-xs text-gray-500">Gentle on feet</div>
+                
+                
               </div>
             </Link>
 
             <nav className="hidden md:flex space-x-6">
-              <Link 
-                to="/" 
-                className={`transition-colors ${
-                  isActive('/') 
-                    ? 'text-red-600 font-medium border-b-2 border-red-600 pb-1' 
-                    : 'text-gray-700 hover:text-red-600'
-                }`}
-              >
+              <Link to="/" className={`transition-colors ${isActive('/') ? 'text-red-600 font-medium border-b-2 border-red-600 pb-1' : 'text-gray-700 hover:text-red-600'}`}>
                 Home
               </Link>
 
-              {categories.map((category) => (
-                category.subcategories && category.subcategories.length > 0 ? (
-                  <DropdownMenu key={category.id}>
+              {categories.map(category => category.subcategories && category.subcategories.length > 0 ? <DropdownMenu key={category.id}>
                     <DropdownMenuTrigger className="flex items-center space-x-1 text-gray-700 hover:text-red-600 transition-colors">
                       <span>{category.name}</span>
                       <ChevronDown className="h-4 w-4" />
@@ -145,44 +110,27 @@ export function CustomerHeader() {
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      {category.subcategories.map((subcategory) => (
-                        <DropdownMenuItem key={subcategory.id} asChild>
+                      {category.subcategories.map(subcategory => <DropdownMenuItem key={subcategory.id} asChild>
                           <Link to={`/subcategories/${subcategory.id}`} className="w-full">
                             {subcategory.name}
                           </Link>
-                        </DropdownMenuItem>
-                      ))}
+                        </DropdownMenuItem>)}
                     </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : (
-                  <Link 
-                    key={category.id}
-                    to={`/categories/${category.id}`}
-                    className={`transition-colors ${
-                      isActive(`/categories/${category.id}`) 
-                        ? 'text-red-600 font-medium border-b-2 border-red-600 pb-1' 
-                        : 'text-gray-700 hover:text-red-600'
-                    }`}
-                  >
+                  </DropdownMenu> : <Link key={category.id} to={`/categories/${category.id}`} className={`transition-colors ${isActive(`/categories/${category.id}`) ? 'text-red-600 font-medium border-b-2 border-red-600 pb-1' : 'text-gray-700 hover:text-red-600'}`}>
                     {category.name}
-                  </Link>
-                )
-              ))}
+                  </Link>)}
             </nav>
 
             <div className="flex items-center space-x-4">
               <CartSidebar />
 
-              {user && !isLoading ? (
-                <DropdownMenu>
+              {user && !isLoading ? <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" disabled={signingOut}>
                       <User className="h-5 w-5" />
-                      {userProfile?.full_name && (
-                        <span className="ml-2 hidden sm:inline">
+                      {userProfile?.full_name && <span className="ml-2 hidden sm:inline">
                           {userProfile.full_name.split(' ')[0]}
-                        </span>
-                      )}
+                        </span>}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
@@ -198,18 +146,14 @@ export function CustomerHeader() {
                       {signingOut ? 'Signing Out...' : 'Sign Out'}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <Link to="/auth">
+                </DropdownMenu> : <Link to="/auth">
                   <Button size="sm" className="bg-red-600 hover:bg-red-700">
                     Sign In
                   </Button>
-                </Link>
-              )}
+                </Link>}
             </div>
           </div>
         </div>
       </header>
-    </>
-  );
+    </>;
 }
