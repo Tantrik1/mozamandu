@@ -71,7 +71,7 @@ export function useCartPricing({ cartItems, activeCombo, discountTiers }: UseCar
         if (comboSubcategory && subcategoryTotalQty >= comboSubcategory.min_units) {
           return {
             finalPrice: comboSubcategory.price,
-            description: `Combo: Rs. ${comboSubcategory.price.toFixed(2)} each`,
+            description: `Combo: Rs.${comboSubcategory.price.toFixed(2)} each`,
             mode: 'combo',
             isCombo: true
           };
@@ -93,7 +93,7 @@ export function useCartPricing({ cartItems, activeCombo, discountTiers }: UseCar
       // Priority 3: Normal pricing
       return {
         finalPrice: item.basePrice,
-        description: `$${item.basePrice.toFixed(2)} each`,
+        description: `Rs. ${item.basePrice.toFixed(2)} each`,
         mode: 'normal'
       };
     };
