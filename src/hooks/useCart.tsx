@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -11,7 +12,7 @@ interface CartItem {
   colorName?: string;
   sizeName?: string;
   quantity: number;
-  price: number;
+  basePrice: number;
   subcategoryId: string;
   image_url?: string;
 }
@@ -21,7 +22,6 @@ interface AddToCartParams {
   colorVariantId?: string | null;
   sizeVariantId?: string | null;
   quantity: number;
-  price: number;
 }
 
 interface SubcategoryData {
@@ -48,13 +48,11 @@ interface DiscountTier {
   discount_amount: number;
 }
 
-interface PriceCalculation {
-  basePrice: number;
-  discountedPrice?: number;
-  comboPrice?: number;
+interface PricingInfo {
   finalPrice: number;
-  appliedDiscount?: DiscountTier;
-  inCombo?: boolean;
+  description: string;
+  mode: 'normal' | 'discount' | 'combo';
+  isCombo?: boolean;
 }
 
 interface CartContextType {
@@ -63,9 +61,9 @@ interface CartContextType {
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
-  getTotalPrice: () => Promise<number>;
+  getTotalPrice: () => number;
   getTotalItems: () => number;
-  getItemPrice: (subcategoryId: string, quantity: number) => Promise<PriceCalculation>;
+  getItemPricing: (item: CartItem) => PricingInfo;
   activeCombo: ComboData | null;
 }
 
@@ -75,10 +73,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [activeCombo, setActiveCombo] = useState<ComboData | null>(null);
   const [subcategoriesData, setSubcategoriesData] = useState<{ [key: string]: SubcategoryData }>({});
+  const [discountTiers, setDiscountTiers] = useState<{ [key: string]: DiscountTier[] }>({});
 
   useEffect(() => {
     loadCartFromStorage();
     fetchSubcategoriesData();
+    fetchDiscountTiers();
   }, []);
 
   useEffect(() => {
@@ -101,6 +101,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const fetchDiscountTiers = async () => {
+    const { data, error } = await supabase
+      .from('discount_tiers')
+      .select('*')
+      .order('subcategory_id')
+      .order('min_quantity');
+
+    if (!error && data) {
+      const tiersMap = data.reduce((acc, tier) => {
+        if (!acc[tier.subcategory_id]) {
+          acc[tier.subcategory_id] = [];
+        }
+        acc[tier.subcategory_id].push(tier);
+        return acc;
+      }, {} as { [key: string]: DiscountTier[] });
+      setDiscountTiers(tiersMap);
+    }
+  };
+
   const loadCartFromStorage = () => {
     const savedCart = localStorage.getItem('cart');
     if (savedCart) {
@@ -116,53 +135,94 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('cart', JSON.stringify(cartItems));
   };
 
-  const getItemPrice = async (subcategoryId: string, quantity: number): Promise<PriceCalculation> => {
-    const subcategoryData = subcategoriesData[subcategoryId];
-    if (!subcategoryData) {
-      return { basePrice: 0, finalPrice: 0 };
+  const getSubcategoryQuantity = (subcategoryId: string): number => {
+    return cartItems
+      .filter(item => item.subcategoryId === subcategoryId)
+      .reduce((total, item) => total + item.quantity, 0);
+  };
+
+  const calculateDiscountPricing = (basePrice: number, quantity: number, tiers: DiscountTier[]): { price: number; description: string } => {
+    if (!tiers || tiers.length === 0) {
+      return { price: basePrice, description: `${quantity} × $${basePrice.toFixed(2)}` };
     }
 
-    const basePrice = subcategoryData.selling_price;
-    let result: PriceCalculation = { basePrice, finalPrice: basePrice };
+    let totalCost = 0;
+    let remainingQty = quantity;
+    let descriptions: string[] = [];
+    let currentTierIndex = 0;
 
-    // Check for combo pricing first (highest priority)
-    if (activeCombo) {
-      const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === subcategoryId);
-      if (comboSubcategory) {
-        result.comboPrice = comboSubcategory.price;
-        result.finalPrice = comboSubcategory.price;
-        result.inCombo = true;
-        return result; // Return early if in combo
-      }
-    }
+    // Sort tiers by min_quantity
+    const sortedTiers = [...tiers].sort((a, b) => a.min_quantity - b.min_quantity);
 
-    // Check for discount tiers (only if not in combo)
-    const { data: discountTiers } = await supabase
-      .from('discount_tiers')
-      .select('*')
-      .eq('subcategory_id', subcategoryId)
-      .order('min_quantity', { ascending: true });
-
-    if (discountTiers) {
-      for (const tier of discountTiers) {
-        if (quantity >= tier.min_quantity && (!tier.max_quantity || quantity <= tier.max_quantity)) {
-          // Apply discount only to quantities above the tier threshold
-          const discountedPrice = basePrice - tier.discount_amount;
-          result.discountedPrice = discountedPrice;
-          result.appliedDiscount = tier;
-          
-          // Calculate weighted average: 
-          // (original price * MOQ + discounted price * extra quantity) / total quantity
-          const originalPriceItems = tier.min_quantity;
-          const discountedItems = quantity - tier.min_quantity;
-          const totalPrice = (basePrice * originalPriceItems) + (discountedPrice * discountedItems);
-          result.finalPrice = totalPrice / quantity;
-          break;
+    while (remainingQty > 0 && currentTierIndex < sortedTiers.length) {
+      const currentTier = sortedTiers[currentTierIndex];
+      const nextTier = sortedTiers[currentTierIndex + 1];
+      
+      const tierStart = currentTier.min_quantity;
+      const tierEnd = nextTier ? nextTier.min_quantity : Infinity;
+      
+      if (quantity >= tierStart) {
+        const qtyInThisTier = Math.min(remainingQty, tierEnd - Math.max(tierStart, quantity - remainingQty));
+        const discountedPrice = basePrice - currentTier.discount_amount;
+        
+        if (qtyInThisTier > 0) {
+          totalCost += qtyInThisTier * discountedPrice;
+          descriptions.push(`${qtyInThisTier} × $${discountedPrice.toFixed(2)}`);
+          remainingQty -= qtyInThisTier;
         }
       }
+      
+      currentTierIndex++;
     }
 
-    return result;
+    // Handle remaining quantity at base price if no more tiers
+    if (remainingQty > 0) {
+      totalCost += remainingQty * basePrice;
+      descriptions.push(`${remainingQty} × $${basePrice.toFixed(2)}`);
+    }
+
+    const avgPrice = totalCost / quantity;
+    const description = descriptions.length > 1 ? descriptions.join(' + ') : descriptions[0] || `${quantity} × $${basePrice.toFixed(2)}`;
+
+    return { price: avgPrice, description };
+  };
+
+  const getItemPricing = (item: CartItem): PricingInfo => {
+    const subcategoryTotalQty = getSubcategoryQuantity(item.subcategoryId);
+    
+    // Check if combo is active and applies to this subcategory
+    if (activeCombo) {
+      const comboSubcategory = activeCombo.combo_subcategories.find(
+        cs => cs.subcategory_id === item.subcategoryId
+      );
+      
+      if (comboSubcategory) {
+        return {
+          finalPrice: comboSubcategory.price,
+          description: `Combo Price: $${comboSubcategory.price.toFixed(2)} each`,
+          mode: 'combo',
+          isCombo: true
+        };
+      }
+    }
+
+    // Check for discount tiers
+    const tiers = discountTiers[item.subcategoryId];
+    if (tiers && tiers.length > 0 && subcategoryTotalQty >= tiers[0].min_quantity) {
+      const { price, description } = calculateDiscountPricing(item.basePrice, item.quantity, tiers);
+      return {
+        finalPrice: price,
+        description: `Discount Applied: ${description}`,
+        mode: 'discount'
+      };
+    }
+
+    // Normal pricing
+    return {
+      finalPrice: item.basePrice,
+      description: `${item.quantity} × $${item.basePrice.toFixed(2)}`,
+      mode: 'normal'
+    };
   };
 
   const addToCart = async (params: AddToCartParams) => {
@@ -170,38 +230,42 @@ export function CartProvider({ children }: { children: ReactNode }) {
       // Fetch product details
       const { data: product, error: productError } = await supabase
         .from('products')
-        .select('name, image_url, subcategory_id')
+        .select('name, image_url, subcategory_id, selling_price')
         .eq('id', params.productId)
         .single();
 
       if (productError) throw productError;
 
+      // Get base price - use product selling_price if available, otherwise subcategory price
+      let basePrice = product.selling_price;
+      if (!basePrice) {
+        const subcategory = subcategoriesData[product.subcategory_id];
+        basePrice = subcategory?.selling_price || 0;
+      }
+
       let colorName = '';
       let sizeName = '';
 
-      // Fetch color variant name if provided
+      // Fetch variant names
       if (params.colorVariantId) {
         const { data: colorVariant } = await supabase
           .from('color_variants')
           .select('color_name')
           .eq('id', params.colorVariantId)
           .single();
-        
         colorName = colorVariant?.color_name || '';
       }
 
-      // Fetch size variant name if provided
       if (params.sizeVariantId) {
         const { data: sizeVariant } = await supabase
           .from('size_variants')
           .select('size_name')
           .eq('id', params.sizeVariantId)
           .single();
-        
         sizeName = sizeVariant?.size_name || '';
       }
 
-      // Check if item already exists in cart
+      // Check if item already exists
       const existingItemIndex = cartItems.findIndex(item => 
         item.productId === params.productId &&
         item.colorVariantId === params.colorVariantId &&
@@ -209,12 +273,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       );
 
       if (existingItemIndex >= 0) {
-        // Update existing item quantity
         const updatedItems = [...cartItems];
         updatedItems[existingItemIndex].quantity += params.quantity;
         setCartItems(updatedItems);
       } else {
-        // Add new item
         const newItem: CartItem = {
           id: `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}`,
           productId: params.productId,
@@ -224,16 +286,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
           colorName,
           sizeName,
           quantity: params.quantity,
-          price: params.price,
+          basePrice,
           subcategoryId: product.subcategory_id,
           image_url: product.image_url
         };
 
         setCartItems(prev => [...prev, newItem]);
       }
+
+      toast({
+        title: "Added to Cart",
+        description: `${product.name} has been added to your cart`,
+      });
     } catch (error) {
       console.error('Error adding to cart:', error);
-      throw error;
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart",
+        variant: "destructive",
+      });
     }
   };
 
@@ -257,13 +328,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setActiveCombo(null);
   };
 
-  const getTotalPrice = async () => {
-    let total = 0;
-    for (const item of cartItems) {
-      const pricing = await getItemPrice(item.subcategoryId, item.quantity);
-      total += pricing.finalPrice * item.quantity;
-    }
-    return total;
+  const getTotalPrice = (): number => {
+    return cartItems.reduce((total, item) => {
+      const pricing = getItemPricing(item);
+      return total + (pricing.finalPrice * item.quantity);
+    }, 0);
   };
 
   const getTotalItems = () => {
@@ -272,7 +341,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const checkComboEligibility = async () => {
     try {
-      // Get all active combos
       const { data: combos, error: combosError } = await supabase
         .from('combos')
         .select(`
@@ -292,7 +360,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Get subcategory counts from current cart
       const subcategoryCounts: { [key: string]: number } = {};
       
       for (const cartItem of cartItems) {
@@ -300,7 +367,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         subcategoryCounts[subcategoryId] = (subcategoryCounts[subcategoryId] || 0) + cartItem.quantity;
       }
 
-      // Check each combo for eligibility
       let newActiveCombo: ComboData | null = null;
       
       for (const combo of combos || []) {
@@ -329,7 +395,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Check if combo was removed
       if (activeCombo && !newActiveCombo) {
         toast({
           title: "💰 Normal Prices Applied",
@@ -352,7 +417,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     clearCart,
     getTotalPrice,
     getTotalItems,
-    getItemPrice,
+    getItemPricing,
     activeCombo
   };
 

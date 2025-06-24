@@ -2,7 +2,7 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, Plus, Minus, X, AlertTriangle, Gift } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, AlertTriangle, Gift, Tag } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,30 +23,17 @@ export function CartSidebar() {
     removeFromCart, 
     getTotalPrice, 
     getTotalItems, 
-    getItemPrice, 
+    getItemPricing,
     activeCombo 
   } = useCart();
   const [isOpen, setIsOpen] = useState(false);
   const [subcategoryRequirements, setSubcategoryRequirements] = useState<SubcategoryRequirement[]>([]);
-  const [cartTotal, setCartTotal] = useState(0);
 
   useEffect(() => {
     if (cartItems.length > 0) {
       checkSubcategoryRequirements();
-      updateCartTotal();
-    } else {
-      setCartTotal(0);
     }
   }, [cartItems, activeCombo]);
-
-  const updateCartTotal = async () => {
-    try {
-      const total = await getTotalPrice();
-      setCartTotal(total);
-    } catch (error) {
-      console.error('Error calculating total:', error);
-    }
-  };
 
   const checkSubcategoryRequirements = async () => {
     const subcategoryTotals: { [key: string]: number } = {};
@@ -79,6 +66,7 @@ export function CartSidebar() {
   };
 
   const canCheckout = subcategoryRequirements.every(req => req.fulfilled);
+  const totalPrice = getTotalPrice();
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -127,15 +115,96 @@ export function CartSidebar() {
 
               {/* Cart Items */}
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {cartItems.map((item) => (
-                  <CartItemCard 
-                    key={item.id} 
-                    item={item} 
-                    onUpdateQuantity={updateQuantity}
-                    onRemove={removeFromCart}
-                    getItemPrice={getItemPrice}
-                  />
-                ))}
+                {cartItems.map((item) => {
+                  const pricing = getItemPricing(item);
+                  const itemTotal = pricing.finalPrice * item.quantity;
+
+                  return (
+                    <div key={item.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                      {item.image_url && (
+                        <img 
+                          src={item.image_url} 
+                          alt={item.productName}
+                          className="w-12 h-12 object-cover rounded-md flex-shrink-0"
+                        />
+                      )}
+                      
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-medium text-gray-900 truncate">
+                          {item.productName}
+                        </h3>
+                        
+                        {/* Variant Info */}
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {item.colorName && (
+                            <span className="text-xs text-gray-500">Color: {item.colorName}</span>
+                          )}
+                          {item.sizeName && (
+                            <span className="text-xs text-gray-500">Size: {item.sizeName}</span>
+                          )}
+                        </div>
+
+                        {/* Pricing Information */}
+                        <div className="mt-2 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-red-600">
+                              ${itemTotal.toFixed(2)}
+                            </span>
+                            {pricing.mode === 'combo' && (
+                              <Badge variant="secondary" className="text-xs px-1 py-0 bg-green-100 text-green-800">
+                                <Tag className="w-2 h-2 mr-1" />
+                                Combo
+                              </Badge>
+                            )}
+                            {pricing.mode === 'discount' && (
+                              <Badge variant="secondary" className="text-xs px-1 py-0 bg-blue-100 text-blue-800">
+                                <Tag className="w-2 h-2 mr-1" />
+                                Discount
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <p className="text-xs text-gray-600">
+                            {pricing.description}
+                          </p>
+                        </div>
+
+                        {/* Quantity Controls */}
+                        <div className="flex items-center justify-between mt-3">
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                              disabled={item.quantity <= 1}
+                              className="h-7 w-7 p-0"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              className="h-7 w-7 p-0"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeFromCart(item.id)}
+                            className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Subcategory Requirements */}
@@ -168,7 +237,7 @@ export function CartSidebar() {
               <div className="border-t pt-4">
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span>${cartTotal.toFixed(2)}</span>
+                  <span>${totalPrice.toFixed(2)}</span>
                 </div>
                 {activeCombo && (
                   <p className="text-sm text-green-600 mt-1">🎉 Combo pricing applied!</p>
@@ -196,100 +265,5 @@ export function CartSidebar() {
         </div>
       </SheetContent>
     </Sheet>
-  );
-}
-
-function CartItemCard({ 
-  item, 
-  onUpdateQuantity, 
-  onRemove, 
-  getItemPrice 
-}: { 
-  item: any;
-  onUpdateQuantity: (id: string, quantity: number) => void;
-  onRemove: (id: string) => void;
-  getItemPrice: (subcategoryId: string, quantity: number) => Promise<any>;
-}) {
-  const [itemPrice, setItemPrice] = useState(item.price);
-  const [priceLabel, setPriceLabel] = useState('');
-
-  useEffect(() => {
-    updateItemPrice();
-  }, [item.quantity, item.subcategoryId]);
-
-  const updateItemPrice = async () => {
-    try {
-      const pricing = await getItemPrice(item.subcategoryId, item.quantity);
-      setItemPrice(pricing.finalPrice);
-      
-      if (pricing.inCombo) {
-        setPriceLabel('Combo');
-      } else if (pricing.appliedDiscount) {
-        setPriceLabel('Discount');
-      } else {
-        setPriceLabel('');
-      }
-    } catch (error) {
-      console.error('Error updating item price:', error);
-    }
-  };
-
-  return (
-    <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-      {item.image_url && (
-        <img 
-          src={item.image_url} 
-          alt={item.productName}
-          className="w-12 h-12 object-cover rounded-md"
-        />
-      )}
-      <div className="flex-1 min-w-0">
-        <h3 className="text-sm font-medium text-gray-900 truncate">
-          {item.productName}
-        </h3>
-        {item.colorName && (
-          <p className="text-xs text-gray-500">Color: {item.colorName}</p>
-        )}
-        {item.sizeName && (
-          <p className="text-xs text-gray-500">Size: {item.sizeName}</p>
-        )}
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-bold text-red-600">${itemPrice.toFixed(2)}</p>
-          {priceLabel && (
-            <Badge variant="outline" className="text-xs px-1 py-0">
-              {priceLabel}
-            </Badge>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-          disabled={item.quantity <= 1}
-          className="h-7 w-7 p-0"
-        >
-          <Minus className="h-3 w-3" />
-        </Button>
-        <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-          className="h-7 w-7 p-0"
-        >
-          <Plus className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onRemove(item.id)}
-          className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
-        >
-          <X className="h-3 w-3" />
-        </Button>
-      </div>
-    </div>
   );
 }
