@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { User, LogOut, LayoutDashboard, ChevronDown, Menu, X } from 'lucide-react';
+import { User, LogOut, LayoutDashboard, ChevronDown, Menu } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { CartSidebar } from './CartSidebar';
@@ -184,9 +184,9 @@ export function CustomerHeader() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem asChild>
-                      <Link to={userProfile?.role === 'admin' ? '/admin' : '/dashboard'}>
+                      <Link to="/dashboard">
                         <LayoutDashboard className="mr-2 h-4 w-4" />
-                        {userProfile?.role === 'admin' ? 'Admin Panel' : 'Dashboard'}
+                        Dashboard
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />

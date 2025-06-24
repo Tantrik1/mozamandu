@@ -3,81 +3,55 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
-import { Link } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Mail } from 'lucide-react';
 
 interface SignUpFormProps {
   onSuccess: () => void;
-  onStart?: () => void;
-  isLoading: boolean;
-  setIsLoading: (loading: boolean) => void;
 }
 
-export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: SignUpFormProps) {
+export function SignUpForm({ onSuccess }: SignUpFormProps) {
   const { signUp, verifyOTP } = useAuth();
   const [showOTPField, setShowOTPField] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
   const [signUpData, setSignUpData] = useState({
     fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
   });
+  
   const [otpCode, setOtpCode] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
-
-  const validatePassword = (password: string) => {
-    const requirements = [
-      { test: password.length >= 8, message: 'Password must be at least 8 characters long' },
-      { test: /[A-Z]/.test(password), message: 'Password must contain an uppercase letter' },
-      { test: /[a-z]/.test(password), message: 'Password must contain a lowercase letter' },
-      { test: /\d/.test(password), message: 'Password must contain a number' },
-      { test: /[!@#$%^&*(),.?":{}|<>]/.test(password), message: 'Password must contain a special character' }
-    ];
-
-    const failedRequirement = requirements.find(req => !req.test);
-    return failedRequirement ? failedRequirement.message : null;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // If OTP field is showing, handle OTP verification
     if (showOTPField) {
       return handleOTPVerification();
     }
 
-    // Validate the form
+    // Validate form
     const newErrors: Record<string, string> = {};
 
     if (!signUpData.fullName.trim()) {
       newErrors.fullName = 'Full name is required';
     }
 
-    if (!signUpData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(signUpData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+    if (!signUpData.email || !/\S+@\S+\.\S+/.test(signUpData.email)) {
+      newErrors.email = 'Valid email is required';
     }
 
-    const passwordError = validatePassword(signUpData.password);
-    if (passwordError) {
-      newErrors.password = passwordError;
+    if (!signUpData.password || signUpData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
 
     if (signUpData.password !== signUpData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
-    }
-
-    if (!acceptedTerms) {
-      newErrors.terms = 'You must accept the Terms and Conditions to continue';
     }
 
     setErrors(newErrors);
@@ -86,290 +60,160 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
       return;
     }
 
-    // Notify parent that signup is starting
-    if (onStart) {
-      onStart();
-    }
-
     setIsLoading(true);
 
-    try {
-      // Create account
-      const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
+    const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
 
-      if (error) {
-        if (error.message.includes('already registered')) {
-          toast({
-            title: "Account Already Exists",
-            description: "An account with this email already exists. Please sign in instead.",
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "Sign Up Failed",
-            description: error.message || "Failed to create account. Please try again.",
-            variant: "destructive",
-          });
-        }
-        return;
-      }
-
-      // Show OTP field - just extend the form
+    if (error) {
+      setErrors({ form: error.message });
+    } else {
       setShowOTPField(true);
       toast({
         title: "Check Your Email!",
         description: "We've sent a verification code to your email address.",
       });
-    } catch (error) {
-      console.error('Signup error:', error);
-      toast({
-        title: "Sign Up Failed",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
     }
+
+    setIsLoading(false);
   };
 
   const handleOTPVerification = async () => {
     if (otpCode.length !== 6) {
-      toast({
-        title: "Invalid OTP",
-        description: "Please enter the complete 6-digit code.",
-        variant: "destructive",
-      });
+      setErrors({ otp: 'Please enter the complete 6-digit code' });
       return;
     }
 
     setIsLoading(true);
 
-    try {
-      const { error, user } = await verifyOTP(signUpData.email, otpCode);
+    const { error } = await verifyOTP(signUpData.email, otpCode);
 
-      if (error) {
-        toast({
-          title: "Verification Failed",
-          description: error.message || "Invalid or expired code. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (user) {
-        toast({
-          title: "Welcome to Mozamandu!",
-          description: "Your account has been created and verified successfully.",
-        });
-        onSuccess();
-      }
-    } catch (error) {
-      console.error('OTP verification error:', error);
-      toast({
-        title: "Verification Failed",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+    if (error) {
+      setErrors({ otp: error.message });
+    } else {
+      onSuccess();
     }
+
+    setIsLoading(false);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="signup-name">Full Name *</Label>
-        <Input
-          id="signup-name"
-          type="text"
-          value={signUpData.fullName}
-          onChange={(e) => {
-            setSignUpData({ ...signUpData, fullName: e.target.value });
-            if (errors.fullName) setErrors({ ...errors, fullName: '' });
-          }}
-          placeholder="Enter your full name"
-          className={errors.fullName ? 'border-red-500' : ''}
-          readOnly={showOTPField}
-        />
-        {errors.fullName && (
-          <p className="text-sm text-red-600 mt-1">{errors.fullName}</p>
-        )}
-      </div>
-
-      <div>
-        <Label htmlFor="signup-email">Email Address *</Label>
-        <Input
-          id="signup-email"
-          type="email"
-          value={signUpData.email}
-          onChange={(e) => {
-            setSignUpData({ ...signUpData, email: e.target.value });
-            if (errors.email) setErrors({ ...errors, email: '' });
-          }}
-          placeholder="Enter your email"
-          className={errors.email ? 'border-red-500' : ''}
-          readOnly={showOTPField}
-        />
-        {errors.email && (
-          <p className="text-sm text-red-600 mt-1">{errors.email}</p>
-        )}
-      </div>
-
-      <div>
-        <Label htmlFor="signup-password">Password *</Label>
-        <div className="relative">
-          <Input
-            id="signup-password"
-            type={showPassword ? "text" : "password"}
-            value={signUpData.password}
-            onChange={(e) => {
-              setSignUpData({ ...signUpData, password: e.target.value });
-              if (errors.password) setErrors({ ...errors, password: '' });
-            }}
-            placeholder="Create a strong password"
-            className={`pr-10 ${errors.password ? 'border-red-500' : ''}`}
-            readOnly={showOTPField}
-          />
-          <button
-            type="button"
-            className="absolute inset-y-0 right-0 pr-3 flex items-center"
-            onClick={() => setShowPassword(!showPassword)}
-          >
-            {showPassword ? (
-              <EyeOff className="h-4 w-4 text-gray-400" />
-            ) : (
-              <Eye className="h-4 w-4 text-gray-400" />
-            )}
-          </button>
+      {errors.form && (
+        <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
+          {errors.form}
         </div>
-        {errors.password && (
-          <p className="text-sm text-red-600 mt-1">{errors.password}</p>
-        )}
-        {!showOTPField && <PasswordStrengthIndicator password={signUpData.password} />}
-      </div>
+      )}
 
-      <div>
-        <Label htmlFor="signup-confirm-password">Confirm Password *</Label>
-        <div className="relative">
-          <Input
-            id="signup-confirm-password"
-            type={showConfirmPassword ? "text" : "password"}
-            value={signUpData.confirmPassword}
-            onChange={(e) => {
-              setSignUpData({ ...signUpData, confirmPassword: e.target.value });
-              if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: '' });
-            }}
-            placeholder="Confirm your password"
-            className={`pr-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
-            readOnly={showOTPField}
-          />
-          <button
-            type="button"
-            className="absolute inset-y-0 right-0 pr-3 flex items-center"
-            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-          >
-            {showConfirmPassword ? (
-              <EyeOff className="h-4 w-4 text-gray-400" />
-            ) : (
-              <Eye className="h-4 w-4 text-gray-400" />
-            )}
-          </button>
-        </div>
-        {errors.confirmPassword && (
-          <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>
-        )}
-      </div>
-
-      {!showOTPField && (
-        <div className="space-y-2">
-          <div className="flex items-start space-x-2">
-            <Checkbox
-              id="accept-terms"
-              checked={acceptedTerms}
-              onCheckedChange={(checked) => {
-                setAcceptedTerms(checked as boolean);
-                if (errors.terms) setErrors({ ...errors, terms: '' });
-              }}
-              className="mt-1"
+      {!showOTPField ? (
+        <>
+          <div>
+            <Label htmlFor="signup-name">Full Name</Label>
+            <Input
+              id="signup-name"
+              type="text"
+              value={signUpData.fullName}
+              onChange={(e) => setSignUpData({ ...signUpData, fullName: e.target.value })}
+              placeholder="Enter your full name"
             />
-            <Label htmlFor="accept-terms" className="text-sm leading-5 cursor-pointer">
-              I accept the{' '}
-              <Link to="/terms" target="_blank" className="text-red-600 hover:text-red-700 underline">
-                Terms and Conditions
-              </Link>{' '}
-              and{' '}
-              <Link to="/privacy" target="_blank" className="text-red-600 hover:text-red-700 underline">
-                Privacy Policy
-              </Link>
-            </Label>
-          </div>
-          {errors.terms && (
-            <p className="text-sm text-red-600">{errors.terms}</p>
-          )}
-        </div>
-      )}
-
-      {/* OTP Section - Only show after signup */}
-      {showOTPField && (
-        <div className="border-t pt-6 mt-6">
-          <div className="text-center mb-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-blue-800">
-                We've sent a 6-digit verification code to<br />
-                <span className="font-semibold text-blue-900">{signUpData.email}</span>
-              </p>
-            </div>
+            {errors.fullName && <p className="text-sm text-red-600 mt-1">{errors.fullName}</p>}
           </div>
 
-          <div className="space-y-4">
-            <Label className="text-center block text-sm font-medium">
-              Enter the 6-digit verification code
-            </Label>
-            <div className="flex justify-center">
-              <InputOTP
-                value={otpCode}
-                onChange={setOtpCode}
-                maxLength={6}
+          <div>
+            <Label htmlFor="signup-email">Email Address</Label>
+            <Input
+              id="signup-email"
+              type="email"
+              value={signUpData.email}
+              onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
+              placeholder="Enter your email"
+            />
+            {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
+          </div>
+
+          <div>
+            <Label htmlFor="signup-password">Password</Label>
+            <div className="relative">
+              <Input
+                id="signup-password"
+                type={showPassword ? "text" : "password"}
+                value={signUpData.password}
+                onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
+                placeholder="Create a password"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                onClick={() => setShowPassword(!showPassword)}
               >
-                <InputOTPGroup className="gap-2">
-                  <InputOTPSlot index={0} className="w-12 h-12 text-lg" />
-                  <InputOTPSlot index={1} className="w-12 h-12 text-lg" />
-                  <InputOTPSlot index={2} className="w-12 h-12 text-lg" />
-                  <InputOTPSlot index={3} className="w-12 h-12 text-lg" />
-                  <InputOTPSlot index={4} className="w-12 h-12 text-lg" />
-                  <InputOTPSlot index={5} className="w-12 h-12 text-lg" />
-                </InputOTPGroup>
-              </InputOTP>
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
+            {errors.password && <p className="text-sm text-red-600 mt-1">{errors.password}</p>}
           </div>
+
+          <div>
+            <Label htmlFor="signup-confirm">Confirm Password</Label>
+            <Input
+              id="signup-confirm"
+              type="password"
+              value={signUpData.confirmPassword}
+              onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
+              placeholder="Confirm your password"
+            />
+            {errors.confirmPassword && <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>}
+          </div>
+        </>
+      ) : (
+        <div className="text-center space-y-4">
+          <Mail className="w-16 h-16 mx-auto text-blue-600" />
+          <h3 className="text-xl font-semibold">Verify Your Email</h3>
+          <p className="text-gray-600">
+            We've sent a verification code to<br />
+            <span className="font-medium">{signUpData.email}</span>
+          </p>
+
+          <div className="flex justify-center">
+            <InputOTP value={otpCode} onChange={setOtpCode} maxLength={6}>
+              <InputOTPGroup>
+                <InputOTPSlot index={0} />
+                <InputOTPSlot index={1} />
+                <InputOTPSlot index={2} />
+                <InputOTPSlot index={3} />
+                <InputOTPSlot index={4} />
+                <InputOTPSlot index={5} />
+              </InputOTPGroup>
+            </InputOTP>
+          </div>
+          {errors.otp && <p className="text-sm text-red-600">{errors.otp}</p>}
         </div>
       )}
 
-      <div className="space-y-3">
+      <Button 
+        type="submit" 
+        className="w-full bg-red-600 hover:bg-red-700" 
+        disabled={isLoading}
+      >
+        {isLoading 
+          ? (showOTPField ? 'Verifying...' : 'Creating Account...') 
+          : (showOTPField ? 'Verify & Create Account' : 'Create Account')
+        }
+      </Button>
+
+      {showOTPField && (
         <Button 
-          type="submit" 
-          className="w-full bg-red-600 hover:bg-red-700" 
-          disabled={isLoading || (!showOTPField && !acceptedTerms)}
+          type="button"
+          variant="ghost" 
+          onClick={() => {
+            setShowOTPField(false);
+            setOtpCode('');
+            setErrors({});
+          }}
+          className="w-full"
         >
-          {isLoading ? (showOTPField ? 'Verifying...' : 'Creating Account...') : (showOTPField ? 'Verify Email and Create Account' : 'Create Account')}
+          Back to Sign Up Form
         </Button>
-        
-        {showOTPField && (
-          <Button 
-            type="button"
-            variant="ghost" 
-            onClick={() => {
-              setShowOTPField(false);
-              setOtpCode('');
-              setErrors({});
-            }}
-            className="w-full"
-            disabled={isLoading}
-          >
-            Back to Sign Up Form
-          </Button>
-        )}
-      </div>
+      )}
     </form>
   );
 }

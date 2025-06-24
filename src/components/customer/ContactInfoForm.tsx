@@ -1,34 +1,38 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Phone, MessageCircle } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 interface ContactInfoFormProps {
-  userId: string;
   onComplete: () => void;
 }
 
-export function ContactInfoForm({ userId, onComplete }: ContactInfoFormProps) {
+export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
+  const { user, userProfile } = useAuth();
+  const navigate = useNavigate();
+  const [contactNumber, setContactNumber] = useState('');
+  const [address, setAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { redirectBasedOnRole } = useAuth();
-  const [contactData, setContactData] = useState({
-    contactNumber: '',
-    whatsappNumber: '',
-  });
+
+  useEffect(() => {
+    if (userProfile?.contact_number) {
+      navigate('/dashboard');
+    }
+  }, [userProfile, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!contactData.contactNumber) {
+    if (!contactNumber.trim()) {
       toast({
-        title: "Contact Number Required",
-        description: "Please provide your contact number",
+        title: "Error",
+        description: "Contact number is required",
         variant: "destructive",
       });
       return;
@@ -40,31 +44,28 @@ export function ContactInfoForm({ userId, onComplete }: ContactInfoFormProps) {
       const { error } = await supabase
         .from('profiles')
         .update({
-          contact_number: contactData.contactNumber,
-          whatsapp_number: contactData.whatsappNumber || null,
+          contact_number: contactNumber.trim(),
+          address: address.trim(),
         })
-        .eq('id', userId);
+        .eq('id', user?.id);
 
       if (error) {
-        console.error('Update error:', error);
         toast({
           title: "Error",
-          description: "Failed to save contact information",
+          description: "Failed to update contact information",
           variant: "destructive",
         });
-      } else {
-        toast({
-          title: "Success",
-          description: "Contact information saved successfully!",
-        });
-        onComplete();
-        // Force redirect after profile update
-        setTimeout(() => {
-          redirectBasedOnRole();
-        }, 1000);
+        return;
       }
+
+      toast({
+        title: "Success",
+        description: "Contact information updated successfully",
+      });
+
+      onComplete();
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error('Contact info update error:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -76,49 +77,42 @@ export function ContactInfoForm({ userId, onComplete }: ContactInfoFormProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <Phone className="w-12 h-12 mx-auto text-blue-600 mb-4" />
+        <CardHeader>
           <CardTitle>Complete Your Profile</CardTitle>
-          <p className="text-sm text-gray-600">
-            Please provide your contact information to continue
-          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="contact-number">Contact Number *</Label>
+              <Label htmlFor="contact">Contact Number *</Label>
               <Input
-                id="contact-number"
+                id="contact"
                 type="tel"
-                value={contactData.contactNumber}
-                onChange={(e) => setContactData({ ...contactData, contactNumber: e.target.value })}
+                value={contactNumber}
+                onChange={(e) => setContactNumber(e.target.value)}
                 placeholder="Enter your contact number"
                 required
               />
             </div>
-            
+
             <div>
-              <Label htmlFor="whatsapp-number">
-                WhatsApp Number (Optional)
-                <MessageCircle className="w-4 h-4 inline ml-1" />
-              </Label>
+              <Label htmlFor="address">Address (Optional)</Label>
               <Input
-                id="whatsapp-number"
-                type="tel"
-                value={contactData.whatsappNumber}
-                onChange={(e) => setContactData({ ...contactData, whatsappNumber: e.target.value })}
-                placeholder="Enter your WhatsApp number"
+                id="address"
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Enter your address"
               />
             </div>
 
             <Button 
               type="submit" 
-              className="w-full" 
-              disabled={isLoading || !contactData.contactNumber}
+              className="w-full bg-red-600 hover:bg-red-700"
+              disabled={isLoading}
             >
-              {isLoading ? 'Saving...' : 'Continue to Dashboard'}
+              {isLoading ? 'Updating...' : 'Complete Profile'}
             </Button>
           </form>
         </CardContent>
