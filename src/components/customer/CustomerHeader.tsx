@@ -165,7 +165,7 @@ export function CustomerHeader() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem asChild>
-                      <Link to={userProfile?.role === 'admin' ? '/admin' : '/customer-dashboard'}>
+                      <Link to={userProfile?.role === 'admin' ? '/admin' : '/dashboard'}>
                         <LayoutDashboard className="mr-2 h-4 w-4" />
                         {userProfile?.role === 'admin' ? 'Admin Panel' : 'Dashboard'}
                       </Link>
