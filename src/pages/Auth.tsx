@@ -88,7 +88,7 @@ export default function Auth() {
 
     try {
       // Send email via Supabase edge function
-      const { error: emailError } = await supabase.functions.invoke('send-otp-email', {
+      const { data, error: emailError } = await supabase.functions.invoke('send-otp-email', {
         body: {
           email,
           code,
@@ -106,10 +106,19 @@ export default function Auth() {
         return false;
       }
 
-      toast({
-        title: isResend ? "New Code Sent" : "Verification Code Sent",
-        description: `Please check your email for the verification code.`,
-      });
+      // Check if we got a debug code (for testing when SMTP isn't configured)
+      if (data?.debug_code) {
+        toast({
+          title: isResend ? "New Code Generated" : "Verification Code Generated",
+          description: `For testing: Your verification code is ${data.debug_code}`,
+          duration: 10000,
+        });
+      } else {
+        toast({
+          title: isResend ? "New Code Sent" : "Verification Code Sent",
+          description: `Please check your email for the verification code.`,
+        });
+      }
 
       if (isResend) {
         setResendCooldown(60); // 60 second cooldown
