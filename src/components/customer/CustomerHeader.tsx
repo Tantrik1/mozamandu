@@ -69,7 +69,7 @@ export function CustomerHeader() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-3">
-            <img src="/lovable-uploads/2d98ffef-154e-49c8-9c1c-39e09f1ea5ae.png" alt="Mozamandu Logo" className="h-8 w-auto" />
+            <img src="/lovable-uploads/2d98ffef-154e-49c8-9c1c-39e09f1ea5ae.png" alt="Mozamandu Logo" className="h-10 w-auto" />
             <div className="flex flex-col">
               
               
