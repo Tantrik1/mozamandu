@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { SignUpForm } from '@/components/auth/SignUpForm';
-import { OTPVerificationForm } from '@/components/auth/OTPVerificationForm';
 
 interface CheckoutLoginProps {
   onSuccess: () => void;
@@ -18,9 +17,7 @@ interface CheckoutLoginProps {
 export function CheckoutLogin({ onSuccess, onBack }: CheckoutLoginProps) {
   const { signIn } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [showOTP, setShowOTP] = useState(false);
-  const [signUpEmail, setSignUpEmail] = useState('');
-  const [signUpData, setSignUpData] = useState<any>(null);
+  const [signUpSuccess, setSignUpSuccess] = useState(false);
   
   const [loginData, setLoginData] = useState({
     email: '',
@@ -40,29 +37,32 @@ export function CheckoutLogin({ onSuccess, onBack }: CheckoutLoginProps) {
     setIsLoading(false);
   };
 
-  const handleOTPSent = (email: string, formData: any) => {
-    setSignUpEmail(email);
-    setSignUpData(formData);
-    setShowOTP(true);
+  const handleSignUpSuccess = () => {
+    setSignUpSuccess(true);
   };
 
-  const handleVerificationSuccess = () => {
-    setShowOTP(false);
-    onSuccess();
-  };
-
-  if (showOTP) {
+  if (signUpSuccess) {
     return (
       <Card className="max-w-md mx-auto">
-        <CardContent className="p-6">
-          <OTPVerificationForm
-            email={signUpEmail}
-            signUpData={signUpData}
-            onBack={() => setShowOTP(false)}
-            onSuccess={handleVerificationSuccess}
-            isLoading={isLoading}
-            setIsLoading={setIsLoading}
-          />
+        <CardContent className="p-6 text-center">
+          <div className="mb-4">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email</h2>
+            <p className="text-gray-600">
+              We've sent you a verification link. Please check your email and click the link to verify your account.
+            </p>
+          </div>
+          <Button 
+            variant="ghost" 
+            onClick={() => setSignUpSuccess(false)}
+            className="w-full"
+          >
+            Back to Login
+          </Button>
         </CardContent>
       </Card>
     );
@@ -116,7 +116,7 @@ export function CheckoutLogin({ onSuccess, onBack }: CheckoutLoginProps) {
             
             <TabsContent value="signup">
               <SignUpForm 
-                onOTPSent={handleOTPSent}
+                onSuccess={handleSignUpSuccess}
                 isLoading={isLoading}
                 setIsLoading={setIsLoading}
               />

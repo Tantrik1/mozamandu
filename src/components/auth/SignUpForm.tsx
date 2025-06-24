@@ -8,12 +8,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 interface SignUpFormProps {
-  onOTPSent: (email: string, signUpData: any) => void;
+  onSuccess: () => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
 }
 
-export function SignUpForm({ onOTPSent, isLoading, setIsLoading }: SignUpFormProps) {
+export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormProps) {
   const [signUpData, setSignUpData] = useState({
     fullName: '',
     email: '',
@@ -34,49 +34,6 @@ export function SignUpForm({ onOTPSent, isLoading, setIsLoading }: SignUpFormPro
 
     const failedRequirement = requirements.find(req => !req.test);
     return failedRequirement ? failedRequirement.message : null;
-  };
-
-  const sendOTP = async (email: string) => {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-    try {
-      const { data, error: emailError } = await supabase.functions.invoke('send-otp-email', {
-        body: {
-          email,
-          code,
-          name: signUpData.fullName,
-        },
-      });
-
-      if (emailError) {
-        console.error('Email sending error:', emailError);
-        toast({
-          title: "Error",
-          description: "Failed to send verification code. Please try again.",
-          variant: "destructive",
-        });
-        return false;
-      }
-
-      if (data?.success) {
-        toast({
-          title: "Verification Code Sent",
-          description: "Please check your email for the verification code.",
-        });
-      } else {
-        throw new Error('Failed to send email');
-      }
-
-      return true;
-    } catch (error) {
-      console.error('OTP sending error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send verification code. Please check your email address and try again.",
-        variant: "destructive",
-      });
-      return false;
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,9 +78,30 @@ export function SignUpForm({ onOTPSent, isLoading, setIsLoading }: SignUpFormPro
     setIsLoading(true);
     
     try {
-      const success = await sendOTP(signUpData.email);
-      if (success) {
-        onOTPSent(signUpData.email, signUpData);
+      const { error } = await supabase.auth.signUp({
+        email: signUpData.email,
+        password: signUpData.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            full_name: signUpData.fullName,
+            role: 'customer',
+          },
+        },
+      });
+
+      if (error) {
+        toast({
+          title: "Sign Up Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Account Created!",
+          description: "Please check your email to verify your account. Check your spam folder if you don't see it.",
+        });
+        onSuccess();
       }
     } finally {
       setIsLoading(false);
@@ -210,7 +188,7 @@ export function SignUpForm({ onOTPSent, isLoading, setIsLoading }: SignUpFormPro
         className="w-full" 
         disabled={isLoading}
       >
-        {isLoading ? 'Sending Code...' : 'Send Verification Code'}
+        {isLoading ? 'Creating Account...' : 'Sign Up'}
       </Button>
     </form>
   );
