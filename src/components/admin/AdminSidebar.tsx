@@ -1,6 +1,8 @@
+
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -20,9 +22,11 @@ import {
   Type, 
   Settings,
   ShoppingCart,
-  UserCheck
+  UserCheck,
+  LogOut
 } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
+import { useAuth } from "@/hooks/useAuth"
 
 const menuItems = [
   {
@@ -94,6 +98,11 @@ const menuItems = [
 
 export function AdminSidebar() {
   const location = useLocation()
+  const { signOut } = useAuth()
+
+  const handleSignOut = () => {
+    signOut()
+  }
 
   return (
     <Sidebar>
@@ -116,6 +125,16 @@ export function AdminSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={handleSignOut}>
+              <LogOut />
+              <span>Sign Out</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   )
 }
