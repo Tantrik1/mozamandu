@@ -43,11 +43,29 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Failed to store verification code');
     }
 
-    // Send a simple email using your custom SMTP settings
-    // We'll use a simple approach that works with your email templates
+    // Send email using Supabase's built-in email functionality
+    // This will use your configured SMTP settings
     try {
-      // Use Supabase's email functionality with a password reset template
-      // This will use your configured SMTP settings
+      // Create a temporary user to send the email, then delete it
+      const tempPassword = Math.random().toString(36).substring(2, 15);
+      
+      const { data: signUpData, error: signUpError } = await supabase.auth.admin.createUser({
+        email: email,
+        password: tempPassword,
+        email_confirm: false,
+        user_metadata: {
+          full_name: name || '',
+          verification_code: code,
+          temp_signup: true,
+        }
+      });
+
+      if (signUpError) {
+        console.error('Error creating temp user:', signUpError);
+        throw signUpError;
+      }
+
+      // Send password reset email which will use your custom template
       const { error: emailError } = await supabase.auth.admin.generateLink({
         type: 'recovery',
         email: email,
@@ -60,11 +78,69 @@ const handler = async (req: Request): Promise<Response> => {
         }
       });
 
+      // Delete the temporary user
+      if (signUpData.user) {
+        await supabase.auth.admin.deleteUser(signUpData.user.id);
+      }
+
       if (emailError) {
-        console.error('Error sending email via Supabase:', emailError);
-        // Don't throw here, we'll use the fallback
-      } else {
-        console.log("OTP email sent successfully via Supabase Auth");
+        console.error('Error sending email:', emailError);
+        throw emailError;
+      }
+
+      console.log("OTP email sent successfully");
+      
+      return new Response(JSON.stringify({ 
+        success: true,
+        message: "Verification code sent to your email"
+      }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      });
+
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+      
+      // If the above approach fails, try direct email sending
+      try {
+        // Use Supabase's direct email sending capability
+        const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/rpc/send_email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            'apikey': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+          },
+          body: JSON.stringify({
+            to: email,
+            subject: 'Your Verification Code - Mozamandu',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #333; text-align: center;">Welcome to Mozamandu!</h2>
+                <p>Hi ${name || 'there'},</p>
+                <p>Thank you for signing up! Your verification code is:</p>
+                <div style="background: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                  <h1 style="color: #333; font-size: 32px; margin: 0; letter-spacing: 4px;">${code}</h1>
+                </div>
+                <p>This code will expire in 10 minutes.</p>
+                <p>If you didn't request this code, please ignore this email.</p>
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+                <p style="color: #666; font-size: 12px; text-align: center;">
+                  This email was sent by Mozamandu. Please do not reply to this email.
+                </p>
+              </div>
+            `
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Email API failed: ${response.status}`);
+        }
+
+        console.log("OTP email sent via direct API");
         
         return new Response(JSON.stringify({ 
           success: true,
@@ -76,30 +152,20 @@ const handler = async (req: Request): Promise<Response> => {
             ...corsHeaders,
           },
         });
-      }
-    } catch (emailSendError) {
-      console.error('Email sending failed:', emailSendError);
-    }
 
-    // Fallback: If email sending fails, return success with debug code for development
-    console.log("Email sending failed, but OTP stored successfully. Code:", code);
-    
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: "Verification code generated",
-      debug_code: code // This will be shown in toast for testing
-    }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders,
-      },
-    });
+      } catch (directEmailError) {
+        console.error('Direct email sending also failed:', directEmailError);
+        throw new Error('Failed to send verification email');
+      }
+    }
 
   } catch (error: any) {
     console.error("Error in send-otp-email function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: "Failed to send verification code. Please try again.",
+        details: error.message 
+      }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },

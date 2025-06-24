@@ -55,13 +55,7 @@ export function OTPVerificationForm({
         return false;
       }
 
-      if (data?.debug_code) {
-        toast({
-          title: isResend ? "New Code Generated" : "Development Mode",
-          description: `Your verification code is: ${data.debug_code}`,
-          duration: 15000,
-        });
-      } else {
+      if (data?.success) {
         toast({
           title: isResend ? "New Code Sent" : "Code Sent",
           description: "Please check your email for the verification code.",

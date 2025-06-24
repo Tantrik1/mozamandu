@@ -58,17 +58,13 @@ export function SignUpForm({ onOTPSent, isLoading, setIsLoading }: SignUpFormPro
         return false;
       }
 
-      if (data?.debug_code) {
-        toast({
-          title: "Development Mode",
-          description: `Your verification code is: ${data.debug_code}`,
-          duration: 15000,
-        });
-      } else {
+      if (data?.success) {
         toast({
           title: "Verification Code Sent",
           description: "Please check your email for the verification code.",
         });
+      } else {
+        throw new Error('Failed to send email');
       }
 
       return true;
@@ -76,7 +72,7 @@ export function SignUpForm({ onOTPSent, isLoading, setIsLoading }: SignUpFormPro
       console.error('OTP sending error:', error);
       toast({
         title: "Error",
-        description: "Failed to send verification code. Please try again.",
+        description: "Failed to send verification code. Please check your email address and try again.",
         variant: "destructive",
       });
       return false;
