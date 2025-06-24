@@ -57,7 +57,7 @@ export function SubcategoryCard({ subcategory }: SubcategoryCardProps) {
             {/* Overlay with price badge */}
             <div className="absolute top-3 right-3">
               <Badge className="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1 text-sm">
-                ${subcategory.selling_price}
+                Rs.{subcategory.selling_price}
               </Badge>
             </div>
             
