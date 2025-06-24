@@ -162,7 +162,7 @@ export function CheckoutInfo({ isGuest, onComplete, onBack }: CheckoutInfoProps)
                 <SelectContent>
                   {deliveryLocations.map((location) => (
                     <SelectItem key={location.id} value={location.id}>
-                      {location.place_name} (+${location.delivery_price} delivery)
+                      {location.place_name} (+Rs. {location.delivery_price} delivery)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -184,7 +184,7 @@ export function CheckoutInfo({ isGuest, onComplete, onBack }: CheckoutInfoProps)
             {selectedLocation && (
               <div className="bg-blue-50 p-4 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>Delivery Charge:</strong> ${selectedLocation.delivery_price} for {selectedLocation.place_name}
+                  <strong>Delivery Charge:</strong> Rs. {selectedLocation.delivery_price} for {selectedLocation.place_name}
                 </p>
               </div>
             )}
