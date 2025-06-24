@@ -21,6 +21,7 @@ export default function Auth() {
   const [showContactForm, setShowContactForm] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
   const [showPassword, setShowPassword] = useState(false);
+  const [pendingSignup, setPendingSignup] = useState(false); // Track if signup is in progress
   
   const [signInData, setSignInData] = useState({
     email: '',
@@ -30,7 +31,8 @@ export default function Auth() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (user && userProfile && !isLoading) {
+    // Only redirect if user is authenticated AND not in the middle of signup process
+    if (user && userProfile && !isLoading && !pendingSignup) {
       console.log('User authenticated, checking profile:', userProfile);
       
       // Check if contact info is missing for first-time users
@@ -52,7 +54,7 @@ export default function Auth() {
         navigate('/dashboard');
       }
     }
-  }, [user, userProfile, isLoading, navigate, redirectTo]);
+  }, [user, userProfile, isLoading, navigate, redirectTo, pendingSignup]);
 
   const validateSignInForm = () => {
     const newErrors: Record<string, string> = {};
@@ -100,11 +102,17 @@ export default function Auth() {
 
   const handleSignUpSuccess = () => {
     console.log('Signup successful and verified');
+    setPendingSignup(false); // Reset pending signup state
     // The useEffect will handle the redirect now that the user is authenticated
+  };
+
+  const handleSignUpStart = () => {
+    setPendingSignup(true); // Mark signup as in progress
   };
 
   const handleContactInfoComplete = () => {
     setShowContactForm(false);
+    setPendingSignup(false);
     // Redirect after contact info is collected
     if (redirectTo) {
       navigate(redirectTo);
@@ -236,6 +244,7 @@ export default function Auth() {
               <CardContent>
                 <SignUpForm 
                   onSuccess={handleSignUpSuccess}
+                  onStart={handleSignUpStart}
                   isLoading={authLoading}
                   setIsLoading={setAuthLoading}
                 />

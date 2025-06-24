@@ -132,10 +132,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
+      // Create user without auto-confirming to prevent immediate login
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth`,
           data: {
             full_name: fullName.trim(),
           },
@@ -145,10 +147,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         console.error('Sign up error:', error);
         return { error };
-      } else {
-        console.log('User created, confirmation required:', data);
+      }
+
+      // If user needs email confirmation, sign them out to prevent auto-login
+      if (data.user && !data.user.email_confirmed_at && !data.session) {
+        console.log('User created, awaiting email confirmation');
         return { error: null };
       }
+
+      // If they're somehow already logged in, sign them out
+      if (data.session) {
+        await supabase.auth.signOut();
+      }
+
+      console.log('User created, confirmation required:', data);
+      return { error: null };
     } catch (error) {
       console.error('Unexpected sign up error:', error);
       return { error };

@@ -86,32 +86,50 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
       return;
     }
 
-    // Create account
-    const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
-
-    if (error) {
-      if (error.message.includes('already registered')) {
-        toast({
-          title: "Account Already Exists",
-          description: "An account with this email already exists. Please sign in instead.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Sign Up Failed",
-          description: error.message || "Failed to create account. Please try again.",
-          variant: "destructive",
-        });
-      }
-      return;
+    // Notify parent that signup is starting
+    if (onStart) {
+      onStart();
     }
 
-    // Show OTP field - just extend the form
-    setShowOTPField(true);
-    toast({
-      title: "Check Your Email!",
-      description: "We've sent a verification code to your email address.",
-    });
+    setIsLoading(true);
+
+    try {
+      // Create account
+      const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
+
+      if (error) {
+        if (error.message.includes('already registered')) {
+          toast({
+            title: "Account Already Exists",
+            description: "An account with this email already exists. Please sign in instead.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Sign Up Failed",
+            description: error.message || "Failed to create account. Please try again.",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+
+      // Show OTP field - just extend the form
+      setShowOTPField(true);
+      toast({
+        title: "Check Your Email!",
+        description: "We've sent a verification code to your email address.",
+      });
+    } catch (error) {
+      console.error('Signup error:', error);
+      toast({
+        title: "Sign Up Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleOTPVerification = async () => {
@@ -124,23 +142,36 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
       return;
     }
 
-    const { error, user } = await verifyOTP(signUpData.email, otpCode);
+    setIsLoading(true);
 
-    if (error) {
+    try {
+      const { error, user } = await verifyOTP(signUpData.email, otpCode);
+
+      if (error) {
+        toast({
+          title: "Verification Failed",
+          description: error.message || "Invalid or expired code. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (user) {
+        toast({
+          title: "Welcome to Mozamandu!",
+          description: "Your account has been created and verified successfully.",
+        });
+        onSuccess();
+      }
+    } catch (error) {
+      console.error('OTP verification error:', error);
       toast({
         title: "Verification Failed",
-        description: error.message || "Invalid or expired code. Please try again.",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
-      return;
-    }
-
-    if (user) {
-      toast({
-        title: "Welcome to Mozamandu!",
-        description: "Your account has been created and verified successfully.",
-      });
-      onSuccess();
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -318,9 +349,9 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
         <Button 
           type="submit" 
           className="w-full bg-red-600 hover:bg-red-700" 
-          disabled={!showOTPField && !acceptedTerms}
+          disabled={isLoading || (!showOTPField && !acceptedTerms)}
         >
-          {showOTPField ? 'Verify Email and Create Account' : 'Create Account'}
+          {isLoading ? (showOTPField ? 'Verifying...' : 'Creating Account...') : (showOTPField ? 'Verify Email and Create Account' : 'Create Account')}
         </Button>
         
         {showOTPField && (
@@ -333,6 +364,7 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
               setErrors({});
             }}
             className="w-full"
+            disabled={isLoading}
           >
             Back to Sign Up Form
           </Button>
