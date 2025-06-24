@@ -62,7 +62,7 @@ export function useCartPricing({ cartItems, activeCombo, discountTiers }: UseCar
     return (item: CartItem): PricingInfo => {
       const subcategoryTotalQty = subcategoryQuantities[item.subcategoryId] || 0;
       
-      // Check if combo is active and applies to this subcategory
+      // Priority 1: Check if combo is active and applies to this subcategory
       if (activeCombo) {
         const comboSubcategory = activeCombo.combo_subcategories.find(
           cs => cs.subcategory_id === item.subcategoryId
@@ -78,19 +78,19 @@ export function useCartPricing({ cartItems, activeCombo, discountTiers }: UseCar
         }
       }
 
-      // Check for discount tiers based on subcategory total
+      // Priority 2: Check for discount tiers based on subcategory total (MOQ)
       const tiers = discountTiers[item.subcategoryId];
       if (tiers && tiers.length > 0 && subcategoryTotalQty >= tiers[0].min_quantity) {
         const pricing = calculateTieredPricing(item.basePrice, subcategoryTotalQty, tiers);
         return {
           finalPrice: pricing.finalPrice,
-          description: `Discount Applied: ${pricing.description}`,
+          description: `MOQ Discount: ${pricing.description}`,
           mode: 'discount',
           breakdown: pricing.breakdown
         };
       }
 
-      // Normal pricing
+      // Priority 3: Normal pricing
       return {
         finalPrice: item.basePrice,
         description: `$${item.basePrice.toFixed(2)} each`,
