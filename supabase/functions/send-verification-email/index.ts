@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@4.0.0";
+import { create, verify } from "https://deno.land/x/djwt@v3.0.1/mod.ts";
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
@@ -9,12 +10,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Store OTP codes in memory (in production, use Redis or database)
-const otpStore = new Map<string, { code: string; expires: number }>();
+// JWT secret for signing tokens
+const JWT_SECRET = new TextEncoder().encode(
+  Deno.env.get('JWT_SECRET') || 'your-super-secret-jwt-key-change-this-in-production'
+);
 
-interface VerificationEmailRequest {
+// Store OTP codes in memory (in production, use Redis or database)
+const otpStore = new Map<string, { code: string; expires: number; userData: any }>();
+
+interface VerificationRequest {
   email: string;
   name?: string;
+  password?: string;
   otp?: string;
   verify?: boolean;
 }
@@ -25,7 +32,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, name, otp, verify }: VerificationEmailRequest = await req.json();
+    const { email, name, password, otp, verify }: VerificationRequest = await req.json();
 
     // If this is a verification request
     if (verify && otp) {
@@ -40,12 +47,24 @@ const handler = async (req: Request): Promise<Response> => {
         });
       }
 
+      // Create JWT token for verified email
+      const payload = {
+        email: email,
+        name: stored.userData.name,
+        password: stored.userData.password,
+        verified: true,
+        exp: Math.floor(Date.now() / 1000) + (60 * 10), // 10 minutes
+      };
+
+      const token = await create({ alg: "HS256", typ: "JWT" }, payload, JWT_SECRET);
+
       // Remove the OTP after successful verification
       otpStore.delete(email);
       
       return new Response(JSON.stringify({ 
         success: true,
-        message: "OTP verified successfully"
+        message: "Email verified successfully",
+        token: token
       }), {
         status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -55,10 +74,11 @@ const handler = async (req: Request): Promise<Response> => {
     // Generate and send OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // Store OTP with 10-minute expiry
+    // Store OTP with user data and 10-minute expiry
     otpStore.set(email, {
       code: otpCode,
-      expires: Date.now() + 10 * 60 * 1000 // 10 minutes
+      expires: Date.now() + 10 * 60 * 1000, // 10 minutes
+      userData: { name, password }
     });
 
     console.log("Sending verification email to:", email);

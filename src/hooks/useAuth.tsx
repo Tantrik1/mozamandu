@@ -1,4 +1,3 @@
-
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -114,11 +113,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fullName: fullName.trim(),
       }));
 
-      // Send OTP email via edge function
-      const { error: emailError } = await supabase.functions.invoke('send-verification-email', {
+      // Send OTP email via edge function (Resend only)
+      const { data, error: emailError } = await supabase.functions.invoke('send-verification-email', {
         body: {
           email: email.trim(),
           name: fullName.trim(),
+          password,
         },
       });
 
@@ -147,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { password, fullName } = JSON.parse(pendingData);
 
-      // Verify OTP with the edge function
+      // Verify OTP with the edge function and get JWT token
       const { data: verificationData, error: verifyError } = await supabase.functions.invoke('send-verification-email', {
         body: {
           email,
@@ -157,10 +157,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (verifyError || !verificationData?.success) {
-        return { error: { message: 'Invalid verification code' } };
+        return { error: { message: verificationData?.error || 'Invalid verification code' } };
       }
 
-      // Create the actual user account
+      // Create the actual user account with email confirmation disabled
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,

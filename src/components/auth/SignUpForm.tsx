@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
-import { Eye, EyeOff, Mail } from 'lucide-react';
+import { Eye, EyeOff, Mail, RefreshCw } from 'lucide-react';
 
 interface SignUpFormProps {
   onSuccess: () => void;
@@ -17,6 +17,7 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
   const [showOTPField, setShowOTPField] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   
   const [signUpData, setSignUpData] = useState({
     fullName: '',
@@ -69,8 +70,8 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
     } else {
       setShowOTPField(true);
       toast({
-        title: "Check Your Email!",
-        description: "We've sent a verification code to your email address.",
+        title: "Verification Code Sent!",
+        description: "Please check your email for the 6-digit verification code from Resend.",
       });
     }
 
@@ -84,16 +85,49 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
     }
 
     setIsLoading(true);
+    setErrors({});
 
     const { error } = await verifyOTP(signUpData.email, otpCode);
 
     if (error) {
       setErrors({ otp: error.message });
+      toast({
+        title: "Verification Failed",
+        description: error.message,
+        variant: "destructive",
+      });
     } else {
+      toast({
+        title: "Email Verified!",
+        description: "Your account has been created successfully.",
+      });
       onSuccess();
     }
 
     setIsLoading(false);
+  };
+
+  const handleResendOTP = async () => {
+    setIsResending(true);
+    setErrors({});
+
+    const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
+
+    if (error) {
+      setErrors({ form: error.message });
+      toast({
+        title: "Error",
+        description: "Failed to resend verification code. Please try again.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Code Resent!",
+        description: "A new verification code has been sent to your email.",
+      });
+    }
+
+    setIsResending(false);
   };
 
   return (
@@ -172,6 +206,9 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
             We've sent a verification code to<br />
             <span className="font-medium">{signUpData.email}</span>
           </p>
+          <p className="text-sm text-blue-600 font-medium">
+            Check your email for the code from Resend
+          </p>
 
           <div className="flex justify-center">
             <InputOTP value={otpCode} onChange={setOtpCode} maxLength={6}>
@@ -186,6 +223,17 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
             </InputOTP>
           </div>
           {errors.otp && <p className="text-sm text-red-600">{errors.otp}</p>}
+
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleResendOTP}
+            disabled={isResending}
+            className="w-full mt-4"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isResending ? 'animate-spin' : ''}`} />
+            {isResending ? 'Sending...' : 'Resend Verification Code'}
+          </Button>
         </div>
       )}
 
