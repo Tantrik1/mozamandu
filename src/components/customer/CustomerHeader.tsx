@@ -90,7 +90,7 @@ export function CustomerHeader() {
                 {/* Megamenu */}
                 {hoveredCategory === category.id && category.subcategories.length > 0 && <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-6 w-96 z-50">
                     <div className="grid grid-cols-2 gap-4">
-                      {category.subcategories.map(subcategory => <Link key={subcategory.id} to={`/subcategories/${subcategory.id}`} className="flex items-center space-x-3 p-3 rounded-lg bg-gray-300 hover:bg-gray-500 transition-colors ">
+                      {category.subcategories.map(subcategory => <Link key={subcategory.id} to={`/subcategories/${subcategory.id}`} className="flex items-center space-x-3 p-3 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors ">
                           {subcategory.image_url && <img src={subcategory.image_url} alt={subcategory.name} className="w-12 h-12 object-cover rounded-lg" />}
                           <div>
                             <h4 className="font-medium text-gray-900">{subcategory.name}</h4>
