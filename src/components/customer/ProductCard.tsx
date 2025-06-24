@@ -127,7 +127,7 @@ export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
     }
   };
 
-  const getAvailableStock = () =>t
+  const getAvailableStock = () => {
     if (product.has_size_variants && selectedSize) {
       const sizeVariant = sizeVariants.find(s => s.id === selectedSize);
       return sizeVariant?.stock_quantity || 0;
