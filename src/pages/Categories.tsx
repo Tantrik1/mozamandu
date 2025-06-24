@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Footer } from '@/components/layout/Footer';
+import { Link } from 'react-router-dom';
+import { Package } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -14,6 +17,7 @@ interface Category {
     id: string;
     name: string;
     selling_price: number;
+    image_url?: string;
   }>;
 }
 
@@ -30,7 +34,7 @@ export default function Categories() {
       .from('categories')
       .select(`
         *,
-        subcategories (id, name, selling_price)
+        subcategories (id, name, selling_price, image_url)
       `)
       .eq('status', 'on')
       .order('created_at', { ascending: false });
@@ -86,12 +90,40 @@ export default function Categories() {
                   {category.subcategories && category.subcategories.length > 0 ? (
                     <div>
                       <h4 className="font-semibold mb-3">Subcategories:</h4>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {category.subcategories.map((subcategory) => (
-                          <div key={subcategory.id} className="flex justify-between items-center">
-                            <span className="text-sm">{subcategory.name}</span>
+                          <Link 
+                            key={subcategory.id} 
+                            to={`/subcategories/${subcategory.id}`}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex items-center space-x-3">
+                              {subcategory.image_url ? (
+                                <img 
+                                  src={subcategory.image_url} 
+                                  alt={subcategory.name}
+                                  className="w-10 h-10 object-cover rounded-lg"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const parent = target.parentElement;
+                                    if (parent) {
+                                      const placeholder = document.createElement('div');
+                                      placeholder.className = 'w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center';
+                                      placeholder.innerHTML = '<svg class="w-5 h-5 text-red-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>';
+                                      parent.appendChild(placeholder);
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                                  <Package className="w-5 h-5 text-red-300" />
+                                </div>
+                              )}
+                              <span className="text-sm font-medium">{subcategory.name}</span>
+                            </div>
                             <Badge variant="outline">${subcategory.selling_price}</Badge>
-                          </div>
+                          </Link>
                         ))}
                       </div>
                     </div>

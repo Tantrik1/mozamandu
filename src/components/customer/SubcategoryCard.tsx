@@ -16,34 +16,40 @@ interface SubcategoryCardProps {
 }
 
 export function SubcategoryCard({ subcategory }: SubcategoryCardProps) {
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement;
+    target.style.display = 'none';
+    const parent = target.parentElement;
+    if (parent) {
+      parent.classList.add('flex', 'items-center', 'justify-center');
+      const placeholder = parent.querySelector('.image-placeholder');
+      if (placeholder) {
+        (placeholder as HTMLElement).style.display = 'flex';
+      }
+    }
+  };
+
   return (
     <Link to={`/subcategories/${subcategory.id}`}>
       <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-0 bg-white">
         <div className="relative">
           {/* Image Section */}
-          <div className="aspect-[4/3] overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+          <div className="aspect-[4/3] overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 relative">
             {subcategory.image_url ? (
-              <img
-                src={subcategory.image_url}
-                alt={subcategory.name}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                onError={(e) => {
-                  console.log('Image load error for subcategory:', subcategory.name, subcategory.image_url);
-                  // Show placeholder if image fails to load
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  target.parentElement?.classList.add('flex', 'items-center', 'justify-center');
-                }}
-              />
+              <>
+                <img
+                  src={subcategory.image_url}
+                  alt={subcategory.name}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  onError={handleImageError}
+                />
+                {/* Hidden placeholder that shows on error */}
+                <div className="image-placeholder absolute inset-0 hidden items-center justify-center bg-gradient-to-br from-red-50 to-red-100">
+                  <Package className="w-16 h-16 text-red-300" />
+                </div>
+              </>
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100">
-                <Package className="w-16 h-16 text-red-300" />
-              </div>
-            )}
-            
-            {/* Placeholder fallback */}
-            {subcategory.image_url && (
-              <div className="absolute inset-0 hidden items-center justify-center bg-gradient-to-br from-red-50 to-red-100">
                 <Package className="w-16 h-16 text-red-300" />
               </div>
             )}
