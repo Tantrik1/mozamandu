@@ -26,7 +26,7 @@ export function HeroSection() {
               <span className="block text-red-500">Sock Collection</span>
             </h1>
             
-            <p className="text-xl sm:text-2xl lg:text-3xl text-gray-300 mb-10 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+            <p className="text-gray-300 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal text-xl md:text-2xl ">
               Discover our exclusive range of comfortable, stylish socks crafted with premium materials for everyday luxury.
             </p>
             
