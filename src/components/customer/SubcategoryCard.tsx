@@ -27,9 +27,23 @@ export function SubcategoryCard({ subcategory }: SubcategoryCardProps) {
                 src={subcategory.image_url}
                 alt={subcategory.name}
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                onError={(e) => {
+                  console.log('Image load error for subcategory:', subcategory.name, subcategory.image_url);
+                  // Show placeholder if image fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  target.parentElement?.classList.add('flex', 'items-center', 'justify-center');
+                }}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100">
+                <Package className="w-16 h-16 text-red-300" />
+              </div>
+            )}
+            
+            {/* Placeholder fallback */}
+            {subcategory.image_url && (
+              <div className="absolute inset-0 hidden items-center justify-center bg-gradient-to-br from-red-50 to-red-100">
                 <Package className="w-16 h-16 text-red-300" />
               </div>
             )}

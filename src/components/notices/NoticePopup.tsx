@@ -4,7 +4,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 
 interface Notice {
   id: string;
@@ -16,14 +15,10 @@ interface Notice {
 export function NoticePopup() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const { userProfile } = useAuth();
 
   useEffect(() => {
-    // Only show popup for admin users
-    if (userProfile?.role === 'admin') {
-      fetchActiveNotice();
-    }
-  }, [userProfile]);
+    fetchActiveNotice();
+  }, []);
 
   const fetchActiveNotice = async () => {
     try {
@@ -36,7 +31,7 @@ export function NoticePopup() {
         .single();
 
       if (error) {
-        // No active notice found
+        console.log('No active notice found');
         return;
       }
 

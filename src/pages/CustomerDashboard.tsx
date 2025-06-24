@@ -1,4 +1,3 @@
-
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { ShoppingBag, Heart, Clock, User, AlertCircle, CreditCard } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { Footer } from '@/components/layout/Footer';
 
 interface Order {
   id: string;
@@ -322,6 +322,7 @@ export default function CustomerDashboard() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Phone, MessageCircle } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ContactInfoFormProps {
   userId: string;
@@ -15,6 +16,7 @@ interface ContactInfoFormProps {
 
 export function ContactInfoForm({ userId, onComplete }: ContactInfoFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const { redirectBasedOnRole } = useAuth();
   const [contactData, setContactData] = useState({
     contactNumber: '',
     whatsappNumber: '',
@@ -56,6 +58,10 @@ export function ContactInfoForm({ userId, onComplete }: ContactInfoFormProps) {
           description: "Contact information saved successfully!",
         });
         onComplete();
+        // Force redirect after profile update
+        setTimeout(() => {
+          redirectBasedOnRole();
+        }, 1000);
       }
     } catch (error) {
       console.error('Error updating profile:', error);

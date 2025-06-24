@@ -15,6 +15,9 @@ import SubcategoryPage from "./pages/SubcategoryPage";
 import Products from "./pages/Products";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import Checkout from "./pages/Checkout";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import ShippingPolicy from "./pages/ShippingPolicy";
+import TermsConditions from "./pages/TermsConditions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +43,9 @@ function App() {
                 <Route path="/products" element={<Products />} />
                 <Route path="/dashboard" element={<CustomerDashboard />} />
                 <Route path="/checkout" element={<Checkout />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/shipping" element={<ShippingPolicy />} />
+                <Route path="/terms" element={<TermsConditions />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>

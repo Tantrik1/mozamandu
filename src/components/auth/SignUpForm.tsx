@@ -1,11 +1,14 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
 import { OTPVerificationForm } from './OTPVerificationForm';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { Link } from 'react-router-dom';
 
 interface SignUpFormProps {
   onSuccess: () => void;
@@ -22,6 +25,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
   });
   const [showOTPForm, setShowOTPForm] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const validatePassword = (password: string) => {
     const requirements = [
@@ -62,6 +66,11 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
     // Validate confirm password
     if (signUpData.password !== signUpData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    // Validate terms acceptance
+    if (!acceptedTerms) {
+      newErrors.terms = 'You must accept the Terms and Conditions to continue';
     }
 
     setErrors(newErrors);
@@ -236,10 +245,38 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
         )}
       </div>
 
+      <div className="space-y-2">
+        <div className="flex items-start space-x-2">
+          <Checkbox
+            id="accept-terms"
+            checked={acceptedTerms}
+            onCheckedChange={(checked) => {
+              setAcceptedTerms(checked as boolean);
+              if (errors.terms) setErrors({ ...errors, terms: '' });
+            }}
+            className="mt-1"
+            disabled={isLoading}
+          />
+          <Label htmlFor="accept-terms" className="text-sm leading-5 cursor-pointer">
+            I accept the{' '}
+            <Link to="/terms" target="_blank" className="text-red-600 hover:text-red-700 underline">
+              Terms and Conditions
+            </Link>{' '}
+            and{' '}
+            <Link to="/privacy" target="_blank" className="text-red-600 hover:text-red-700 underline">
+              Privacy Policy
+            </Link>
+          </Label>
+        </div>
+        {errors.terms && (
+          <p className="text-sm text-red-600">{errors.terms}</p>
+        )}
+      </div>
+
       <Button 
         type="submit" 
         className="w-full bg-red-600 hover:bg-red-700" 
-        disabled={isLoading}
+        disabled={isLoading || !acceptedTerms}
       >
         {isLoading ? 'Sending Verification Code...' : 'Continue'}
       </Button>

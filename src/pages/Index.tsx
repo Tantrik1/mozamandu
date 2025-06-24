@@ -1,6 +1,8 @@
+
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { HeroSection } from '@/components/customer/HeroSection';
 import { NoticePopup } from '@/components/notices/NoticePopup';
+import { Footer } from '@/components/layout/Footer';
 
 export default function Index() {
   return (
@@ -8,6 +10,7 @@ export default function Index() {
       <CustomerHeader />
       <NoticePopup />
       <HeroSection />
+      <Footer />
     </div>
   );
 }

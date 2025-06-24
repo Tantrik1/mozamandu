@@ -1,10 +1,10 @@
-
 import { useEffect, useState } from 'react';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { Footer } from '@/components/layout/Footer';
 
 interface Product {
   id: string;
@@ -126,6 +126,7 @@ export default function Products() {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }
