@@ -7,13 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { SignUpForm } from '@/components/auth/SignUpForm';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 interface CheckoutLoginProps {
   onSuccess: () => void;
+  onBack: () => void;
 }
 
-export function CheckoutLogin({ onSuccess }: CheckoutLoginProps) {
+export function CheckoutLogin({ onSuccess, onBack }: CheckoutLoginProps) {
   const { signIn } = useAuth();
   const [activeTab, setActiveTab] = useState('signin');
   const [showPassword, setShowPassword] = useState(false);
@@ -50,7 +51,17 @@ export function CheckoutLogin({ onSuccess }: CheckoutLoginProps) {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>Sign In to Continue</CardTitle>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="p-1"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <CardTitle>Sign In to Continue</CardTitle>
+        </div>
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
