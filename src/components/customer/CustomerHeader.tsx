@@ -34,10 +34,11 @@ interface TopBarText {
 }
 
 export function CustomerHeader() {
-  const { user, userProfile, signOut } = useAuth();
+  const { user, userProfile, signOut, isLoading } = useAuth();
   const location = useLocation();
   const [categories, setCategories] = useState<Category[]>([]);
   const [topBarText, setTopBarText] = useState<TopBarText | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -79,7 +80,16 @@ export function CustomerHeader() {
   };
 
   const handleSignOut = async () => {
-    await signOut();
+    if (signingOut) return;
+    
+    setSigningOut(true);
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Sign out error:', error);
+    } finally {
+      setSigningOut(false);
+    }
   };
 
   const isActive = (path: string) => location.pathname === path;
@@ -156,11 +166,16 @@ export function CustomerHeader() {
             <div className="flex items-center space-x-4">
               <CartSidebar />
 
-              {user ? (
+              {user && !isLoading ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" disabled={signingOut}>
                       <User className="h-5 w-5" />
+                      {userProfile?.full_name && (
+                        <span className="ml-2 hidden sm:inline">
+                          {userProfile.full_name.split(' ')[0]}
+                        </span>
+                      )}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
@@ -171,15 +186,17 @@ export function CustomerHeader() {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut}>
+                    <DropdownMenuItem onClick={handleSignOut} disabled={signingOut}>
                       <LogOut className="mr-2 h-4 w-4" />
-                      Sign Out
+                      {signingOut ? 'Signing Out...' : 'Sign Out'}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
                 <Link to="/auth">
-                  <Button size="sm" className="bg-red-600 hover:bg-red-700">Sign In</Button>
+                  <Button size="sm" className="bg-red-600 hover:bg-red-700">
+                    Sign In
+                  </Button>
                 </Link>
               )}
             </div>

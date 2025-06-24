@@ -24,9 +24,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
+
         console.log('Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
@@ -34,18 +38,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           // Defer profile fetch to avoid auth state callback issues
           setTimeout(() => {
-            fetchUserProfile(session.user.id);
+            if (mounted) {
+              fetchUserProfile(session.user.id);
+            }
           }, 0);
         } else {
           setUserProfile(null);
         }
         
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     );
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+
       console.log('Initial session:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
@@ -57,7 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
@@ -92,23 +105,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password,
       });
       
       if (error) {
-        toast({
-          title: "Sign In Failed",
-          description: error.message,
-          variant: "destructive",
-        });
+        console.error('Sign in error:', error);
+        return { error };
       } else {
         toast({
           title: "Welcome back!",
           description: "You have successfully signed in.",
         });
+        return { error: null };
       }
-      
+    } catch (error) {
+      console.error('Unexpected sign in error:', error);
       return { error };
     } finally {
       setIsLoading(false);
@@ -118,33 +130,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, fullName: string, role: string = 'customer') => {
     try {
       setIsLoading(true);
-      const redirectUrl = `${window.location.origin}/`;
+      const redirectUrl = `${window.location.origin}/auth`;
       
       const { error } = await supabase.auth.signUp({
-        email,
+        email: email.trim(),
         password,
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            full_name: fullName,
+            full_name: fullName.trim(),
             role: role,
           },
         },
       });
 
       if (error) {
-        toast({
-          title: "Sign Up Failed",
-          description: error.message,
-          variant: "destructive",
-        });
+        console.error('Sign up error:', error);
+        return { error };
       } else {
         toast({
           title: "Account Created!",
           description: "Please check your email to verify your account.",
         });
+        return { error: null };
       }
-      
+    } catch (error) {
+      console.error('Unexpected sign up error:', error);
       return { error };
     } finally {
       setIsLoading(false);
@@ -153,15 +164,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
-      toast({
-        title: "Signed Out",
-        description: "You have been successfully signed out.",
-      });
-      // Redirect to home page after sign out
-      window.location.href = '/';
+      setIsLoading(true);
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Sign out error:', error);
+        toast({
+          title: "Sign Out Failed",
+          description: "There was an error signing you out. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        // Clear local state
+        setUser(null);
+        setSession(null);
+        setUserProfile(null);
+        
+        toast({
+          title: "Signed Out",
+          description: "You have been successfully signed out.",
+        });
+        
+        // Redirect to home page after sign out
+        window.location.href = '/';
+      }
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error('Unexpected sign out error:', error);
+      toast({
+        title: "Sign Out Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
