@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -115,8 +114,9 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
         description: "Please check your email for the verification code.",
       });
 
-      // Move to OTP verification step
+      // Move to OTP verification step - this should show the OTP form
       setCurrentStep('otp');
+      console.log('Switched to OTP step, currentStep:', 'otp');
     } catch (error) {
       console.error('Unexpected signup error:', error);
       toast({
@@ -181,34 +181,45 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
     setErrors({});
   };
 
+  console.log('Current step:', currentStep); // Debug log
+
   // Show OTP verification form
   if (currentStep === 'otp') {
+    console.log('Rendering OTP form'); // Debug log
     return (
       <div className="space-y-6 w-full">
         <div className="text-center">
-          <h3 className="text-lg font-semibold mb-2">Verify Your Email</h3>
-          <p className="text-sm text-gray-600">
-            We've sent a verification code to<br />
-            <span className="font-medium">{signUpData.email}</span>
-          </p>
+          <h3 className="text-xl font-bold mb-4">Verify Your Email</h3>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <p className="text-sm text-blue-800">
+              We've sent a verification code to<br />
+              <span className="font-semibold text-blue-900">{signUpData.email}</span>
+            </p>
+          </div>
         </div>
 
         <form onSubmit={handleOTPVerification} className="space-y-6 w-full">
-          <div className="flex justify-center">
-            <InputOTP
-              value={otpCode}
-              onChange={setOtpCode}
-              maxLength={6}
-            >
-              <InputOTPGroup>
-                <InputOTPSlot index={0} />
-                <InputOTPSlot index={1} />
-                <InputOTPSlot index={2} />
-                <InputOTPSlot index={3} />
-                <InputOTPSlot index={4} />
-                <InputOTPSlot index={5} />
-              </InputOTPGroup>
-            </InputOTP>
+          <div className="space-y-4">
+            <Label className="text-center block text-sm font-medium">
+              Enter the 6-digit verification code
+            </Label>
+            <div className="flex justify-center">
+              <InputOTP
+                value={otpCode}
+                onChange={setOtpCode}
+                maxLength={6}
+                className="gap-2"
+              >
+                <InputOTPGroup className="gap-2">
+                  <InputOTPSlot index={0} className="w-12 h-12 text-lg" />
+                  <InputOTPSlot index={1} className="w-12 h-12 text-lg" />
+                  <InputOTPSlot index={2} className="w-12 h-12 text-lg" />
+                  <InputOTPSlot index={3} className="w-12 h-12 text-lg" />
+                  <InputOTPSlot index={4} className="w-12 h-12 text-lg" />
+                  <InputOTPSlot index={5} className="w-12 h-12 text-lg" />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
           </div>
           
           <div className="space-y-3 w-full">
@@ -235,6 +246,8 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
       </div>
     );
   }
+
+  console.log('Rendering signup form'); // Debug log
 
   // Show signup form
   return (
