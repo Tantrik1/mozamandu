@@ -1,8 +1,11 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,28 +27,41 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { email, code, name }: OTPEmailRequest = await req.json();
 
-    const emailResponse = await resend.emails.send({
-      from: "Mozamandu <onboarding@resend.dev>",
-      to: [email],
-      subject: "Your Verification Code - Mozamandu",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #333; text-align: center;">Welcome to Mozamandu!</h1>
-          ${name ? `<p>Hi ${name},</p>` : '<p>Hello,</p>'}
-          <p>Thank you for signing up! Please use the verification code below to complete your account setup:</p>
-          <div style="background: #f4f4f4; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
-            <h2 style="color: #2563eb; font-size: 32px; letter-spacing: 8px; margin: 0;">${code}</h2>
-          </div>
-          <p>This code will expire in 10 minutes for security reasons.</p>
-          <p>If you didn't create an account with us, please ignore this email.</p>
-          <p>Best regards,<br>The Mozamandu Team</p>
-        </div>
-      `,
+    // Use Supabase's built-in email functionality
+    // Create a temporary user to trigger the email template
+    const { data, error } = await supabase.auth.admin.generateLink({
+      type: 'signup',
+      email: email,
+      options: {
+        data: {
+          verification_code: code,
+          full_name: name || '',
+        }
+      }
     });
 
-    console.log("OTP email sent successfully:", emailResponse);
+    if (error) {
+      console.error('Error generating email link:', error);
+      throw new Error('Failed to send verification email');
+    }
 
-    return new Response(JSON.stringify({ success: true, messageId: emailResponse.data?.id }), {
+    // Store the OTP in the database for verification
+    const { error: insertError } = await supabase
+      .from('email_verification_codes')
+      .insert({
+        email,
+        code,
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes
+      });
+
+    if (insertError) {
+      console.error('Error storing OTP:', insertError);
+      throw new Error('Failed to store verification code');
+    }
+
+    console.log("OTP email sent successfully via Supabase");
+
+    return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",

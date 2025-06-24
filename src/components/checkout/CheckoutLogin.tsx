@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,22 +62,9 @@ export function CheckoutLogin({ onSuccess, onBack }: CheckoutLoginProps) {
 
   const sendOTP = async (email: string, isResend: boolean = false) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     try {
-      const { error } = await supabase
-        .from('email_verification_codes')
-        .insert({
-          email,
-          code,
-          expires_at: expiresAt.toISOString(),
-        });
-
-      if (error) {
-        throw new Error('Failed to generate verification code');
-      }
-
-      // Send email via edge function
+      // Send email via Supabase edge function
       const { error: emailError } = await supabase.functions.invoke('send-otp-email', {
         body: {
           email,
@@ -89,18 +75,18 @@ export function CheckoutLogin({ onSuccess, onBack }: CheckoutLoginProps) {
 
       if (emailError) {
         console.error('Email sending error:', emailError);
-        // Fallback: show code in toast for demo
         toast({
-          title: isResend ? "New Verification Code" : "Verification Code Sent",
-          description: `Your verification code is: ${code} (Note: Email service not configured, showing code here)`,
-          duration: 10000,
+          title: "Error",
+          description: "Failed to send verification code",
+          variant: "destructive",
         });
-      } else {
-        toast({
-          title: isResend ? "New Code Sent" : "Verification Code Sent",
-          description: `Please check your email for the verification code.`,
-        });
+        return false;
       }
+
+      toast({
+        title: isResend ? "New Code Sent" : "Verification Code Sent",
+        description: `Please check your email for the verification code.`,
+      });
 
       if (isResend) {
         setResendCooldown(60); // 60 second cooldown
