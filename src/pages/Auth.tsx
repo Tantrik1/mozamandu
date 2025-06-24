@@ -1,17 +1,20 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function Auth() {
-  const { signIn, signUp, user, userProfile } = useAuth();
+  const { signIn, signUp, user, userProfile, isLoading } = useAuth();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirect');
+  
+  const [authLoading, setAuthLoading] = useState(false);
   const [signInData, setSignInData] = useState({
     email: '',
     password: '',
@@ -19,41 +22,91 @@ export default function Auth() {
   const [signUpData, setSignUpData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     fullName: '',
   });
 
   useEffect(() => {
-    if (user && userProfile) {
-      // Redirect based on user role
+    if (user && userProfile && !isLoading) {
+      console.log('User authenticated, redirecting based on role:', userProfile.role);
+      
+      // Handle redirect parameter first
+      if (redirectTo) {
+        navigate(redirectTo);
+        return;
+      }
+
+      // Role-based redirect
       if (userProfile.role === 'admin') {
         navigate('/admin');
       } else {
-        navigate('/');
+        navigate('/dashboard');
       }
     }
-  }, [user, userProfile, navigate]);
+  }, [user, userProfile, isLoading, navigate, redirectTo]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    if (!signInData.email || !signInData.password) {
+      return;
+    }
     
-    await signIn(signInData.email, signInData.password);
+    setAuthLoading(true);
     
-    setIsLoading(false);
+    try {
+      const { error } = await signIn(signInData.email, signInData.password);
+      if (!error) {
+        // Success handling is done in useEffect above
+      }
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     
-    const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
-    
-    if (!error) {
-      navigate('/');
+    if (!signUpData.email || !signUpData.password || !signUpData.fullName) {
+      return;
+    }
+
+    if (signUpData.password !== signUpData.confirmPassword) {
+      return;
+    }
+
+    if (signUpData.password.length < 6) {
+      return;
     }
     
-    setIsLoading(false);
+    setAuthLoading(true);
+    
+    try {
+      const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
+      if (!error) {
+        // Reset form
+        setSignUpData({
+          email: '',
+          password: '',
+          confirmPassword: '',
+          fullName: '',
+        });
+      }
+    } finally {
+      setAuthLoading(false);
+    }
   };
+
+  // Show loading while checking auth state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -72,17 +125,18 @@ export default function Auth() {
           <TabsContent value="signin">
             <Card>
               <CardHeader>
-                <CardTitle>Sign In</CardTitle>
+                <CardTitle>Sign In to Your Account</CardTitle>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div>
-                    <Label htmlFor="signin-email">Email</Label>
+                    <Label htmlFor="signin-email">Email Address</Label>
                     <Input
                       id="signin-email"
                       type="email"
                       value={signInData.email}
                       onChange={(e) => setSignInData({ ...signInData, email: e.target.value })}
+                      placeholder="Enter your email"
                       required
                     />
                   </div>
@@ -93,11 +147,16 @@ export default function Auth() {
                       type="password"
                       value={signInData.password}
                       onChange={(e) => setSignInData({ ...signInData, password: e.target.value })}
+                      placeholder="Enter your password"
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Signing In...' : 'Sign In'}
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={authLoading || !signInData.email || !signInData.password}
+                  >
+                    {authLoading ? 'Signing In...' : 'Sign In'}
                   </Button>
                 </form>
               </CardContent>
@@ -107,7 +166,7 @@ export default function Auth() {
           <TabsContent value="signup">
             <Card>
               <CardHeader>
-                <CardTitle>Customer Sign Up</CardTitle>
+                <CardTitle>Create New Account</CardTitle>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSignUp} className="space-y-4">
@@ -118,16 +177,18 @@ export default function Auth() {
                       type="text"
                       value={signUpData.fullName}
                       onChange={(e) => setSignUpData({ ...signUpData, fullName: e.target.value })}
+                      placeholder="Enter your full name"
                       required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="signup-email">Email</Label>
+                    <Label htmlFor="signup-email">Email Address</Label>
                     <Input
                       id="signup-email"
                       type="email"
                       value={signUpData.email}
                       onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
+                      placeholder="Enter your email"
                       required
                     />
                   </div>
@@ -138,11 +199,40 @@ export default function Auth() {
                       type="password"
                       value={signUpData.password}
                       onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
+                      placeholder="Minimum 6 characters"
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Creating Account...' : 'Create Account'}
+                  <div>
+                    <Label htmlFor="signup-confirm-password">Confirm Password</Label>
+                    <Input
+                      id="signup-confirm-password"
+                      type="password"
+                      value={signUpData.confirmPassword}
+                      onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
+                      placeholder="Confirm your password"
+                      required
+                    />
+                  </div>
+                  {signUpData.password && signUpData.confirmPassword && signUpData.password !== signUpData.confirmPassword && (
+                    <p className="text-sm text-red-600">Passwords do not match</p>
+                  )}
+                  {signUpData.password && signUpData.password.length < 6 && (
+                    <p className="text-sm text-red-600">Password must be at least 6 characters</p>
+                  )}
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={
+                      authLoading || 
+                      !signUpData.email || 
+                      !signUpData.password || 
+                      !signUpData.fullName ||
+                      signUpData.password !== signUpData.confirmPassword ||
+                      signUpData.password.length < 6
+                    }
+                  >
+                    {authLoading ? 'Creating Account...' : 'Create Account'}
                   </Button>
                 </form>
               </CardContent>
