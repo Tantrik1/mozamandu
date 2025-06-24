@@ -20,7 +20,6 @@ export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
   const [contactNumber, setContactNumber] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [sameAsContact, setSameAsContact] = useState(true);
-  const [address, setAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -57,11 +56,11 @@ export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
         .update({
           contact_number: contactNumber.trim(),
           whatsapp_number: finalWhatsappNumber.trim(),
-          address: address.trim(),
         })
         .eq('id', user?.id);
 
       if (error) {
+        console.error('Profile update error:', error);
         toast({
           title: "Error",
           description: "Failed to update contact information",
@@ -131,17 +130,6 @@ export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
                 />
               </div>
             )}
-
-            <div>
-              <Label htmlFor="address">Address (Optional)</Label>
-              <Input
-                id="address"
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Enter your address"
-              />
-            </div>
 
             <Button 
               type="submit" 
