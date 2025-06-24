@@ -115,6 +115,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
         description: "Please check your email for the verification code.",
       });
 
+      // Move to OTP verification step
       setCurrentStep('otp');
     } catch (error) {
       console.error('Unexpected signup error:', error);
@@ -177,8 +178,10 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
   const handleBackToForm = () => {
     setCurrentStep('form');
     setOtpCode('');
+    setErrors({});
   };
 
+  // Show OTP verification form
   if (currentStep === 'otp') {
     return (
       <div className="space-y-6">
@@ -230,6 +233,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
     );
   }
 
+  // Show signup form
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
