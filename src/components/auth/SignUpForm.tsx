@@ -202,7 +202,7 @@ export function SignUpForm({ onSuccess, isLoading, setIsLoading }: SignUpFormPro
 
       <Button 
         type="submit" 
-        className="w-full" 
+        className="w-full bg-red-600 hover:bg-red-700" 
         disabled={isLoading}
       >
         {isLoading ? 'Creating Account...' : 'Sign Up'}

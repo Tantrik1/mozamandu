@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { CheckoutAuthChoice } from '@/components/checkout/CheckoutAuthChoice';
 import { CheckoutLogin } from '@/components/checkout/CheckoutLogin';
 import { EnhancedCheckoutInfo } from '@/components/checkout/EnhancedCheckoutInfo';
@@ -55,6 +56,7 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <CustomerHeader />
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>

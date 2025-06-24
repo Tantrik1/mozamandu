@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { Header } from '@/components/layout/Header';
+import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -74,17 +74,17 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
+      <CustomerHeader />
       
       {/* Hero Section */}
-      <section className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-20">
+      <section className="bg-gradient-to-r from-red-600 to-red-700 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-5xl font-bold mb-6">Welcome to Mozamandu</h1>
           <p className="text-xl mb-8 max-w-2xl mx-auto">
             Discover premium quality socks, boxers, and caps. Comfort meets style in every product.
           </p>
-          <Link to="/products">
-            <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100">
+          <Link to="/">
+            <Button size="lg" className="bg-white text-red-600 hover:bg-gray-100">
               Shop Now
             </Button>
           </Link>
@@ -103,7 +103,7 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600 mb-4">{category.description}</p>
-                  <Link to={`/category/${category.id}`}>
+                  <Link to={`/categories/${category.id}`}>
                     <Button variant="outline" className="w-full">
                       Browse {category.name}
                     </Button>
@@ -134,12 +134,12 @@ export default function Home() {
                 <CardContent>
                   <p className="text-gray-600 mb-4 text-sm">{product.description}</p>
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-2xl font-bold text-blue-600">
+                    <span className="text-2xl font-bold text-red-600">
                       ${getProductPrice(product).toFixed(2)}
                     </span>
                     <Badge variant="outline">{product.categories?.name}</Badge>
                   </div>
-                  <Button className="w-full">
+                  <Button className="w-full bg-red-600 hover:bg-red-700">
                     <ShoppingCart className="h-4 w-4 mr-2" />
                     Add to Cart
                   </Button>

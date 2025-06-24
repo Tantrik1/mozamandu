@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { Header } from '@/components/layout/Header';
+import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,7 +50,7 @@ export default function Categories() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Header />
+        <CustomerHeader />
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
           <div className="text-center">Loading categories...</div>
         </div>
@@ -60,7 +60,7 @@ export default function Categories() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
+      <CustomerHeader />
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Product Categories</h1>

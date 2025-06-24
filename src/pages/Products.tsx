@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { Header } from '@/components/layout/Header';
+import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -56,7 +56,7 @@ export default function Products() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Header />
+        <CustomerHeader />
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
           <div className="text-center">Loading products...</div>
         </div>
@@ -66,7 +66,7 @@ export default function Products() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
+      <CustomerHeader />
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Our Products</h1>
@@ -116,7 +116,7 @@ export default function Products() {
                   )}
                   
                   <div className="flex items-center justify-between">
-                    <span className="text-xl font-bold text-blue-600">
+                    <span className="text-xl font-bold text-red-600">
                       ${getProductPrice(product)}
                     </span>
                   </div>

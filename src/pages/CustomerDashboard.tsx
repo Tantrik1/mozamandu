@@ -1,7 +1,8 @@
+
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header } from '@/components/layout/Header';
+import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { ContactInfoForm } from '@/components/customer/ContactInfoForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -102,7 +103,7 @@ export default function CustomerDashboard() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading your dashboard...</p>
         </div>
       </div>
@@ -123,7 +124,7 @@ export default function CustomerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
+      <CustomerHeader />
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Welcome back!</h1>
@@ -211,14 +212,14 @@ export default function CustomerDashboard() {
               <CardContent>
                 {ordersLoading ? (
                   <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4"></div>
                     <p className="text-gray-500">Loading orders...</p>
                   </div>
                 ) : orders.length === 0 ? (
                   <div className="text-center py-8">
                     <ShoppingBag className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-500 mb-4">No orders found</p>
-                    <Button onClick={() => navigate('/')} className="bg-blue-600 hover:bg-blue-700">
+                    <Button onClick={() => navigate('/')} className="bg-red-600 hover:bg-red-700">
                       Start Shopping
                     </Button>
                   </div>
@@ -312,9 +313,6 @@ export default function CustomerDashboard() {
               <CardContent className="space-y-3">
                 <Button onClick={() => navigate('/')} variant="outline" className="w-full">
                   Browse Products
-                </Button>
-                <Button onClick={() => navigate('/categories')} variant="outline" className="w-full">
-                  Shop by Category
                 </Button>
                 <Button onClick={fetchOrders} variant="outline" className="w-full">
                   Refresh Orders
