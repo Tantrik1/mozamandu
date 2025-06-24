@@ -1,63 +1,49 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-
-const defaultSockTypes = [
-  {
-    id: 1,
-    name: 'Full Socks',
-    description: 'Complete coverage and comfort',
-    image: '/lovable-uploads/fd4fd25e-ccf5-42d0-a176-49b63583881b.png',
-    color: 'from-red-500 to-red-700',
-    categoryId: null
-  },
-  {
-    id: 2,
-    name: 'Half Socks',
-    description: 'Perfect for casual wear',
-    image: '/lovable-uploads/237dafb7-830d-417a-bbb5-1a22d7c3a115.png',
-    color: 'from-red-600 to-red-800',
-    categoryId: null
-  },
-  {
-    id: 3,
-    name: 'Ankle Socks',
-    description: 'Minimal and stylish',
-    image: '/lovable-uploads/c75106db-4b85-4396-a9eb-c802f441793b.png',
-    color: 'from-red-700 to-red-900',
-    categoryId: null
-  }
-];
-
+const defaultSockTypes = [{
+  id: 1,
+  name: 'Full Socks',
+  description: 'Complete coverage and comfort',
+  image: '/lovable-uploads/fd4fd25e-ccf5-42d0-a176-49b63583881b.png',
+  color: 'from-red-500 to-red-700',
+  categoryId: null
+}, {
+  id: 2,
+  name: 'Half Socks',
+  description: 'Perfect for casual wear',
+  image: '/lovable-uploads/237dafb7-830d-417a-bbb5-1a22d7c3a115.png',
+  color: 'from-red-600 to-red-800',
+  categoryId: null
+}, {
+  id: 3,
+  name: 'Ankle Socks',
+  description: 'Minimal and stylish',
+  image: '/lovable-uploads/c75106db-4b85-4396-a9eb-c802f441793b.png',
+  color: 'from-red-700 to-red-900',
+  categoryId: null
+}];
 export function HeroSection() {
   const [currentSock, setCurrentSock] = useState(0);
   const [categories, setCategories] = useState<any[]>([]);
   const [sockTypes, setSockTypes] = useState(defaultSockTypes);
-
   useEffect(() => {
     fetchCategories();
   }, []);
-
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentSock((prev) => (prev + 1) % sockTypes.length);
+      setCurrentSock(prev => (prev + 1) % sockTypes.length);
     }, 3500);
-
     return () => clearInterval(interval);
   }, [sockTypes.length]);
-
   const fetchCategories = async () => {
     try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('id, name')
-        .eq('status', 'on')
-        .limit(3);
-
+      const {
+        data,
+        error
+      } = await supabase.from('categories').select('id, name').eq('status', 'on').limit(3);
       if (error) throw error;
-      
       if (data && data.length > 0) {
         const updatedSockTypes = defaultSockTypes.map((sock, index) => ({
           ...sock,
@@ -70,15 +56,12 @@ export function HeroSection() {
       console.error('Error fetching categories:', error);
     }
   };
-
   const handleSockClick = (sock: any) => {
     if (sock.categoryId) {
       window.location.href = `/categories/${sock.categoryId}`;
     }
   };
-
-  return (
-    <section className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 relative overflow-hidden">
+  return <section className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,0,0,0.1),transparent_50%)]"></div>
@@ -104,19 +87,12 @@ export function HeroSection() {
 
             <div className="flex flex-col sm:flex-row gap-4">
               <Link to="/products">
-                <Button 
-                  size="lg" 
-                  className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-lg font-medium"
-                >
+                <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-lg font-medium">
                   Shop Now
                 </Button>
               </Link>
               <Link to="/categories">
-                <Button 
-                  size="lg" 
-                  variant="outline" 
-                  className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white px-8 py-3 text-lg font-medium"
-                >
+                <Button size="lg" variant="outline" className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white px-8 py-3 text-lg font-medium">
                   View Collection
                 </Button>
               </Link>
@@ -142,47 +118,28 @@ export function HeroSection() {
           <div className="relative h-[600px] flex items-center justify-center">
             {/* Sock Images Container */}
             <div className="relative w-full h-full overflow-hidden">
-              {sockTypes.map((sock, index) => (
-                <div
-                  key={sock.id}
-                  className={`absolute inset-0 transition-all duration-1000 transform cursor-pointer ${
-                    index === currentSock
-                      ? 'opacity-100 scale-100 z-20'
-                      : 'opacity-0 scale-95 z-0'
-                  }`}
-                  onClick={() => handleSockClick(sock)}
-                >
+              {sockTypes.map((sock, index) => <div key={sock.id} className={`absolute inset-0 transition-all duration-1000 transform cursor-pointer ${index === currentSock ? 'opacity-100 scale-100 z-20' : 'opacity-0 scale-95 z-0'}`} onClick={() => handleSockClick(sock)}>
                   {/* Sock Image Container */}
                   <div className="w-full h-full flex items-center justify-center relative">
                     {/* Actual Sock Image */}
-                    <div className="relative z-10 flex flex-col items-center justify-center h-full p-8 transition-transform duration-300 hover:scale-110">
+                    <div className="relative z-10 flex flex-col items-center justify-center h-full p-8 transition-transform duration-300 hover:scale-110 py-0">
                       <div className="mb-6 transform transition-transform duration-300">
-                        <img 
-                          src={sock.image} 
-                          alt={sock.name}
-                          className="max-w-full max-h-80 object-contain drop-shadow-2xl filter brightness-110"
-                        />
+                        <img src={sock.image} alt={sock.name} className="max-w-full max-h-80 object-contain drop-shadow-2xl filter brightness-110" />
                       </div>
                       <h3 className="text-2xl font-bold mb-2 text-white">{sock.name}</h3>
                       <p className="text-lg opacity-90 text-white text-center">{sock.description}</p>
-                      {sock.categoryId && (
-                        <Button 
-                          className="mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSockClick(sock);
-                          }}
-                        >
+                      {sock.categoryId && <Button className="mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-2" onClick={e => {
+                    e.stopPropagation();
+                    handleSockClick(sock);
+                  }}>
                           Shop {sock.name}
-                        </Button>
-                      )}
+                        </Button>}
                     </div>
 
                     {/* Subtle Glow Effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-transparent blur-xl animate-pulse"></div>
                   </div>
-                </div>
-              ))}
+                </div>)}
             </div>
           </div>
         </div>
@@ -195,6 +152,5 @@ export function HeroSection() {
           <div className="w-px h-16 bg-gradient-to-b from-white/60 to-transparent"></div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 }
