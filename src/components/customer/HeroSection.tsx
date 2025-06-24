@@ -1,71 +1,56 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-
-const defaultSockTypes = [
-  {
-    id: 1,
-    name: 'Full Socks',
-    description: 'Complete coverage and comfort',
-    image: '/lovable-uploads/fd4fd25e-ccf5-42d0-a176-49b63583881b.png',
-    color: 'from-red-500 to-red-700',
-    subcategoryId: null
-  },
-  {
-    id: 2,
-    name: 'Half Socks',
-    description: 'Perfect for casual wear',
-    image: '/lovable-uploads/237dafb7-830d-417a-bbb5-1a22d7c3a115.png',
-    color: 'from-red-600 to-red-800',
-    subcategoryId: null
-  },
-  {
-    id: 3,
-    name: 'Ankle Socks',
-    description: 'Minimal and stylish',
-    image: '/lovable-uploads/c75106db-4b85-4396-a9eb-c802f441793b.png',
-    color: 'from-red-700 to-red-900',
-    subcategoryId: null
-  }
-];
-
+const defaultSockTypes = [{
+  id: 1,
+  name: 'Full Socks',
+  description: 'Complete coverage and comfort',
+  image: '/lovable-uploads/fd4fd25e-ccf5-42d0-a176-49b63583881b.png',
+  color: 'from-red-500 to-red-700',
+  subcategoryId: null
+}, {
+  id: 2,
+  name: 'Half Socks',
+  description: 'Perfect for casual wear',
+  image: '/lovable-uploads/237dafb7-830d-417a-bbb5-1a22d7c3a115.png',
+  color: 'from-red-600 to-red-800',
+  subcategoryId: null
+}, {
+  id: 3,
+  name: 'Ankle Socks',
+  description: 'Minimal and stylish',
+  image: '/lovable-uploads/c75106db-4b85-4396-a9eb-c802f441793b.png',
+  color: 'from-red-700 to-red-900',
+  subcategoryId: null
+}];
 export function HeroSection() {
   const [currentSock, setCurrentSock] = useState(0);
   const [sockTypes, setSockTypes] = useState(defaultSockTypes);
-
   useEffect(() => {
     fetchSubcategories();
   }, []);
-
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentSock(prev => (prev + 1) % sockTypes.length);
     }, 3500);
     return () => clearInterval(interval);
   }, [sockTypes.length]);
-
   const fetchSubcategories = async () => {
     try {
-      const { data, error } = await supabase
-        .from('subcategories')
-        .select('id, name')
-        .eq('status', 'on')
-        .in('name', ['Full Socks', 'Half Socks', 'Ankle Socks'])
-        .limit(3);
-
+      const {
+        data,
+        error
+      } = await supabase.from('subcategories').select('id, name').eq('status', 'on').in('name', ['Full Socks', 'Half Socks', 'Ankle Socks']).limit(3);
       if (error) throw error;
-
       if (data && data.length > 0) {
-        const updatedSockTypes = defaultSockTypes.map((sock) => {
+        const updatedSockTypes = defaultSockTypes.map(sock => {
           let subcategory = data.find(sub => sub.name === sock.name);
-          
+
           // For ankle and half socks, use the same subcategory if found
           if (!subcategory && (sock.name === 'Half Socks' || sock.name === 'Ankle Socks')) {
             subcategory = data.find(sub => sub.name === 'Half Socks' || sub.name === 'Ankle Socks');
           }
-          
           return {
             ...sock,
             subcategoryId: subcategory?.id || null
@@ -77,15 +62,12 @@ export function HeroSection() {
       console.error('Error fetching subcategories:', error);
     }
   };
-
   const handleSockClick = (sock: any) => {
     if (sock.subcategoryId) {
       window.location.href = `/subcategories/${sock.subcategoryId}`;
     }
   };
-
-  return (
-    <section className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 relative overflow-hidden">
+  return <section className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,0,0,0.1),transparent_50%)]"></div>
@@ -142,42 +124,20 @@ export function HeroSection() {
           <div className="relative h-[400px] sm:h-[500px] lg:h-[600px] flex items-center justify-center">
             {/* Sock Images Container */}
             <div className="relative w-full h-full overflow-hidden">
-              {sockTypes.map((sock, index) => (
-                <div
-                  key={sock.id}
-                  className={`absolute inset-0 transition-all duration-1000 transform cursor-pointer ${
-                    index === currentSock ? 'opacity-100 scale-100 z-20' : 'opacity-0 scale-95 z-0'
-                  }`}
-                  onClick={() => handleSockClick(sock)}
-                >
+              {sockTypes.map((sock, index) => <div key={sock.id} className={`absolute inset-0 transition-all duration-1000 transform cursor-pointer ${index === currentSock ? 'opacity-100 scale-100 z-20' : 'opacity-0 scale-95 z-0'}`} onClick={() => handleSockClick(sock)}>
                   {/* Sock Image Container */}
                   <div className="w-full h-full flex items-center justify-center relative">
                     {/* Actual Sock Image */}
                     <div className="relative z-10 flex flex-col items-center justify-center h-full p-4 sm:p-8 transition-transform duration-300 hover:scale-110">
                       <div className="mb-4 sm:mb-6 transform transition-transform duration-300">
-                        <img
-                          src={sock.image}
-                          alt={sock.name}
-                          className="max-w-full max-h-60 sm:max-h-80 object-contain drop-shadow-2xl filter brightness-110"
-                        />
+                        <img src={sock.image} alt={sock.name} className="max-w-full max-h-60 sm:max-h-80 object-contain drop-shadow-2xl filter brightness-110" />
                       </div>
-                      <h3 className="text-xl sm:text-2xl font-bold mb-2 text-white text-center">{sock.name}</h3>
-                      <p className="text-base sm:text-lg opacity-90 text-white text-center">{sock.description}</p>
-                      {sock.subcategoryId && (
-                        <Button 
-                          className="mt-4 bg-red-600 hover:bg-red-700 text-white px-4 sm:px-6 py-2" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSockClick(sock);
-                          }}
-                        >
-                          Shop {sock.name}
-                        </Button>
-                      )}
+                      
+                      
+                      {sock.subcategoryId}
                     </div>
                   </div>
-                </div>
-              ))}
+                </div>)}
             </div>
           </div>
         </div>
@@ -190,6 +150,5 @@ export function HeroSection() {
           <div className="w-px h-16 bg-gradient-to-b from-white/60 to-transparent"></div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 }
