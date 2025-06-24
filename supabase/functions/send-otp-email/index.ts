@@ -43,26 +43,23 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Failed to store verification code');
     }
 
-    // Use Supabase's built-in email functionality by creating a magic link
-    // This will use your configured SMTP settings
-    const { data, error } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
-      email: email,
-      options: {
-        data: {
-          verification_code: code,
-          full_name: name || '',
-          custom_otp: true,
-        }
-      }
+    // Use Supabase Auth's invite functionality to trigger email
+    // This will use your configured SMTP settings and email templates
+    const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
+      data: {
+        verification_code: code,
+        full_name: name || '',
+        invite_type: 'otp_verification',
+      },
+      redirectTo: `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify`
     });
 
     if (error) {
-      console.error('Error generating magic link:', error);
+      console.error('Error sending invite email:', error);
       
-      // Fallback: If magic link fails, we still have the OTP stored
+      // Fallback: If email sending fails, we still have the OTP stored
       // The frontend can show the code in a toast for testing
-      console.log("Magic link failed, but OTP stored successfully. Code:", code);
+      console.log("Email sending failed, but OTP stored successfully. Code:", code);
       
       return new Response(JSON.stringify({ 
         success: true, 
@@ -77,7 +74,7 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    console.log("Magic link generated successfully");
+    console.log("OTP email sent successfully via Supabase");
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
