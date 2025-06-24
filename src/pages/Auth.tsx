@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SignUpForm } from '@/components/auth/SignUpForm';
 import { ContactInfoForm } from '@/components/customer/ContactInfoForm';
 import { toast } from '@/hooks/use-toast';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function Auth() {
   const { signIn, user, userProfile, isLoading } = useAuth();
@@ -20,6 +20,7 @@ export default function Auth() {
   const [authLoading, setAuthLoading] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
+  const [showPassword, setShowPassword] = useState(false);
   
   const [signInData, setSignInData] = useState({
     email: '',
@@ -184,18 +185,32 @@ export default function Auth() {
                   
                   <div>
                     <Label htmlFor="signin-password">Password</Label>
-                    <Input
-                      id="signin-password"
-                      type="password"
-                      value={signInData.password}
-                      onChange={(e) => {
-                        setSignInData({ ...signInData, password: e.target.value });
-                        if (errors.password) setErrors({ ...errors, password: '' });
-                      }}
-                      placeholder="Enter your password"
-                      className={errors.password ? 'border-red-500' : ''}
-                      disabled={authLoading}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="signin-password"
+                        type={showPassword ? "text" : "password"}
+                        value={signInData.password}
+                        onChange={(e) => {
+                          setSignInData({ ...signInData, password: e.target.value });
+                          if (errors.password) setErrors({ ...errors, password: '' });
+                        }}
+                        placeholder="Enter your password"
+                        className={`pr-10 ${errors.password ? 'border-red-500' : ''}`}
+                        disabled={authLoading}
+                      />
+                      <button
+                        type="button"
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                        onClick={() => setShowPassword(!showPassword)}
+                        disabled={authLoading}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-gray-400" />
+                        )}
+                      </button>
+                    </div>
                     {errors.password && (
                       <p className="text-sm text-red-600 mt-1">{errors.password}</p>
                     )}

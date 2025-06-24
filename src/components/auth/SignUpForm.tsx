@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { Link } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface SignUpFormProps {
   onSuccess: () => void;
@@ -19,6 +21,8 @@ interface SignUpFormProps {
 export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: SignUpFormProps) {
   const { signUp, verifyOTP } = useAuth();
   const [showOTPField, setShowOTPField] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [signUpData, setSignUpData] = useState({
     fullName: '',
     email: '',
@@ -121,13 +125,13 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
       }
 
       toast({
-        title: "Account Created!",
-        description: "Please check your email for the verification code to complete setup.",
+        title: "Verification Code Sent!",
+        description: "Please check your email for the 6-digit verification code.",
       });
 
       // Show OTP field in the same form
       setShowOTPField(true);
-      console.log('Showing OTP field in the same form');
+      console.log('Showing OTP field for verification');
     } catch (error) {
       console.error('Unexpected signup error:', error);
       toast({
@@ -235,19 +239,33 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
 
       <div>
         <Label htmlFor="signup-password">Password *</Label>
-        <Input
-          id="signup-password"
-          type="password"
-          value={signUpData.password}
-          onChange={(e) => {
-            setSignUpData({ ...signUpData, password: e.target.value });
-            if (errors.password) setErrors({ ...errors, password: '' });
-          }}
-          placeholder="Create a strong password"
-          className={errors.password ? 'border-red-500' : ''}
-          disabled={isLoading || showOTPField}
-          readOnly={showOTPField}
-        />
+        <div className="relative">
+          <Input
+            id="signup-password"
+            type={showPassword ? "text" : "password"}
+            value={signUpData.password}
+            onChange={(e) => {
+              setSignUpData({ ...signUpData, password: e.target.value });
+              if (errors.password) setErrors({ ...errors, password: '' });
+            }}
+            placeholder="Create a strong password"
+            className={`pr-10 ${errors.password ? 'border-red-500' : ''}`}
+            disabled={isLoading || showOTPField}
+            readOnly={showOTPField}
+          />
+          <button
+            type="button"
+            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            onClick={() => setShowPassword(!showPassword)}
+            disabled={isLoading || showOTPField}
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4 text-gray-400" />
+            ) : (
+              <Eye className="h-4 w-4 text-gray-400" />
+            )}
+          </button>
+        </div>
         {errors.password && (
           <p className="text-sm text-red-600 mt-1">{errors.password}</p>
         )}
@@ -256,19 +274,33 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
 
       <div>
         <Label htmlFor="signup-confirm-password">Confirm Password *</Label>
-        <Input
-          id="signup-confirm-password"
-          type="password"
-          value={signUpData.confirmPassword}
-          onChange={(e) => {
-            setSignUpData({ ...signUpData, confirmPassword: e.target.value });
-            if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: '' });
-          }}
-          placeholder="Confirm your password"
-          className={errors.confirmPassword ? 'border-red-500' : ''}
-          disabled={isLoading || showOTPField}
-          readOnly={showOTPField}
-        />
+        <div className="relative">
+          <Input
+            id="signup-confirm-password"
+            type={showConfirmPassword ? "text" : "password"}
+            value={signUpData.confirmPassword}
+            onChange={(e) => {
+              setSignUpData({ ...signUpData, confirmPassword: e.target.value });
+              if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: '' });
+            }}
+            placeholder="Confirm your password"
+            className={`pr-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+            disabled={isLoading || showOTPField}
+            readOnly={showOTPField}
+          />
+          <button
+            type="button"
+            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            disabled={isLoading || showOTPField}
+          >
+            {showConfirmPassword ? (
+              <EyeOff className="h-4 w-4 text-gray-400" />
+            ) : (
+              <Eye className="h-4 w-4 text-gray-400" />
+            )}
+          </button>
+        </div>
         {errors.confirmPassword && (
           <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>
         )}
@@ -304,11 +336,11 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
 
       {/* OTP Verification Section - Only show after successful signup */}
       {showOTPField && (
-        <div className="border-t pt-4 mt-6">
-          <div className="text-center mb-4">
+        <div className="border-t pt-6 mt-6">
+          <div className="text-center mb-6">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
               <p className="text-sm text-blue-800">
-                We've sent a verification code to<br />
+                We've sent a 6-digit verification code to<br />
                 <span className="font-semibold text-blue-900">{signUpData.email}</span>
               </p>
             </div>
