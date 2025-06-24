@@ -166,7 +166,7 @@ export function CartSidebar() {
                         <div className="mt-2 space-y-1">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold text-red-600">
-                              ${itemTotal.toFixed(2)}
+                              Rs.{itemTotal.toFixed(2)}
                             </span>
                             {pricing.mode === 'combo' && (
                               <Badge variant="secondary" className="text-xs px-2 py-0 bg-green-100 text-green-800 border border-green-200">
@@ -270,7 +270,7 @@ export function CartSidebar() {
               <div className="border-t pt-4">
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span>${totalPrice.toFixed(2)}</span>
+                  <span>Rs.{totalPrice.toFixed(2)}</span>
                 </div>
                 {activeCombo && (
                   <div className="bg-green-50 border border-green-200 rounded p-2 mt-2">
