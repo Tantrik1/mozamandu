@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,7 @@ import { ArrowLeft } from 'lucide-react';
 
 interface SignUpFormProps {
   onSuccess: () => void;
-  onStart?: () => void; // New callback for when signup starts
+  onStart?: () => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
 }
@@ -116,11 +117,11 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
       }
 
       toast({
-        title: "OTP Sent",
-        description: "Please check your email for the verification code.",
+        title: "Account Created!",
+        description: "Please check your email for the verification code to complete setup.",
       });
 
-      // Move to OTP verification step - this should show the OTP form
+      // Move to OTP verification step
       setCurrentStep('otp');
       console.log('Switched to OTP step, currentStep:', 'otp');
     } catch (error) {
@@ -165,7 +166,7 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
       if (user) {
         toast({
           title: "Account Verified!",
-          description: "Your email has been verified successfully.",
+          description: "Your email has been verified successfully. Welcome to Mozamandu!",
         });
         onSuccess();
       }
@@ -187,11 +188,11 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
     setErrors({});
   };
 
-  console.log('Current step:', currentStep); // Debug log
+  console.log('Current step:', currentStep);
 
   // Show OTP verification form
   if (currentStep === 'otp') {
-    console.log('Rendering OTP form'); // Debug log
+    console.log('Rendering OTP form');
     return (
       <div className="space-y-6 w-full">
         <div className="text-center">
@@ -234,7 +235,7 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
               className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3" 
               disabled={otpCode.length !== 6 || isLoading}
             >
-              {isLoading ? 'Verifying...' : 'Verify & Create Account'}
+              {isLoading ? 'Verifying...' : 'Verify & Complete Setup'}
             </Button>
             
             <Button 
@@ -253,7 +254,7 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
     );
   }
 
-  console.log('Rendering signup form'); // Debug log
+  console.log('Rendering signup form');
 
   // Show signup form
   return (
@@ -368,7 +369,7 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
         className="w-full bg-red-600 hover:bg-red-700" 
         disabled={isLoading || !acceptedTerms}
       >
-        {isLoading ? 'Sending OTP...' : 'Send OTP'}
+        {isLoading ? 'Creating Account...' : 'Create Account'}
       </Button>
     </form>
   );
