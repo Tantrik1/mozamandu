@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -130,7 +129,7 @@ export function CheckoutPayment({ isGuest, onComplete, onBack }: CheckoutPayment
     if (promo.minimum_order_amount && totalWithDelivery < promo.minimum_order_amount) {
       toast({
         title: "Minimum Order Not Met",
-        description: `Minimum order amount for this promo code is $${promo.minimum_order_amount}`,
+        description: `Minimum order amount for this promo code is Rs. ${promo.minimum_order_amount}`,
         variant: "destructive",
       });
       return;
@@ -205,7 +204,7 @@ export function CheckoutPayment({ isGuest, onComplete, onBack }: CheckoutPayment
     if (paidAmount < totals.minimumPayment) {
       toast({
         title: "Insufficient Payment",
-        description: `Minimum payment required: $${totals.minimumPayment.toFixed(2)}`,
+        description: `Minimum payment required: Rs. ${totals.minimumPayment.toFixed(2)}`,
         variant: "destructive",
       });
       return;
@@ -346,8 +345,8 @@ export function CheckoutPayment({ isGuest, onComplete, onBack }: CheckoutPayment
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium">${(pricing.finalPrice * item.quantity).toFixed(2)}</p>
-                      <p className="text-sm text-gray-600">${pricing.finalPrice.toFixed(2)} each</p>
+                      <p className="font-medium">Rs. {(pricing.finalPrice * item.quantity).toFixed(2)}</p>
+                      <p className="text-sm text-gray-600">Rs. {pricing.finalPrice.toFixed(2)} each</p>
                     </div>
                   </div>
                 );
@@ -357,24 +356,24 @@ export function CheckoutPayment({ isGuest, onComplete, onBack }: CheckoutPayment
             <div className="border-t pt-4 space-y-2">
               <div className="flex justify-between">
                 <span>Subtotal</span>
-                <span>${totals.subtotal.toFixed(2)}</span>
+                <span>Rs. {totals.subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Delivery Charge</span>
-                <span>${totals.deliveryCharge.toFixed(2)}</span>
+                <span>Rs. {totals.deliveryCharge.toFixed(2)}</span>
               </div>
               {appliedPromo && (
                 <div className="flex justify-between text-green-600">
                   <span>Promo Discount ({appliedPromo.discount_percentage}%)</span>
-                  <span>-${totals.promoDiscount.toFixed(2)}</span>
+                  <span>-Rs. {totals.promoDiscount.toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-lg border-t pt-2">
                 <span>Total</span>
-                <span>${totals.finalTotal.toFixed(2)}</span>
+                <span>Rs. {totals.finalTotal.toFixed(2)}</span>
               </div>
               <p className="text-sm text-gray-600">
-                Minimum payment: ${totals.minimumPayment.toFixed(2)} (20%)
+                Minimum payment: Rs. {totals.minimumPayment.toFixed(2)} (20%)
               </p>
             </div>
           </CardContent>
@@ -453,10 +452,10 @@ export function CheckoutPayment({ isGuest, onComplete, onBack }: CheckoutPayment
                 max={totals.finalTotal}
                 value={paymentData.paidAmount}
                 onChange={(e) => setPaymentData({ ...paymentData, paidAmount: e.target.value })}
-                placeholder={`Min: $${totals.minimumPayment.toFixed(2)}`}
+                placeholder={`Min: Rs. ${totals.minimumPayment.toFixed(2)}`}
               />
               <p className="text-sm text-gray-600 mt-1">
-                You can pay between ${totals.minimumPayment.toFixed(2)} - ${totals.finalTotal.toFixed(2)}
+                You can pay between Rs. {totals.minimumPayment.toFixed(2)} - Rs. {totals.finalTotal.toFixed(2)}
               </p>
             </div>
 

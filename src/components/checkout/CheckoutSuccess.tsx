@@ -78,19 +78,19 @@ export function CheckoutSuccess({ orderId }: CheckoutSuccessProps) {
             </div>
             <div>
               <p className="text-sm text-gray-600">Total Amount</p>
-              <p className="font-bold text-lg">${orderDetails.total_amount.toFixed(2)}</p>
+              <p className="font-bold text-lg">Rs. {orderDetails.total_amount.toFixed(2)}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Paid Amount</p>
               <p className="font-medium text-green-600">
-                ${orderDetails.paid_amount.toFixed(2)}
+                Rs. {orderDetails.paid_amount.toFixed(2)}
               </p>
             </div>
             {orderDetails.remaining_amount > 0 && (
               <div className="md:col-span-2">
                 <p className="text-sm text-gray-600">Remaining Amount</p>
                 <p className="font-medium text-orange-600">
-                  ${orderDetails.remaining_amount.toFixed(2)}
+                  Rs. {orderDetails.remaining_amount.toFixed(2)}
                 </p>
               </div>
             )}

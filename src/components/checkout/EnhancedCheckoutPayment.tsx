@@ -458,13 +458,13 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
                             </Badge>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">${pricing.finalPrice.toFixed(2)} each</p>
+                        <p className="text-xs text-gray-500 mt-1">Rs. {pricing.finalPrice.toFixed(2)} each</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium">${(pricing.finalPrice * item.quantity).toFixed(2)}</p>
+                        <p className="font-medium">Rs. {(pricing.finalPrice * item.quantity).toFixed(2)}</p>
                         {item.basePrice !== pricing.finalPrice && (
                           <p className="text-sm text-gray-500 line-through">
-                            ${(item.basePrice * item.quantity).toFixed(2)}
+                            Rs. {(item.basePrice * item.quantity).toFixed(2)}
                           </p>
                         )}
                       </div>
@@ -479,25 +479,25 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span>Subtotal ({cartItems.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
-                  <span>${totals.subtotal.toFixed(2)}</span>
+                  <span>Rs. {totals.subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Delivery Charge</span>
-                  <span>${totals.deliveryCharge.toFixed(2)}</span>
+                  <span>Rs. {totals.deliveryCharge.toFixed(2)}</span>
                 </div>
                 {appliedPromo && (
                   <div className="flex justify-between text-green-600">
                     <span>Promo Discount ({appliedPromo.discount_percentage}%)</span>
-                    <span>-${totals.promoDiscount.toFixed(2)}</span>
+                    <span>-Rs. {totals.promoDiscount.toFixed(2)}</span>
                   </div>
                 )}
                 <Separator />
                 <div className="flex justify-between font-bold text-lg">
                   <span>Total Amount</span>
-                  <span>${totals.finalTotal.toFixed(2)}</span>
+                  <span>Rs. {totals.finalTotal.toFixed(2)}</span>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Minimum payment: ${totals.minimumPayment.toFixed(2)} (20%)
+                  Minimum payment: Rs. {totals.minimumPayment.toFixed(2)} (20%)
                 </p>
               </div>
             </CardContent>
@@ -535,7 +535,7 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
                 <p className="font-medium">{deliveryLocation}</p>
                 <p className="text-sm text-gray-600">{checkoutInfo.deliveryAddress}</p>
                 <p className="text-sm font-medium text-green-600 mt-1">
-                  Delivery Charge: ${deliveryCharge.toFixed(2)}
+                  Delivery Charge: Rs. {deliveryCharge.toFixed(2)}
                 </p>
               </div>
             </CardContent>
@@ -620,11 +620,11 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="full" id="full" />
-                  <Label htmlFor="full">Pay Full Amount (${totals.finalTotal.toFixed(2)})</Label>
+                  <Label htmlFor="full">Pay Full Amount (Rs. {totals.finalTotal.toFixed(2)})</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="partial" id="partial" />
-                  <Label htmlFor="partial">Pay Custom Amount (Min: ${totals.minimumPayment.toFixed(2)})</Label>
+                  <Label htmlFor="partial">Pay Custom Amount (Min: Rs. {totals.minimumPayment.toFixed(2)})</Label>
                 </div>
               </RadioGroup>
 
@@ -640,10 +640,10 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
                       setPaymentData({ ...paymentData, paidAmount: e.target.value });
                       updateActivity();
                     }}
-                    placeholder={`Enter amount (Min: $${totals.minimumPayment.toFixed(2)})`}
+                    placeholder={`Enter amount (Min: Rs. ${totals.minimumPayment.toFixed(2)})`}
                   />
                   <p className="text-sm text-gray-600 mt-1">
-                    Range: ${totals.minimumPayment.toFixed(2)} - ${totals.finalTotal.toFixed(2)}
+                    Range: Rs. {totals.minimumPayment.toFixed(2)} - Rs. {totals.finalTotal.toFixed(2)}
                   </p>
                 </div>
               )}

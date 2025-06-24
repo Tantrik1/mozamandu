@@ -71,7 +71,7 @@ export function useCartPricing({ cartItems, activeCombo, discountTiers }: UseCar
         if (comboSubcategory && subcategoryTotalQty >= comboSubcategory.min_units) {
           return {
             finalPrice: comboSubcategory.price,
-            description: `Combo: Rs.${comboSubcategory.price.toFixed(2)} each`,
+            description: `Combo: Rs. ${comboSubcategory.price.toFixed(2)} each`,
             mode: 'combo',
             isCombo: true
           };
