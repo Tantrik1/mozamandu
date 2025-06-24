@@ -46,12 +46,16 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
         return;
       }
 
+      console.log('🔍 Checking combo eligibility...');
+      console.log('📦 Cart items:', cartItems);
+
       const { data: combos, error: combosError } = await supabase
         .from('combos')
         .select(`
           id,
           name,
           description,
+          status,
           combo_subcategories (
             subcategory_id,
             min_units,
@@ -61,9 +65,11 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
         .eq('status', 'active');
 
       if (combosError) {
-        console.error('Error fetching combos:', combosError);
+        console.error('❌ Error fetching combos:', combosError);
         return;
       }
+
+      console.log('📋 Available combos:', combos);
 
       // Calculate subcategory quantities
       const subcategoryCounts: { [key: string]: number } = {};
@@ -72,31 +78,67 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
         subcategoryCounts[subcategoryId] = (subcategoryCounts[subcategoryId] || 0) + cartItem.quantity;
       }
 
+      console.log('📊 Subcategory counts in cart:', subcategoryCounts);
+
+      // Get subcategory names for better debugging
+      const subcategoryIds = Object.keys(subcategoryCounts);
+      if (subcategoryIds.length > 0) {
+        const { data: subcategoryNames } = await supabase
+          .from('subcategories')
+          .select('id, name')
+          .in('id', subcategoryIds);
+        
+        if (subcategoryNames) {
+          const nameMap = subcategoryNames.reduce((acc, sub) => {
+            acc[sub.id] = sub.name;
+            return acc;
+          }, {} as { [key: string]: string });
+          
+          console.log('📝 Cart subcategories with names:', 
+            Object.entries(subcategoryCounts).map(([id, count]) => ({
+              id,
+              name: nameMap[id] || 'Unknown',
+              count
+            }))
+          );
+        }
+      }
+
       let newActiveCombo: ComboData | null = null;
       
       // Check each combo for eligibility
       for (const combo of combos || []) {
+        console.log(`🎯 Checking combo: ${combo.name}`);
+        console.log(`📋 Combo requirements:`, combo.combo_subcategories);
+        
         let isEligible = true;
+        const missingRequirements: string[] = [];
         
         for (const comboSubcategory of combo.combo_subcategories) {
           const requiredUnits = comboSubcategory.min_units;
           const availableUnits = subcategoryCounts[comboSubcategory.subcategory_id] || 0;
           
+          console.log(`📏 Subcategory ${comboSubcategory.subcategory_id}: needs ${requiredUnits}, has ${availableUnits}`);
+          
           if (availableUnits < requiredUnits) {
             isEligible = false;
-            break;
+            missingRequirements.push(`Subcategory ${comboSubcategory.subcategory_id}: needs ${requiredUnits}, has ${availableUnits}`);
           }
         }
 
         if (isEligible) {
+          console.log(`✅ Combo "${combo.name}" is eligible!`);
           newActiveCombo = combo;
           break; // Take the first eligible combo
+        } else {
+          console.log(`❌ Combo "${combo.name}" not eligible. Missing:`, missingRequirements);
         }
       }
 
       // Handle combo state changes and notifications
       if (newActiveCombo && (!activeCombo || activeCombo.id !== newActiveCombo.id)) {
         // New combo activated
+        console.log(`🎉 Activating combo: ${newActiveCombo.name}`);
         toast({
           title: "🎉 Combo Applied!",
           description: `${newActiveCombo.name}: ${newActiveCombo.description}`,
@@ -106,6 +148,7 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
         setPreviousComboId(newActiveCombo.id);
       } else if (activeCombo && !newActiveCombo) {
         // Combo lost
+        console.log('💔 Combo lost');
         toast({
           title: "💰 Normal Pricing Applied",
           description: "Combo requirements no longer met. Add more items to reactivate combo pricing.",
@@ -115,14 +158,16 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
         setPreviousComboId(null);
       } else if (!newActiveCombo && !activeCombo) {
         // No combo, maintain state
+        console.log('🚫 No combo eligible');
         setActiveCombo(null);
       } else {
         // Same combo still active, no notification needed
+        console.log(`✨ Combo "${newActiveCombo?.name}" still active`);
         setActiveCombo(newActiveCombo);
       }
 
     } catch (error) {
-      console.error('Error checking combo eligibility:', error);
+      console.error('💥 Error checking combo eligibility:', error);
     }
   };
 
