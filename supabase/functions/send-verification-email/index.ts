@@ -32,27 +32,29 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { email, name, password, otp, verify }: VerificationRequest = await req.json();
 
-    console.log('Request received:', { email, verify, otp, hasName: !!name, hasPassword: !!password });
+    console.log('Request received:', { email, verify, otp: otp ? `${otp.substring(0, 2)}****` : 'none', hasName: !!name, hasPassword: !!password });
 
     // If this is a verification request
     if (verify && otp) {
       console.log('Verifying OTP for email:', email);
       
-      // Get the stored OTP from database
+      // Get the stored OTP from database - make sure to trim and compare properly
       const { data: storedOTP, error: fetchError } = await supabase
         .from('email_verification_codes')
         .select('*')
-        .eq('email', email.toLowerCase())
-        .eq('code', otp)
+        .eq('email', email.toLowerCase().trim())
+        .eq('code', otp.trim())
         .eq('verified', false)
         .gt('expires_at', new Date().toISOString())
         .single();
+
+      console.log('Database query result:', { found: !!storedOTP, error: fetchError });
 
       if (fetchError || !storedOTP) {
         console.log('No valid OTP found for email:', email, 'Error:', fetchError);
         return new Response(JSON.stringify({ 
           success: false,
-          error: "Invalid or expired verification code"
+          error: "Invalid or expired verification code. Please try requesting a new code."
         }), {
           status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -62,16 +64,20 @@ const handler = async (req: Request): Promise<Response> => {
       console.log('OTP verified successfully for email:', email);
 
       // Mark the OTP as verified
-      await supabase
+      const { error: updateError } = await supabase
         .from('email_verification_codes')
         .update({ verified: true })
         .eq('id', storedOTP.id);
+
+      if (updateError) {
+        console.error('Error updating OTP status:', updateError);
+      }
 
       return new Response(JSON.stringify({ 
         success: true,
         message: "Email verified successfully",
         userData: {
-          email: email.toLowerCase(),
+          email: email.toLowerCase().trim(),
           name: storedOTP.user_data?.name,
           password: storedOTP.user_data?.password
         }
@@ -83,6 +89,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Generate and send OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log('Generated OTP:', otpCode, 'for email:', email);
     
     // Store OTP in database with 10-minute expiry
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -91,15 +98,15 @@ const handler = async (req: Request): Promise<Response> => {
     await supabase
       .from('email_verification_codes')
       .delete()
-      .eq('email', email.toLowerCase())
+      .eq('email', email.toLowerCase().trim())
       .eq('verified', false);
 
     // Store new OTP in database
     const { error: insertError } = await supabase
       .from('email_verification_codes')
       .insert({
-        email: email.toLowerCase(),
-        code: otpCode,
+        email: email.toLowerCase().trim(),
+        code: otpCode.trim(),
         expires_at: expiresAt,
         user_data: { name, password }
       });
@@ -119,7 +126,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const emailResponse = await resend.emails.send({
       from: "Mozamandu <onboarding@resend.dev>",
-      to: [email],
+      to: [email.trim()],
       subject: "Verify Your Email - Mozamandu",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">

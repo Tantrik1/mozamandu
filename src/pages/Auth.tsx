@@ -1,9 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
@@ -19,6 +19,7 @@ export default function Auth() {
   const [activeTab, setActiveTab] = useState('signin');
   const [showPassword, setShowPassword] = useState(false);
   const [showOTPField, setShowOTPField] = useState(false);
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
   
   const [signInData, setSignInData] = useState({
     email: '',
@@ -91,6 +92,10 @@ export default function Auth() {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
+    if (!agreeToTerms) {
+      newErrors.terms = 'You must agree to the terms and conditions';
+    }
+
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) {
@@ -121,11 +126,22 @@ export default function Auth() {
     }
 
     setAuthLoading(true);
+    setErrors({});
 
     const { error } = await verifyOTP(signUpData.email, otpCode);
 
     if (error) {
       setErrors({ otp: error.message });
+      toast({
+        title: "Verification Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Account Created!",
+        description: "Your account has been created successfully.",
+      });
     }
 
     setAuthLoading(false);
@@ -277,6 +293,28 @@ export default function Auth() {
                         />
                         {errors.confirmPassword && <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>}
                       </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="terms" 
+                          checked={agreeToTerms}
+                          onCheckedChange={(checked) => setAgreeToTerms(checked as boolean)}
+                        />
+                        <label
+                          htmlFor="terms"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          I agree to the{' '}
+                          <a href="/terms-conditions" className="text-red-600 hover:underline">
+                            Terms & Conditions
+                          </a>
+                          {' '}and{' '}
+                          <a href="/privacy-policy" className="text-red-600 hover:underline">
+                            Privacy Policy
+                          </a>
+                        </label>
+                      </div>
+                      {errors.terms && <p className="text-sm text-red-600">{errors.terms}</p>}
                     </>
                   ) : (
                     <div className="text-center space-y-4">
