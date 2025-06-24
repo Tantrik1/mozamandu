@@ -32,7 +32,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
-                <Route path="/admin" element={<Admin />} />
+                <Route path="/admin/*" element={<Admin />} />
                 <Route path="/home" element={<Home />} />
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/categories/:categoryId" element={<CategoryPage />} />
