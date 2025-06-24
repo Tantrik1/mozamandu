@@ -19,8 +19,12 @@ export function CartSidebar() {
   const [cartTotal, setCartTotal] = useState(0);
 
   useEffect(() => {
-    updateCartTotal();
-  }, [cartItems]);
+    if (cartItems.length > 0) {
+      updateCartTotal();
+    } else {
+      setCartTotal(0);
+    }
+  }, [cartItems, activeCombo]);
 
   const updateCartTotal = async () => {
     try {
@@ -28,7 +32,6 @@ export function CartSidebar() {
       setCartTotal(total);
     } catch (error) {
       console.error('Error calculating total:', error);
-      setCartTotal(0);
     }
   };
 
@@ -104,7 +107,7 @@ export function CartSidebar() {
               <Button 
                 className="w-full bg-red-600 hover:bg-red-700"
                 onClick={() => {
-                  console.log('Proceeding to checkout...');
+                  // Checkout logic here
                 }}
               >
                 Proceed to Checkout
@@ -129,7 +132,7 @@ function CartItemCard({
   const getPricingBadgeStyle = () => {
     if (item.pricingDescription?.includes('Combo')) {
       return 'border-green-500 text-green-700 bg-green-50';
-    } else if (item.pricingDescription?.includes('Next') || item.pricingDescription?.includes('First')) {
+    } else if (item.pricingDescription?.includes('Next')) {
       return 'border-blue-500 text-blue-700 bg-blue-50';
     } else {
       return 'border-gray-500 text-gray-700 bg-gray-50';
@@ -139,7 +142,7 @@ function CartItemCard({
   const getPriceColor = () => {
     if (item.pricingDescription?.includes('Combo')) {
       return 'text-green-600';
-    } else if (item.pricingDescription?.includes('Next') || item.pricingDescription?.includes('First')) {
+    } else if (item.pricingDescription?.includes('Next')) {
       return 'text-blue-600';
     } else {
       return 'text-gray-900';
@@ -206,7 +209,7 @@ function CartItemCard({
           {/* Subtotal and Remove */}
           <div className="flex items-center space-x-2">
             <p className={`text-sm font-bold ${getPriceColor()}`}>
-              Rs. {(item.subtotal || 0).toFixed(2)}
+              Rs. {item.subtotal?.toFixed(2) || '0.00'}
             </p>
             <Button
               variant="ghost"
