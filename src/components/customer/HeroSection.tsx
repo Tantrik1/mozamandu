@@ -95,7 +95,7 @@ export function HeroSection() {
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-screen flex items-center">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center w-full py-8 lg:py-0">
           {/* Left Side - Text Content */}
-          <div className="space-y-6 lg:space-y-8 text-white order-2 order-1">
+          <div className="space-y-6 lg:space-y-8 text-white order-1">
             <div className="space-y-4">
               <h1 className="text-3xl sm:text-4xl lg:text-6xl xl:text-7xl font-bold leading-tight">
                 Premium
