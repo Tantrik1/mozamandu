@@ -42,22 +42,34 @@ export function CheckoutInfo({ isGuest, onComplete, onBack }: CheckoutInfoProps)
   }, []);
 
   const fetchDeliveryLocations = async () => {
-    const { data, error } = await supabase
-      .from('delivery_charges')
-      .select('id, place_name, delivery_price')
-      .eq('is_active', true)
-      .order('place_name');
+    console.log('Fetching delivery locations...');
+    try {
+      const { data, error } = await supabase
+        .from('delivery_charges')
+        .select('id, place_name, delivery_price')
+        .eq('is_active', true)
+        .order('place_name');
 
-    if (error) {
+      if (error) {
+        console.error('Error fetching delivery locations:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load delivery locations",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Delivery locations fetched:', data);
+      setDeliveryLocations(data || []);
+    } catch (error) {
+      console.error('Unexpected error:', error);
       toast({
         title: "Error",
         description: "Failed to load delivery locations",
         variant: "destructive",
       });
-      return;
     }
-
-    setDeliveryLocations(data || []);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
