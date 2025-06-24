@@ -11,7 +11,8 @@ interface AuthContextType {
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
-  verifyToken: (email: string, token: string) => Promise<{ error: any }>;
+  verifyOTP: (email: string, token: string) => Promise<{ error: any }>;
+  resendOTP: (email: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -32,7 +33,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          fetchUserProfile(session.user.id);
+          setTimeout(() => {
+            fetchUserProfile(session.user.id);
+          }, 0);
         } else {
           setUserProfile(null);
         }
@@ -107,27 +110,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
-      console.log('Sending signup request for:', email.trim().toLowerCase());
+      console.log('Sending OTP signup request for:', email.trim().toLowerCase());
 
-      // Send signup request via edge function
-      const { data, error: emailError } = await supabase.functions.invoke('send-verification-email', {
+      // Send OTP via edge function
+      const { data, error: otpError } = await supabase.functions.invoke('send-otp-email', {
         body: {
           email: email.trim().toLowerCase(),
           name: fullName.trim(),
           password,
+          type: 'signup'
         },
       });
 
-      console.log('Signup response:', data, emailError);
+      console.log('OTP signup response:', data, otpError);
 
-      if (emailError) {
-        console.error('Signup error:', emailError);
-        return { error: emailError };
+      if (otpError) {
+        console.error('OTP signup error:', otpError);
+        return { error: otpError };
       }
 
       if (!data?.success) {
-        console.error('Signup failed:', data);
-        return { error: { message: data?.error || 'Failed to create account' } };
+        console.error('OTP signup failed:', data);
+        return { error: { message: data?.error || 'Failed to send verification code' } };
       }
 
       return { error: null };
@@ -139,45 +143,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const verifyToken = async (email: string, token: string) => {
+  const verifyOTP = async (email: string, token: string) => {
     try {
       setIsLoading(true);
       
-      const emailKey = email.trim().toLowerCase();
+      console.log('Verifying OTP for:', email.trim().toLowerCase());
 
-      console.log('Verifying token for:', emailKey);
-
-      // Verify token with the edge function
-      const { data: verificationData, error: verifyError } = await supabase.functions.invoke('send-verification-email', {
-        body: {
-          email: emailKey,
-          token: token.trim(),
-          verify: true,
-        },
+      // Verify OTP using Supabase's built-in method
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token: token.trim(),
+        type: 'signup'
       });
 
-      console.log('Verification response:', verificationData, verifyError);
+      console.log('OTP verification response:', data, error);
 
-      if (verifyError) {
-        console.error('Verification error:', verifyError);
-        return { error: { message: 'Failed to verify token. Please try again.' } };
+      if (error) {
+        console.error('OTP verification error:', error);
+        return { error };
       }
 
-      if (!verificationData?.success) {
-        console.error('Verification failed:', verificationData);
-        return { error: { message: verificationData?.error || 'Invalid verification token' } };
-      }
-
-      console.log('Token verified and user confirmed successfully');
+      console.log('OTP verified successfully');
 
       toast({
         title: "Email Verified!",
-        description: "Your account has been activated successfully.",
+        description: "Your account has been created successfully.",
       });
 
       return { error: null };
     } catch (error) {
-      console.error('Token verification error:', error);
+      console.error('OTP verification error:', error);
+      return { error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendOTP = async (email: string) => {
+    try {
+      setIsLoading(true);
+      
+      console.log('Resending OTP for:', email.trim().toLowerCase());
+
+      // Resend OTP via edge function
+      const { data, error: otpError } = await supabase.functions.invoke('send-otp-email', {
+        body: {
+          email: email.trim().toLowerCase(),
+          type: 'resend'
+        },
+      });
+
+      console.log('OTP resend response:', data, otpError);
+
+      if (otpError) {
+        console.error('OTP resend error:', otpError);
+        return { error: otpError };
+      }
+
+      if (!data?.success) {
+        console.error('OTP resend failed:', data);
+        return { error: { message: data?.error || 'Failed to resend verification code' } };
+      }
+
+      return { error: null };
+    } catch (error) {
+      console.error('OTP resend error:', error);
       return { error };
     } finally {
       setIsLoading(false);
@@ -222,7 +252,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       signIn,
       signUp,
-      verifyToken,
+      verifyOTP,
+      resendOTP,
       signOut,
     }}>
       {children}

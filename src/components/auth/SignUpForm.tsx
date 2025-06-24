@@ -13,7 +13,7 @@ interface SignUpFormProps {
 }
 
 export function SignUpForm({ onSuccess }: SignUpFormProps) {
-  const { signUp, verifyOTP } = useAuth();
+  const { signUp, verifyOTP, resendOTP } = useAuth();
   const [showOTPField, setShowOTPField] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -104,8 +104,8 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
       });
     } else {
       toast({
-        title: "Email Verified!",
-        description: "Your account has been created successfully.",
+        title: "Account Created!",
+        description: "Welcome to Mozamandu. You're now signed in.",
       });
       onSuccess();
     }
@@ -118,7 +118,7 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
     setErrors({});
     setOtpCode('');
 
-    const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
+    const { error } = await resendOTP(signUpData.email);
 
     if (error) {
       setErrors({ form: error.message });
