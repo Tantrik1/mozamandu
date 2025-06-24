@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import { Plus, Minus, ShoppingCart, Star, Tag } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useCart } from '@/hooks/useCart';
+
 interface Product {
   id: string;
   name: string;
@@ -21,6 +23,7 @@ interface Product {
   category_id: string;
   subcategory_id: string;
 }
+
 interface ColorVariant {
   id: string;
   color_name: string;
@@ -28,19 +31,19 @@ interface ColorVariant {
   has_sizes: boolean;
   image_url: string;
 }
+
 interface SizeVariant {
   id: string;
   size_name: string;
   stock_quantity: number;
 }
+
 interface ProductCardProps {
   product: Product;
   subcategoryPrice: number;
 }
-export function ProductCard({
-  product,
-  subcategoryPrice
-}: ProductCardProps) {
+
+export function ProductCard({ product, subcategoryPrice }: ProductCardProps) {
   const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
   const [sizeVariants, setSizeVariants] = useState<SizeVariant[]>([]);
   const [selectedColor, setSelectedColor] = useState<string>('');
@@ -48,31 +51,30 @@ export function ProductCard({
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);
   const [currentImage, setCurrentImage] = useState(product.image_url);
-  const [discountPrice, setDiscountPrice] = useState<number | null>(null);
-  const [comboPrice, setComboPrice] = useState<number | null>(null);
-
-  const {
-    addToCart,
-    cartItems,
-    activeCombo
-  } = useCart();
+  const [dynamicPrice, setDynamicPrice] = useState(subcategoryPrice);
+  const [priceLabel, setPriceLabel] = useState('Normal Price');
+  const { addToCart, cartItems, getItemPrice, activeCombo } = useCart();
 
   useEffect(() => {
     if (product.has_color_variants) {
       fetchColorVariants();
     }
   }, [product.id, product.has_color_variants]);
+
   useEffect(() => {
     if (selectedColor && product.has_size_variants) {
       fetchSizeVariants();
     }
   }, [selectedColor, product.has_size_variants]);
 
-  // Reset quantity when variants change
+  // Reset quantity when color changes or load existing cart quantity
   useEffect(() => {
-    const existingItem = cartItems.find(item => {
-      return item.productId === product.id && item.colorVariantId === selectedColor && item.sizeVariantId === selectedSize;
-    });
+    const existingItem = cartItems.find(item => 
+      item.productId === product.id &&
+      item.colorVariantId === selectedColor &&
+      item.sizeVariantId === selectedSize
+    );
+    
     setQuantity(existingItem ? existingItem.quantity : 1);
   }, [selectedColor, selectedSize, cartItems]);
 
@@ -90,63 +92,36 @@ export function ProductCard({
     }
   }, [selectedColor, colorVariants, product.image_url]);
 
-  // Check for discount pricing based on current cart state
+  // Update dynamic pricing
   useEffect(() => {
-    checkPricingMode();
-  }, [cartItems, activeCombo, product.subcategory_id]);
+    updateDynamicPrice();
+  }, [quantity, product.subcategory_id, activeCombo]);
 
-  const checkPricingMode = async () => {
+  const updateDynamicPrice = async () => {
     try {
-      // Check combo pricing first (highest priority)
-      if (activeCombo) {
-        const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === product.subcategory_id);
-        if (comboSubcategory) {
-          setComboPrice(comboSubcategory.price);
-          setDiscountPrice(null);
-          return;
-        }
+      const pricing = await getItemPrice(product.subcategory_id, quantity);
+      setDynamicPrice(pricing.finalPrice);
+      
+      if (pricing.inCombo) {
+        setPriceLabel('Combo Price');
+      } else if (pricing.appliedDiscount) {
+        setPriceLabel(`Discount Applied (${pricing.appliedDiscount.discount_amount} off)`);
+      } else {
+        setPriceLabel('Normal Price');
       }
-
-      // Check discount pricing
-      const currentSubcategoryQuantity = cartItems
-        .filter(item => item.subcategoryId === product.subcategory_id)
-        .reduce((total, item) => total + item.quantity, 0);
-
-      const { data: discountTiers } = await supabase
-        .from('discount_tiers')
-        .select('*')
-        .eq('subcategory_id', product.subcategory_id)
-        .order('min_quantity', { ascending: true });
-
-      if (discountTiers && discountTiers.length > 0) {
-        const applicableTier = discountTiers.find(tier => 
-          currentSubcategoryQuantity >= tier.min_quantity && 
-          (!tier.max_quantity || currentSubcategoryQuantity <= tier.max_quantity)
-        );
-
-        if (applicableTier) {
-          const discountedPrice = subcategoryPrice - applicableTier.discount_amount;
-          setDiscountPrice(discountedPrice);
-          setComboPrice(null);
-          return;
-        }
-      }
-
-      // No special pricing
-      setDiscountPrice(null);
-      setComboPrice(null);
     } catch (error) {
-      console.error('Error checking pricing mode:', error);
-      setDiscountPrice(null);
-      setComboPrice(null);
+      console.error('Error updating dynamic price:', error);
+      setDynamicPrice(subcategoryPrice);
+      setPriceLabel('Normal Price');
     }
   };
 
   const fetchColorVariants = async () => {
-    const {
-      data,
-      error
-    } = await supabase.from('color_variants').select('id, color_name, stock_quantity, has_sizes, image_url').eq('product_id', product.id);
+    const { data, error } = await supabase
+      .from('color_variants')
+      .select('id, color_name, stock_quantity, has_sizes, image_url')
+      .eq('product_id', product.id);
+
     if (error) {
       console.error('Error fetching color variants:', error);
     } else {
@@ -156,12 +131,15 @@ export function ProductCard({
       }
     }
   };
+
   const fetchSizeVariants = async () => {
     if (!selectedColor) return;
-    const {
-      data,
-      error
-    } = await supabase.from('size_variants').select('id, size_name, stock_quantity').eq('color_variant_id', selectedColor);
+
+    const { data, error } = await supabase
+      .from('size_variants')
+      .select('id, size_name, stock_quantity')
+      .eq('color_variant_id', selectedColor);
+
     if (error) {
       console.error('Error fetching size variants:', error);
     } else {
@@ -171,6 +149,7 @@ export function ProductCard({
       }
     }
   };
+
   const getAvailableStock = () => {
     if (product.has_size_variants && selectedSize) {
       const sizeVariant = sizeVariants.find(s => s.id === selectedSize);
@@ -187,15 +166,16 @@ export function ProductCard({
       toast({
         title: "Selection Required",
         description: "Please select a color",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
+
     if (product.has_size_variants && !selectedSize) {
       toast({
         title: "Selection Required",
         description: "Please select a size",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -205,34 +185,32 @@ export function ProductCard({
       toast({
         title: "Insufficient Stock",
         description: `Only ${availableStock} items available`,
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
     setLoading(true);
+
     try {
-      const effectivePrice = comboPrice || discountPrice || subcategoryPrice;
-      
       await addToCart({
         productId: product.id,
         colorVariantId: selectedColor || null,
         sizeVariantId: selectedSize || null,
         quantity,
-        price: effectivePrice
+        price: dynamicPrice
       });
 
-      const modeText = comboPrice ? 'combo price' : discountPrice ? 'discount price' : 'normal price';
       toast({
         title: "Added to Cart",
-        description: `${product.name} has been added to your cart at ${modeText}`
+        description: `${product.name} has been added to your cart`,
       });
     } catch (error) {
       console.error('Error adding to cart:', error);
       toast({
         title: "Error",
         description: "Failed to add item to cart",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -241,49 +219,6 @@ export function ProductCard({
 
   const availableStock = getAvailableStock();
 
-  const renderPriceDisplay = () => {
-    if (comboPrice) {
-      return (
-        <div className="text-center">
-          <span className="text-sm font-bold text-green-600">
-            ${comboPrice.toFixed(2)}
-          </span>
-          <div className="flex items-center gap-1 justify-center">
-            <Tag className="w-2 h-2 text-green-600" />
-            <span className="text-xs text-green-600">Combo</span>
-          </div>
-        </div>
-      );
-    }
-
-    if (discountPrice) {
-      return (
-        <div className="text-center">
-          <div className="flex flex-col">
-            <span className="text-xs text-gray-500 line-through">
-              ${subcategoryPrice.toFixed(2)}
-            </span>
-            <span className="text-sm font-bold text-blue-600">
-              ${discountPrice.toFixed(2)}
-            </span>
-          </div>
-          <div className="flex items-center gap-1 justify-center">
-            <Tag className="w-2 h-2 text-blue-600" />
-            <span className="text-xs text-blue-600">Discount</span>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="text-center">
-        <span className="text-sm font-bold text-gray-900">
-          ${subcategoryPrice.toFixed(2)}
-        </span>
-      </div>
-    );
-  };
-
   return (
     <Card className="group hover:shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer h-full flex flex-col overflow-hidden">
       {/* Image Section */}
@@ -291,8 +226,8 @@ export function ProductCard({
         {currentImage ? (
           <img 
             src={currentImage} 
-            alt={product.name} 
-            className="w-full h-36 sm:h-40 object-cover group-hover:scale-110 transition-transform duration-300" 
+            alt={product.name}
+            className="w-full h-36 sm:h-40 object-cover group-hover:scale-110 transition-transform duration-300"
           />
         ) : (
           <div className="w-full h-36 sm:h-40 bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
@@ -308,9 +243,21 @@ export function ProductCard({
           </Badge>
         )}
 
-        {/* Price Badge */}
+        {/* Price Badge with dynamic pricing */}
         <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1">
-          {renderPriceDisplay()}
+          <div className="text-center">
+            <span className="text-sm font-bold text-red-600">
+              ${dynamicPrice.toFixed(2)}
+            </span>
+            {priceLabel !== 'Normal Price' && (
+              <div className="flex items-center gap-1">
+                <Tag className="w-2 h-2 text-green-600" />
+                <span className="text-xs text-green-600 font-medium">
+                  {priceLabel.includes('Combo') ? 'Combo' : 'Discount'}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
@@ -336,7 +283,7 @@ export function ProductCard({
                 <SelectValue placeholder="Select color" />
               </SelectTrigger>
               <SelectContent>
-                {colorVariants.map(color => (
+                {colorVariants.map((color) => (
                   <SelectItem key={color.id} value={color.id}>
                     {color.color_name}
                   </SelectItem>
@@ -355,7 +302,7 @@ export function ProductCard({
                 <SelectValue placeholder="Select size" />
               </SelectTrigger>
               <SelectContent>
-                {sizeVariants.map(size => (
+                {sizeVariants.map((size) => (
                   <SelectItem key={size.id} value={size.id}>
                     {size.size_name}
                   </SelectItem>
@@ -365,38 +312,48 @@ export function ProductCard({
           </div>
         )}
 
-        {/* Quantity Selection */}
+        {/* Color and Quantity Row */}
         <div className="flex items-center justify-between mb-2">
+          {/* Quantity Selection */}
           <div className="flex items-center space-x-1">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setQuantity(Math.max(1, quantity - 1))} 
-              disabled={quantity <= 1} 
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              disabled={quantity <= 1}
               className="h-6 w-6 p-0"
             >
               <Minus className="h-2 w-2" />
             </Button>
             <span className="px-2 py-1 border rounded text-xs min-w-[1.5rem] text-center">{quantity}</span>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setQuantity(Math.min(availableStock, quantity + 1))} 
-              disabled={quantity >= availableStock} 
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setQuantity(Math.min(availableStock, quantity + 1))}
+              disabled={quantity >= availableStock}
               className="h-6 w-6 p-0"
             >
               <Plus className="h-2 w-2" />
             </Button>
           </div>
+          
+          {/* Price Label */}
+          <div className="text-right">
+            <span className="text-xs text-gray-500">{priceLabel}</span>
+          </div>
         </div>
 
         {/* Add to Cart Button */}
         <Button 
-          onClick={handleAddToCart} 
-          disabled={loading || availableStock === 0} 
+          onClick={handleAddToCart}
+          disabled={loading || availableStock === 0}
           className="w-full bg-red-600 hover:bg-red-700 text-xs h-7 mt-auto"
         >
-          {loading ? "Adding..." : availableStock === 0 ? "Out of Stock" : (
+          {loading ? (
+            "Adding..."
+          ) : availableStock === 0 ? (
+            "Out of Stock"
+          ) : (
             <>
               <ShoppingCart className="mr-1 h-2 w-2" />
               Add to Cart

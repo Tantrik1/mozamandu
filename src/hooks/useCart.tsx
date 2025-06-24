@@ -1,7 +1,6 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ComboCongratsModal } from '@/components/customer/ComboCongratsModal';
+import { toast } from '@/hooks/use-toast';
 
 interface CartItem {
   id: string;
@@ -15,8 +14,6 @@ interface CartItem {
   price: number;
   subcategoryId: string;
   image_url?: string;
-  pricingDescription?: string;
-  subtotal: number;
 }
 
 interface AddToCartParams {
@@ -78,8 +75,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [activeCombo, setActiveCombo] = useState<ComboData | null>(null);
   const [subcategoriesData, setSubcategoriesData] = useState<{ [key: string]: SubcategoryData }>({});
-  const [showComboModal, setShowComboModal] = useState(false);
-  const [newCombo, setNewCombo] = useState<ComboData | null>(null);
 
   useEffect(() => {
     loadCartFromStorage();
@@ -89,7 +84,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveCartToStorage();
     checkComboEligibility();
-    recalculateCartPricing();
   }, [cartItems]);
 
   const fetchSubcategoriesData = async () => {
@@ -138,7 +132,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         result.comboPrice = comboSubcategory.price;
         result.finalPrice = comboSubcategory.price;
         result.inCombo = true;
-        return result;
+        return result; // Return early if in combo
       }
     }
 
@@ -152,145 +146,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (discountTiers) {
       for (const tier of discountTiers) {
         if (quantity >= tier.min_quantity && (!tier.max_quantity || quantity <= tier.max_quantity)) {
+          // Apply discount only to quantities above the tier threshold
           const discountedPrice = basePrice - tier.discount_amount;
           result.discountedPrice = discountedPrice;
           result.appliedDiscount = tier;
-          result.finalPrice = discountedPrice;
+          
+          // Calculate weighted average: 
+          // (original price * MOQ + discounted price * extra quantity) / total quantity
+          const originalPriceItems = tier.min_quantity;
+          const discountedItems = quantity - tier.min_quantity;
+          const totalPrice = (basePrice * originalPriceItems) + (discountedPrice * discountedItems);
+          result.finalPrice = totalPrice / quantity;
           break;
         }
       }
     }
 
     return result;
-  };
-
-  const calculatePricingDescription = async (item: CartItem, subcategoryTotal: number) => {
-    const subcategoryData = subcategoriesData[item.subcategoryId];
-    if (!subcategoryData) return '';
-
-    // Check if combo is active for this subcategory
-    if (activeCombo) {
-      const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === item.subcategoryId);
-      if (comboSubcategory) {
-        return `Combo Price: Rs. ${comboSubcategory.price.toFixed(2)}`;
-      }
-    }
-
-    // Get discount tiers for this subcategory
-    const { data: discountTiers } = await supabase
-      .from('discount_tiers')
-      .select('*')
-      .eq('subcategory_id', item.subcategoryId)
-      .order('min_quantity', { ascending: true });
-
-    if (!discountTiers || discountTiers.length === 0) {
-      return `Regular Price: Rs. ${subcategoryData.selling_price.toFixed(2)}`;
-    }
-
-    // Find applicable tier based on subcategory total
-    const applicableTier = discountTiers.find(tier => 
-      subcategoryTotal >= tier.min_quantity && 
-      (!tier.max_quantity || subcategoryTotal <= tier.max_quantity)
-    );
-
-    if (applicableTier) {
-      const discountedPrice = subcategoryData.selling_price - applicableTier.discount_amount;
-      const moq = applicableTier.min_quantity;
-      
-      if (subcategoryTotal === moq) {
-        return `First ${moq} items: Rs. ${discountedPrice.toFixed(2)}`;
-      } else {
-        const regularCount = moq;
-        const discountCount = subcategoryTotal - moq;
-        return `First ${regularCount} items: Rs. ${subcategoryData.selling_price.toFixed(2)}, Next ${discountCount} items: Rs. ${discountedPrice.toFixed(2)}`;
-      }
-    }
-
-    return `Regular Price: Rs. ${subcategoryData.selling_price.toFixed(2)}`;
-  };
-
-  const calculateItemSubtotal = async (item: CartItem, subcategoryTotal: number) => {
-    const subcategoryData = subcategoriesData[item.subcategoryId];
-    if (!subcategoryData) return 0;
-
-    // Check if combo is active for this subcategory
-    if (activeCombo) {
-      const comboSubcategory = activeCombo.combo_subcategories.find(cs => cs.subcategory_id === item.subcategoryId);
-      if (comboSubcategory) {
-        return comboSubcategory.price * item.quantity;
-      }
-    }
-
-    // Get discount tiers for this subcategory
-    const { data: discountTiers } = await supabase
-      .from('discount_tiers')
-      .select('*')
-      .eq('subcategory_id', item.subcategoryId)
-      .order('min_quantity', { ascending: true });
-
-    if (!discountTiers || discountTiers.length === 0) {
-      return subcategoryData.selling_price * item.quantity;
-    }
-
-    // Find applicable tier based on subcategory total
-    const applicableTier = discountTiers.find(tier => 
-      subcategoryTotal >= tier.min_quantity && 
-      (!tier.max_quantity || subcategoryTotal <= tier.max_quantity)
-    );
-
-    if (applicableTier) {
-      const basePrice = subcategoryData.selling_price;
-      const discountedPrice = basePrice - applicableTier.discount_amount;
-      const moq = applicableTier.min_quantity;
-      
-      if (subcategoryTotal === moq) {
-        // All items at discount price
-        return discountedPrice * item.quantity;
-      } else {
-        // Calculate mixed pricing for this specific item's portion
-        const itemStartIndex = subcategoryTotal - item.quantity;
-        const itemEndIndex = subcategoryTotal;
-        
-        let itemTotal = 0;
-        for (let i = itemStartIndex; i < itemEndIndex; i++) {
-          if (i < moq) {
-            itemTotal += basePrice;
-          } else {
-            itemTotal += discountedPrice;
-          }
-        }
-        return itemTotal;
-      }
-    }
-
-    return subcategoryData.selling_price * item.quantity;
-  };
-
-  const recalculateCartPricing = async () => {
-    if (cartItems.length === 0) return;
-
-    // Calculate subcategory totals
-    const subcategoryTotals: { [key: string]: number } = {};
-    cartItems.forEach(item => {
-      subcategoryTotals[item.subcategoryId] = (subcategoryTotals[item.subcategoryId] || 0) + item.quantity;
-    });
-
-    // Update each item's pricing description and subtotal
-    const updatedItems = await Promise.all(
-      cartItems.map(async (item) => {
-        const subcategoryTotal = subcategoryTotals[item.subcategoryId];
-        const pricingDescription = await calculatePricingDescription(item, subcategoryTotal);
-        const subtotal = await calculateItemSubtotal(item, subcategoryTotal);
-        
-        return {
-          ...item,
-          pricingDescription,
-          subtotal
-        };
-      })
-    );
-
-    setCartItems(updatedItems);
   };
 
   const addToCart = async (params: AddToCartParams) => {
@@ -329,11 +201,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         sizeName = sizeVariant?.size_name || '';
       }
 
-      // Create unique item ID based on product, color, and size
-      const itemId = `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}`;
-      
-      const existingItemIndex = cartItems.findIndex(item => item.id === itemId);
-      
+      // Check if item already exists in cart
+      const existingItemIndex = cartItems.findIndex(item => 
+        item.productId === params.productId &&
+        item.colorVariantId === params.colorVariantId &&
+        item.sizeVariantId === params.sizeVariantId
+      );
+
       if (existingItemIndex >= 0) {
         // Update existing item quantity
         const updatedItems = [...cartItems];
@@ -342,7 +216,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       } else {
         // Add new item
         const newItem: CartItem = {
-          id: itemId,
+          id: `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}`,
           productId: params.productId,
           productName: product.name,
           colorVariantId: params.colorVariantId,
@@ -350,12 +224,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
           colorName,
           sizeName,
           quantity: params.quantity,
-          price: subcategoriesData[product.subcategory_id]?.selling_price || params.price,
+          price: params.price,
           subcategoryId: product.subcategory_id,
-          image_url: product.image_url,
-          pricingDescription: '',
-          subtotal: 0
+          image_url: product.image_url
         };
+
         setCartItems(prev => [...prev, newItem]);
       }
     } catch (error) {
@@ -365,7 +238,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const removeFromCart = (itemId: string) => {
-    setCartItems(cartItems.filter(item => item.id !== itemId));
+    setCartItems(prev => prev.filter(item => item.id !== itemId));
   };
 
   const updateQuantity = (itemId: string, quantity: number) => {
@@ -374,7 +247,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    setCartItems(cartItems.map(item => 
+    setCartItems(prev => prev.map(item => 
       item.id === itemId ? { ...item, quantity } : item
     ));
   };
@@ -387,7 +260,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const getTotalPrice = async () => {
     let total = 0;
     for (const item of cartItems) {
-      total += item.subtotal || 0;
+      const pricing = await getItemPrice(item.subcategoryId, item.quantity);
+      total += pricing.finalPrice * item.quantity;
     }
     return total;
   };
@@ -444,12 +318,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
         if (isEligible) {
           if (!activeCombo || activeCombo.id !== combo.id) {
-            setNewCombo(combo);
-            setShowComboModal(true);
+            toast({
+              title: "🎉 Combo Applied!",
+              description: `${combo.name}: ${combo.description}`,
+              duration: 5000,
+            });
           }
           newActiveCombo = combo;
           break;
         }
+      }
+
+      // Check if combo was removed
+      if (activeCombo && !newActiveCombo) {
+        toast({
+          title: "💰 Normal Prices Applied",
+          description: "Combo requirements no longer met",
+          duration: 3000,
+        });
       }
 
       setActiveCombo(newActiveCombo);
@@ -473,17 +359,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
   return (
     <CartContext.Provider value={value}>
       {children}
-      {newCombo && (
-        <ComboCongratsModal
-          isOpen={showComboModal}
-          onClose={() => {
-            setShowComboModal(false);
-            setNewCombo(null);
-          }}
-          combo={newCombo}
-          subcategoriesData={subcategoriesData}
-        />
-      )}
     </CartContext.Provider>
   );
 }
