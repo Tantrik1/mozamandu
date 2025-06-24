@@ -54,33 +54,28 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
       return handleOTPVerification();
     }
 
-    // Otherwise, handle initial signup
+    // Validate the form
     const newErrors: Record<string, string> = {};
 
-    // Validate full name
     if (!signUpData.fullName.trim()) {
       newErrors.fullName = 'Full name is required';
     }
 
-    // Validate email
     if (!signUpData.email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(signUpData.email)) {
       newErrors.email = 'Please enter a valid email address';
     }
 
-    // Validate password
     const passwordError = validatePassword(signUpData.password);
     if (passwordError) {
       newErrors.password = passwordError;
     }
 
-    // Validate confirm password
     if (signUpData.password !== signUpData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
-    // Validate terms acceptance
     if (!acceptedTerms) {
       newErrors.terms = 'You must accept the Terms and Conditions to continue';
     }
@@ -88,60 +83,35 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) {
-      toast({
-        title: "Please fix the following errors:",
-        description: Object.values(newErrors)[0],
-        variant: "destructive",
-      });
       return;
     }
 
-    // Call onStart callback to notify parent that signup is starting
-    if (onStart) {
-      onStart();
-    }
+    // Create account
+    const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
 
-    setIsLoading(true);
-    
-    try {
-      const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
-
-      if (error) {
-        if (error.message.includes('already registered')) {
-          toast({
-            title: "Account Already Exists",
-            description: "An account with this email already exists. Please sign in instead.",
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "Sign Up Failed",
-            description: error.message || "Failed to create account. Please try again.",
-            variant: "destructive",
-          });
-        }
-        setIsLoading(false);
-        return;
+    if (error) {
+      if (error.message.includes('already registered')) {
+        toast({
+          title: "Account Already Exists",
+          description: "An account with this email already exists. Please sign in instead.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sign Up Failed",
+          description: error.message || "Failed to create account. Please try again.",
+          variant: "destructive",
+        });
       }
-
-      toast({
-        title: "Verification Code Sent!",
-        description: "Please check your email for the 6-digit verification code.",
-      });
-
-      // Show OTP field in the same form
-      setShowOTPField(true);
-      console.log('Showing OTP field for verification');
-    } catch (error) {
-      console.error('Unexpected signup error:', error);
-      toast({
-        title: "Sign Up Failed",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+      return;
     }
+
+    // Show OTP field - just extend the form
+    setShowOTPField(true);
+    toast({
+      title: "Check Your Email!",
+      description: "We've sent a verification code to your email address.",
+    });
   };
 
   const handleOTPVerification = async () => {
@@ -154,49 +124,28 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
       return;
     }
 
-    setIsLoading(true);
+    const { error, user } = await verifyOTP(signUpData.email, otpCode);
 
-    try {
-      const { error, user } = await verifyOTP(signUpData.email, otpCode);
-
-      if (error) {
-        toast({
-          title: "Verification Failed",
-          description: error.message || "Invalid or expired OTP. Please try again.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      if (user) {
-        toast({
-          title: "Account Verified!",
-          description: "Your email has been verified successfully. Welcome to Mozamandu!",
-        });
-        onSuccess();
-      }
-    } catch (error) {
-      console.error('OTP verification error:', error);
+    if (error) {
       toast({
         title: "Verification Failed",
-        description: "An unexpected error occurred. Please try again.",
+        description: error.message || "Invalid or expired code. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+      return;
     }
-  };
 
-  const handleBackToSignup = () => {
-    setShowOTPField(false);
-    setOtpCode('');
-    setErrors({});
+    if (user) {
+      toast({
+        title: "Welcome to Mozamandu!",
+        description: "Your account has been created and verified successfully.",
+      });
+      onSuccess();
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Always show signup fields */}
       <div>
         <Label htmlFor="signup-name">Full Name *</Label>
         <Input
@@ -209,7 +158,6 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
           }}
           placeholder="Enter your full name"
           className={errors.fullName ? 'border-red-500' : ''}
-          disabled={isLoading || showOTPField}
           readOnly={showOTPField}
         />
         {errors.fullName && (
@@ -229,7 +177,6 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
           }}
           placeholder="Enter your email"
           className={errors.email ? 'border-red-500' : ''}
-          disabled={isLoading || showOTPField}
           readOnly={showOTPField}
         />
         {errors.email && (
@@ -250,14 +197,12 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
             }}
             placeholder="Create a strong password"
             className={`pr-10 ${errors.password ? 'border-red-500' : ''}`}
-            disabled={isLoading || showOTPField}
             readOnly={showOTPField}
           />
           <button
             type="button"
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
             onClick={() => setShowPassword(!showPassword)}
-            disabled={isLoading || showOTPField}
           >
             {showPassword ? (
               <EyeOff className="h-4 w-4 text-gray-400" />
@@ -285,14 +230,12 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
             }}
             placeholder="Confirm your password"
             className={`pr-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
-            disabled={isLoading || showOTPField}
             readOnly={showOTPField}
           />
           <button
             type="button"
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            disabled={isLoading || showOTPField}
           >
             {showConfirmPassword ? (
               <EyeOff className="h-4 w-4 text-gray-400" />
@@ -306,35 +249,36 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
         )}
       </div>
 
-      <div className="space-y-2">
-        <div className="flex items-start space-x-2">
-          <Checkbox
-            id="accept-terms"
-            checked={acceptedTerms}
-            onCheckedChange={(checked) => {
-              setAcceptedTerms(checked as boolean);
-              if (errors.terms) setErrors({ ...errors, terms: '' });
-            }}
-            className="mt-1"
-            disabled={isLoading || showOTPField}
-          />
-          <Label htmlFor="accept-terms" className="text-sm leading-5 cursor-pointer">
-            I accept the{' '}
-            <Link to="/terms" target="_blank" className="text-red-600 hover:text-red-700 underline">
-              Terms and Conditions
-            </Link>{' '}
-            and{' '}
-            <Link to="/privacy" target="_blank" className="text-red-600 hover:text-red-700 underline">
-              Privacy Policy
-            </Link>
-          </Label>
+      {!showOTPField && (
+        <div className="space-y-2">
+          <div className="flex items-start space-x-2">
+            <Checkbox
+              id="accept-terms"
+              checked={acceptedTerms}
+              onCheckedChange={(checked) => {
+                setAcceptedTerms(checked as boolean);
+                if (errors.terms) setErrors({ ...errors, terms: '' });
+              }}
+              className="mt-1"
+            />
+            <Label htmlFor="accept-terms" className="text-sm leading-5 cursor-pointer">
+              I accept the{' '}
+              <Link to="/terms" target="_blank" className="text-red-600 hover:text-red-700 underline">
+                Terms and Conditions
+              </Link>{' '}
+              and{' '}
+              <Link to="/privacy" target="_blank" className="text-red-600 hover:text-red-700 underline">
+                Privacy Policy
+              </Link>
+            </Label>
+          </div>
+          {errors.terms && (
+            <p className="text-sm text-red-600">{errors.terms}</p>
+          )}
         </div>
-        {errors.terms && (
-          <p className="text-sm text-red-600">{errors.terms}</p>
-        )}
-      </div>
+      )}
 
-      {/* OTP Verification Section - Only show after successful signup */}
+      {/* OTP Section - Only show after signup */}
       {showOTPField && (
         <div className="border-t pt-6 mt-6">
           <div className="text-center mb-6">
@@ -355,7 +299,6 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
                 value={otpCode}
                 onChange={setOtpCode}
                 maxLength={6}
-                className="gap-2"
               >
                 <InputOTPGroup className="gap-2">
                   <InputOTPSlot index={0} className="w-12 h-12 text-lg" />
@@ -371,26 +314,25 @@ export function SignUpForm({ onSuccess, onStart, isLoading, setIsLoading }: Sign
         </div>
       )}
 
-      {/* Dynamic button and back option */}
       <div className="space-y-3">
         <Button 
           type="submit" 
           className="w-full bg-red-600 hover:bg-red-700" 
-          disabled={isLoading || (!showOTPField && !acceptedTerms) || (showOTPField && otpCode.length !== 6)}
+          disabled={!showOTPField && !acceptedTerms}
         >
-          {isLoading 
-            ? (showOTPField ? 'Verifying...' : 'Creating Account...') 
-            : (showOTPField ? 'Verify Email and Create Account' : 'Create Account')
-          }
+          {showOTPField ? 'Verify Email and Create Account' : 'Create Account'}
         </Button>
         
         {showOTPField && (
           <Button 
             type="button"
             variant="ghost" 
-            onClick={handleBackToSignup}
+            onClick={() => {
+              setShowOTPField(false);
+              setOtpCode('');
+              setErrors({});
+            }}
             className="w-full"
-            disabled={isLoading}
           >
             Back to Sign Up Form
           </Button>
