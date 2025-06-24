@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -5,125 +6,131 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { SignUpForm } from '@/components/auth/SignUpForm';
-import { ContactInfoForm } from '@/components/customer/ContactInfoForm';
+import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Mail } from 'lucide-react';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 export default function Auth() {
-  const { signIn, user, userProfile, isLoading } = useAuth();
+  const { signIn, signUp, verifyOTP, user, userProfile, isLoading } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const redirectTo = searchParams.get('redirect');
   
   const [authLoading, setAuthLoading] = useState(false);
-  const [showContactForm, setShowContactForm] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
   const [showPassword, setShowPassword] = useState(false);
-  const [pendingSignup, setPendingSignup] = useState(false); // Track if signup is in progress
+  const [showOTPField, setShowOTPField] = useState(false);
   
   const [signInData, setSignInData] = useState({
     email: '',
     password: '',
   });
 
+  const [signUpData, setSignUpData] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
+
+  const [otpCode, setOtpCode] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    // Only redirect if user is authenticated AND not in the middle of signup process
-    if (user && userProfile && !isLoading && !pendingSignup) {
-      console.log('User authenticated, checking profile:', userProfile);
-      
-      // Check if contact info is missing for first-time users
-      if (!userProfile.contact_number) {
-        setShowContactForm(true);
-        return;
-      }
-
-      // Handle redirect parameter first
-      if (redirectTo) {
-        navigate(redirectTo);
-        return;
-      }
-
-      // Role-based redirect
+    if (user && userProfile && !isLoading) {
+      // Role-based redirect - only admin or customer
       if (userProfile.role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
       }
     }
-  }, [user, userProfile, isLoading, navigate, redirectTo, pendingSignup]);
-
-  const validateSignInForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!signInData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(signInData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-
-    if (!signInData.password.trim()) {
-      newErrors.password = 'Password is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  }, [user, userProfile, isLoading, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateSignInForm()) {
+    if (!signInData.email || !signInData.password) {
+      setErrors({ form: 'Please fill in all fields' });
       return;
     }
     
     setAuthLoading(true);
     setErrors({});
     
-    try {
-      const { error } = await signIn(signInData.email, signInData.password);
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          setErrors({ form: 'Invalid email or password. Please try again.' });
-        } else {
-          setErrors({ form: error.message });
-        }
-      }
-    } catch (error) {
-      console.error('Sign in error:', error);
-      setErrors({ form: 'An unexpected error occurred. Please try again.' });
-    } finally {
-      setAuthLoading(false);
+    const { error } = await signIn(signInData.email, signInData.password);
+    if (error) {
+      setErrors({ form: error.message });
     }
+    
+    setAuthLoading(false);
   };
 
-  const handleSignUpSuccess = () => {
-    console.log('Signup successful and verified');
-    setPendingSignup(false); // Reset pending signup state
-    // The useEffect will handle the redirect now that the user is authenticated
-  };
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (showOTPField) {
+      return handleOTPVerification();
+    }
 
-  const handleSignUpStart = () => {
-    setPendingSignup(true); // Mark signup as in progress
-  };
+    // Validate form
+    const newErrors: Record<string, string> = {};
 
-  const handleContactInfoComplete = () => {
-    setShowContactForm(false);
-    setPendingSignup(false);
-    // Redirect after contact info is collected
-    if (redirectTo) {
-      navigate(redirectTo);
-    } else if (userProfile?.role === 'admin') {
-      navigate('/admin');
+    if (!signUpData.fullName.trim()) {
+      newErrors.fullName = 'Full name is required';
+    }
+
+    if (!signUpData.email || !/\S+@\S+\.\S+/.test(signUpData.email)) {
+      newErrors.email = 'Valid email is required';
+    }
+
+    if (!signUpData.password || signUpData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    if (signUpData.password !== signUpData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) {
+      return;
+    }
+
+    setAuthLoading(true);
+
+    const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
+
+    if (error) {
+      setErrors({ form: error.message });
     } else {
-      navigate('/dashboard');
+      setShowOTPField(true);
+      toast({
+        title: "Check Your Email!",
+        description: "We've sent a verification code to your email address.",
+      });
     }
+
+    setAuthLoading(false);
   };
 
-  // Show loading while checking auth state
+  const handleOTPVerification = async () => {
+    if (otpCode.length !== 6) {
+      setErrors({ otp: 'Please enter the complete 6-digit code' });
+      return;
+    }
+
+    setAuthLoading(true);
+
+    const { error } = await verifyOTP(signUpData.email, otpCode);
+
+    if (error) {
+      setErrors({ otp: error.message });
+    }
+
+    setAuthLoading(false);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -132,16 +139,6 @@ export default function Auth() {
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
-    );
-  }
-
-  // Show contact form for first-time users
-  if (showContactForm && user && userProfile) {
-    return (
-      <ContactInfoForm 
-        userId={user.id} 
-        onComplete={handleContactInfoComplete} 
-      />
     );
   }
 
@@ -178,17 +175,10 @@ export default function Auth() {
                       id="signin-email"
                       type="email"
                       value={signInData.email}
-                      onChange={(e) => {
-                        setSignInData({ ...signInData, email: e.target.value });
-                        if (errors.email) setErrors({ ...errors, email: '' });
-                      }}
+                      onChange={(e) => setSignInData({ ...signInData, email: e.target.value })}
                       placeholder="Enter your email"
-                      className={errors.email ? 'border-red-500' : ''}
                       disabled={authLoading}
                     />
-                    {errors.email && (
-                      <p className="text-sm text-red-600 mt-1">{errors.email}</p>
-                    )}
                   </div>
                   
                   <div>
@@ -198,30 +188,19 @@ export default function Auth() {
                         id="signin-password"
                         type={showPassword ? "text" : "password"}
                         value={signInData.password}
-                        onChange={(e) => {
-                          setSignInData({ ...signInData, password: e.target.value });
-                          if (errors.password) setErrors({ ...errors, password: '' });
-                        }}
+                        onChange={(e) => setSignInData({ ...signInData, password: e.target.value })}
                         placeholder="Enter your password"
-                        className={`pr-10 ${errors.password ? 'border-red-500' : ''}`}
+                        className="pr-10"
                         disabled={authLoading}
                       />
                       <button
                         type="button"
                         className="absolute inset-y-0 right-0 pr-3 flex items-center"
                         onClick={() => setShowPassword(!showPassword)}
-                        disabled={authLoading}
                       >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4 text-gray-400" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-gray-400" />
-                        )}
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                    {errors.password && (
-                      <p className="text-sm text-red-600 mt-1">{errors.password}</p>
-                    )}
                   </div>
                   
                   <Button 
@@ -242,12 +221,114 @@ export default function Auth() {
                 <CardTitle>Create Your Account</CardTitle>
               </CardHeader>
               <CardContent>
-                <SignUpForm 
-                  onSuccess={handleSignUpSuccess}
-                  onStart={handleSignUpStart}
-                  isLoading={authLoading}
-                  setIsLoading={setAuthLoading}
-                />
+                <form onSubmit={handleSignUp} className="space-y-4">
+                  {errors.form && (
+                    <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
+                      {errors.form}
+                    </div>
+                  )}
+
+                  {!showOTPField ? (
+                    <>
+                      <div>
+                        <Label htmlFor="signup-name">Full Name</Label>
+                        <Input
+                          id="signup-name"
+                          type="text"
+                          value={signUpData.fullName}
+                          onChange={(e) => setSignUpData({ ...signUpData, fullName: e.target.value })}
+                          placeholder="Enter your full name"
+                        />
+                        {errors.fullName && <p className="text-sm text-red-600 mt-1">{errors.fullName}</p>}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="signup-email">Email Address</Label>
+                        <Input
+                          id="signup-email"
+                          type="email"
+                          value={signUpData.email}
+                          onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
+                          placeholder="Enter your email"
+                        />
+                        {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="signup-password">Password</Label>
+                        <Input
+                          id="signup-password"
+                          type="password"
+                          value={signUpData.password}
+                          onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
+                          placeholder="Create a password"
+                        />
+                        {errors.password && <p className="text-sm text-red-600 mt-1">{errors.password}</p>}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="signup-confirm">Confirm Password</Label>
+                        <Input
+                          id="signup-confirm"
+                          type="password"
+                          value={signUpData.confirmPassword}
+                          onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
+                          placeholder="Confirm your password"
+                        />
+                        {errors.confirmPassword && <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center space-y-4">
+                      <Mail className="w-16 h-16 mx-auto text-blue-600" />
+                      <h3 className="text-xl font-semibold">Verify Your Email</h3>
+                      <p className="text-gray-600">
+                        We've sent a verification code to<br />
+                        <span className="font-medium">{signUpData.email}</span>
+                      </p>
+
+                      <div className="flex justify-center">
+                        <InputOTP value={otpCode} onChange={setOtpCode} maxLength={6}>
+                          <InputOTPGroup>
+                            <InputOTPSlot index={0} />
+                            <InputOTPSlot index={1} />
+                            <InputOTPSlot index={2} />
+                            <InputOTPSlot index={3} />
+                            <InputOTPSlot index={4} />
+                            <InputOTPSlot index={5} />
+                          </InputOTPGroup>
+                        </InputOTP>
+                      </div>
+                      {errors.otp && <p className="text-sm text-red-600">{errors.otp}</p>}
+                    </div>
+                  )}
+
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-red-600 hover:bg-red-700" 
+                    disabled={authLoading}
+                  >
+                    {authLoading 
+                      ? (showOTPField ? 'Verifying...' : 'Creating Account...') 
+                      : (showOTPField ? 'Verify & Create Account' : 'Create Account')
+                    }
+                  </Button>
+
+                  {showOTPField && (
+                    <Button 
+                      type="button"
+                      variant="ghost" 
+                      onClick={() => {
+                        setShowOTPField(false);
+                        setOtpCode('');
+                        setErrors({});
+                      }}
+                      className="w-full"
+                    >
+                      Back to Sign Up Form
+                    </Button>
+                  )}
+                </form>
               </CardContent>
             </Card>
           </TabsContent>

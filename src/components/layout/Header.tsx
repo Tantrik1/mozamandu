@@ -1,10 +1,8 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, User, LogOut, Settings, LayoutDashboard } from 'lucide-react';
+import { ShoppingCart, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,14 +18,13 @@ export function Header() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/');
   };
 
   const handleDashboardClick = () => {
     if (userProfile?.role === 'admin') {
       navigate('/admin');
     } else {
-      navigate('/');
+      navigate('/dashboard');
     }
   };
 
@@ -38,7 +35,7 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link to="/" className="flex items-center space-x-2">
-            <div className="text-2xl font-bold text-blue-600">Mozamandu</div>
+            <div className="text-2xl font-bold text-red-600">Mozamandu</div>
             <div className="text-sm text-gray-500">Gear Shop</div>
           </Link>
 
@@ -47,8 +44,8 @@ export function Header() {
               to="/" 
               className={`transition-colors ${
                 isActive('/') 
-                  ? 'text-blue-600 font-medium' 
-                  : 'text-gray-700 hover:text-blue-600'
+                  ? 'text-red-600 font-medium' 
+                  : 'text-gray-700 hover:text-red-600'
               }`}
             >
               Home
@@ -57,8 +54,8 @@ export function Header() {
               to="/products" 
               className={`transition-colors ${
                 isActive('/products') 
-                  ? 'text-blue-600 font-medium' 
-                  : 'text-gray-700 hover:text-blue-600'
+                  ? 'text-red-600 font-medium' 
+                  : 'text-gray-700 hover:text-red-600'
               }`}
             >
               Products
@@ -67,8 +64,8 @@ export function Header() {
               to="/categories" 
               className={`transition-colors ${
                 isActive('/categories') 
-                  ? 'text-blue-600 font-medium' 
-                  : 'text-gray-700 hover:text-blue-600'
+                  ? 'text-red-600 font-medium' 
+                  : 'text-gray-700 hover:text-red-600'
               }`}
             >
               Categories
@@ -101,7 +98,7 @@ export function Header() {
               </DropdownMenu>
             ) : (
               <Link to="/auth">
-                <Button size="sm">Sign In</Button>
+                <Button size="sm" className="bg-red-600 hover:bg-red-700">Sign In</Button>
               </Link>
             )}
           </div>

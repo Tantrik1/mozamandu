@@ -11,9 +11,8 @@ interface AuthContextType {
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
-  verifyOTP: (email: string, otp: string) => Promise<{ error: any; user?: User }>;
+  verifyOTP: (email: string, otp: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
-  redirectBasedOnRole: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,38 +24,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    let mounted = true;
-
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (!mounted) return;
-
         console.log('Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Defer profile fetch to avoid auth state callback issues
-          setTimeout(() => {
-            if (mounted) {
-              fetchUserProfile(session.user.id);
-            }
-          }, 0);
+          fetchUserProfile(session.user.id);
         } else {
           setUserProfile(null);
         }
         
-        if (mounted) {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       }
     );
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return;
-
       console.log('Initial session:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
@@ -69,7 +55,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
-      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -87,18 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      console.log('User profile fetched:', data);
       setUserProfile(data);
     } catch (error) {
       console.error('Profile fetch error:', error);
-    }
-  };
-
-  const redirectBasedOnRole = () => {
-    if (userProfile?.role === 'admin') {
-      window.location.href = '/admin';
-    } else {
-      window.location.href = '/dashboard';
     }
   };
 
@@ -111,17 +87,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       
       if (error) {
-        console.error('Sign in error:', error);
         return { error };
-      } else {
-        toast({
-          title: "Welcome back!",
-          description: "You have successfully signed in.",
-        });
-        return { error: null };
       }
+      
+      toast({
+        title: "Welcome back!",
+        description: "You have successfully signed in.",
+      });
+      
+      return { error: null };
     } catch (error) {
-      console.error('Unexpected sign in error:', error);
       return { error };
     } finally {
       setIsLoading(false);
@@ -132,38 +107,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
-      // Create user without auto-confirming to prevent immediate login
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
-          data: {
-            full_name: fullName.trim(),
-          },
+      // Generate OTP and send via Resend
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Send OTP email via edge function
+      const { error: emailError } = await supabase.functions.invoke('send-verification-email', {
+        body: {
+          email: email.trim(),
+          name: fullName.trim(),
+          otp: otpCode,
         },
       });
 
-      if (error) {
-        console.error('Sign up error:', error);
-        return { error };
+      if (emailError) {
+        return { error: emailError };
       }
 
-      // If user needs email confirmation, sign them out to prevent auto-login
-      if (data.user && !data.user.email_confirmed_at && !data.session) {
-        console.log('User created, awaiting email confirmation');
-        return { error: null };
-      }
+      // Store user data temporarily (not creating auth user yet)
+      sessionStorage.setItem('pendingSignup', JSON.stringify({
+        email: email.trim(),
+        password,
+        fullName: fullName.trim(),
+        otp: otpCode,
+      }));
 
-      // If they're somehow already logged in, sign them out
-      if (data.session) {
-        await supabase.auth.signOut();
-      }
-
-      console.log('User created, confirmation required:', data);
       return { error: null };
     } catch (error) {
-      console.error('Unexpected sign up error:', error);
       return { error };
     } finally {
       setIsLoading(false);
@@ -174,21 +143,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: email.trim(),
-        token: otp,
-        type: 'signup'
-      });
-
-      if (error) {
-        console.error('OTP verification error:', error);
-        return { error };
+      const pendingData = sessionStorage.getItem('pendingSignup');
+      if (!pendingData) {
+        return { error: { message: 'No pending signup found' } };
       }
 
-      console.log('OTP verified successfully:', data);
-      return { error: null, user: data.user };
+      const { password, fullName, otp: storedOtp } = JSON.parse(pendingData);
+
+      if (otp !== storedOtp) {
+        return { error: { message: 'Invalid verification code' } };
+      }
+
+      // Create the actual user account
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            full_name: fullName,
+            role: 'customer',
+          },
+        },
+      });
+
+      if (signUpError) {
+        return { error: signUpError };
+      }
+
+      // Clear pending data
+      sessionStorage.removeItem('pendingSignup');
+
+      toast({
+        title: "Account created successfully!",
+        description: "Welcome to Mozamandu!",
+      });
+
+      return { error: null };
     } catch (error) {
-      console.error('Unexpected OTP verification error:', error);
       return { error };
     } finally {
       setIsLoading(false);
@@ -199,49 +191,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
-      // Clear local state first to provide immediate feedback
+      // Clear local state immediately
       setUser(null);
       setSession(null);
       setUserProfile(null);
       
-      const { error } = await supabase.auth.signOut();
+      await supabase.auth.signOut();
       
-      if (error) {
-        // Check if it's an AuthSessionMissingError - this is expected if session already expired
-        if (error.message === 'Auth session missing!' || error.name === 'AuthSessionMissingError') {
-          console.log('Session already expired, proceeding with sign out');
-          toast({
-            title: "Signed Out",
-            description: "You have been successfully signed out.",
-          });
-        } else {
-          console.error('Sign out error:', error);
-          toast({
-            title: "Sign Out Failed",
-            description: "There was an error signing you out. Please try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-      } else {
-        toast({
-          title: "Signed Out",
-          description: "You have been successfully signed out.",
-        });
-      }
-      
-      // Redirect to home page after sign out
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 1000);
-      
-    } catch (error) {
-      console.error('Unexpected sign out error:', error);
       toast({
-        title: "Sign Out Failed",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
+        title: "Signed Out",
+        description: "You have been successfully signed out.",
       });
+      
+      // Redirect to home
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Sign out error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -257,7 +222,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       verifyOTP,
       signOut,
-      redirectBasedOnRole,
     }}>
       {children}
     </AuthContext.Provider>
