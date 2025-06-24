@@ -2,6 +2,7 @@
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { HeroSection } from '@/components/customer/HeroSection';
 import { FeaturedProductsCarousel } from '@/components/customer/FeaturedProductsCarousel';
+import { BrowseSubcategories } from '@/components/customer/BrowseSubcategories';
 import { SubcategoryProductTabs } from '@/components/customer/SubcategoryProductTabs';
 import { LatestProducts } from '@/components/customer/LatestProducts';
 import { WhyChooseUs } from '@/components/customer/WhyChooseUs';
@@ -16,6 +17,9 @@ export default function Home() {
       
       {/* Hero Section - Full Viewport */}
       <HeroSection />
+
+      {/* Browse Subcategories */}
+      <BrowseSubcategories />
 
       {/* Featured Products Carousel */}
       <FeaturedProductsCarousel />

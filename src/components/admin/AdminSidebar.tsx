@@ -23,7 +23,8 @@ import {
   Settings,
   ShoppingCart,
   UserCheck,
-  LogOut
+  LogOut,
+  HelpCircle
 } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
@@ -88,6 +89,11 @@ const menuItems = [
     title: "Top Bar Text",
     url: "/admin/top-bar-text",
     icon: Type,
+  },
+  {
+    title: "FAQs",
+    url: "/admin/faqs",
+    icon: HelpCircle,
   },
   {
     title: "Settings",
