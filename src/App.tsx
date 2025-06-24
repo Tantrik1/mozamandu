@@ -22,6 +22,8 @@ import TermsConditions from "./pages/TermsConditions";
 import NotFound from "./pages/NotFound";
 import Home from "./pages/Home";
 import FAQ from "./pages/FAQ";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +63,8 @@ function App() {
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/shipping" element={<ShippingPolicy />} />
                 <Route path="/terms" element={<TermsConditions />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/contact" element={<Contact />} />
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
