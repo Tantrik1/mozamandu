@@ -6,12 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { ArrowLeft, MapPin, User, Mail, Phone, MessageSquare } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { useCheckoutSession } from './CheckoutSession';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface CheckoutInfoProps {
   isGuest: boolean;
@@ -25,31 +22,49 @@ interface DeliveryLocation {
   delivery_price: number;
 }
 
+interface FormData {
+  customerName: string;
+  customerEmail: string;
+  contactNumber: string;
+  whatsappNumber: string;
+  deliveryLocationId: string;
+  deliveryAddress: string;
+}
+
 export function EnhancedCheckoutInfo({ isGuest, onComplete, onBack }: CheckoutInfoProps) {
-  const { user, userProfile } = useAuth();
-  const { updateActivity, isExpired } = useCheckoutSession();
-  const [isLoading, setIsLoading] = useState(false);
   const [deliveryLocations, setDeliveryLocations] = useState<DeliveryLocation[]>([]);
-  const [isLoadingLocations, setIsLoadingLocations] = useState(true);
-  const [retryCount, setRetryCount] = useState(0);
-  
-  const [formData, setFormData] = useState({
-    customerName: userProfile?.full_name || '',
-    customerEmail: user?.email || '',
+  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState<FormData>({
+    customerName: '',
+    customerEmail: '',
     contactNumber: '',
     whatsappNumber: '',
     deliveryLocationId: '',
     deliveryAddress: '',
   });
 
+  // Load saved form data on component mount
   useEffect(() => {
+    const savedData = sessionStorage.getItem('checkoutInfo');
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        setFormData(parsed);
+      } catch (error) {
+        console.error('Error parsing saved checkout info:', error);
+      }
+    }
     fetchDeliveryLocations();
   }, []);
 
-  const fetchDeliveryLocations = async (attempt = 1) => {
-    console.log(`Fetching delivery locations (attempt ${attempt})...`);
-    setIsLoadingLocations(true);
-    
+  // Save form data whenever it changes
+  useEffect(() => {
+    if (formData.customerName || formData.customerEmail || formData.contactNumber) {
+      sessionStorage.setItem('checkoutInfo', JSON.stringify(formData));
+    }
+  }, [formData]);
+
+  const fetchDeliveryLocations = async () => {
     try {
       const { data, error } = await supabase
         .from('delivery_charges')
@@ -58,48 +73,32 @@ export function EnhancedCheckoutInfo({ isGuest, onComplete, onBack }: CheckoutIn
         .order('place_name');
 
       if (error) {
-        throw error;
-      }
-
-      console.log('Delivery locations fetched:', data);
-      setDeliveryLocations(data || []);
-      setRetryCount(0);
-    } catch (error) {
-      console.error('Error fetching delivery locations:', error);
-      
-      if (attempt < 3) {
-        // Retry with exponential backoff
-        setTimeout(() => {
-          fetchDeliveryLocations(attempt + 1);
-        }, 1000 * attempt);
-        setRetryCount(attempt);
-      } else {
+        console.error('Error fetching delivery locations:', error);
         toast({
-          title: "Error Loading Delivery Options",
-          description: "Failed to load delivery locations. Please refresh the page.",
+          title: "Error",
+          description: "Failed to load delivery locations",
           variant: "destructive",
         });
+      } else {
+        setDeliveryLocations(data || []);
       }
+    } catch (error) {
+      console.error('Error fetching delivery locations:', error);
     } finally {
-      setIsLoadingLocations(false);
+      setLoading(false);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleInputChange = (field: keyof FormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateActivity();
-    
-    if (isExpired) {
-      toast({
-        title: "Session Expired",
-        description: "Please restart the checkout process",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (!formData.customerName || !formData.customerEmail || !formData.contactNumber || 
-        !formData.deliveryLocationId || !formData.deliveryAddress) {
+
+    if (!formData.customerName.trim() || !formData.customerEmail.trim() || 
+        !formData.contactNumber.trim() || !formData.deliveryLocationId || 
+        !formData.deliveryAddress.trim()) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields",
@@ -108,7 +107,7 @@ export function EnhancedCheckoutInfo({ isGuest, onComplete, onBack }: CheckoutIn
       return;
     }
 
-    // Validate email format
+    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.customerEmail)) {
       toast({
@@ -119,25 +118,29 @@ export function EnhancedCheckoutInfo({ isGuest, onComplete, onBack }: CheckoutIn
       return;
     }
 
-    // Store checkout info in sessionStorage for next step
-    sessionStorage.setItem('checkoutInfo', JSON.stringify(formData));
+    // Phone validation
+    const phoneRegex = /^[\+]?[0-9\-\(\)\s]+$/;
+    if (!phoneRegex.test(formData.contactNumber)) {
+      toast({
+        title: "Invalid Phone Number",
+        description: "Please enter a valid phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
     onComplete();
   };
 
   const selectedLocation = deliveryLocations.find(loc => loc.id === formData.deliveryLocationId);
 
-  if (isExpired) {
+  if (loading) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Your checkout session has expired. Please start over.
-          </AlertDescription>
-        </Alert>
-        <Button onClick={() => window.location.href = '/'} className="mt-4">
-          Return to Home
-        </Button>
+      <div className="max-w-2xl mx-auto flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading delivery options...</p>
+        </div>
       </div>
     );
   }
@@ -151,155 +154,132 @@ export function EnhancedCheckoutInfo({ isGuest, onComplete, onBack }: CheckoutIn
 
       <Card>
         <CardHeader>
-          <CardTitle>
-            {isGuest ? 'Your Information' : 'Delivery Information'}
+          <CardTitle className="flex items-center">
+            <User className="w-5 h-5 mr-2" />
+            {isGuest ? 'Guest Checkout Information' : 'Delivery Information'}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoadingLocations && (
-            <Alert className="mb-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <AlertDescription>
-                Loading delivery locations...
-                {retryCount > 0 && ` (Attempt ${retryCount + 1})`}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {!isLoadingLocations && deliveryLocations.length === 0 && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                No delivery locations available. Please contact support.
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => fetchDeliveryLocations()}
-                  className="ml-2"
-                >
-                  Retry
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-4">
+            {/* Customer Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium flex items-center">
+                <User className="w-4 h-4 mr-2" />
+                Personal Information
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="name">Full Name *</Label>
+                  <Input
+                    id="name"
+                    value={formData.customerName}
+                    onChange={(e) => handleInputChange('customerName', e.target.value)}
+                    placeholder="Enter your full name"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="email">Email Address *</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.customerEmail}
+                      onChange={(e) => handleInputChange('customerEmail', e.target.value)}
+                      placeholder="Enter your email"
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="contact">Contact Number *</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="contact"
+                      type="tel"
+                      value={formData.contactNumber}
+                      onChange={(e) => handleInputChange('contactNumber', e.target.value)}
+                      placeholder="Enter your phone number"
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="whatsapp">WhatsApp Number (Optional)</Label>
+                  <div className="relative">
+                    <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="whatsapp"
+                      type="tel"
+                      value={formData.whatsappNumber}
+                      onChange={(e) => handleInputChange('whatsappNumber', e.target.value)}
+                      placeholder="WhatsApp number (if different)"
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Delivery Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium flex items-center">
+                <MapPin className="w-4 h-4 mr-2" />
+                Delivery Information
+              </h3>
+
               <div>
-                <Label htmlFor="name">Full Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.customerName}
-                  onChange={(e) => {
-                    setFormData({ ...formData, customerName: e.target.value });
-                    updateActivity();
-                  }}
+                <Label htmlFor="location">Delivery Location *</Label>
+                <Select
+                  value={formData.deliveryLocationId}
+                  onValueChange={(value) => handleInputChange('deliveryLocationId', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select delivery location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {deliveryLocations.map((location) => (
+                      <SelectItem key={location.id} value={location.id}>
+                        <div className="flex justify-between items-center w-full">
+                          <span>{location.place_name}</span>
+                          <span className="ml-4 text-sm text-gray-600">
+                            +${location.delivery_price.toFixed(2)}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedLocation && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Delivery charge: ${selectedLocation.delivery_price.toFixed(2)}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="address">Complete Address *</Label>
+                <Textarea
+                  id="address"
+                  value={formData.deliveryAddress}
+                  onChange={(e) => handleInputChange('deliveryAddress', e.target.value)}
+                  placeholder="Enter your complete delivery address..."
+                  rows={3}
                   required
                 />
               </div>
-              <div>
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.customerEmail}
-                  onChange={(e) => {
-                    setFormData({ ...formData, customerEmail: e.target.value });
-                    updateActivity();
-                  }}
-                  required
-                />
-              </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="contact">Contact Number *</Label>
-                <Input
-                  id="contact"
-                  type="tel"
-                  value={formData.contactNumber}
-                  onChange={(e) => {
-                    setFormData({ ...formData, contactNumber: e.target.value });
-                    updateActivity();
-                  }}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="whatsapp">WhatsApp Number</Label>
-                <Input
-                  id="whatsapp"
-                  type="tel"
-                  value={formData.whatsappNumber}
-                  onChange={(e) => {
-                    setFormData({ ...formData, whatsappNumber: e.target.value });
-                    updateActivity();
-                  }}
-                  placeholder="Same as contact if not provided"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="location">Delivery Location *</Label>
-              <Select
-                value={formData.deliveryLocationId}
-                onValueChange={(value) => {
-                  setFormData({ ...formData, deliveryLocationId: value });
-                  updateActivity();
-                }}
-                disabled={isLoadingLocations || deliveryLocations.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select delivery location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {deliveryLocations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.place_name} (+${location.delivery_price} delivery)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="address">Complete Address *</Label>
-              <Textarea
-                id="address"
-                value={formData.deliveryAddress}
-                onChange={(e) => {
-                  setFormData({ ...formData, deliveryAddress: e.target.value });
-                  updateActivity();
-                }}
-                placeholder="House/Flat number, Street, Landmark..."
-                rows={3}
-                required
-              />
-            </div>
-
-            {selectedLocation && (
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Delivery Charge:</strong> ${selectedLocation.delivery_price} for {selectedLocation.place_name}
-                </p>
-              </div>
-            )}
-
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isLoading || isLoadingLocations || deliveryLocations.length === 0}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                'Continue to Payment'
-              )}
+            <Button type="submit" className="w-full">
+              Continue to Payment
             </Button>
           </form>
         </CardContent>

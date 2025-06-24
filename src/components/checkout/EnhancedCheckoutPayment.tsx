@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Upload, Gift, Tag, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Separator } from '@/components/ui/separator';
+import { ArrowLeft, Gift, Tag, AlertCircle, Loader2, CheckCircle, User, MapPin, Phone, Mail } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,10 +58,12 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [checkoutInfo, setCheckoutInfo] = useState<CheckoutInfo | null>(null);
   const [deliveryCharge, setDeliveryCharge] = useState(0);
+  const [deliveryLocation, setDeliveryLocation] = useState('');
   
   const [paymentData, setPaymentData] = useState({
     promoCode: '',
     paymentMethodId: '',
+    paymentType: 'partial' as 'full' | 'partial',
     paidAmount: '',
     paymentNotes: '',
     paymentScreenshot: null as File | null,
@@ -116,15 +121,16 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
     const info: CheckoutInfo = JSON.parse(saved);
     setCheckoutInfo(info);
 
-    // Fetch delivery charge
+    // Fetch delivery charge and location name
     const { data: deliveryData } = await supabase
       .from('delivery_charges')
-      .select('delivery_price')
+      .select('delivery_price, place_name')
       .eq('id', info.deliveryLocationId)
       .single();
 
     if (deliveryData) {
       setDeliveryCharge(deliveryData.delivery_price);
+      setDeliveryLocation(deliveryData.place_name);
     }
   };
 
@@ -146,17 +152,22 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
       return;
     }
 
-    setAppliedPromo({
-      id: '',
-      code: paymentData.promoCode.toUpperCase(),
-      discount_percentage: 0,
-      minimum_order_amount: 0
-    });
-    setIsPromoApplied(true);
-    toast({
-      title: "Promo Code Applied!",
-      description: `Discount applied successfully`,
-    });
+    // Fetch the actual promo code details
+    const { data: promo } = await supabase
+      .from('promocodes')
+      .select('*')
+      .eq('code', paymentData.promoCode.toUpperCase())
+      .eq('is_active', true)
+      .single();
+
+    if (promo) {
+      setAppliedPromo(promo);
+      setIsPromoApplied(true);
+      toast({
+        title: "Promo Code Applied!",
+        description: `${promo.discount_percentage}% discount applied`,
+      });
+    }
   };
 
   const removePromoCode = () => {
@@ -225,6 +236,15 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
       finalTotal,
       minimumPayment,
     };
+  };
+
+  const handlePaymentTypeChange = (type: 'full' | 'partial') => {
+    const totals = calculateTotals();
+    setPaymentData(prev => ({
+      ...prev,
+      paymentType: type,
+      paidAmount: type === 'full' ? totals.finalTotal.toString() : ''
+    }));
   };
 
   const placeOrder = async () => {
@@ -388,7 +408,7 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
   const selectedPaymentMethod = paymentMethods.find(pm => pm.id === paymentData.paymentMethodId);
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       <Button variant="ghost" onClick={onBack} className="mb-4">
         <ArrowLeft className="w-4 h-4 mr-2" />
         Back
@@ -396,75 +416,131 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
 
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Order Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              Order Summary
-              {stockValidated && (
-                <CheckCircle className="w-5 h-5 text-green-500 ml-2" />
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Cart Items */}
-            <div className="space-y-3">
-              {cartItems.map((item) => {
-                const pricing = getItemPricing(item);
-                return (
-                  <div key={item.id} className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h4 className="font-medium">{item.productName}</h4>
-                      {item.colorName && <p className="text-sm text-gray-600">Color: {item.colorName}</p>}
-                      {item.sizeName && <p className="text-sm text-gray-600">Size: {item.sizeName}</p>}
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-sm">Qty: {item.quantity}</span>
-                        {pricing.mode === 'combo' && (
-                          <Badge variant="secondary" className="text-xs">
-                            <Gift className="w-2 h-2 mr-1" />
-                            Combo
-                          </Badge>
-                        )}
-                        {pricing.mode === 'discount' && (
-                          <Badge variant="secondary" className="text-xs">
-                            <Tag className="w-2 h-2 mr-1" />
-                            MOQ
-                          </Badge>
+        <div className="space-y-6">
+          {/* Complete Order Breakdown */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                Order Summary
+                {stockValidated && (
+                  <CheckCircle className="w-5 h-5 text-green-500 ml-2" />
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Cart Items with detailed pricing */}
+              <div className="space-y-3">
+                {cartItems.map((item) => {
+                  const pricing = getItemPricing(item);
+                  return (
+                    <div key={item.id} className="flex justify-between items-start p-3 bg-gray-50 rounded-lg">
+                      <div className="flex-1">
+                        <h4 className="font-medium">{item.productName}</h4>
+                        {item.colorName && <p className="text-sm text-gray-600">Color: {item.colorName}</p>}
+                        {item.sizeName && <p className="text-sm text-gray-600">Size: {item.sizeName}</p>}
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-sm">Qty: {item.quantity}</span>
+                          {pricing.mode === 'combo' && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Gift className="w-2 h-2 mr-1" />
+                              Combo Price
+                            </Badge>
+                          )}
+                          {pricing.mode === 'discount' && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Tag className="w-2 h-2 mr-1" />
+                              MOQ Discount
+                            </Badge>
+                          )}
+                          {pricing.mode === 'normal' && (
+                            <Badge variant="outline" className="text-xs">
+                              Regular Price
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">${pricing.finalPrice.toFixed(2)} each</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">${(pricing.finalPrice * item.quantity).toFixed(2)}</p>
+                        {item.basePrice !== pricing.finalPrice && (
+                          <p className="text-sm text-gray-500 line-through">
+                            ${(item.basePrice * item.quantity).toFixed(2)}
+                          </p>
                         )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium">${(pricing.finalPrice * item.quantity).toFixed(2)}</p>
-                      <p className="text-sm text-gray-600">${pricing.finalPrice.toFixed(2)} each</p>
-                    </div>
+                  );
+                })}
+              </div>
+
+              <Separator />
+
+              {/* Price Breakdown */}
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal ({cartItems.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
+                  <span>${totals.subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Delivery Charge</span>
+                  <span>${totals.deliveryCharge.toFixed(2)}</span>
+                </div>
+                {appliedPromo && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Promo Discount ({appliedPromo.discount_percentage}%)</span>
+                    <span>-${totals.promoDiscount.toFixed(2)}</span>
                   </div>
-                );
-              })}
-            </div>
-            <div className="border-t pt-4 space-y-2">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>${totals.subtotal.toFixed(2)}</span>
+                )}
+                <Separator />
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Total Amount</span>
+                  <span>${totals.finalTotal.toFixed(2)}</span>
+                </div>
+                <p className="text-sm text-gray-600">
+                  Minimum payment: ${totals.minimumPayment.toFixed(2)} (20%)
+                </p>
               </div>
-              <div className="flex justify-between">
-                <span>Delivery Charge</span>
-                <span>${totals.deliveryCharge.toFixed(2)}</span>
+            </CardContent>
+          </Card>
+
+          {/* Delivery Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <MapPin className="w-5 h-5 mr-2" />
+                Delivery Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-gray-500" />
+                <span className="font-medium">{checkoutInfo.customerName}</span>
               </div>
-              {appliedPromo && (
-                <div className="flex justify-between text-green-600">
-                  <span>Promo Discount ({appliedPromo.discount_percentage}%)</span>
-                  <span>-${totals.promoDiscount.toFixed(2)}</span>
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-gray-500" />
+                <span>{checkoutInfo.customerEmail}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone className="w-4 h-4 text-gray-500" />
+                <span>{checkoutInfo.contactNumber}</span>
+              </div>
+              {checkoutInfo.whatsappNumber && (
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-gray-500" />
+                  <span>WhatsApp: {checkoutInfo.whatsappNumber}</span>
                 </div>
               )}
-              <div className="flex justify-between font-bold text-lg border-t pt-2">
-                <span>Total</span>
-                <span>${totals.finalTotal.toFixed(2)}</span>
+              <Separator />
+              <div>
+                <p className="font-medium">{deliveryLocation}</p>
+                <p className="text-sm text-gray-600">{checkoutInfo.deliveryAddress}</p>
+                <p className="text-sm font-medium text-green-600 mt-1">
+                  Delivery Charge: ${deliveryCharge.toFixed(2)}
+                </p>
               </div>
-              <p className="text-sm text-gray-600">
-                Minimum payment: ${totals.minimumPayment.toFixed(2)} (20%)
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Payment Form */}
         <Card>
@@ -534,25 +610,43 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
               </div>
             )}
 
-            {/* Payment Amount */}
+            {/* Payment Amount Options */}
             <div>
-              <Label htmlFor="paid-amount">Payment Amount *</Label>
-              <Input
-                id="paid-amount"
-                type="number"
-                step="0.01"
-                min={totals.minimumPayment}
-                max={totals.finalTotal}
-                value={paymentData.paidAmount}
-                onChange={(e) => {
-                  setPaymentData({ ...paymentData, paidAmount: e.target.value });
-                  updateActivity();
-                }}
-                placeholder={`Min: $${totals.minimumPayment.toFixed(2)}`}
-              />
-              <p className="text-sm text-gray-600 mt-1">
-                You can pay between ${totals.minimumPayment.toFixed(2)} - ${totals.finalTotal.toFixed(2)}
-              </p>
+              <Label>Payment Amount *</Label>
+              <RadioGroup
+                value={paymentData.paymentType}
+                onValueChange={handlePaymentTypeChange}
+                className="mt-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="full" id="full" />
+                  <Label htmlFor="full">Pay Full Amount (${totals.finalTotal.toFixed(2)})</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="partial" id="partial" />
+                  <Label htmlFor="partial">Pay Custom Amount (Min: ${totals.minimumPayment.toFixed(2)})</Label>
+                </div>
+              </RadioGroup>
+
+              {paymentData.paymentType === 'partial' && (
+                <div className="mt-3">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={totals.minimumPayment}
+                    max={totals.finalTotal}
+                    value={paymentData.paidAmount}
+                    onChange={(e) => {
+                      setPaymentData({ ...paymentData, paidAmount: e.target.value });
+                      updateActivity();
+                    }}
+                    placeholder={`Enter amount (Min: $${totals.minimumPayment.toFixed(2)})`}
+                  />
+                  <p className="text-sm text-gray-600 mt-1">
+                    Range: ${totals.minimumPayment.toFixed(2)} - ${totals.finalTotal.toFixed(2)}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Payment Screenshot */}
