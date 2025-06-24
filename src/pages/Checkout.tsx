@@ -5,8 +5,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { CheckoutAuthChoice } from '@/components/checkout/CheckoutAuthChoice';
 import { CheckoutLogin } from '@/components/checkout/CheckoutLogin';
-import { CheckoutInfo } from '@/components/checkout/CheckoutInfo';
-import { CheckoutPayment } from '@/components/checkout/CheckoutPayment';
+import { EnhancedCheckoutInfo } from '@/components/checkout/EnhancedCheckoutInfo';
+import { EnhancedCheckoutPayment } from '@/components/checkout/EnhancedCheckoutPayment';
 import { CheckoutSuccess } from '@/components/checkout/CheckoutSuccess';
 
 type CheckoutStep = 'auth-choice' | 'login' | 'info' | 'payment' | 'success';
@@ -75,7 +75,7 @@ export default function Checkout() {
         )}
 
         {currentStep === 'info' && (
-          <CheckoutInfo 
+          <EnhancedCheckoutInfo 
             isGuest={isGuest}
             onComplete={handleInfoComplete}
             onBack={() => user ? navigate('/') : setCurrentStep('auth-choice')}
@@ -83,7 +83,7 @@ export default function Checkout() {
         )}
 
         {currentStep === 'payment' && (
-          <CheckoutPayment 
+          <EnhancedCheckoutPayment 
             isGuest={isGuest}
             onComplete={handlePaymentComplete}
             onBack={() => setCurrentStep('info')}
