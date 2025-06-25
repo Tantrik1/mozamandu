@@ -61,12 +61,6 @@ export default function Contact() {
                   <p className="text-gray-600">info@mozamandu.com</p>
                 </div>
               </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="bg-red-100 p-3 rounded-full">
-                  <Clock className="h-6 w-6 text-red-600" />
-                </div>
-              </div>
             </div>
 
             {/* Social Media */}
