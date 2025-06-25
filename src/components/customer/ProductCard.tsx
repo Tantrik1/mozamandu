@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Minus, ShoppingCart, Star, Tag } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { useCart } from '@/hooks/useCart';
+import { useRobustCart } from '@/hooks/useRobustCart';
 
 interface Product {
   id: string;
@@ -52,7 +51,7 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);
   const [currentImage, setCurrentImage] = useState(product.image_url);
-  const { addToCart, cartItems, activeCombo, getItemPricing } = useCart();
+  const { addToCart, cartItems, activeCombo, getItemPricing } = useRobustCart();
 
   // Get the base price for display
   const basePrice = product.selling_price || subcategoryPrice;
