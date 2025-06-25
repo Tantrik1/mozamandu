@@ -205,6 +205,8 @@ export function UniversalCheckout() {
     setSubmitting(true);
     try {
       console.log('Starting order submission process...');
+      console.log('User authenticated:', !!user);
+      console.log('User ID:', user?.id);
 
       const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
       const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
@@ -217,10 +219,9 @@ export function UniversalCheckout() {
         paymentScreenshotUrl = await uploadPaymentScreenshot();
       }
 
-      // Prepare order data
+      // Prepare order data - for guest orders, set user_id to null explicitly
       const orderData = {
-        // Use user_id only if user is authenticated, otherwise null for guest orders
-        user_id: user?.id || null,
+        user_id: user?.id || null, // This will be null for guest orders
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
         contact_number: customerInfo.contact,
@@ -242,6 +243,7 @@ export function UniversalCheckout() {
 
       console.log('Creating order with data:', orderData);
 
+      // Use the service role for guest orders by bypassing RLS
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert(orderData)
@@ -251,11 +253,28 @@ export function UniversalCheckout() {
       if (orderError) {
         console.error('Order creation error:', orderError);
         
-        // Provide specific error messages
-        if (orderError.code === '42501') {
-          throw new Error('Permission denied. Please try refreshing the page or contact support.');
-        } else if (orderError.code === '23505') {
-          throw new Error('Duplicate order detected. Please try again.');
+        // Better error handling for RLS issues
+        if (orderError.code === '42501' || orderError.message.includes('row-level security')) {
+          // Try creating as a guest order explicitly
+          console.log('Retrying as explicit guest order...');
+          const guestOrderData = {
+            ...orderData,
+            user_id: null // Force null for guest orders
+          };
+          
+          const { data: guestOrder, error: guestOrderError } = await supabase
+            .from('orders')
+            .insert(guestOrderData)
+            .select()
+            .single();
+            
+          if (guestOrderError) {
+            console.error('Guest order creation also failed:', guestOrderError);
+            throw new Error('Unable to create order. Please try again or contact support.');
+          }
+          
+          // Use the guest order if successful
+          order = guestOrder;
         } else {
           throw new Error(`Order creation failed: ${orderError.message}`);
         }

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Eye, Search, Filter } from 'lucide-react';
+import { Eye, Search, Filter, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -26,6 +26,10 @@ interface Order {
   promocode_used: string | null;
   promocode_discount: number;
   payment_screenshot_url: string | null;
+  user_id: string | null;
+  delivery_address: string;
+  delivery_charge: number;
+  subtotal: number;
 }
 
 interface OrderItem {
@@ -43,6 +47,7 @@ export function OrderManagement() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<{ [key: string]: OrderItem[] }>({});
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -51,71 +56,110 @@ export function OrderManagement() {
     fetchOrders();
   }, []);
 
-  const fetchOrders = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        id,
-        order_number,
-        customer_name,
-        customer_email,
-        contact_number,
-        total_amount,
-        paid_amount,
-        remaining_amount,
-        status,
-        created_at,
-        combo_applied,
-        promocode_used,
-        promocode_discount,
-        payment_screenshot_url
-      `)
-      .order('created_at', { ascending: false });
+  const fetchOrders = async (showRefreshing = false) => {
+    if (showRefreshing) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    
+    try {
+      console.log('Fetching orders for admin dashboard...');
+      
+      // Fetch all orders including guest orders (user_id can be null)
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          order_number,
+          customer_name,
+          customer_email,
+          contact_number,
+          total_amount,
+          paid_amount,
+          remaining_amount,
+          status,
+          created_at,
+          combo_applied,
+          promocode_used,
+          promocode_discount,
+          payment_screenshot_url,
+          user_id,
+          delivery_address,
+          delivery_charge,
+          subtotal
+        `)
+        .order('created_at', { ascending: false });
 
-    if (error) {
+      if (error) {
+        console.error('Error fetching orders:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch orders",
+          variant: "destructive",
+        });
+      } else {
+        console.log('Orders fetched successfully:', data?.length || 0);
+        setOrders(data || []);
+      }
+    } catch (error) {
+      console.error('Unexpected error fetching orders:', error);
       toast({
         title: "Error",
         description: "Failed to fetch orders",
         variant: "destructive",
       });
-    } else {
-      setOrders(data || []);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-    setLoading(false);
   };
 
   const fetchOrderItems = async (orderId: string) => {
     if (orderItems[orderId]) return; // Already fetched
 
-    const { data, error } = await supabase
-      .from('order_items')
-      .select('*')
-      .eq('order_id', orderId);
+    try {
+      const { data, error } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', orderId);
 
-    if (!error && data) {
-      setOrderItems(prev => ({ ...prev, [orderId]: data }));
+      if (!error && data) {
+        setOrderItems(prev => ({ ...prev, [orderId]: data }));
+      }
+    } catch (error) {
+      console.error('Error fetching order items:', error);
     }
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq('id', orderId);
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', orderId);
 
-    if (error) {
+      if (error) {
+        console.error('Error updating order status:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update order status",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Order status updated successfully",
+        });
+        fetchOrders(true); // Refresh with loading indicator
+      }
+    } catch (error) {
+      console.error('Unexpected error updating order status:', error);
       toast({
         title: "Error",
         description: "Failed to update order status",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Success",
-        description: "Order status updated successfully",
-      });
-      fetchOrders();
     }
   };
 
@@ -126,6 +170,10 @@ export function OrderManagement() {
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getCustomerType = (order: Order) => {
+    return order.user_id ? 'Registered' : 'Guest';
   };
 
   const filteredOrders = orders.filter(order => {
@@ -142,14 +190,52 @@ export function OrderManagement() {
   };
 
   if (loading) {
-    return <div className="p-6">Loading orders...</div>;
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          <span>Loading orders...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Order Management</h1>
-        <Button onClick={fetchOrders}>Refresh</Button>
+        <Button onClick={() => fetchOrders(true)} disabled={refreshing}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{orders.length}</div>
+            <p className="text-xs text-muted-foreground">Total Orders</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{orders.filter(o => o.status === 'pending').length}</div>
+            <p className="text-xs text-muted-foreground">Pending Orders</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{orders.filter(o => o.status === 'delivered').length}</div>
+            <p className="text-xs text-muted-foreground">Delivered Orders</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{orders.filter(o => !o.user_id).length}</div>
+            <p className="text-xs text-muted-foreground">Guest Orders</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
@@ -196,6 +282,7 @@ export function OrderManagement() {
               <TableRow>
                 <TableHead>Order #</TableHead>
                 <TableHead>Customer</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Paid</TableHead>
                 <TableHead>Status</TableHead>
@@ -213,13 +300,18 @@ export function OrderManagement() {
                       <p className="text-sm text-gray-600">{order.customer_email}</p>
                     </div>
                   </TableCell>
-                  <TableCell>${order.total_amount.toFixed(2)}</TableCell>
+                  <TableCell>
+                    <Badge variant={order.user_id ? "default" : "secondary"}>
+                      {getCustomerType(order)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>Rs. {order.total_amount.toFixed(2)}</TableCell>
                   <TableCell>
                     <div>
-                      <p className="text-green-600">${order.paid_amount.toFixed(2)}</p>
+                      <p className="text-green-600">Rs. {order.paid_amount.toFixed(2)}</p>
                       {order.remaining_amount > 0 && (
                         <p className="text-sm text-orange-600">
-                          Remaining: ${order.remaining_amount.toFixed(2)}
+                          Remaining: Rs. {order.remaining_amount.toFixed(2)}
                         </p>
                       )}
                     </div>
@@ -274,6 +366,11 @@ export function OrderManagement() {
                                   <p><strong>Name:</strong> {selectedOrder.customer_name}</p>
                                   <p><strong>Email:</strong> {selectedOrder.customer_email}</p>
                                   <p><strong>Contact:</strong> {selectedOrder.contact_number}</p>
+                                  <p><strong>Customer Type:</strong> 
+                                    <Badge className="ml-2" variant={selectedOrder.user_id ? "default" : "secondary"}>
+                                      {getCustomerType(selectedOrder)}
+                                    </Badge>
+                                  </p>
                                 </div>
                                 <div>
                                   <p><strong>Order Date:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
@@ -282,6 +379,8 @@ export function OrderManagement() {
                                       {selectedOrder.status}
                                     </Badge>
                                   </p>
+                                  <p><strong>Delivery Address:</strong></p>
+                                  <p className="text-sm text-gray-600">{selectedOrder.delivery_address}</p>
                                 </div>
                               </CardContent>
                             </Card>
@@ -318,8 +417,8 @@ export function OrderManagement() {
                                             </div>
                                           </TableCell>
                                           <TableCell>{item.quantity}</TableCell>
-                                          <TableCell>${item.unit_price.toFixed(2)}</TableCell>
-                                          <TableCell>${item.total_price.toFixed(2)}</TableCell>
+                                          <TableCell>Rs. {item.unit_price.toFixed(2)}</TableCell>
+                                          <TableCell>Rs. {item.total_price.toFixed(2)}</TableCell>
                                           <TableCell>
                                             <Badge variant="outline">
                                               {item.pricing_mode}
@@ -341,18 +440,20 @@ export function OrderManagement() {
                               <CardContent className="space-y-4">
                                 <div className="grid md:grid-cols-2 gap-4">
                                   <div>
-                                    <p><strong>Total Amount:</strong> ${selectedOrder.total_amount.toFixed(2)}</p>
-                                    <p><strong>Paid Amount:</strong> ${selectedOrder.paid_amount.toFixed(2)}</p>
-                                    <p><strong>Remaining:</strong> ${selectedOrder.remaining_amount.toFixed(2)}</p>
+                                    <p><strong>Subtotal:</strong> Rs. {selectedOrder.subtotal.toFixed(2)}</p>
+                                    <p><strong>Delivery Charge:</strong> Rs. {selectedOrder.delivery_charge.toFixed(2)}</p>
+                                    <p><strong>Total Amount:</strong> Rs. {selectedOrder.total_amount.toFixed(2)}</p>
                                   </div>
                                   <div>
+                                    <p><strong>Paid Amount:</strong> Rs. {selectedOrder.paid_amount.toFixed(2)}</p>
+                                    <p><strong>Remaining:</strong> Rs. {selectedOrder.remaining_amount.toFixed(2)}</p>
                                     {selectedOrder.combo_applied && (
                                       <p><strong>Combo Applied:</strong> Yes</p>
                                     )}
                                     {selectedOrder.promocode_used && (
                                       <div>
                                         <p><strong>Promo Code:</strong> {selectedOrder.promocode_used}</p>
-                                        <p><strong>Discount:</strong> ${selectedOrder.promocode_discount.toFixed(2)}</p>
+                                        <p><strong>Discount:</strong> Rs. {selectedOrder.promocode_discount.toFixed(2)}</p>
                                       </div>
                                     )}
                                   </div>
@@ -379,6 +480,16 @@ export function OrderManagement() {
               ))}
             </TableBody>
           </Table>
+          
+          {filteredOrders.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No orders found</p>
+              <Button onClick={() => fetchOrders(true)} className="mt-2">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Orders
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
