@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
-import { CartProvider } from "@/hooks/useCart";
+import { RobustCartProvider } from "@/hooks/useRobustCart";
 import { RouteGuard } from "@/components/RouteGuard";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -22,7 +22,7 @@ import TermsConditions from "./pages/TermsConditions";
 import NotFound from "./pages/NotFound";
 import Home from "./pages/Home";
 import FAQ from "./pages/FAQ";
-import About from "./pages/About";
+import About from "./pages/About";  
 import Contact from "./pages/Contact";
 
 const queryClient = new QueryClient();
@@ -32,7 +32,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <CartProvider>
+          <RobustCartProvider>
             <Toaster />
             <Sonner />
             <BrowserRouter>
@@ -69,7 +69,7 @@ function App() {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
-          </CartProvider>
+          </RobustCartProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
