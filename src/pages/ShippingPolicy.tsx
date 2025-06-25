@@ -106,7 +106,7 @@ export default function ShippingPolicy() {
                 If you receive a damaged or defective item:
               </p>
               <ul className="list-disc list-inside text-gray-700 mb-4 ml-4">
-                <li>Contact us immediately at info@mozamandu.com or +977 9761691727</li>
+                <li>Contact us immediately at info@mozamandu.com or +977 9761691276</li>
                 <li>Provide photos of the damaged item</li>
                 <li>We will arrange for immediate replacement or full refund</li>
                 <li>Return shipping will be covered by us</li>
@@ -133,7 +133,7 @@ export default function ShippingPolicy() {
                 <p className="text-gray-700">
                   <strong>Customer Service</strong><br />
                   Email: info@mozamandu.com<br />
-                  Phone: +977 9761691727<br />
+                  Phone: +977 9761691276<br />
                   Address: Kathmandu, Nepal<br />
                   Hours: 12:00 PM - 6:00 PM (Daily)
                 </p>
