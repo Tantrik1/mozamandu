@@ -59,14 +59,14 @@ export function NoticePopup() {
             <DialogTitle className="text-lg font-semibold pr-8">
               {notice.title}
             </DialogTitle>
-            <Button
+            {/* <Button
               variant="ghost"
               size="sm"
               onClick={handleClose}
               className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100"
             >
               <X className="h-4 w-4" />
-            </Button>
+            </Button> */}
           </div>
         </DialogHeader>
         
