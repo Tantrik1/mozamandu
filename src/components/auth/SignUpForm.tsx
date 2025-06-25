@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
 
 interface SignUpFormProps {
   onSuccess: () => void;
@@ -43,8 +44,8 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
       newErrors.email = 'Valid email is required';
     }
 
-    if (!signUpData.password || signUpData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+    if (!signUpData.password || signUpData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
     }
 
     if (signUpData.password !== signUpData.confirmPassword) {
@@ -140,6 +141,9 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
           </button>
         </div>
         {errors.password && <p className="text-sm text-red-600 mt-1">{errors.password}</p>}
+        
+        {/* Password Strength Indicator */}
+        <PasswordStrengthIndicator password={signUpData.password} />
       </div>
 
       <div>
