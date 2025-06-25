@@ -37,9 +37,7 @@ export default function ShippingPolicy() {
 
               <h3 className="text-xl font-semibold text-gray-800 mb-3">Shipping Methods</h3>
               <ul className="list-disc list-inside text-gray-700 mb-4 ml-4">
-                <li>Standard Delivery: 2-3 business days</li>
-                <li>Express Delivery: Same day or next day (additional charges apply)</li>
-                <li>Pick-up: Available at our location during business hours</li>
+                <li>For orders placed before 12 PM, we offer same-day delivery between 12-3 PM. Orders between 12-2 PM can be delivered the same day between 3-6 PM or the next day 12-3 PM. Orders after 2 PM will be delivered the next day between 12-3 PM. For outside valley, it may generally take upto 2-3days.</li>
               </ul>
             </section>
 
@@ -48,7 +46,7 @@ export default function ShippingPolicy() {
               
               <h3 className="text-xl font-semibold text-gray-800 mb-3">Return Window</h3>
               <p className="text-gray-700 mb-4">
-                You may return items within <strong>7 days</strong> of delivery for a full refund or exchange, provided they meet our return conditions.
+                You may return items within <strong>2 days</strong> of delivery on your own expense. No refunds will be provided.
               </p>
 
               <h3 className="text-xl font-semibold text-gray-800 mb-3">Return Conditions</h3>
