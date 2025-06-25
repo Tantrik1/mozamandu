@@ -243,7 +243,8 @@ export function UniversalCheckout() {
 
       console.log('Creating order with data:', orderData);
 
-      // Use the service role for guest orders by bypassing RLS
+      // Create order - fix the constant assignment error
+      let orderResult = null;
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert(orderData)
@@ -255,7 +256,6 @@ export function UniversalCheckout() {
         
         // Better error handling for RLS issues
         if (orderError.code === '42501' || orderError.message.includes('row-level security')) {
-          // Try creating as a guest order explicitly
           console.log('Retrying as explicit guest order...');
           const guestOrderData = {
             ...orderData,
@@ -274,23 +274,25 @@ export function UniversalCheckout() {
           }
           
           // Use the guest order if successful
-          order = guestOrder;
+          orderResult = guestOrder;
         } else {
           throw new Error(`Order creation failed: ${orderError.message}`);
         }
+      } else {
+        orderResult = order;
       }
 
-      if (!order) {
+      if (!orderResult) {
         throw new Error('Order was not created properly');
       }
 
-      console.log('Order created successfully:', order);
+      console.log('Order created successfully:', orderResult);
 
       // Create order items with proper pricing
       const orderItems = cartItems.map(item => {
         const pricing = getItemPricing(item);
         return {
-          order_id: order.id,
+          order_id: orderResult.id,
           product_id: item.productId,
           color_variant_id: item.colorVariantId,
           size_variant_id: item.sizeVariantId,
@@ -314,29 +316,22 @@ export function UniversalCheckout() {
         console.error('Order items creation error:', itemsError);
         
         // Try to cleanup the order if items creation fails
-        await supabase.from('orders').delete().eq('id', order.id);
+        await supabase.from('orders').delete().eq('id', orderResult.id);
         throw new Error(`Failed to create order items: ${itemsError.message}`);
       }
 
       console.log('Order items created successfully');
 
-      // Clear cart and show success
+      // Clear cart and redirect to order summary
       clearCart();
       
       toast({
         title: "Order Placed Successfully!",
-        description: `Your order #${order.order_number} has been placed successfully.`,
+        description: `Your order #${orderResult.order_number} has been placed successfully.`,
       });
 
-      // Redirect based on user type
-      if (user && userProfile?.role === 'admin') {
-        navigate('/admin/orders');
-      } else if (user && userProfile?.role === 'customer') {
-        navigate('/dashboard');
-      } else {
-        // For guest users, redirect to home with success message
-        navigate('/?order-success=true');
-      }
+      // Redirect to order summary page with order ID
+      navigate(`/order-summary/${orderResult.id}`);
       
     } catch (error) {
       console.error('Error creating order:', error);
