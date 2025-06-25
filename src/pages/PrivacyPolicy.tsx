@@ -21,7 +21,7 @@ export default function PrivacyPolicy() {
                 We collect information you provide directly to us, such as when you create an account, make a purchase, or contact us for support. This may include:
               </p>
               <ul className="list-disc list-inside text-gray-700 mb-4 ml-4">
-                <li>Personal identifiers (name, email address, phone number)</li>
+                <li>Personal identifiers (name, email address, phone number, District, Address, age, gender)</li>
                 <li>Commercial information (purchase history, preferences)</li>
                 <li>Payment information (processed securely through third-party processors)</li>
                 <li>Communication records (customer support interactions)</li>
@@ -39,6 +39,7 @@ export default function PrivacyPolicy() {
                 <li>Improve our products and services</li>
                 <li>Comply with legal obligations</li>
                 <li>Detect and prevent fraud</li>
+                <li>For Delivery and Payment Fulfillment Purposes</li>
               </ul>
             </section>
 
@@ -68,7 +69,7 @@ export default function PrivacyPolicy() {
                 <li>Request a copy of your personal information</li>
               </ul>
               <p className="text-gray-700 mb-4">
-                To exercise these rights, please contact us at privacy@mozamandu.com or +977 9761691727.
+                To exercise these rights, please contact us at info@mozamandu.com or +9779761691276.
               </p>
             </section>
 
@@ -108,8 +109,8 @@ export default function PrivacyPolicy() {
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-gray-700">
                   <strong>Mozamandu</strong><br />
-                  Email: privacy@mozamandu.com<br />
-                  Phone: +977 9761691727<br />
+                  Email: info@mozamandu.com<br />
+                  Phone: +977 9761691276<br />
                   Address: Kathmandu, Nepal
                 </p>
               </div>
