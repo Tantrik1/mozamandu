@@ -24,10 +24,10 @@ export function Footer() {
               Mozamandu specializes in premium socks and caps that bring comfort to your everyday style. Our products are designed to be gentle on your feet while keeping you looking stylish.
             </p>
             <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+              <a href="https://www.facebook.com/mozamandu2024/" className="text-gray-400 hover:text-white transition-colors">
                 <Facebook className="h-5 w-5" />
               </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+              <a href="https://www.instagram.com/mozamandu2024/?hl=en" className="text-gray-400 hover:text-white transition-colors">
                 <Instagram className="h-5 w-5" />
               </a>
             </div>
@@ -66,15 +66,11 @@ export function Footer() {
               </div>
               <div className="flex items-center space-x-2">
                 <Phone className="h-4 w-4 text-red-500" />
-                <span className="text-gray-300">+977 9761691727</span>
+                <span className="text-gray-300">+977 9761691276</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Mail className="h-4 w-4 text-red-500" />
                 <span className="text-gray-300">info@mozamandu.com</span>
-              </div>
-              <div className="mt-4">
-                <p className="text-gray-300 font-medium">Delivery Hours:</p>
-                <p className="text-gray-400 text-xs">12:00 PM - 6:00 PM</p>
               </div>
             </div>
           </div>
