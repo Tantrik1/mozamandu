@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Gift, Tag, AlertCircle, Loader2, CheckCircle, User, MapPin, Phone, Mail } from 'lucide-react';
-import { useCart } from '@/hooks/useCart';
+import { useRobustCart } from '@/hooks/useRobustCart';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -48,7 +47,7 @@ interface CheckoutInfo {
 }
 
 export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: CheckoutPaymentProps) {
-  const { cartItems, getTotalPrice, getItemPricing, activeCombo, clearCart } = useCart();
+  const { cartItems, getTotalPrice, getItemPricing, activeCombo, clearCart } = useRobustCart();
   const { user } = useAuth();
   const { updateActivity, isExpired } = useCheckoutSession();
   const { validateStock, validatePromoCode, validatePaymentAmount, validateFileUpload, isValidating } = useCheckoutValidation();

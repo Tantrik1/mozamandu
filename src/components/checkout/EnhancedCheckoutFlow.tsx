@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AlertCircle, CreditCard, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useCart } from '@/hooks/useCart';
+import { useRobustCart } from '@/hooks/useRobustCart';
 import { toast } from '@/hooks/use-toast';
 
 interface PaymentMethod {

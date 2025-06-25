@@ -164,8 +164,8 @@ export function UniversalCheckout() {
 
       console.log('Creating order with user_id:', user?.id);
 
-      // Create order with proper user context
-      const orderData = {
+      // Create order with proper user context - define the base order data first
+      const baseOrderData = {
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
         contact_number: customerInfo.contact,
@@ -183,10 +183,10 @@ export function UniversalCheckout() {
         status: 'pending'
       };
 
-      // Only add user_id if user is authenticated to avoid RLS issues
-      if (user?.id) {
-        orderData.user_id = user.id;
-      }
+      // Add user_id conditionally to avoid RLS issues
+      const orderData = user?.id 
+        ? { ...baseOrderData, user_id: user.id }
+        : baseOrderData;
 
       console.log('Creating order with data:', orderData);
 
