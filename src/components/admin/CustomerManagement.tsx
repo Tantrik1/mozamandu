@@ -5,16 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Eye, Search, Mail, Phone, User } from 'lucide-react';
+import { Eye, Search, Phone, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 interface Customer {
   id: string;
   email: string;
-  full_name: string;
-  contact_number: string;
-  whatsapp_number: string;
+  full_name: string | null;
+  contact_number: string | null;
+  whatsapp_number: string | null;
   role: string;
   created_at: string;
   total_orders: number;
@@ -46,7 +46,7 @@ export function CustomerManagement() {
     console.log('Fetching customers...');
     
     try {
-      // Get all profiles (both customers and any other roles) to see what data exists
+      // First, let's check what profiles exist
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
@@ -56,55 +56,78 @@ export function CustomerManagement() {
         console.error('Profile fetch error:', profilesError);
         toast({
           title: "Error",
-          description: "Failed to fetch customer profiles",
+          description: "Failed to fetch customer profiles: " + profilesError.message,
           variant: "destructive",
         });
         setLoading(false);
         return;
       }
 
-      console.log('All profiles fetched:', profiles);
+      console.log('Raw profiles data:', profiles);
 
-      // Filter customers or show all if no customers exist yet
-      const customerProfiles = profiles?.filter(profile => 
-        profile.role === 'customer' || !profile.role // include profiles without role set
-      ) || [];
+      if (!profiles || profiles.length === 0) {
+        console.log('No profiles found in database');
+        setCustomers([]);
+        setLoading(false);
+        return;
+      }
 
-      console.log('Customer profiles:', customerProfiles);
-
-      // Get order statistics for each customer
+      // Get order statistics for each profile
       const customersWithStats = await Promise.all(
-        customerProfiles.map(async (profile) => {
-          const { data: orders, error: ordersError } = await supabase
-            .from('orders')
-            .select('total_amount')
-            .eq('user_id', profile.id);
+        profiles.map(async (profile) => {
+          try {
+            console.log(`Fetching orders for user ${profile.id}...`);
+            
+            const { data: orders, error: ordersError } = await supabase
+              .from('orders')
+              .select('total_amount')
+              .eq('user_id', profile.id);
 
-          if (ordersError) {
-            console.error('Orders fetch error for user', profile.id, ':', ordersError);
+            if (ordersError) {
+              console.error('Orders fetch error for user', profile.id, ':', ordersError);
+            }
+
+            const totalOrders = orders?.length || 0;
+            const totalSpent = orders?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
+
+            console.log(`User ${profile.email}: ${totalOrders} orders, Rs. ${totalSpent} spent`);
+
+            return {
+              id: profile.id,
+              email: profile.email,
+              full_name: profile.full_name,
+              contact_number: profile.contact_number,
+              whatsapp_number: profile.whatsapp_number,
+              role: profile.role || 'customer',
+              created_at: profile.created_at,
+              total_orders: totalOrders,
+              total_spent: totalSpent,
+            };
+          } catch (error) {
+            console.error('Error processing profile', profile.id, ':', error);
+            return {
+              id: profile.id,
+              email: profile.email,
+              full_name: profile.full_name,
+              contact_number: profile.contact_number,
+              whatsapp_number: profile.whatsapp_number,
+              role: profile.role || 'customer',
+              created_at: profile.created_at,
+              total_orders: 0,
+              total_spent: 0,
+            };
           }
-
-          const totalOrders = orders?.length || 0;
-          const totalSpent = orders?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
-
-          console.log(`Customer ${profile.email}: ${totalOrders} orders, Rs. ${totalSpent} spent`);
-
-          return {
-            ...profile,
-            total_orders: totalOrders,
-            total_spent: totalSpent,
-          };
         })
       );
 
-      console.log('Customers with stats:', customersWithStats);
+      console.log('Final customers with stats:', customersWithStats);
       setCustomers(customersWithStats);
       
     } catch (error) {
       console.error('Error in fetchCustomers:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch customers",
+        description: "Failed to fetch customers: " + (error as Error).message,
         variant: "destructive",
       });
     } finally {
@@ -368,14 +391,16 @@ export function CustomerManagement() {
               <p className="text-gray-500 mb-4">
                 {searchQuery 
                   ? "No customers found matching your search criteria."
-                  : "No customers found. This could mean:"
+                  : "No customer profiles found in the database."
                 }
               </p>
               {!searchQuery && (
                 <div className="text-sm text-gray-400 space-y-1">
-                  <p>• No users have signed up yet</p>
-                  <p>• Users exist but don't have the 'customer' role</p>
+                  <p>• No users have signed up yet, or</p>
                   <p>• There might be a database connectivity issue</p>
+                  <Button onClick={fetchCustomers} variant="outline" className="mt-2">
+                    Try Again
+                  </Button>
                 </div>
               )}
             </div>
