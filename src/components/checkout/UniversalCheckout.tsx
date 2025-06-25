@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,7 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface DeliveryCharge {
   id: string;
@@ -24,11 +26,16 @@ interface PaymentMethod {
   qr_code_url: string;
 }
 
+interface FormErrors {
+  [key: string]: string;
+}
+
 export function UniversalCheckout() {
   const { cartItems, getTotalPrice, clearCart, getItemPricing } = useRobustCart();
   const { user, userProfile } = useAuth();
   const navigate = useNavigate();
   
+  // Form state
   const [customerInfo, setCustomerInfo] = useState({
     name: '',
     email: '',
@@ -37,24 +44,30 @@ export function UniversalCheckout() {
     address: ''
   });
   
+  // Checkout data
   const [deliveryCharges, setDeliveryCharges] = useState<DeliveryCharge[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedDelivery, setSelectedDelivery] = useState('');
   const [selectedPayment, setSelectedPayment] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
+  
+  // UI state
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
 
+  // Redirect if cart is empty
   useEffect(() => {
     if (cartItems.length === 0) {
       navigate('/');
       return;
     }
     
-    fetchDeliveryCharges();
-    fetchPaymentMethods();
+    fetchCheckoutData();
     
-    // Pre-fill user info if logged in
+    // Auto-fill user info if logged in
     if (user && userProfile) {
       setCustomerInfo(prev => ({
         ...prev,
@@ -66,91 +79,133 @@ export function UniversalCheckout() {
     }
   }, [cartItems, user, userProfile, navigate]);
 
-  const fetchDeliveryCharges = async () => {
+  const fetchCheckoutData = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('delivery_charges')
-        .select('*')
-        .eq('is_active', true)
-        .order('place_name');
+      console.log('Fetching checkout data...');
+      
+      const [deliveryRes, paymentRes] = await Promise.all([
+        supabase
+          .from('delivery_charges')
+          .select('*')
+          .eq('is_active', true)
+          .order('place_name'),
+        supabase
+          .from('payment_methods')
+          .select('*')
+          .eq('is_active', true)
+          .order('name')
+      ]);
 
-      if (error) throw error;
-      setDeliveryCharges(data || []);
+      if (deliveryRes.error) {
+        console.error('Error fetching delivery charges:', deliveryRes.error);
+        toast({
+          title: "Error",
+          description: "Failed to load delivery options",
+          variant: "destructive",
+        });
+      } else {
+        setDeliveryCharges(deliveryRes.data || []);
+      }
+
+      if (paymentRes.error) {
+        console.error('Error fetching payment methods:', paymentRes.error);
+        toast({
+          title: "Error",
+          description: "Failed to load payment methods",
+          variant: "destructive",
+        });
+      } else {
+        setPaymentMethods(paymentRes.data || []);
+      }
     } catch (error) {
-      console.error('Error fetching delivery charges:', error);
+      console.error('Unexpected error fetching checkout data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load checkout data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const fetchPaymentMethods = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('payment_methods')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
+  const validateForm = (): boolean => {
+    const errors: FormErrors = {};
 
-      if (error) throw error;
-      setPaymentMethods(data || []);
-    } catch (error) {
-      console.error('Error fetching payment methods:', error);
+    // Required field validation
+    if (!customerInfo.name.trim()) errors.name = 'Name is required';
+    if (!customerInfo.email.trim()) errors.email = 'Email is required';
+    if (!customerInfo.contact.trim()) errors.contact = 'Contact number is required';
+    if (!customerInfo.address.trim()) errors.address = 'Delivery address is required';
+    if (!selectedDelivery) errors.delivery = 'Please select delivery location';
+    if (!selectedPayment) errors.payment = 'Please select payment method';
+
+    // Email validation
+    if (customerInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email)) {
+      errors.email = 'Please enter a valid email address';
     }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const uploadPaymentScreenshot = async (): Promise<string | null> => {
     if (!paymentScreenshot) return null;
 
+    setUploadingScreenshot(true);
     try {
       const fileExt = paymentScreenshot.name.split('.').pop();
       const fileName = `payment-${Date.now()}.${fileExt}`;
       const filePath = `payment-screenshots/${fileName}`;
 
+      console.log('Uploading payment screenshot:', filePath);
+
       const { error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(filePath, paymentScreenshot);
+        .upload(filePath, paymentScreenshot, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Error uploading payment screenshot:', uploadError);
+        throw new Error('Failed to upload payment screenshot');
+      }
 
       const { data } = supabase.storage
         .from('product-images')
         .getPublicUrl(filePath);
 
+      console.log('Payment screenshot uploaded successfully:', data.publicUrl);
       return data.publicUrl;
     } catch (error) {
       console.error('Error uploading payment screenshot:', error);
+      toast({
+        title: "Upload Error",
+        description: "Failed to upload payment screenshot. You can continue without it.",
+        variant: "destructive",
+      });
       return null;
+    } finally {
+      setUploadingScreenshot(false);
     }
   };
 
   const handleSubmitOrder = async () => {
-    if (!customerInfo.name || !customerInfo.email || !customerInfo.contact || !customerInfo.address) {
+    if (!validateForm()) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in all required customer information",
+        title: "Validation Error",
+        description: "Please fix the errors in the form before submitting",
         variant: "destructive",
       });
       return;
     }
 
-    if (!selectedDelivery) {
-      toast({
-        title: "Missing Delivery Location",
-        description: "Please select a delivery location",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!selectedPayment) {
-      toast({
-        title: "Missing Payment Method",
-        description: "Please select a payment method",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
+    setSubmitting(true);
     try {
+      console.log('Starting order submission process...');
+
       const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
       const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
       const subtotal = getTotalPrice();
@@ -162,10 +217,10 @@ export function UniversalCheckout() {
         paymentScreenshotUrl = await uploadPaymentScreenshot();
       }
 
-      console.log('Creating order with user_id:', user?.id);
-
-      // Create order with proper user context - define the base order data first
-      const baseOrderData = {
+      // Prepare order data
+      const orderData = {
+        // Use user_id only if user is authenticated, otherwise null for guest orders
+        user_id: user?.id || null,
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
         contact_number: customerInfo.contact,
@@ -180,13 +235,10 @@ export function UniversalCheckout() {
         payment_method_id: selectedPayment,
         payment_notes: paymentNotes || null,
         payment_screenshot_url: paymentScreenshotUrl,
-        status: 'pending'
+        status: 'pending',
+        combo_applied: false,
+        promocode_discount: 0
       };
-
-      // Add user_id conditionally to avoid RLS issues
-      const orderData = user?.id 
-        ? { ...baseOrderData, user_id: user.id }
-        : baseOrderData;
 
       console.log('Creating order with data:', orderData);
 
@@ -199,14 +251,18 @@ export function UniversalCheckout() {
       if (orderError) {
         console.error('Order creation error:', orderError);
         
-        // Provide more specific error messages
+        // Provide specific error messages
         if (orderError.code === '42501') {
-          throw new Error('Permission denied. Please try logging out and back in, or contact support.');
+          throw new Error('Permission denied. Please try refreshing the page or contact support.');
         } else if (orderError.code === '23505') {
           throw new Error('Duplicate order detected. Please try again.');
         } else {
           throw new Error(`Order creation failed: ${orderError.message}`);
         }
+      }
+
+      if (!order) {
+        throw new Error('Order was not created properly');
       }
 
       console.log('Order created successfully:', order);
@@ -229,23 +285,28 @@ export function UniversalCheckout() {
         };
       });
 
+      console.log('Creating order items:', orderItems.length);
+
       const { error: itemsError } = await supabase
         .from('order_items')
         .insert(orderItems);
 
       if (itemsError) {
         console.error('Order items creation error:', itemsError);
+        
+        // Try to cleanup the order if items creation fails
+        await supabase.from('orders').delete().eq('id', order.id);
         throw new Error(`Failed to create order items: ${itemsError.message}`);
       }
 
       console.log('Order items created successfully');
 
-      // Clear cart and redirect
+      // Clear cart and show success
       clearCart();
       
       toast({
         title: "Order Placed Successfully!",
-        description: `Your order #${order.order_number} has been placed.`,
+        description: `Your order #${order.order_number} has been placed successfully.`,
       });
 
       // Redirect based on user type
@@ -254,7 +315,8 @@ export function UniversalCheckout() {
       } else if (user && userProfile?.role === 'customer') {
         navigate('/dashboard');
       } else {
-        navigate('/');
+        // For guest users, redirect to home with success message
+        navigate('/?order-success=true');
       }
       
     } catch (error) {
@@ -265,15 +327,27 @@ export function UniversalCheckout() {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
+  // Calculate totals
   const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
   const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
   const subtotal = getTotalPrice();
   const totalAmount = subtotal + deliveryPrice;
   const selectedPaymentMethod = paymentMethods.find(p => p.id === selectedPayment);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading checkout...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -285,6 +359,23 @@ export function UniversalCheckout() {
           </Button>
           <h1 className="text-3xl font-bold">Checkout</h1>
         </div>
+
+        {/* Show user status */}
+        {user ? (
+          <Alert className="mb-6">
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>
+              Logged in as <strong>{userProfile?.full_name || user.email}</strong>
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              You're checking out as a guest. <strong>Your order will be processed normally.</strong>
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Customer Info & Delivery */}
@@ -301,8 +392,9 @@ export function UniversalCheckout() {
                     value={customerInfo.name}
                     onChange={(e) => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Enter your full name"
-                    required
+                    className={formErrors.name ? 'border-red-500' : ''}
                   />
+                  {formErrors.name && <p className="text-sm text-red-500 mt-1">{formErrors.name}</p>}
                 </div>
                 <div>
                   <Label>Email Address *</Label>
@@ -311,8 +403,9 @@ export function UniversalCheckout() {
                     value={customerInfo.email}
                     onChange={(e) => setCustomerInfo(prev => ({ ...prev, email: e.target.value }))}
                     placeholder="Enter your email"
-                    required
+                    className={formErrors.email ? 'border-red-500' : ''}
                   />
+                  {formErrors.email && <p className="text-sm text-red-500 mt-1">{formErrors.email}</p>}
                 </div>
                 <div>
                   <Label>Contact Number *</Label>
@@ -320,8 +413,9 @@ export function UniversalCheckout() {
                     value={customerInfo.contact}
                     onChange={(e) => setCustomerInfo(prev => ({ ...prev, contact: e.target.value }))}
                     placeholder="Enter your contact number"
-                    required
+                    className={formErrors.contact ? 'border-red-500' : ''}
                   />
+                  {formErrors.contact && <p className="text-sm text-red-500 mt-1">{formErrors.contact}</p>}
                 </div>
                 <div>
                   <Label>WhatsApp Number</Label>
@@ -338,8 +432,9 @@ export function UniversalCheckout() {
                     onChange={(e) => setCustomerInfo(prev => ({ ...prev, address: e.target.value }))}
                     placeholder="Enter complete delivery address"
                     rows={3}
-                    required
+                    className={formErrors.address ? 'border-red-500' : ''}
                   />
+                  {formErrors.address && <p className="text-sm text-red-500 mt-1">{formErrors.address}</p>}
                 </div>
               </CardContent>
             </Card>
@@ -351,7 +446,7 @@ export function UniversalCheckout() {
               </CardHeader>
               <CardContent>
                 <Select value={selectedDelivery} onValueChange={setSelectedDelivery}>
-                  <SelectTrigger>
+                  <SelectTrigger className={formErrors.delivery ? 'border-red-500' : ''}>
                     <SelectValue placeholder="Select delivery location" />
                   </SelectTrigger>
                   <SelectContent>
@@ -362,6 +457,7 @@ export function UniversalCheckout() {
                     ))}
                   </SelectContent>
                 </Select>
+                {formErrors.delivery && <p className="text-sm text-red-500 mt-1">{formErrors.delivery}</p>}
               </CardContent>
             </Card>
 
@@ -372,7 +468,7 @@ export function UniversalCheckout() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <Select value={selectedPayment} onValueChange={setSelectedPayment}>
-                  <SelectTrigger>
+                  <SelectTrigger className={formErrors.payment ? 'border-red-500' : ''}>
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
                   <SelectContent>
@@ -383,6 +479,7 @@ export function UniversalCheckout() {
                     ))}
                   </SelectContent>
                 </Select>
+                {formErrors.payment && <p className="text-sm text-red-500 mt-1">{formErrors.payment}</p>}
 
                 {selectedPaymentMethod && (
                   <div className="text-center">
@@ -392,7 +489,7 @@ export function UniversalCheckout() {
                       className="mx-auto max-w-48 h-48 object-contain border rounded"
                     />
                     <p className="text-sm text-gray-600 mt-2">
-                      Scan this QR code to make payment
+                      Scan this QR code to make payment of <strong>Rs. {totalAmount.toFixed(2)}</strong>
                     </p>
                   </div>
                 )}
@@ -403,10 +500,17 @@ export function UniversalCheckout() {
                     type="file"
                     accept="image/*"
                     onChange={(e) => setPaymentScreenshot(e.target.files?.[0] || null)}
+                    disabled={uploadingScreenshot}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Upload screenshot of your payment (optional)
+                    Upload screenshot of your payment (optional but recommended)
                   </p>
+                  {uploadingScreenshot && (
+                    <div className="flex items-center mt-2 text-sm text-blue-600">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Uploading screenshot...
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -414,7 +518,7 @@ export function UniversalCheckout() {
                   <Textarea
                     value={paymentNotes}
                     onChange={(e) => setPaymentNotes(e.target.value)}
-                    placeholder="Any additional notes about payment"
+                    placeholder="Any additional notes about payment (optional)"
                     rows={2}
                   />
                 </div>
@@ -424,7 +528,7 @@ export function UniversalCheckout() {
 
           {/* Right Column - Order Summary */}
           <div>
-            <Card>
+            <Card className="sticky top-4">
               <CardHeader>
                 <CardTitle>Order Summary</CardTitle>
                 <CardDescription>Review your order before placing it</CardDescription>
@@ -439,9 +543,15 @@ export function UniversalCheckout() {
                         {item.colorName && <p className="text-sm text-gray-600">Color: {item.colorName}</p>}
                         {item.sizeName && <p className="text-sm text-gray-600">Size: {item.sizeName}</p>}
                         <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                        {pricing.mode !== 'normal' && (
+                          <p className="text-xs text-green-600">{pricing.description}</p>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="font-medium">Rs. {(pricing.finalPrice * item.quantity).toFixed(2)}</p>
+                        {pricing.finalPrice < item.basePrice && (
+                          <p className="text-xs text-gray-500 line-through">Rs. {(item.basePrice * item.quantity).toFixed(2)}</p>
+                        )}
                       </div>
                     </div>
                   );
@@ -464,12 +574,23 @@ export function UniversalCheckout() {
 
                 <Button 
                   onClick={handleSubmitOrder} 
-                  disabled={loading}
+                  disabled={submitting || uploadingScreenshot}
                   className="w-full mt-6"
                   size="lg"
                 >
-                  {loading ? 'Placing Order...' : `Place Order - Rs. ${totalAmount.toFixed(2)}`}
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Placing Order...
+                    </>
+                  ) : (
+                    `Place Order - Rs. ${totalAmount.toFixed(2)}`
+                  )}
                 </Button>
+
+                <p className="text-xs text-gray-500 text-center mt-2">
+                  By placing this order, you agree to our terms and conditions
+                </p>
               </CardContent>
             </Card>
           </div>
