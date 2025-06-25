@@ -48,7 +48,7 @@ export default function Contact() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-1">Phone</h3>
-                  <p className="text-gray-600">+977 9761691727</p>
+                  <p className="text-gray-600">+977 9761691276</p>
                 </div>
               </div>
 
@@ -66,11 +66,6 @@ export default function Contact() {
                 <div className="bg-red-100 p-3 rounded-full">
                   <Clock className="h-6 w-6 text-red-600" />
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Delivery Hours</h3>
-                  <p className="text-gray-600">12:00 PM - 6:00 PM</p>
-                  <p className="text-gray-500 text-sm">Monday to Saturday</p>
-                </div>
               </div>
             </div>
 
@@ -79,14 +74,14 @@ export default function Contact() {
               <h3 className="font-semibold text-gray-900 mb-4">Follow Us</h3>
               <div className="flex space-x-4">
                 <a 
-                  href="#" 
+                  href="https://www.facebook.com/mozamandu2024/" 
                   className="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 transition-colors"
                 >
                   <span className="sr-only">Facebook</span>
                   📘
                 </a>
                 <a 
-                  href="#" 
+                  href="https://www.instagram.com/mozamandu2024/?hl=en" 
                   className="bg-pink-600 text-white p-3 rounded-full hover:bg-pink-700 transition-colors"
                 >
                   <span className="sr-only">Instagram</span>
@@ -188,42 +183,6 @@ export default function Contact() {
                 Send Message
               </button>
             </form>
-          </div>
-        </div>
-
-        {/* FAQ Section */}
-        <div className="mt-16">
-          <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">
-            Frequently Asked Questions
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="font-semibold text-gray-900 mb-3">What are your delivery hours?</h3>
-              <p className="text-gray-600">
-                We deliver Monday to Saturday from 12:00 PM to 6:00 PM within Kathmandu valley.
-              </p>
-            </div>
-            
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="font-semibold text-gray-900 mb-3">Do you have a return policy?</h3>
-              <p className="text-gray-600">
-                Yes, we offer returns within 7 days of delivery for unused items in original packaging.
-              </p>
-            </div>
-            
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="font-semibold text-gray-900 mb-3">How can I track my order?</h3>
-              <p className="text-gray-600">
-                Once your order is confirmed, you'll receive updates via WhatsApp and can track through your account.
-              </p>
-            </div>
-            
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="font-semibold text-gray-900 mb-3">What payment methods do you accept?</h3>
-              <p className="text-gray-600">
-                We accept various digital payment methods including mobile banking and e-wallets.
-              </p>
-            </div>
           </div>
         </div>
       </div>
