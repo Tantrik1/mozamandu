@@ -29,7 +29,7 @@ interface AddToCartParams {
 interface SubcategoryData {
   id: string;
   name: string;
-  selling_price: number;
+  selling_price: number;  
   minimum_quantity: number;
 }
 
@@ -81,7 +81,6 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Use the combo manager hook
   const { activeCombo } = useComboManager({ cartItems });
 
   const { getItemPricing, getTotalPrice: calculateTotalPrice } = useCartPricing({
@@ -171,7 +170,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('Error loading cart from storage:', error);
-      localStorage.removeItem('cart'); // Clear corrupted data
+      localStorage.removeItem('cart');
     }
   };
 
@@ -184,11 +183,10 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const validateStock = async (productId: string, colorVariantId?: string | null, sizeVariantId?: string | null, requestedQuantity: number): Promise<boolean> => {
+  const validateStock = async (productId: string, colorVariantId: string | null = null, sizeVariantId: string | null = null, requestedQuantity: number): Promise<boolean> => {
     try {
       console.log('Validating stock for:', { productId, colorVariantId, sizeVariantId, requestedQuantity });
       
-      // Check if we have size variant
       if (sizeVariantId) {
         const { data, error } = await supabase
           .from('size_variants')
@@ -205,7 +203,6 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         return data.stock_quantity >= requestedQuantity;
       }
       
-      // Check if we have color variant
       if (colorVariantId) {
         const { data, error } = await supabase
           .from('color_variants')
@@ -222,7 +219,6 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         return data.stock_quantity >= requestedQuantity;
       }
       
-      // Check base product stock
       const { data, error } = await supabase
         .from('products')
         .select('stock_quantity')
@@ -249,7 +245,6 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     try {
       console.log('Adding to cart:', params);
       
-      // Validate stock first
       const hasStock = await validateStock(
         params.productId, 
         params.colorVariantId, 
@@ -267,7 +262,6 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Fetch product details
       const { data: product, error: productError } = await supabase
         .from('products')
         .select('name, image_url, subcategory_id, selling_price')
@@ -279,7 +273,6 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         throw new Error('Product not found');
       }
 
-      // Get base price - use product selling_price if available, otherwise subcategory price
       let basePrice = product.selling_price;
       if (!basePrice) {
         const subcategory = subcategoriesData[product.subcategory_id];
@@ -289,7 +282,6 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
       let colorName = '';
       let sizeName = '';
 
-      // Fetch variant names
       if (params.colorVariantId) {
         const { data: colorVariant } = await supabase
           .from('color_variants')
@@ -308,7 +300,6 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         sizeName = sizeVariant?.size_name || '';
       }
 
-      // Check if item already exists
       const existingItemIndex = cartItems.findIndex(item => 
         item.productId === params.productId &&
         item.colorVariantId === params.colorVariantId &&
@@ -319,7 +310,6 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         const existingItem = cartItems[existingItemIndex];
         const newQuantity = existingItem.quantity + params.quantity;
         
-        // Validate total stock for updated quantity
         const hasStockForUpdate = await validateStock(
           params.productId, 
           params.colorVariantId, 
@@ -397,7 +387,6 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     const item = cartItems.find(i => i.id === itemId);
     if (!item) return;
 
-    // Validate stock for new quantity
     const hasStock = await validateStock(
       item.productId,
       item.colorVariantId,

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,8 +13,8 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
-import { ProductVariantForm } from './ProductVariantForm';
+import { ArrowLeft, Upload, X } from 'lucide-react';
+import { SmartProductVariantForm } from './SmartProductVariantForm';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -111,7 +112,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
       const filtered = subcategories.filter(sub => sub.category_id === watchedCategoryId);
       setFilteredSubcategories(filtered);
       
-      // Only reset subcategory if the current one doesn't belong to the selected category
       const currentSubcategoryId = form.getValues('subcategory_id');
       if (currentSubcategoryId && !filtered.find(sub => sub.id === currentSubcategoryId)) {
         form.setValue('subcategory_id', '');
@@ -165,9 +165,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
 
       if (error) throw error;
 
-      console.log('Fetched product data:', product);
-
-      // Set form values with proper type conversion
       form.reset({
         name: product.name,
         description: product.description || '',
@@ -186,7 +183,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
         setImagePreview(product.image_url);
       }
 
-      // Fetch color variants if product has them
       if (product.has_color_variants) {
         await fetchColorVariants();
       }
@@ -243,7 +239,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
         })
       );
 
-      console.log('Fetched color variants with sizes:', variantsWithSizes);
       setColorVariants(variantsWithSizes);
     } catch (error) {
       console.error('Error in fetchColorVariants:', error);
@@ -276,13 +271,13 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
       const filePath = `product-images/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('products')
+        .from('product-images')
         .upload(filePath, imageFile);
 
       if (uploadError) throw uploadError;
 
       const { data } = supabase.storage
-        .from('products')
+        .from('product-images')
         .getPublicUrl(filePath);
 
       return data.publicUrl;
@@ -302,7 +297,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
     try {
       let imageUrl = imagePreview;
 
-      // Upload new image if selected
       if (imageFile) {
         imageUrl = await uploadImage();
       }
@@ -325,7 +319,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
       let currentProductId = productId;
 
       if (productId) {
-        // Update existing product
         const { error } = await supabase
           .from('products')
           .update(productData)
@@ -333,7 +326,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
 
         if (error) throw error;
       } else {
-        // Create new product
         const { data: newProduct, error } = await supabase
           .from('products')
           .insert(productData)
@@ -344,7 +336,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
         currentProductId = newProduct.id;
       }
 
-      // Save color variants if enabled
       if (data.has_color_variants && colorVariants.length > 0 && currentProductId) {
         await saveColorVariants(currentProductId, data.has_size_variants);
       }
@@ -389,7 +380,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
         .delete()
         .eq('product_id', currentProductId);
 
-      // Insert new color variants
       const validVariants = colorVariants.filter(cv => cv.color_name.trim());
       if (validVariants.length > 0) {
         const { data: insertedColors, error: colorError } = await supabase
@@ -407,7 +397,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
 
         if (colorError) throw colorError;
 
-        // Insert size variants if applicable
         if (hasSizeVariants && insertedColors) {
           for (let i = 0; i < validVariants.length; i++) {
             const variant = validVariants[i];
@@ -606,24 +595,15 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
                             alt="Product preview"
                             className="w-full max-w-sm h-48 object-cover rounded-lg border"
                           />
-                          <div className="absolute top-2 right-2 space-x-1">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => window.open(imagePreview, '_blank')}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="destructive"
-                              onClick={removeImage}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="absolute top-2 right-2"
+                            onClick={removeImage}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -641,13 +621,13 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="cost_price">Cost Price (Rs)</Label>
+                    <Label htmlFor="cost_price">Cost Price (Rs.) *</Label>
                     <Input
                       id="cost_price"
                       type="number"
                       step="0.01"
                       {...form.register('cost_price', { valueAsNumber: true })}
-                      placeholder="0.00"
+                      placeholder="Enter cost price"
                     />
                     {form.formState.errors.cost_price && (
                       <p className="text-red-500 text-sm mt-1">{form.formState.errors.cost_price.message}</p>
@@ -655,14 +635,17 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
                   </div>
 
                   <div>
-                    <Label htmlFor="selling_price">Selling Price (Rs)</Label>
+                    <Label htmlFor="selling_price">Selling Price (Rs.)</Label>
                     <Input
                       id="selling_price"
                       type="number"
                       step="0.01"
                       {...form.register('selling_price', { valueAsNumber: true })}
-                      placeholder="0.00"
+                      placeholder="Enter selling price"
                     />
+                    {form.formState.errors.selling_price && (
+                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.selling_price.message}</p>
+                    )}
                   </div>
                 </div>
 
@@ -673,8 +656,11 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
                       id="stock_quantity"
                       type="number"
                       {...form.register('stock_quantity', { valueAsNumber: true })}
-                      placeholder="0"
+                      placeholder="Enter stock quantity"
                     />
+                    {form.formState.errors.stock_quantity && (
+                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.stock_quantity.message}</p>
+                    )}
                   </div>
                 )}
 
@@ -682,10 +668,10 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
                   <Label htmlFor="status">Status</Label>
                   <Select
                     value={form.watch('status')}
-                    onValueChange={(value: 'active' | 'inactive') => form.setValue('status', value)}
+                    onValueChange={(value) => form.setValue('status', value as 'active' | 'inactive')}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
@@ -698,7 +684,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
           </TabsContent>
 
           <TabsContent value="variants" className="space-y-6">
-            <ProductVariantForm
+            <SmartProductVariantForm
               productId={productId}
               hasColorVariants={watchedHasColorVariants}
               hasSizeVariants={watchedHasSizeVariants}
@@ -710,7 +696,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
 
         <div className="flex justify-end space-x-4 mt-8">
           <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
+            Cancel  
           </Button>
           <Button type="submit" disabled={loading}>
             {loading ? 'Saving...' : productId ? 'Update Product' : 'Create Product'}
