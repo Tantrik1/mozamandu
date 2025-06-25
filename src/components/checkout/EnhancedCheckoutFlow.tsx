@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,7 +40,7 @@ interface CheckoutFormData {
 export function EnhancedCheckoutFlow() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { cartItems, getTotalPrice, clearCart } = useCart();
+  const { cartItems, getTotalPrice, clearCart } = useRobustCart();
   
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [deliveryCharges, setDeliveryCharges] = useState<DeliveryCharge[]>([]);
