@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useAuth } from '@/hooks/useAuth';
@@ -7,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
@@ -26,7 +25,7 @@ interface PaymentMethod {
 }
 
 export function UniversalCheckout() {
-  const { cartItems, getTotalPrice, clearCart } = useRobustCart();
+  const { cartItems, getTotalPrice, clearCart, getItemPricing } = useRobustCart();
   const { user, userProfile } = useAuth();
   const navigate = useNavigate();
   
@@ -163,13 +162,14 @@ export function UniversalCheckout() {
         paymentScreenshotUrl = await uploadPaymentScreenshot();
       }
 
-      // Create order - works for both guests and authenticated users
+      console.log('Creating order with user_id:', user?.id);
+
+      // Create order with proper user context
       const orderData = {
-        user_id: user?.id || null, // null for guests, user id for authenticated users
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
         contact_number: customerInfo.contact,
-        whatsapp_number: customerInfo.whatsapp || null,
+        whatsapp_number: customerInfo.whatsapp || customerInfo.contact,
         delivery_location_id: selectedDelivery,
         delivery_address: customerInfo.address,
         delivery_charge: deliveryPrice,
@@ -183,6 +183,11 @@ export function UniversalCheckout() {
         status: 'pending'
       };
 
+      // Only add user_id if user is authenticated to avoid RLS issues
+      if (user?.id) {
+        orderData.user_id = user.id;
+      }
+
       console.log('Creating order with data:', orderData);
 
       const { data: order, error: orderError } = await supabase
@@ -193,25 +198,36 @@ export function UniversalCheckout() {
 
       if (orderError) {
         console.error('Order creation error:', orderError);
-        throw orderError;
+        
+        // Provide more specific error messages
+        if (orderError.code === '42501') {
+          throw new Error('Permission denied. Please try logging out and back in, or contact support.');
+        } else if (orderError.code === '23505') {
+          throw new Error('Duplicate order detected. Please try again.');
+        } else {
+          throw new Error(`Order creation failed: ${orderError.message}`);
+        }
       }
 
       console.log('Order created successfully:', order);
 
-      // Create order items
-      const orderItems = cartItems.map(item => ({
-        order_id: order.id,
-        product_id: item.productId,
-        color_variant_id: item.colorVariantId,
-        size_variant_id: item.sizeVariantId,
-        product_name: item.productName,
-        color_name: item.colorName,
-        size_name: item.sizeName,
-        quantity: item.quantity,
-        unit_price: item.basePrice,
-        total_price: item.basePrice * item.quantity,
-        pricing_mode: 'normal'
-      }));
+      // Create order items with proper pricing
+      const orderItems = cartItems.map(item => {
+        const pricing = getItemPricing(item);
+        return {
+          order_id: order.id,
+          product_id: item.productId,
+          color_variant_id: item.colorVariantId,
+          size_variant_id: item.sizeVariantId,
+          product_name: item.productName,
+          color_name: item.colorName || '',
+          size_name: item.sizeName || '',
+          quantity: item.quantity,
+          unit_price: pricing.finalPrice,
+          total_price: pricing.finalPrice * item.quantity,
+          pricing_mode: pricing.mode
+        };
+      });
 
       const { error: itemsError } = await supabase
         .from('order_items')
@@ -219,7 +235,7 @@ export function UniversalCheckout() {
 
       if (itemsError) {
         console.error('Order items creation error:', itemsError);
-        throw itemsError;
+        throw new Error(`Failed to create order items: ${itemsError.message}`);
       }
 
       console.log('Order items created successfully');
@@ -245,7 +261,7 @@ export function UniversalCheckout() {
       console.error('Error creating order:', error);
       toast({
         title: "Order Failed",
-        description: "There was an error placing your order. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error placing your order. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -276,6 +292,7 @@ export function UniversalCheckout() {
             <Card>
               <CardHeader>
                 <CardTitle>Customer Information</CardTitle>
+                <CardDescription>Please provide your contact details for order delivery</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -330,6 +347,7 @@ export function UniversalCheckout() {
             <Card>
               <CardHeader>
                 <CardTitle>Delivery Location</CardTitle>
+                <CardDescription>Select your delivery area to calculate shipping costs</CardDescription>
               </CardHeader>
               <CardContent>
                 <Select value={selectedDelivery} onValueChange={setSelectedDelivery}>
@@ -350,6 +368,7 @@ export function UniversalCheckout() {
             <Card>
               <CardHeader>
                 <CardTitle>Payment Method</CardTitle>
+                <CardDescription>Choose your preferred payment method and upload payment proof</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Select value={selectedPayment} onValueChange={setSelectedPayment}>
@@ -408,21 +427,25 @@ export function UniversalCheckout() {
             <Card>
               <CardHeader>
                 <CardTitle>Order Summary</CardTitle>
+                <CardDescription>Review your order before placing it</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {cartItems.map((item) => (
-                  <div key={item.id} className="flex justify-between items-center py-2 border-b">
-                    <div>
-                      <h4 className="font-medium">{item.productName}</h4>
-                      {item.colorName && <p className="text-sm text-gray-600">Color: {item.colorName}</p>}
-                      {item.sizeName && <p className="text-sm text-gray-600">Size: {item.sizeName}</p>}
-                      <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                {cartItems.map((item) => {
+                  const pricing = getItemPricing(item);
+                  return (
+                    <div key={item.id} className="flex justify-between items-center py-2 border-b">
+                      <div>
+                        <h4 className="font-medium">{item.productName}</h4>
+                        {item.colorName && <p className="text-sm text-gray-600">Color: {item.colorName}</p>}
+                        {item.sizeName && <p className="text-sm text-gray-600">Size: {item.sizeName}</p>}
+                        <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">Rs. {(pricing.finalPrice * item.quantity).toFixed(2)}</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium">Rs. {(item.basePrice * item.quantity).toFixed(2)}</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 
                 <div className="pt-4 space-y-2">
                   <div className="flex justify-between">
