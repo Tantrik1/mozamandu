@@ -7,8 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Separator } from '@/components/ui/separator';
-import { Eye, Search, Filter, Gift, Tag, User, MapPin, Phone, Mail } from 'lucide-react';
+import { Eye, Search, Filter, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -18,27 +17,15 @@ interface Order {
   customer_name: string;
   customer_email: string;
   contact_number: string;
-  whatsapp_number: string;
-  delivery_address: string;
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;
-  delivery_charge: number;
-  subtotal: number;
   status: string;
   created_at: string;
   combo_applied: boolean;
-  combo_details: any;
   promocode_used: string | null;
   promocode_discount: number;
   payment_screenshot_url: string | null;
-  payment_notes: string | null;
-  delivery_location: {
-    place_name: string;
-  } | null;
-  payment_method: {
-    name: string;
-  } | null;
 }
 
 interface OrderItem {
@@ -56,6 +43,7 @@ export function EnhancedOrderManagement() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<{ [key: string]: OrderItem[] }>({});
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -66,81 +54,120 @@ export function EnhancedOrderManagement() {
 
   const fetchOrders = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        id,
-        order_number,
-        customer_name,
-        customer_email,
-        contact_number,
-        whatsapp_number,
-        delivery_address,
-        total_amount,
-        paid_amount,
-        remaining_amount,
-        delivery_charge,
-        subtotal,
-        status,
-        created_at,
-        combo_applied,
-        combo_details,
-        promocode_used,
-        promocode_discount,
-        payment_screenshot_url,
-        payment_notes,
-        delivery_charges:delivery_location_id(place_name),
-        payment_methods:payment_method_id(name)
-      `)
-      .order('created_at', { ascending: false });
+    try {
+      console.log('Fetching orders...');
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          order_number,
+          customer_name,
+          customer_email,
+          contact_number,
+          total_amount,
+          paid_amount,
+          remaining_amount,
+          status,
+          created_at,
+          combo_applied,
+          promocode_used,
+          promocode_discount,
+          payment_screenshot_url
+        `)
+        .order('created_at', { ascending: false });
 
-    if (error) {
+      if (error) {
+        console.error('Error fetching orders:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch orders: " + error.message,
+          variant: "destructive",
+        });
+      } else {
+        console.log('Fetched orders:', data?.length || 0);
+        setOrders(data || []);
+      }
+    } catch (error) {
+      console.error('Unexpected error fetching orders:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch orders",
+        description: "An unexpected error occurred",
         variant: "destructive",
       });
-    } else {
-      setOrders(data?.map(order => ({
-        ...order,
-        delivery_location: Array.isArray(order.delivery_charges) ? order.delivery_charges[0] : order.delivery_charges,
-        payment_method: Array.isArray(order.payment_methods) ? order.payment_methods[0] : order.payment_methods
-      })) || []);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const fetchOrderItems = async (orderId: string) => {
     if (orderItems[orderId]) return; // Already fetched
 
-    const { data, error } = await supabase
-      .from('order_items')
-      .select('*')
-      .eq('order_id', orderId);
+    try {
+      console.log('Fetching order items for:', orderId);
+      const { data, error } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', orderId);
 
-    if (!error && data) {
-      setOrderItems(prev => ({ ...prev, [orderId]: data }));
+      if (error) {
+        console.error('Error fetching order items:', error);
+      } else {
+        console.log('Fetched order items:', data?.length || 0);
+        setOrderItems(prev => ({ ...prev, [orderId]: data || [] }));
+      }
+    } catch (error) {
+      console.error('Unexpected error fetching order items:', error);
     }
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq('id', orderId);
+    setUpdating(orderId);
+    try {
+      console.log('Updating order status:', orderId, 'to', newStatus);
+      
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          status: newStatus, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', orderId);
 
-    if (error) {
+      if (error) {
+        console.error('Error updating order status:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update order status: " + error.message,
+          variant: "destructive",
+        });
+      } else {
+        console.log('Order status updated successfully');
+        toast({
+          title: "Success",
+          description: "Order status updated successfully",
+        });
+        
+        // Update local state
+        setOrders(prev => prev.map(order => 
+          order.id === orderId 
+            ? { ...order, status: newStatus }
+            : order
+        ));
+        
+        // Also update selected order if it's the one being updated
+        if (selectedOrder?.id === orderId) {
+          setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
+        }
+      }
+    } catch (error) {
+      console.error('Unexpected error updating order status:', error);
       toast({
         title: "Error",
-        description: "Failed to update order status",
+        description: "An unexpected error occurred",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Success",
-        description: "Order status updated successfully",
-      });
-      fetchOrders();
+    } finally {
+      setUpdating(null);
     }
   };
 
@@ -150,22 +177,6 @@ export function EnhancedOrderManagement() {
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPricingModeIcon = (mode: string) => {
-    switch (mode) {
-      case 'combo': return <Gift className="w-3 h-3 text-purple-500" />;
-      case 'discount': return <Tag className="w-3 h-3 text-blue-500" />;
-      default: return null;
-    }
-  };
-
-  const getPricingModeLabel = (mode: string) => {
-    switch (mode) {
-      case 'combo': return 'Combo Price';
-      case 'discount': return 'MOQ Discount';
-      default: return 'Regular Price';
     }
   };
 
@@ -183,14 +194,56 @@ export function EnhancedOrderManagement() {
   };
 
   if (loading) {
-    return <div className="p-6">Loading orders...</div>;
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+        Loading orders...
+      </div>
+    );
   }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Order Management</h1>
-        <Button onClick={fetchOrders}>Refresh</Button>
+        <Button onClick={fetchOrders} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{orders.length}</div>
+            <div className="text-sm text-gray-600">Total Orders</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-yellow-600">
+              {orders.filter(o => o.status === 'pending').length}
+            </div>
+            <div className="text-sm text-gray-600">Pending</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-green-600">
+              {orders.filter(o => o.status === 'delivered').length}
+            </div>
+            <div className="text-sm text-gray-600">Delivered</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">
+              Rs. {orders.reduce((sum, o) => sum + Number(o.total_amount), 0).toFixed(2)}
+            </div>
+            <div className="text-sm text-gray-600">Total Revenue</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
@@ -254,13 +307,13 @@ export function EnhancedOrderManagement() {
                       <p className="text-sm text-gray-600">{order.customer_email}</p>
                     </div>
                   </TableCell>
-                  <TableCell>${order.total_amount.toFixed(2)}</TableCell>
+                  <TableCell>Rs. {Number(order.total_amount).toFixed(2)}</TableCell>
                   <TableCell>
                     <div>
-                      <p className="text-green-600">${order.paid_amount.toFixed(2)}</p>
+                      <p className="text-green-600">Rs. {Number(order.paid_amount).toFixed(2)}</p>
                       {order.remaining_amount > 0 && (
                         <p className="text-sm text-orange-600">
-                          Remaining: ${order.remaining_amount.toFixed(2)}
+                          Remaining: Rs. {Number(order.remaining_amount).toFixed(2)}
                         </p>
                       )}
                     </div>
@@ -269,10 +322,14 @@ export function EnhancedOrderManagement() {
                     <Select
                       value={order.status}
                       onValueChange={(value) => updateOrderStatus(order.id, value)}
+                      disabled={updating === order.id}
                     >
                       <SelectTrigger className="w-32">
                         <SelectValue>
                           <Badge className={getStatusColor(order.status)}>
+                            {updating === order.id ? (
+                              <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                            ) : null}
                             {order.status}
                           </Badge>
                         </SelectValue>
@@ -299,203 +356,123 @@ export function EnhancedOrderManagement() {
                           View
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                         <DialogHeader>
                           <DialogTitle>Order Details - {selectedOrder?.order_number}</DialogTitle>
                         </DialogHeader>
                         {selectedOrder && (
-                          <div className="grid lg:grid-cols-2 gap-6">
-                            {/* Left Column */}
-                            <div className="space-y-6">
-                              {/* Customer Info */}
-                              <Card>
-                                <CardHeader>
-                                  <CardTitle className="text-lg flex items-center">
-                                    <User className="w-5 h-5 mr-2" />
-                                    Customer Information
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                  <div className="flex items-center gap-2">
-                                    <User className="w-4 h-4 text-gray-500" />
-                                    <span className="font-medium">{selectedOrder.customer_name}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Mail className="w-4 h-4 text-gray-500" />
-                                    <span>{selectedOrder.customer_email}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Phone className="w-4 h-4 text-gray-500" />
-                                    <span>{selectedOrder.contact_number}</span>
-                                  </div>
-                                  {selectedOrder.whatsapp_number && (
-                                    <div className="flex items-center gap-2">
-                                      <Phone className="w-4 h-4 text-gray-500" />
-                                      <span>WhatsApp: {selectedOrder.whatsapp_number}</span>
-                                    </div>
-                                  )}
-                                </CardContent>
-                              </Card>
+                          <div className="space-y-6">
+                            {/* Customer Info */}
+                            <Card>
+                              <CardHeader>
+                                <CardTitle className="text-lg">Customer Information</CardTitle>
+                              </CardHeader>
+                              <CardContent className="grid md:grid-cols-2 gap-4">
+                                <div>
+                                  <p><strong>Name:</strong> {selectedOrder.customer_name}</p>
+                                  <p><strong>Email:</strong> {selectedOrder.customer_email}</p>
+                                  <p><strong>Contact:</strong> {selectedOrder.contact_number}</p>
+                                </div>
+                                <div>
+                                  <p><strong>Order Date:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
+                                  <p><strong>Status:</strong> 
+                                    <Badge className={`ml-2 ${getStatusColor(selectedOrder.status)}`}>
+                                      {selectedOrder.status}
+                                    </Badge>
+                                  </p>
+                                </div>
+                              </CardContent>
+                            </Card>
 
-                              {/* Delivery Info */}
-                              <Card>
-                                <CardHeader>
-                                  <CardTitle className="text-lg flex items-center">
-                                    <MapPin className="w-5 h-5 mr-2" />
-                                    Delivery Information
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                  <div>
-                                    <p className="font-medium">{selectedOrder.delivery_location?.place_name}</p>
-                                    <p className="text-sm text-gray-600">{selectedOrder.delivery_address}</p>
-                                    <p className="text-sm font-medium text-green-600 mt-1">
-                                      Delivery Charge: ${selectedOrder.delivery_charge.toFixed(2)}
-                                    </p>
-                                  </div>
-                                  <div className="text-sm text-gray-500">
-                                    <p><strong>Order Date:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
-                                    <p><strong>Status:</strong> 
-                                      <Badge className={`ml-2 ${getStatusColor(selectedOrder.status)}`}>
-                                        {selectedOrder.status}
-                                      </Badge>
-                                    </p>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </div>
-
-                            {/* Right Column */}
-                            <div className="space-y-6">
-                              {/* Order Items with Detailed Breakdown */}
-                              <Card>
-                                <CardHeader>
-                                  <CardTitle className="text-lg">Order Items & Pricing</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  {orderItems[selectedOrder.id] && (
-                                    <div className="space-y-4">
+                            {/* Order Items */}
+                            <Card>
+                              <CardHeader>
+                                <CardTitle className="text-lg">Order Items</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                {orderItems[selectedOrder.id] ? (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Product</TableHead>
+                                        <TableHead>Qty</TableHead>
+                                        <TableHead>Unit Price</TableHead>
+                                        <TableHead>Total</TableHead>
+                                        <TableHead>Type</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
                                       {orderItems[selectedOrder.id].map((item) => (
-                                        <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
-                                          <div className="flex justify-between items-start">
-                                            <div className="flex-1">
-                                              <h4 className="font-medium">{item.product_name}</h4>
+                                        <TableRow key={item.id}>
+                                          <TableCell>
+                                            <div>
+                                              <p className="font-medium">{item.product_name}</p>
                                               {item.color_name && (
                                                 <p className="text-sm text-gray-600">Color: {item.color_name}</p>
                                               )}
                                               {item.size_name && (
                                                 <p className="text-sm text-gray-600">Size: {item.size_name}</p>
                                               )}
-                                              <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-sm">Qty: {item.quantity}</span>
-                                                <div className="flex items-center gap-1">
-                                                  {getPricingModeIcon(item.pricing_mode)}
-                                                  <Badge variant="outline" className="text-xs">
-                                                    {getPricingModeLabel(item.pricing_mode)}
-                                                  </Badge>
-                                                </div>
-                                              </div>
-                                              <p className="text-xs text-gray-500 mt-1">
-                                                ${item.unit_price.toFixed(2)} each
-                                              </p>
                                             </div>
-                                            <div className="text-right">
-                                              <p className="font-medium">${item.total_price.toFixed(2)}</p>
-                                            </div>
-                                          </div>
-                                        </div>
+                                          </TableCell>
+                                          <TableCell>{item.quantity}</TableCell>
+                                          <TableCell>Rs. {Number(item.unit_price).toFixed(2)}</TableCell>
+                                          <TableCell>Rs. {Number(item.total_price).toFixed(2)}</TableCell>
+                                          <TableCell>
+                                            <Badge variant="outline">
+                                              {item.pricing_mode}
+                                            </Badge>
+                                          </TableCell>
+                                        </TableRow>
                                       ))}
-                                      
-                                      <Separator />
-                                      
-                                      {/* Price Breakdown */}
-                                      <div className="space-y-2">
-                                        <div className="flex justify-between">
-                                          <span>Subtotal</span>
-                                          <span>${selectedOrder.subtotal.toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span>Delivery Charge</span>
-                                          <span>${selectedOrder.delivery_charge.toFixed(2)}</span>
-                                        </div>
-                                        {selectedOrder.promocode_discount > 0 && (
-                                          <div className="flex justify-between text-green-600">
-                                            <span>Promo Discount ({selectedOrder.promocode_used})</span>
-                                            <span>-${selectedOrder.promocode_discount.toFixed(2)}</span>
-                                          </div>
-                                        )}
-                                        <Separator />
-                                        <div className="flex justify-between font-bold text-lg">
-                                          <span>Total Amount</span>
-                                          <span>${selectedOrder.total_amount.toFixed(2)}</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                </CardContent>
-                              </Card>
-
-                              {/* Payment Information */}
-                              <Card>
-                                <CardHeader>
-                                  <CardTitle className="text-lg">Payment Information</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                      <p><strong>Payment Method:</strong></p>
-                                      <p>{selectedOrder.payment_method?.name || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                      <p><strong>Payment Status:</strong></p>
-                                      <p className={selectedOrder.remaining_amount > 0 ? 'text-orange-600' : 'text-green-600'}>
-                                        {selectedOrder.remaining_amount > 0 ? 'Partial Payment' : 'Fully Paid'}
-                                      </p>
-                                    </div>
+                                    </TableBody>
+                                  </Table>
+                                ) : (
+                                  <div className="flex items-center justify-center py-4">
+                                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                                    Loading order items...
                                   </div>
-                                  
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                      <p><strong>Paid Amount:</strong></p>
-                                      <p className="text-green-600 font-medium">${selectedOrder.paid_amount.toFixed(2)}</p>
-                                    </div>
-                                    <div>
-                                      <p><strong>Remaining:</strong></p>
-                                      <p className="text-orange-600 font-medium">${selectedOrder.remaining_amount.toFixed(2)}</p>
-                                    </div>
-                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
 
-                                  {selectedOrder.combo_applied && (
-                                    <div>
+                            {/* Payment Info */}
+                            <Card>
+                              <CardHeader>
+                                <CardTitle className="text-lg">Payment Information</CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-4">
+                                <div className="grid md:grid-cols-2 gap-4">
+                                  <div>
+                                    <p><strong>Total Amount:</strong> Rs. {Number(selectedOrder.total_amount).toFixed(2)}</p>
+                                    <p><strong>Paid Amount:</strong> Rs. {Number(selectedOrder.paid_amount).toFixed(2)}</p>
+                                    <p><strong>Remaining:</strong> Rs. {Number(selectedOrder.remaining_amount).toFixed(2)}</p>
+                                  </div>
+                                  <div>
+                                    {selectedOrder.combo_applied && (
                                       <p><strong>Combo Applied:</strong> Yes</p>
-                                      {selectedOrder.combo_details && (
-                                        <p className="text-sm text-gray-600">
-                                          {JSON.stringify(selectedOrder.combo_details)}
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {selectedOrder.payment_notes && (
-                                    <div>
-                                      <p><strong>Payment Notes:</strong></p>
-                                      <p className="text-sm bg-gray-50 p-2 rounded">{selectedOrder.payment_notes}</p>
-                                    </div>
-                                  )}
-                                  
-                                  {selectedOrder.payment_screenshot_url && (
-                                    <div>
-                                      <p className="font-medium mb-2">Payment Screenshot:</p>
-                                      <img
-                                        src={selectedOrder.payment_screenshot_url}
-                                        alt="Payment Screenshot"
-                                        className="max-w-full h-auto border rounded-lg"
-                                      />
-                                    </div>
-                                  )}
-                                </CardContent>
-                              </Card>
-                            </div>
+                                    )}
+                                    {selectedOrder.promocode_used && (
+                                      <div>
+                                        <p><strong>Promo Code:</strong> {selectedOrder.promocode_used}</p>
+                                        <p><strong>Discount:</strong> Rs. {Number(selectedOrder.promocode_discount).toFixed(2)}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {selectedOrder.payment_screenshot_url && (
+                                  <div>
+                                    <h4 className="font-medium mb-2">Payment Screenshot:</h4>
+                                    <img
+                                      src={selectedOrder.payment_screenshot_url}
+                                      alt="Payment Screenshot"
+                                      className="max-w-md border rounded-lg"
+                                    />
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
                           </div>
                         )}
                       </DialogContent>
@@ -503,6 +480,13 @@ export function EnhancedOrderManagement() {
                   </TableCell>
                 </TableRow>
               ))}
+              {filteredOrders.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                    No orders found matching your criteria.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
