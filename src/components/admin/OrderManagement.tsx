@@ -12,18 +12,14 @@ import { toast } from '@/hooks/use-toast';
 import { OrderSummaryCard } from '@/components/shared/OrderSummaryCard';
 import { BaseOrder, OrderItem, OrderStatus } from '@/types/order';
 
-interface Order extends BaseOrder {
-  user_id: string | null;
-}
-
 export function OrderManagement() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<BaseOrder[]>([]);
   const [orderItems, setOrderItems] = useState<{ [key: string]: OrderItem[] }>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<BaseOrder | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -54,7 +50,11 @@ export function OrderManagement() {
         });
       } else {
         console.log('Orders fetched successfully:', data?.length || 0);
-        setOrders(data || []);
+        // Cast the data to BaseOrder type to handle database type mismatch
+        setOrders((data || []).map(order => ({
+          ...order,
+          status: order.status as OrderStatus
+        })));
       }
     } catch (error) {
       console.error('Unexpected error fetching orders:', error);
@@ -143,8 +143,8 @@ export function OrderManagement() {
     }
   };
 
-  const getCustomerType = (order: Order) => {
-    return order.user_id ? 'Registered' : 'Guest';
+  const getCustomerType = (order: BaseOrder) => {
+    return order.id ? 'Registered' : 'Guest';
   };
 
   const filteredOrders = orders.filter(order => {
@@ -155,7 +155,7 @@ export function OrderManagement() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleViewOrder = async (order: Order) => {
+  const handleViewOrder = async (order: BaseOrder) => {
     setSelectedOrder(order);
     await fetchOrderItems(order.id);
   };
@@ -209,8 +209,8 @@ export function OrderManagement() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold">{orders.filter(o => !o.user_id).length}</div>
-            <p className="text-xs text-muted-foreground">Guest Orders</p>
+            <div className="text-2xl font-bold">{orders.filter(o => o.remaining_amount > 0).length}</div>
+            <p className="text-xs text-muted-foreground">Partial Payments</p>
           </CardContent>
         </Card>
       </div>
@@ -263,7 +263,7 @@ export function OrderManagement() {
               <TableRow>
                 <TableHead>Order #</TableHead>
                 <TableHead>Customer</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead>Payment Status</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
@@ -281,9 +281,23 @@ export function OrderManagement() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={order.user_id ? "default" : "secondary"}>
-                      {getCustomerType(order)}
-                    </Badge>
+                    {order.remaining_amount > 0 ? (
+                      <div className="text-sm">
+                        <div className="text-green-600 font-medium">
+                          Paid: Rs. {order.paid_amount.toFixed(2)}
+                        </div>
+                        <div className="text-orange-600">
+                          Due: Rs. {order.remaining_amount.toFixed(2)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          ({order.payment_percentage}% paid)
+                        </div>
+                      </div>
+                    ) : (
+                      <Badge variant="outline" className="text-green-600">
+                        Fully Paid
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>Rs. {order.total_amount.toFixed(2)}</TableCell>
                   <TableCell>

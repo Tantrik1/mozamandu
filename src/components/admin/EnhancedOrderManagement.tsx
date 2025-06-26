@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,18 +12,14 @@ import { toast } from '@/hooks/use-toast';
 import { OrderSummaryCard } from '@/components/shared/OrderSummaryCard';
 import { BaseOrder, OrderItem, OrderStatus } from '@/types/order';
 
-interface Order extends BaseOrder {
-  // Order is now just an alias for BaseOrder
-}
-
 export function EnhancedOrderManagement() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<BaseOrder[]>([]);
   const [orderItems, setOrderItems] = useState<{ [key: string]: OrderItem[] }>({});
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<BaseOrder | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -48,7 +43,11 @@ export function EnhancedOrderManagement() {
         });
       } else {
         console.log('Fetched orders:', data?.length || 0);
-        setOrders(data || []);
+        // Cast the data to BaseOrder type to handle database type mismatch
+        setOrders((data || []).map(order => ({
+          ...order,
+          status: order.status as OrderStatus
+        })));
       }
     } catch (error) {
       console.error('Unexpected error fetching orders:', error);
@@ -166,7 +165,7 @@ export function EnhancedOrderManagement() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleViewOrder = async (order: Order) => {
+  const handleViewOrder = async (order: BaseOrder) => {
     setSelectedOrder(order);
     await fetchOrderItems(order.id);
   };
@@ -191,7 +190,7 @@ export function EnhancedOrderManagement() {
       </div>
 
       {/* Stats */}
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{orders.length}</div>
@@ -212,6 +211,14 @@ export function EnhancedOrderManagement() {
               {orders.filter(o => o.status === 'delivered').length}
             </div>
             <div className="text-sm text-gray-600">Delivered</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-orange-600">
+              {orders.filter(o => o.remaining_amount > 0).length}
+            </div>
+            <div className="text-sm text-gray-600">Partial Payments</div>
           </CardContent>
         </Card>
         <Card>
@@ -272,6 +279,7 @@ export function EnhancedOrderManagement() {
               <TableRow>
                 <TableHead>Order #</TableHead>
                 <TableHead>Customer</TableHead>
+                <TableHead>Payment</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
@@ -287,6 +295,22 @@ export function EnhancedOrderManagement() {
                       <p className="font-medium">{order.customer_name}</p>
                       <p className="text-sm text-gray-600">{order.customer_email}</p>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {order.remaining_amount > 0 ? (
+                      <div className="text-sm">
+                        <div className="text-green-600 font-medium">
+                          Rs. {order.paid_amount.toFixed(2)} ({order.payment_percentage}%)
+                        </div>
+                        <div className="text-orange-600">
+                          Due: Rs. {order.remaining_amount.toFixed(2)}
+                        </div>
+                      </div>
+                    ) : (
+                      <Badge variant="outline" className="text-green-600">
+                        Fully Paid
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>Rs. {Number(order.total_amount).toFixed(2)}</TableCell>
                   <TableCell>
@@ -349,7 +373,7 @@ export function EnhancedOrderManagement() {
               ))}
               {filteredOrders.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                     No orders found matching your criteria.
                   </TableCell>
                 </TableRow>

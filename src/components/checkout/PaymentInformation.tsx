@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,14 @@ interface Promocode {
   maximum_discount_amount?: number;
 }
 
+const PAYMENT_PERCENTAGES = [
+  { value: 20, label: '20% - Pay Now' },
+  { value: 40, label: '40% - Pay Now' },
+  { value: 60, label: '60% - Pay Now' },
+  { value: 80, label: '80% - Pay Now' },
+  { value: 100, label: '100% - Pay Full Amount' }
+];
+
 export function PaymentInformation({ deliveryData, user, isGuest, onPrevious }: PaymentInformationProps) {
   const navigate = useNavigate();
   const { cartItems, getItemPricing, getTotalPrice, clearCart } = useRobustCart();
@@ -39,6 +48,7 @@ export function PaymentInformation({ deliveryData, user, isGuest, onPrevious }: 
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
   const [promocode, setPromocode] = useState('');
   const [appliedPromocode, setAppliedPromocode] = useState<Promocode | null>(null);
+  const [selectedPaymentPercentage, setSelectedPaymentPercentage] = useState<number>(100);
   const [loading, setLoading] = useState(false);
   const [placing, setPlacing] = useState(false);
 
@@ -139,12 +149,16 @@ export function PaymentInformation({ deliveryData, user, isGuest, onPrevious }: 
     }
 
     const total = subtotal + deliveryCharge - promocodeDiscount;
+    const paidAmount = (total * selectedPaymentPercentage) / 100;
+    const remainingAmount = total - paidAmount;
 
     return {
       subtotal,
       deliveryCharge,
       promocodeDiscount,
-      total: Math.max(0, total)
+      total: Math.max(0, total),
+      paidAmount: Math.max(0, paidAmount),
+      remainingAmount: Math.max(0, remainingAmount)
     };
   };
 
@@ -207,7 +221,7 @@ export function PaymentInformation({ deliveryData, user, isGuest, onPrevious }: 
         };
       });
 
-      // Create order
+      // Create order with partial payment fields
       const orderData = {
         user_id: user?.id || null,
         customer_name: deliveryData.customerName,
@@ -220,6 +234,9 @@ export function PaymentInformation({ deliveryData, user, isGuest, onPrevious }: 
         delivery_charge: totals.deliveryCharge,
         promocode_discount: totals.promocodeDiscount,
         total_amount: totals.total,
+        paid_amount: totals.paidAmount,
+        remaining_amount: totals.remainingAmount,
+        payment_percentage: selectedPaymentPercentage,
         payment_method_id: selectedPaymentMethod,
         payment_screenshot_url: screenshotUrl,
         promocode_used: appliedPromocode?.code || null,
@@ -277,7 +294,7 @@ export function PaymentInformation({ deliveryData, user, isGuest, onPrevious }: 
       
       toast({
         title: 'Success',
-        description: 'Order placed successfully!',
+        description: `Order placed successfully! ${selectedPaymentPercentage < 100 ? `You paid ${selectedPaymentPercentage}% now. Remaining: Rs. ${totals.remainingAmount.toFixed(2)}` : 'Full payment completed.'}`,
       });
 
       if (isGuest) {
@@ -302,6 +319,42 @@ export function PaymentInformation({ deliveryData, user, isGuest, onPrevious }: 
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Payment Amount</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <Label>Choose how much to pay now:</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {PAYMENT_PERCENTAGES.map((option) => (
+                <div
+                  key={option.value}
+                  className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                    selectedPaymentPercentage === option.value
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setSelectedPaymentPercentage(option.value)}
+                >
+                  <div className="text-center">
+                    <div className="font-semibold text-lg">{option.label}</div>
+                    <div className="text-sm text-gray-600 mt-1">
+                      Pay Now: Rs. {((totals.total * option.value) / 100).toFixed(2)}
+                    </div>
+                    {option.value < 100 && (
+                      <div className="text-sm text-orange-600">
+                        Due Later: Rs. {(totals.total - (totals.total * option.value) / 100).toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Payment Methods</CardTitle>
@@ -403,7 +456,7 @@ export function PaymentInformation({ deliveryData, user, isGuest, onPrevious }: 
 
       <Card>
         <CardHeader>
-          <CardTitle>Order Summary</CardTitle>
+          <CardTitle>Payment Summary</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
@@ -422,10 +475,21 @@ export function PaymentInformation({ deliveryData, user, isGuest, onPrevious }: 
               </div>
             )}
             <Separator />
-            <div className="flex justify-between font-bold text-lg">
-              <span>Total</span>
+            <div className="flex justify-between font-semibold">
+              <span>Total Amount</span>
               <span>Rs. {totals.total.toFixed(2)}</span>
             </div>
+            <Separator />
+            <div className="flex justify-between font-bold text-lg text-blue-600">
+              <span>Paying Now ({selectedPaymentPercentage}%)</span>
+              <span>Rs. {totals.paidAmount.toFixed(2)}</span>
+            </div>
+            {totals.remainingAmount > 0 && (
+              <div className="flex justify-between text-orange-600 font-medium">
+                <span>Due Payment</span>
+                <span>Rs. {totals.remainingAmount.toFixed(2)}</span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -435,7 +499,7 @@ export function PaymentInformation({ deliveryData, user, isGuest, onPrevious }: 
           Previous
         </Button>
         <Button onClick={handlePlaceOrder} disabled={placing} className="flex-1">
-          {placing ? 'Placing Order...' : 'Place Order'}
+          {placing ? 'Placing Order...' : `Place Order (Pay Rs. ${totals.paidAmount.toFixed(2)})`}
         </Button>
       </div>
     </div>

@@ -62,6 +62,9 @@ export function OrderSummaryCard({
               <p><strong>Order Number:</strong> {orderDetails.order_number}</p>
               <p><strong>Order Date:</strong> {new Date(orderDetails.created_at).toLocaleDateString()}</p>
               <p><strong>Status:</strong> {getStatusLabel(orderDetails.status)}</p>
+              {orderDetails.payment_percentage < 100 && (
+                <p><strong>Payment:</strong> {orderDetails.payment_percentage}% Paid</p>
+              )}
             </div>
           </div>
           <div>
@@ -180,6 +183,30 @@ export function OrderSummaryCard({
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total Amount:</span>
                   <span>Rs. {Number(orderDetails.total_amount).toFixed(2)}</span>
+                </div>
+              </>
+            )}
+            
+            {/* Partial Payment Information */}
+            {orderDetails.payment_percentage < 100 && (
+              <>
+                <Separator />
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <h4 className="font-semibold text-blue-800 mb-2">Payment Information</h4>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span>Payment Percentage:</span>
+                      <span className="font-medium">{orderDetails.payment_percentage}%</span>
+                    </div>
+                    <div className="flex justify-between text-green-600">
+                      <span>Amount Paid:</span>
+                      <span className="font-medium">Rs. {Number(orderDetails.paid_amount).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-orange-600">
+                      <span>Due Payment:</span>
+                      <span className="font-medium">Rs. {Number(orderDetails.remaining_amount).toFixed(2)}</span>
+                    </div>
+                  </div>
                 </div>
               </>
             )}

@@ -12,6 +12,9 @@ export interface BaseOrder {
   total_amount: number;
   subtotal: number;
   delivery_charge: number;
+  paid_amount: number;
+  remaining_amount: number;
+  payment_percentage: number;
   status: OrderStatus;
   created_at: string;
   updated_at: string;

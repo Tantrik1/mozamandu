@@ -426,11 +426,14 @@ export type Database = {
           delivery_location_id: string | null
           id: string
           order_number: string
+          paid_amount: number
           payment_method_id: string | null
+          payment_percentage: number
           payment_screenshot_url: string | null
           pricing_breakdown: Json | null
           promocode_discount: number | null
           promocode_used: string | null
+          remaining_amount: number
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
           total_amount: number
@@ -449,11 +452,14 @@ export type Database = {
           delivery_location_id?: string | null
           id?: string
           order_number?: string
+          paid_amount?: number
           payment_method_id?: string | null
+          payment_percentage?: number
           payment_screenshot_url?: string | null
           pricing_breakdown?: Json | null
           promocode_discount?: number | null
           promocode_used?: string | null
+          remaining_amount?: number
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           total_amount?: number
@@ -472,11 +478,14 @@ export type Database = {
           delivery_location_id?: string | null
           id?: string
           order_number?: string
+          paid_amount?: number
           payment_method_id?: string | null
+          payment_percentage?: number
           payment_screenshot_url?: string | null
           pricing_breakdown?: Json | null
           promocode_discount?: number | null
           promocode_used?: string | null
+          remaining_amount?: number
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           total_amount?: number

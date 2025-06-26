@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,17 +7,13 @@ import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, CreditCard, MapPin, Package, Receipt, User } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BaseOrder } from '@/types/order';
-
-interface CustomerOrder extends BaseOrder {
-  user_id?: string;
-}
+import { Badge } from '@/components/ui/badge';
+import { BaseOrder, OrderStatus } from '@/types/order';
 
 export default function CustomerDashboard() {
   const { user, isLoading } = useAuth();
-  const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [orders, setOrders] = useState<BaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,7 +42,11 @@ export default function CustomerDashboard() {
         });
       } else {
         console.log('Orders fetched successfully:', data?.length || 0);
-        setOrders(data || []);
+        // Cast the data to BaseOrder type to handle database type mismatch
+        setOrders((data || []).map(order => ({
+          ...order,
+          status: order.status as OrderStatus
+        })));
       }
     } catch (error) {
       console.error('Unexpected error fetching orders:', error);
@@ -56,6 +57,32 @@ export default function CustomerDashboard() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
+      case 'processing': return 'bg-blue-100 text-blue-800';
+      case 'verified': return 'bg-purple-100 text-purple-800';
+      case 'in_delivery': return 'bg-orange-100 text-orange-800';
+      case 'delivered': return 'bg-green-100 text-green-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      case 'refunded': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending_payment': return 'Pending Payment';
+      case 'processing': return 'Processing';
+      case 'verified': return 'Verified';
+      case 'in_delivery': return 'In Delivery';
+      case 'delivered': return 'Delivered';
+      case 'cancelled': return 'Cancelled';
+      case 'refunded': return 'Refunded';
+      default: return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
     }
   };
 
@@ -104,20 +131,34 @@ export default function CustomerDashboard() {
               {orders.map(order => (
                 <Card key={order.id}>
                   <CardHeader>
-                    <CardTitle>Order #{order.order_number}</CardTitle>
-                    <CardDescription>
-                      Placed on {new Date(order.created_at).toLocaleDateString()}
-                    </CardDescription>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>Order #{order.order_number}</CardTitle>
+                        <CardDescription>
+                          Placed on {new Date(order.created_at).toLocaleDateString()}
+                        </CardDescription>
+                      </div>
+                      <Badge className={getStatusColor(order.status)}>
+                        {getStatusLabel(order.status)}
+                      </Badge>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
                       <p className="text-gray-700">
                         Total: Rs. {order.total_amount.toFixed(2)}
                       </p>
-                      <p className="text-gray-700">
-                        Status: {order.status}
-                      </p>
-                      <Button asChild variant="link">
+                      {order.remaining_amount > 0 && (
+                        <div className="text-sm">
+                          <p className="text-green-600">
+                            Paid: Rs. {order.paid_amount.toFixed(2)} ({order.payment_percentage}%)
+                          </p>
+                          <p className="text-orange-600">
+                            Due: Rs. {order.remaining_amount.toFixed(2)}
+                          </p>
+                        </div>
+                      )}
+                      <Button asChild variant="link" className="p-0 h-auto">
                         <Link to={`/order-summary/${order.id}`}>
                           View Details
                         </Link>
@@ -149,7 +190,6 @@ export default function CustomerDashboard() {
             </CardHeader>
             <CardContent className="grid gap-4">
               <div className="flex items-center space-x-4">
-                <User className="h-5 w-5 text-gray-500" />
                 <span>{user.email}</span>
               </div>
             </CardContent>
