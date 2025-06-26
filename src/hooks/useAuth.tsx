@@ -1,4 +1,3 @@
-
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,18 +23,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    let initialLoadComplete = false;
 
-    // Get initial session
-    const getInitialSession = async () => {
+    // Get initial session first
+    const initializeAuth = async () => {
       try {
-        console.log('Fetching initial session...');
+        console.log('Initializing auth...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Error getting session:', error);
+          console.error('Error getting initial session:', error);
         } else {
-          console.log('Initial session:', session?.user?.email || 'No session');
+          console.log('Initial session found:', session?.user?.email || 'No session');
         }
 
         if (mounted) {
@@ -45,14 +43,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (session?.user) {
             await fetchUserProfile(session.user.id);
           }
+          
+          // Set loading to false after initial check
+          setIsLoading(false);
+          console.log('Auth initialization complete');
         }
       } catch (error) {
-        console.error('Session fetch error:', error);
-      } finally {
+        console.error('Auth initialization error:', error);
         if (mounted) {
-          initialLoadComplete = true;
           setIsLoading(false);
-          console.log('Initial auth check complete');
         }
       }
     };
@@ -72,15 +71,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setUserProfile(null);
         }
-        
-        // Only set loading to false if initial load is complete
-        if (initialLoadComplete) {
-          setIsLoading(false);
-        }
       }
     );
 
-    getInitialSession();
+    // Initialize auth
+    initializeAuth();
 
     return () => {
       mounted = false;
