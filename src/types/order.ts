@@ -1,5 +1,5 @@
 
-export type OrderStatus = 'pending_payment' | 'processing' | 'verified' | 'in_delivery' | 'delivered' | 'cancelled' | 'refunded';
+export type OrderStatus = 'pending_payment' | 'payment_confirmed' | 'processing' | 'verified' | 'on_delivery' | 'in_delivery' | 'delivered' | 'cancelled' | 'refunded';
 
 export interface BaseOrder {
   id: string;

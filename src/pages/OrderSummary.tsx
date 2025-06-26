@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,14 +10,10 @@ import { OrderSummaryCard } from '@/components/shared/OrderSummaryCard';
 import { toast } from '@/hooks/use-toast';
 import { BaseOrder, OrderItem } from '@/types/order';
 
-interface OrderDetails extends BaseOrder {
-  // OrderDetails is now just an alias for BaseOrder
-}
-
 export default function OrderSummary() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
-  const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
+  const [orderDetails, setOrderDetails] = useState<BaseOrder | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -67,7 +64,7 @@ export default function OrderSummary() {
         });
       }
 
-      setOrderDetails(order);
+      setOrderDetails(order as BaseOrder);
       setOrderItems(items || []);
     } catch (error) {
       console.error('Unexpected error fetching order:', error);
