@@ -1,9 +1,10 @@
 
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { UserProfile } from '@/contexts/AuthContext';
 
 export function useUserProfile() {
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   const fetchUserProfile = useCallback(async (userId: string) => {
     try {
@@ -16,7 +17,6 @@ export function useUserProfile() {
 
       if (error) {
         console.error('❌ UserProfile: Error fetching user profile:', error);
-        // Check if it's an RLS issue
         if (error.code === 'PGRST116' || error.message.includes('row-level security')) {
           console.warn('⚠️ UserProfile: RLS may be blocking profile access');
         }
@@ -31,6 +31,7 @@ export function useUserProfile() {
   }, []);
 
   const clearUserProfile = useCallback(() => {
+    console.log('🧹 UserProfile: Clearing profile');
     setUserProfile(null);
   }, []);
 

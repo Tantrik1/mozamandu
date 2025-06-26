@@ -39,31 +39,26 @@ export default function Auth() {
     }
   }, [searchParams]);
 
-  // Handle redirect for authenticated users - improved logic
+  // Handle redirect for authenticated users
   useEffect(() => {
-    console.log('🔄 Auth page: Checking auth state', { 
+    console.log('🔄 Auth page: Checking auth state for redirect', { 
       user: !!user, 
       userProfile: !!userProfile, 
       isLoading,
       userRole: userProfile?.role 
     });
 
-    // Only redirect if we have both user and profile data and auth is not loading
-    if (user && userProfile && !isLoading && !authLoading) {
-      console.log('✅ Auth page: User authenticated, redirecting...', userProfile.role);
+    // Only redirect if we have user data and auth is not loading
+    if (!isLoading && user && userProfile) {
+      console.log('✅ Auth page: User authenticated, redirecting to dashboard');
       
-      // Small delay to ensure auth state is fully settled
-      setTimeout(() => {
-        if (userProfile.role === 'admin') {
-          console.log('🔄 Auth page: Redirecting to admin dashboard');
-          navigate('/admin', { replace: true });
-        } else {
-          console.log('🔄 Auth page: Redirecting to customer dashboard');
-          navigate('/dashboard', { replace: true });
-        }
-      }, 100);
+      if (userProfile.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     }
-  }, [user, userProfile, isLoading, authLoading, navigate]);
+  }, [user, userProfile, isLoading, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,15 +76,11 @@ export default function Auth() {
     if (error) {
       console.error('❌ Auth page: Sign in error:', error);
       setErrors({ form: error.message });
+      setAuthLoading(false);
     } else {
       console.log('✅ Auth page: Sign in successful');
+      // Don't set authLoading to false here - let the redirect happen
     }
-    
-    setAuthLoading(false);
-  };
-
-  const handleSignUpSuccess = () => {
-    console.log('✅ Auth page: Sign up successful, will redirect via useEffect');
   };
 
   // Show loading while auth is initializing
@@ -194,7 +185,7 @@ export default function Auth() {
                 <CardTitle>Create Your Account</CardTitle>
               </CardHeader>
               <CardContent>
-                <SignUpForm onSuccess={handleSignUpSuccess} />
+                <SignUpForm onSuccess={() => {}} />
               </CardContent>
             </Card>
           </TabsContent>

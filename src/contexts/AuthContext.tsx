@@ -1,11 +1,22 @@
 
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
+
+interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: 'admin' | 'customer';
+  contact_number: string | null;
+  whatsapp_number: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  userProfile: any;
+  userProfile: UserProfile | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
@@ -23,4 +34,4 @@ export function useAuthContext() {
 }
 
 export { AuthContext };
-export type { AuthContextType };
+export type { AuthContextType, UserProfile };

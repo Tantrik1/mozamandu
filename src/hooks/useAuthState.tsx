@@ -12,28 +12,18 @@ export function useAuthState() {
 
   useEffect(() => {
     let isMounted = true;
-    let loadingTimeout: NodeJS.Timeout;
 
-    console.log('🔄 AuthState: Starting auth initialization');
+    console.log('🔄 AuthState: Initializing auth state');
 
-    // Set timeout fallback for loading state
-    loadingTimeout = setTimeout(() => {
-      if (isMounted && isLoading) {
-        console.warn('⚠️ AuthState: Loading timeout after 10 seconds, forcing completion');
-        setIsLoading(false);
-      }
-    }, 10000);
-
-    const initializeAuth = async () => {
+    // Get initial session
+    const getInitialSession = async () => {
       try {
-        console.log('🔄 AuthState: Getting initial session');
-        
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('❌ AuthState: Error getting session:', error);
         } else {
-          console.log('✅ AuthState: Initial session retrieved:', session?.user?.email || 'No session');
+          console.log('✅ AuthState: Initial session:', session?.user?.email || 'No session');
         }
 
         if (!isMounted) return;
@@ -42,17 +32,14 @@ export function useAuthState() {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          console.log('🔄 AuthState: Fetching user profile');
           await fetchUserProfile(session.user.id);
         }
         
+        setIsLoading(false);
       } catch (error) {
-        console.error('❌ AuthState: Auth initialization error:', error);
-      } finally {
+        console.error('❌ AuthState: Session initialization error:', error);
         if (isMounted) {
-          console.log('✅ AuthState: Auth initialization complete, setting loading to false');
           setIsLoading(false);
-          clearTimeout(loadingTimeout);
         }
       }
     };
@@ -68,25 +55,20 @@ export function useAuthState() {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          console.log('🔄 AuthState: Fetching user profile after auth change');
           await fetchUserProfile(session.user.id);
         } else {
           clearUserProfile();
         }
         
-        // Ensure loading is always set to false after auth state change
-        console.log('✅ AuthState: Auth state change complete, setting loading to false');
         setIsLoading(false);
-        clearTimeout(loadingTimeout);
       }
     );
 
-    initializeAuth();
+    getInitialSession();
 
     return () => {
       console.log('🧹 AuthState: Cleanup');
       isMounted = false;
-      clearTimeout(loadingTimeout);
       subscription.unsubscribe();
     };
   }, [fetchUserProfile, clearUserProfile]);
