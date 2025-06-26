@@ -18,8 +18,6 @@ interface OrderDetails {
   whatsapp_number: string;
   delivery_address: string;
   total_amount: number;
-  paid_amount: number;
-  remaining_amount: number;
   subtotal: number;
   delivery_charge: number;
   status: string;

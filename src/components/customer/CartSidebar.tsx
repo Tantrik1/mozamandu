@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -17,16 +18,6 @@ import { useRobustCart } from "@/hooks/useRobustCart";
 interface CartSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-}
-
-interface CartItemProps {
-  id: string;
-  productName: string;
-  colorName?: string;
-  sizeName?: string;
-  quantity: number;
-  basePrice: number;
-  image_url?: string;
 }
 
 export function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
@@ -73,7 +64,7 @@ export function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
         ) : (
           <div className="flex-1 overflow-y-auto py-4">
             <ul className="divide-y divide-gray-200">
-              {cartItems.map((item: CartItemProps) => {
+              {cartItems.map((item) => {
                 const pricing = getItemPricing(item);
                 return (
                   <li key={item.id} className="py-4">

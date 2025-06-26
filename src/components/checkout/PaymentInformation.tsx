@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -85,10 +84,6 @@ export function PaymentInformation({ deliveryData, user, isGuest, onPrevious }: 
       
       if (currentTotal < data.minimum_order_amount) {
         throw new Error(`Minimum order amount is Rs. ${data.minimum_order_amount}`);
-      }
-
-      if (data.usage_limit && data.used_count >= data.usage_limit) {
-        throw new Error('Promocode usage limit exceeded');
       }
 
       if (data.valid_until && new Date() > new Date(data.valid_until)) {

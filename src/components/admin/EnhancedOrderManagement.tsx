@@ -12,6 +12,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { OrderSummaryCard } from '@/components/shared/OrderSummaryCard';
 
+type OrderStatus = 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled';
+
 interface Order {
   id: string;
   order_number: string;
@@ -21,12 +23,11 @@ interface Order {
   whatsapp_number: string | null;
   delivery_address: string;
   total_amount: number;
-  paid_amount: number;
-  remaining_amount: number;
   subtotal: number;
   delivery_charge: number;
-  status: string;
+  status: OrderStatus;
   created_at: string;
+  updated_at: string;
   combo_applied: boolean;
   promocode_used: string | null;
   promocode_discount: number;
@@ -112,7 +113,7 @@ export function EnhancedOrderManagement() {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     setUpdating(orderId);
     try {
       console.log('Updating order status:', orderId, 'to', newStatus);
@@ -161,28 +162,24 @@ export function EnhancedOrderManagement() {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: OrderStatus) => {
     switch (status) {
       case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
-      case 'processing': return 'bg-blue-100 text-blue-800';
-      case 'verified': return 'bg-purple-100 text-purple-800';
-      case 'in_delivery': return 'bg-orange-100 text-orange-800';
+      case 'payment_confirmed': return 'bg-blue-100 text-blue-800';
+      case 'on_delivery': return 'bg-orange-100 text-orange-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'refunded': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: OrderStatus) => {
     switch (status) {
       case 'pending_payment': return 'Pending Payment';
-      case 'processing': return 'Processing';
-      case 'verified': return 'Verified';
-      case 'in_delivery': return 'In Delivery';
+      case 'payment_confirmed': return 'Payment Confirmed';
+      case 'on_delivery': return 'On Delivery';
       case 'delivered': return 'Delivered';
       case 'cancelled': return 'Cancelled';
-      case 'refunded': return 'Refunded';
       default: return status.toUpperCase();
     }
   };
@@ -277,12 +274,10 @@ export function EnhancedOrderManagement() {
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                  <SelectItem value="processing">Processing</SelectItem>
-                  <SelectItem value="verified">Verified</SelectItem>
-                  <SelectItem value="in_delivery">In Delivery</SelectItem>
+                  <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
+                  <SelectItem value="on_delivery">On Delivery</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
-                  <SelectItem value="refunded">Refunded</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -321,7 +316,7 @@ export function EnhancedOrderManagement() {
                   <TableCell>
                     <Select
                       value={order.status}
-                      onValueChange={(value) => updateOrderStatus(order.id, value)}
+                      onValueChange={(value: OrderStatus) => updateOrderStatus(order.id, value)}
                       disabled={updating === order.id}
                     >
                       <SelectTrigger className="w-40">
@@ -336,12 +331,10 @@ export function EnhancedOrderManagement() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                        <SelectItem value="processing">Processing</SelectItem>
-                        <SelectItem value="verified">Verified</SelectItem>
-                        <SelectItem value="in_delivery">In Delivery</SelectItem>
+                        <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
+                        <SelectItem value="on_delivery">On Delivery</SelectItem>
                         <SelectItem value="delivered">Delivered</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
-                        <SelectItem value="refunded">Refunded</SelectItem>
                       </SelectContent>
                     </Select>
                   </TableCell>
