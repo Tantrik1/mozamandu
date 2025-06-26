@@ -236,7 +236,7 @@ export function UniversalCheckout() {
         payment_method_id: selectedPayment,
         payment_notes: paymentNotes || null,
         payment_screenshot_url: paymentScreenshotUrl,
-        status: 'pending',
+        status: 'pending_payment' as const,
         combo_applied: false,
         promocode_discount: 0
       };
@@ -296,13 +296,7 @@ export function UniversalCheckout() {
           product_id: item.productId,
           color_variant_id: item.colorVariantId,
           size_variant_id: item.sizeVariantId,
-          product_name: item.productName,
-          color_name: item.colorName || '',
-          size_name: item.sizeName || '',
-          quantity: item.quantity,
-          unit_price: pricing.finalPrice,
-          total_price: pricing.finalPrice * item.quantity,
-          pricing_mode: pricing.mode
+          quantity: item.quantity
         };
       });
 
@@ -318,6 +312,30 @@ export function UniversalCheckout() {
         // Try to cleanup the order if items creation fails
         await supabase.from('orders').delete().eq('id', orderResult.id);
         throw new Error(`Failed to create order items: ${itemsError.message}`);
+      }
+
+      // Create order item details
+      const orderItemDetails = cartItems.map(item => {
+        const pricing = getItemPricing(item);
+        return {
+          order_id: orderResult.id,
+          product_name: item.productName,
+          color_name: item.colorName || '',
+          size_name: item.sizeName || '',
+          quantity: item.quantity,
+          unit_price: pricing.finalPrice,
+          total_price: pricing.finalPrice * item.quantity,
+          pricing_mode: pricing.mode
+        };
+      });
+
+      const { error: detailsError } = await supabase
+        .from('order_item_details')
+        .insert(orderItemDetails);
+
+      if (detailsError) {
+        console.error('Order item details creation error:', detailsError);
+        // Don't fail the order for this, just log it
       }
 
       console.log('Order items created successfully');

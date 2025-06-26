@@ -20,7 +20,7 @@ interface Order {
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;
-  status: string;
+  status: 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled';
   created_at: string;
   combo_applied: boolean;
   promocode_used: string | null;
@@ -29,6 +29,15 @@ interface Order {
 }
 
 interface OrderItem {
+  id: string;
+  product_id: string;
+  color_variant_id: string | null;
+  size_variant_id: string | null;
+  quantity: number;
+  created_at: string | null;
+}
+
+interface OrderItemDetail {
   id: string;
   product_name: string;
   color_name: string | null;
@@ -41,7 +50,7 @@ interface OrderItem {
 
 export function EnhancedOrderManagement() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [orderItems, setOrderItems] = useState<{ [key: string]: OrderItem[] }>({});
+  const [orderItemDetails, setOrderItemDetails] = useState<{ [key: string]: OrderItemDetail[] }>({});
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,24 +108,24 @@ export function EnhancedOrderManagement() {
     }
   };
 
-  const fetchOrderItems = async (orderId: string) => {
-    if (orderItems[orderId]) return; // Already fetched
+  const fetchOrderItemDetails = async (orderId: string) => {
+    if (orderItemDetails[orderId]) return; // Already fetched
 
     try {
-      console.log('Fetching order items for:', orderId);
+      console.log('Fetching order item details for:', orderId);
       const { data, error } = await supabase
-        .from('order_items')
+        .from('order_item_details')
         .select('*')
         .eq('order_id', orderId);
 
       if (error) {
-        console.error('Error fetching order items:', error);
+        console.error('Error fetching order item details:', error);
       } else {
-        console.log('Fetched order items:', data?.length || 0);
-        setOrderItems(prev => ({ ...prev, [orderId]: data || [] }));
+        console.log('Fetched order item details:', data?.length || 0);
+        setOrderItemDetails(prev => ({ ...prev, [orderId]: data || [] }));
       }
     } catch (error) {
-      console.error('Unexpected error fetching order items:', error);
+      console.error('Unexpected error fetching order item details:', error);
     }
   };
 
@@ -128,7 +137,7 @@ export function EnhancedOrderManagement() {
       const { error } = await supabase
         .from('orders')
         .update({ 
-          status: newStatus, 
+          status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled', 
           updated_at: new Date().toISOString() 
         })
         .eq('id', orderId);
@@ -150,13 +159,13 @@ export function EnhancedOrderManagement() {
         // Update local state
         setOrders(prev => prev.map(order => 
           order.id === orderId 
-            ? { ...order, status: newStatus }
+            ? { ...order, status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled' }
             : order
         ));
         
         // Also update selected order if it's the one being updated
         if (selectedOrder?.id === orderId) {
-          setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
+          setSelectedOrder(prev => prev ? { ...prev, status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled' } : null);
         }
       }
     } catch (error) {
@@ -173,7 +182,9 @@ export function EnhancedOrderManagement() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
+      case 'payment_confirmed': return 'bg-blue-100 text-blue-800';
+      case 'on_delivery': return 'bg-purple-100 text-purple-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -190,7 +201,7 @@ export function EnhancedOrderManagement() {
 
   const handleViewOrder = async (order: Order) => {
     setSelectedOrder(order);
-    await fetchOrderItems(order.id);
+    await fetchOrderItemDetails(order.id);
   };
 
   if (loading) {
@@ -223,9 +234,9 @@ export function EnhancedOrderManagement() {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-yellow-600">
-              {orders.filter(o => o.status === 'pending').length}
+              {orders.filter(o => o.status === 'pending_payment').length}
             </div>
-            <div className="text-sm text-gray-600">Pending</div>
+            <div className="text-sm text-gray-600">Pending Payment</div>
           </CardContent>
         </Card>
         <Card>
@@ -264,12 +275,14 @@ export function EnhancedOrderManagement() {
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="pending_payment">Pending Payment</SelectItem>
+                  <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
+                  <SelectItem value="on_delivery">On Delivery</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
@@ -324,18 +337,20 @@ export function EnhancedOrderManagement() {
                       onValueChange={(value) => updateOrderStatus(order.id, value)}
                       disabled={updating === order.id}
                     >
-                      <SelectTrigger className="w-32">
+                      <SelectTrigger className="w-40">
                         <SelectValue>
                           <Badge className={getStatusColor(order.status)}>
                             {updating === order.id ? (
                               <RefreshCw className="h-3 w-3 animate-spin mr-1" />
                             ) : null}
-                            {order.status}
+                            {order.status.replace('_', ' ')}
                           </Badge>
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="pending_payment">Pending Payment</SelectItem>
+                        <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
+                        <SelectItem value="on_delivery">On Delivery</SelectItem>
                         <SelectItem value="delivered">Delivered</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
@@ -377,7 +392,7 @@ export function EnhancedOrderManagement() {
                                   <p><strong>Order Date:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
                                   <p><strong>Status:</strong> 
                                     <Badge className={`ml-2 ${getStatusColor(selectedOrder.status)}`}>
-                                      {selectedOrder.status}
+                                      {selectedOrder.status.replace('_', ' ')}
                                     </Badge>
                                   </p>
                                 </div>
@@ -390,7 +405,7 @@ export function EnhancedOrderManagement() {
                                 <CardTitle className="text-lg">Order Items</CardTitle>
                               </CardHeader>
                               <CardContent>
-                                {orderItems[selectedOrder.id] ? (
+                                {orderItemDetails[selectedOrder.id] ? (
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
@@ -402,7 +417,7 @@ export function EnhancedOrderManagement() {
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                      {orderItems[selectedOrder.id].map((item) => (
+                                      {orderItemDetails[selectedOrder.id].map((item) => (
                                         <TableRow key={item.id}>
                                           <TableCell>
                                             <div>

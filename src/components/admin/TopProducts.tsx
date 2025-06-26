@@ -20,15 +20,16 @@ export function TopProducts() {
 
   const fetchTopProducts = async () => {
     try {
-      const { data: orderItems, error } = await supabase
-        .from('order_items')
+      // Use order_item_details table instead of order_items
+      const { data: orderItemDetails, error } = await supabase
+        .from('order_item_details')
         .select('product_name, quantity, total_price');
 
       if (error) throw error;
 
       const productStats: { [key: string]: { quantity: number; revenue: number } } = {};
       
-      orderItems?.forEach((item) => {
+      orderItemDetails?.forEach((item) => {
         if (!productStats[item.product_name]) {
           productStats[item.product_name] = { quantity: 0, revenue: 0 };
         }
@@ -94,7 +95,7 @@ export function TopProducts() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="font-semibold">${product.total_revenue.toFixed(2)}</p>
+                <p className="font-semibold">Rs. {product.total_revenue.toFixed(2)}</p>
               </div>
             </div>
           ))}

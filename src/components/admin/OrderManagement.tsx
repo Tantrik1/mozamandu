@@ -20,7 +20,7 @@ interface Order {
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;
-  status: string;
+  status: 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled';
   created_at: string;
   combo_applied: boolean;
   promocode_used: string | null;
@@ -32,7 +32,7 @@ interface Order {
   subtotal: number;
 }
 
-interface OrderItem {
+interface OrderItemDetail {
   id: string;
   product_name: string;
   color_name: string | null;
@@ -45,7 +45,7 @@ interface OrderItem {
 
 export function OrderManagement() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [orderItems, setOrderItems] = useState<{ [key: string]: OrderItem[] }>({});
+  const [orderItemDetails, setOrderItemDetails] = useState<{ [key: string]: OrderItemDetail[] }>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -115,20 +115,20 @@ export function OrderManagement() {
     }
   };
 
-  const fetchOrderItems = async (orderId: string) => {
-    if (orderItems[orderId]) return; // Already fetched
+  const fetchOrderItemDetails = async (orderId: string) => {
+    if (orderItemDetails[orderId]) return; // Already fetched
 
     try {
       const { data, error } = await supabase
-        .from('order_items')
+        .from('order_item_details')
         .select('*')
         .eq('order_id', orderId);
 
       if (!error && data) {
-        setOrderItems(prev => ({ ...prev, [orderId]: data }));
+        setOrderItemDetails(prev => ({ ...prev, [orderId]: data }));
       }
     } catch (error) {
-      console.error('Error fetching order items:', error);
+      console.error('Error fetching order item details:', error);
     }
   };
 
@@ -136,7 +136,10 @@ export function OrderManagement() {
     try {
       const { error } = await supabase
         .from('orders')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update({ 
+          status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled', 
+          updated_at: new Date().toISOString() 
+        })
         .eq('id', orderId);
 
       if (error) {
@@ -165,7 +168,9 @@ export function OrderManagement() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
+      case 'payment_confirmed': return 'bg-blue-100 text-blue-800';
+      case 'on_delivery': return 'bg-purple-100 text-purple-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -186,7 +191,7 @@ export function OrderManagement() {
 
   const handleViewOrder = async (order: Order) => {
     setSelectedOrder(order);
-    await fetchOrderItems(order.id);
+    await fetchOrderItemDetails(order.id);
   };
 
   if (loading) {
@@ -220,7 +225,7 @@ export function OrderManagement() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold">{orders.filter(o => o.status === 'pending').length}</div>
+            <div className="text-2xl font-bold">{orders.filter(o => o.status === 'pending_payment').length}</div>
             <p className="text-xs text-muted-foreground">Pending Orders</p>
           </CardContent>
         </Card>
@@ -256,12 +261,14 @@ export function OrderManagement() {
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="pending_payment">Pending Payment</SelectItem>
+                  <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
+                  <SelectItem value="on_delivery">On Delivery</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
@@ -321,15 +328,17 @@ export function OrderManagement() {
                       value={order.status}
                       onValueChange={(value) => updateOrderStatus(order.id, value)}
                     >
-                      <SelectTrigger className="w-32">
+                      <SelectTrigger className="w-40">
                         <SelectValue>
                           <Badge className={getStatusColor(order.status)}>
-                            {order.status}
+                            {order.status.replace('_', ' ')}
                           </Badge>
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="pending_payment">Pending Payment</SelectItem>
+                        <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
+                        <SelectItem value="on_delivery">On Delivery</SelectItem>
                         <SelectItem value="delivered">Delivered</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
@@ -376,7 +385,7 @@ export function OrderManagement() {
                                   <p><strong>Order Date:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
                                   <p><strong>Status:</strong> 
                                     <Badge className={`ml-2 ${getStatusColor(selectedOrder.status)}`}>
-                                      {selectedOrder.status}
+                                      {selectedOrder.status.replace('_', ' ')}
                                     </Badge>
                                   </p>
                                   <p><strong>Delivery Address:</strong></p>
@@ -391,7 +400,7 @@ export function OrderManagement() {
                                 <CardTitle className="text-lg">Order Items</CardTitle>
                               </CardHeader>
                               <CardContent>
-                                {orderItems[selectedOrder.id] && (
+                                {orderItemDetails[selectedOrder.id] && (
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
@@ -403,7 +412,7 @@ export function OrderManagement() {
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                      {orderItems[selectedOrder.id].map((item) => (
+                                      {orderItemDetails[selectedOrder.id].map((item) => (
                                         <TableRow key={item.id}>
                                           <TableCell>
                                             <div>
