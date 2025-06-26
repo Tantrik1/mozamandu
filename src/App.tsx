@@ -18,6 +18,7 @@ import CheckoutSelection from '@/pages/CheckoutSelection';
 import Checkout from '@/pages/Checkout';
 import Admin from '@/pages/Admin';
 import EnhancedAdmin from '@/pages/EnhancedAdmin';
+import NotFound from '@/pages/NotFound';
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ function App() {
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/admin/*" element={<Admin />} />
                 <Route path="/enhanced-admin/*" element={<EnhancedAdmin />} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
               <Toaster />
             </div>

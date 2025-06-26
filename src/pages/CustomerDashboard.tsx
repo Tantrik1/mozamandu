@@ -42,7 +42,6 @@ export default function CustomerDashboard() {
         });
       } else {
         console.log('Orders fetched successfully:', data?.length || 0);
-        // Cast the data to BaseOrder type to handle database type mismatch
         setOrders((data || []).map(order => ({
           ...order,
           status: order.status as OrderStatus
@@ -63,12 +62,10 @@ export default function CustomerDashboard() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
-      case 'processing': return 'bg-blue-100 text-blue-800';
-      case 'verified': return 'bg-purple-100 text-purple-800';
-      case 'in_delivery': return 'bg-orange-100 text-orange-800';
+      case 'payment_confirmed': return 'bg-blue-100 text-blue-800';
+      case 'on_delivery': return 'bg-orange-100 text-orange-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'refunded': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -76,12 +73,10 @@ export default function CustomerDashboard() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'pending_payment': return 'Pending Payment';
-      case 'processing': return 'Processing';
-      case 'verified': return 'Verified';
-      case 'in_delivery': return 'In Delivery';
+      case 'payment_confirmed': return 'Payment Confirmed';
+      case 'on_delivery': return 'On Delivery';
       case 'delivered': return 'Delivered';
       case 'cancelled': return 'Cancelled';
-      case 'refunded': return 'Refunded';
       default: return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
     }
   };
