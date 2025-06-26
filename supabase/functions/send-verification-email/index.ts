@@ -71,11 +71,35 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Create user with email confirmation required
-    console.log('Creating user account with email confirmation for:', email);
+    // Handle signup flow
+    const emailAddress = email.toLowerCase().trim();
+    console.log('Processing signup for:', emailAddress);
+
+    // Check if user already exists
+    const { data: existingUser, error: getUserError } = await supabase.auth.admin.getUserByEmail(emailAddress);
+    
+    if (existingUser && existingUser.user && existingUser.user.email_confirmed_at) {
+      console.log('User already exists and is confirmed:', emailAddress);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: "An account with this email already exists and is verified. Please sign in instead."
+      }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    // If user exists but is not confirmed, delete the old user first
+    if (existingUser && existingUser.user && !existingUser.user.email_confirmed_at) {
+      console.log('Deleting unconfirmed user before creating new one:', emailAddress);
+      await supabase.auth.admin.deleteUser(existingUser.user.id);
+    }
+
+    // Create new user with email confirmation required
+    console.log('Creating new user account for:', emailAddress);
     
     const { data: signUpData, error: signUpError } = await supabase.auth.admin.createUser({
-      email: email.toLowerCase().trim(),
+      email: emailAddress,
       password: password,
       email_confirm: false, // Require email confirmation
       user_metadata: {
@@ -86,36 +110,24 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (signUpError) {
       console.error('Error creating user:', signUpError);
-      
-      // Handle specific error cases
-      if (signUpError.message.includes('User already registered')) {
-        return new Response(JSON.stringify({ 
-          success: false,
-          error: "An account with this email already exists. Please sign in instead or use a different email."
-        }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        });
-      }
-      
       return new Response(JSON.stringify({ 
         success: false,
-        error: signUpError.message || "Failed to create user account"
+        error: "Failed to create user account. Please try again."
       }), {
-        status: 400,
+        status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
 
-    console.log('User created successfully, now generating confirmation token');
+    console.log('User created successfully, generating confirmation link');
 
     // Generate email confirmation link
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: 'signup',
-      email: email.toLowerCase().trim(),
+      email: emailAddress,
     });
 
-    if (linkError || !linkData.properties?.hashed_token) {
+    if (linkError || !linkData.properties?.action_link) {
       console.error('Error generating confirmation link:', linkError);
       return new Response(JSON.stringify({ 
         success: false,
@@ -126,14 +138,13 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const confirmationToken = linkData.properties.hashed_token;
     const confirmationUrl = linkData.properties.action_link;
-    console.log('Generated confirmation token and URL for email verification');
+    console.log('Generated confirmation URL for email verification');
 
-    // Send custom confirmation email with both token and link
+    // Send custom confirmation email
     const emailResponse = await resend.emails.send({
       from: "Mozamandu <onboarding@resend.dev>",
-      to: [email.trim()],
+      to: [emailAddress],
       subject: "Confirm Your Email - Mozamandu",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -145,7 +156,7 @@ const handler = async (req: Request): Promise<Response> => {
           <h2 style="color: #333; text-align: center;">Welcome ${name || 'there'}!</h2>
           
           <p style="color: #333; font-size: 16px;">
-            Thank you for signing up! Please click the button below to verify your email address:
+            Thank you for signing up! Please click the button below to verify your email address and activate your account:
           </p>
           
           <div style="text-align: center; margin: 30px 0;">
@@ -180,11 +191,22 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Confirmation email sent successfully:", emailResponse);
+    if (emailResponse.error) {
+      console.error("Error sending confirmation email:", emailResponse.error);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: "Account created but failed to send verification email. Please contact support."
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    console.log("Confirmation email sent successfully:", emailResponse.data?.id);
 
     return new Response(JSON.stringify({ 
       success: true,
-      message: "Account created! Please check your email for the verification link."
+      message: "Account created successfully! Please check your email for the verification link."
     }), {
       status: 200,
       headers: {
@@ -198,7 +220,7 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: "Failed to process request",
+        error: "An unexpected error occurred. Please try again.",
         details: error.message 
       }),
       {
