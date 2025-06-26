@@ -17,7 +17,6 @@ import CategoryPage from "./pages/CategoryPage";
 import SubcategoryPage from "./pages/SubcategoryPage";
 import Auth from "./pages/Auth";
 import CustomerDashboard from "./pages/CustomerDashboard";
-import Admin from "./pages/Admin";
 import EnhancedAdmin from "./pages/EnhancedAdmin";
 import Checkout from "./pages/Checkout";
 import OrderSummary from "./pages/OrderSummary";
@@ -51,6 +50,7 @@ const App = () => {
             <RobustCartProvider>
               <SidebarProvider>
                 <Routes>
+                  {/* Public routes - no RouteGuard needed */}
                   <Route path="/" element={<Index />} />
                   <Route path="/home" element={<Home />} />
                   <Route path="/products" element={<Products />} />
@@ -58,6 +58,16 @@ const App = () => {
                   <Route path="/category/:categoryId" element={<CategoryPage />} />
                   <Route path="/subcategory/:subcategoryId" element={<SubcategoryPage />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/checkout" element={<Checkout />} />
+                  <Route path="/order-summary" element={<OrderSummary />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/faq" element={<FAQ />} />
+                  <Route path="/privacy" element={<PrivacyPolicy />} />
+                  <Route path="/terms" element={<TermsConditions />} />
+                  <Route path="/shipping" element={<ShippingPolicy />} />
+                  
+                  {/* Protected routes */}
                   <Route 
                     path="/dashboard" 
                     element={
@@ -74,14 +84,8 @@ const App = () => {
                       </RouteGuard>
                     } 
                   />
-                  <Route path="/checkout" element={<Checkout />} />
-                  <Route path="/order-summary" element={<OrderSummary />} />
-                  <Route path="/contact" element={<Contact />} />
-                  <Route path="/about" element={<About />} />
-                  <Route path="/faq" element={<FAQ />} />
-                  <Route path="/privacy" element={<PrivacyPolicy />} />
-                  <Route path="/terms" element={<TermsConditions />} />
-                  <Route path="/shipping" element={<ShippingPolicy />} />
+                  
+                  {/* 404 page */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </SidebarProvider>

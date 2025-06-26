@@ -19,6 +19,7 @@ export default function Auth() {
   const [authLoading, setAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
   const [showPassword, setShowPassword] = useState(false);
+  const [hasRedirected, setHasRedirected] = useState(false);
   
   const [signInData, setSignInData] = useState({
     email: '',
@@ -39,31 +40,36 @@ export default function Auth() {
     }
   }, [searchParams]);
 
-  // Handle redirect for authenticated users
+  // Handle redirect for authenticated users - with proper checks
   useEffect(() => {
     console.log('🔄 Auth page: Checking auth state for redirect', { 
       user: !!user, 
       userProfile: !!userProfile, 
-      isLoading,
+      isLoading, 
+      hasRedirected,
       userRole: userProfile?.role 
     });
 
-    // Only redirect if we have user and auth is not loading
-    if (!isLoading && user) {
-      console.log('✅ Auth page: User authenticated, redirecting');
+    // Don't redirect if we're still loading or already redirected
+    if (isLoading || hasRedirected) {
+      return;
+    }
+
+    // Only redirect if we have a user
+    if (user) {
+      console.log('✅ Auth page: User authenticated, preparing redirect');
+      setHasRedirected(true);
       
-      // Wait a bit for profile to load, then redirect
+      // Use a longer delay to allow profile to load
       const timer = setTimeout(() => {
-        if (userProfile?.role === 'admin') {
-          navigate('/admin', { replace: true });
-        } else {
-          navigate('/dashboard', { replace: true });
-        }
-      }, 500);
+        const targetPath = userProfile?.role === 'admin' ? '/admin' : '/dashboard';
+        console.log('🔄 Auth page: Redirecting to:', targetPath);
+        navigate(targetPath, { replace: true });
+      }, 1000);
 
       return () => clearTimeout(timer);
     }
-  }, [user, userProfile, isLoading, navigate]);
+  }, [user, userProfile, isLoading, navigate, hasRedirected]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,13 +94,25 @@ export default function Auth() {
     }
   };
 
-  // Show loading while auth is initializing
+  // Show loading while auth is initializing - but with timeout
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If user is authenticated and we haven't redirected yet, show loading
+  if (user && !hasRedirected) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirecting...</p>
         </div>
       </div>
     );

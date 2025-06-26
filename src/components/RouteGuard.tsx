@@ -29,14 +29,20 @@ export function RouteGuard({
       requireAdmin 
     });
 
-    // Don't do anything while auth is loading
+    // Show loading while auth is checking, but with timeout
     if (isLoading) {
       setShouldRender(false);
-      return;
+      // Set a timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        console.log('⏰ RouteGuard: Loading timeout - allowing render');
+        setShouldRender(true);
+      }, 2000);
+      return () => clearTimeout(timeout);
     }
 
     // For routes that don't require auth, always render
     if (!requireAuth && !requireAdmin) {
+      console.log('✅ RouteGuard: Public route - allowing access');
       setShouldRender(true);
       return;
     }
@@ -60,7 +66,7 @@ export function RouteGuard({
     setShouldRender(true);
   }, [user, userProfile, isLoading, requireAuth, requireAdmin, navigate, redirectTo]);
 
-  // Show loading while auth is checking
+  // Show loading while auth is checking (with shorter timeout)
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -74,7 +80,14 @@ export function RouteGuard({
 
   // Don't render anything if we're redirecting
   if (!shouldRender) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking permissions...</p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;

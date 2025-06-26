@@ -12,40 +12,19 @@ export function useAuthState() {
 
   useEffect(() => {
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     console.log('🔄 AuthState: Initializing auth state');
 
-    // Set up auth state listener first
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!isMounted) return;
-
-        console.log('🔄 AuthState: Auth state changed:', event, session?.user?.email || 'No session');
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Use setTimeout to avoid blocking the auth state change
-          setTimeout(() => {
-            if (isMounted) {
-              fetchUserProfile(session.user.id);
-            }
-          }, 0);
-        } else {
-          clearUserProfile();
-        }
-        
-        // Only set loading to false after we've processed the auth change
-        setTimeout(() => {
-          if (isMounted) {
-            setIsLoading(false);
-          }
-        }, 100);
+    // Set loading timeout - if auth doesn't resolve in 3 seconds, stop loading
+    const loadingTimeout = setTimeout(() => {
+      if (isMounted) {
+        console.log('⏰ AuthState: Loading timeout - setting loading to false');
+        setIsLoading(false);
       }
-    );
+    }, 3000);
 
-    // Get initial session
+    // Get initial session first
     const getInitialSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -58,38 +37,67 @@ export function useAuthState() {
 
         if (!isMounted) return;
 
-        // Set initial state
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch profile for initial session
           setTimeout(() => {
             if (isMounted) {
               fetchUserProfile(session.user.id);
             }
           }, 0);
+        } else {
+          clearUserProfile();
         }
         
-        // Set loading to false after initial check
-        setTimeout(() => {
-          if (isMounted) {
-            setIsLoading(false);
-          }
-        }, 100);
+        // Clear loading timeout and set loading to false
+        clearTimeout(loadingTimeout);
+        setIsLoading(false);
       } catch (error) {
         console.error('❌ AuthState: Session initialization error:', error);
         if (isMounted) {
+          clearTimeout(loadingTimeout);
           setIsLoading(false);
         }
       }
     };
 
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (!isMounted) return;
+
+        console.log('🔄 AuthState: Auth state changed:', event, session?.user?.email || 'No session');
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          setTimeout(() => {
+            if (isMounted) {
+              fetchUserProfile(session.user.id);
+            }
+          }, 0);
+        } else {
+          clearUserProfile();
+        }
+        
+        // Ensure loading stops after auth state change
+        setTimeout(() => {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+        }, 100);
+      }
+    );
+
+    // Get initial session
     getInitialSession();
 
     return () => {
       console.log('🧹 AuthState: Cleanup');
       isMounted = false;
+      clearTimeout(loadingTimeout);
       subscription.unsubscribe();
     };
   }, [fetchUserProfile, clearUserProfile]);
