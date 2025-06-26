@@ -114,18 +114,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: {
           data: {
             full_name: fullName.trim(),
-            role: 'customer'
+            role: 'customer' // Ensure all signups are customers by default
           },
           emailRedirectTo: `${window.location.origin}/auth?confirmed=true`
         }
       });
 
       if (error) {
+        console.error('SignUp error:', error);
         return { error };
       }
 
+      console.log('User signed up successfully, check email for verification');
       return { error: null };
     } catch (error) {
+      console.error('SignUp catch error:', error);
       return { error };
     } finally {
       setIsLoading(false);

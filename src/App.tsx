@@ -14,7 +14,7 @@ import Auth from '@/pages/Auth';
 import OrderSummary from '@/pages/OrderSummary';
 import AboutUs from '@/pages/AboutUs';
 import ContactUs from '@/pages/ContactUs';
-import CheckoutSelection from '@/pages/CheckoutSelection';
+import CheckoutSelection from '@/pages/CheckoutSelection';  
 import Checkout from '@/pages/Checkout';
 import Admin from '@/pages/Admin';
 import EnhancedAdmin from '@/pages/EnhancedAdmin';
@@ -35,6 +35,8 @@ function App() {
                 <Route path="/products" element={<Products />} />
                 <Route path="/products/:productId" element={<ProductDetails />} />
                 <Route path="/categories" element={<Categories />} />
+                <Route path="/categories/:categoryId" element={<Categories />} />
+                <Route path="/subcategories/:subcategoryId" element={<Products />} />
                 <Route path="/dashboard" element={<CustomerDashboard />} />
                 <Route path="/customer-dashboard" element={<CustomerDashboard />} />
                 <Route path="/auth" element={<Auth />} />
