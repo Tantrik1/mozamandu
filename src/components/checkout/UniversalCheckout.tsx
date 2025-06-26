@@ -258,8 +258,25 @@ export function UniversalCheckout() {
 
     setUploadingScreenshot(true);
     try {
+      // Ensure the uploads bucket exists
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const uploadsBucket = buckets?.find(bucket => bucket.name === 'uploads');
+      
+      if (!uploadsBucket) {
+        console.log('Creating uploads bucket...');
+        const { error: bucketError } = await supabase.storage.createBucket('uploads', {
+          public: true,
+          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+          fileSizeLimit: 5242880 // 5MB
+        });
+        
+        if (bucketError) {
+          console.error('Error creating uploads bucket:', bucketError);
+        }
+      }
+
       const fileExt = paymentScreenshot.name.split('.').pop();
-      const fileName = `payment-${Date.now()}.${fileExt}`;
+      const fileName = `payment-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
       const filePath = `payment-screenshots/${fileName}`;
 
       console.log('Uploading payment screenshot:', filePath);

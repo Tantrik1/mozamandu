@@ -20,11 +20,17 @@ export function TopProducts() {
 
   const fetchTopProducts = async () => {
     try {
+      console.log('Fetching top products...');
       const { data: orderItemDetails, error } = await supabase
         .from('order_item_details')
         .select('product_name, quantity, total_price');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching order item details:', error);
+        throw error;
+      }
+
+      console.log('Fetched order item details:', orderItemDetails?.length || 0);
 
       const productStats: { [key: string]: { quantity: number; revenue: number } } = {};
       
@@ -45,6 +51,7 @@ export function TopProducts() {
         .sort((a, b) => b.total_quantity - a.total_quantity)
         .slice(0, 5);
 
+      console.log('Top products calculated:', topProducts);
       setProducts(topProducts);
     } catch (error) {
       console.error('Error fetching top products:', error);
