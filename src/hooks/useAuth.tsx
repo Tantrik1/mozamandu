@@ -24,16 +24,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let initialLoadComplete = false;
 
-    const initializeAuth = async () => {
+    // Get initial session
+    const getInitialSession = async () => {
       try {
-        console.log('Initializing auth...');
+        console.log('Fetching initial session...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Error getting initial session:', error);
+          console.error('Error getting session:', error);
         } else {
-          console.log('Initial session found:', session?.user?.email || 'No session');
+          console.log('Initial session:', session?.user?.email || 'No session');
         }
 
         if (mounted) {
@@ -45,11 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
+        console.error('Session fetch error:', error);
       } finally {
         if (mounted) {
-          console.log('Auth initialization complete, setting loading to false');
+          initialLoadComplete = true;
           setIsLoading(false);
+          console.log('Initial auth check complete');
         }
       }
     };
@@ -69,11 +72,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setUserProfile(null);
         }
+        
+        // Only set loading to false if initial load is complete
+        if (initialLoadComplete) {
+          setIsLoading(false);
+        }
       }
     );
 
-    // Initialize auth
-    initializeAuth();
+    getInitialSession();
 
     return () => {
       mounted = false;

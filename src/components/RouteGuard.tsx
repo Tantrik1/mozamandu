@@ -20,17 +20,16 @@ export function RouteGuard({
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Only redirect after loading is complete
+    // Don't redirect while still loading
     if (isLoading) return;
 
+    // Only redirect after we have confirmed the auth state
     if (requireAuth && !user) {
-      console.log('Redirecting unauthenticated user to:', redirectTo);
       navigate(redirectTo, { replace: true });
       return;
     }
 
     if (requireAdmin && (!user || !userProfile || userProfile.role !== 'admin')) {
-      console.log('Redirecting non-admin user to home');
       navigate('/', { replace: true });
       return;
     }
