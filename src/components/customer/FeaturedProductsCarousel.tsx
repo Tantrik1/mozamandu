@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductCard } from './ProductCard';
@@ -10,6 +9,13 @@ interface Product {
   name: string;
   selling_price: number;
   image_url: string | null;
+  description: string | null;
+  cost_price: number;
+  is_featured: boolean | null;
+  has_color_variants: boolean | null;
+  has_size_variants: boolean | null;
+  status: string | null;
+  stock_quantity: number | null;
   subcategory: {
     id: string;
     name: string;
@@ -35,6 +41,13 @@ export function FeaturedProductsCarousel() {
             name,
             selling_price,
             image_url,
+            description,
+            cost_price,
+            is_featured,
+            has_color_variants,
+            has_size_variants,
+            status,
+            stock_quantity,
             subcategory:subcategories(id, name)
           `)
           .eq('status', 'active')
