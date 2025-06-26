@@ -103,8 +103,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
-    let isMounted = true;
-    
     try {
       console.log('🔄 AuthProvider: Fetching user profile for:', userId);
       const { data, error } = await supabase
@@ -122,22 +120,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (!isMounted) return;
-
       console.log('✅ AuthProvider: User profile fetched:', data);
       setUserProfile(data);
     } catch (error) {
       console.error('❌ AuthProvider: Profile fetch error:', error);
     }
-    
-    return () => {
-      isMounted = false;
-    };
   };
 
   const signIn = async (email: string, password: string) => {
-    let isMounted = true;
-    
     try {
       console.log('🔄 AuthProvider: Starting sign in');
       setIsLoading(true);
@@ -146,8 +136,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: email.trim(),
         password,
       });
-      
-      if (!isMounted) return { error };
       
       if (error) {
         console.error('❌ AuthProvider: Sign in error:', error);
@@ -164,20 +152,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null };
     } catch (error) {
       console.error('❌ AuthProvider: Sign in exception:', error);
-      if (isMounted) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
       return { error };
     }
-    
-    return () => {
-      isMounted = false;
-    };
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    let isMounted = true;
-    
     try {
       console.log('🔄 AuthProvider: Starting sign up');
       setIsLoading(true);
@@ -194,8 +174,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
 
-      if (!isMounted) return { error };
-
       if (error) {
         console.error('❌ AuthProvider: Sign up error:', error);
         setIsLoading(false);
@@ -207,20 +185,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null };
     } catch (error) {
       console.error('❌ AuthProvider: Sign up exception:', error);
-      if (isMounted) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
       return { error };
     }
-    
-    return () => {
-      isMounted = false;
-    };
   };
 
   const signOut = async () => {
-    let isMounted = true;
-    
     try {
       console.log('🔄 AuthProvider: Starting sign out');
       setIsLoading(true);
@@ -249,14 +219,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('❌ AuthProvider: Sign out exception:', error);
     } finally {
-      if (isMounted) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     }
-    
-    return () => {
-      isMounted = false;
-    };
   };
 
   return (
