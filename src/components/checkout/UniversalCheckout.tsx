@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -24,6 +24,13 @@ interface PaymentMethod {
   id: string;
   name: string;
   qr_code_url: string;
+}
+
+interface PromoCode {
+  id: string;
+  code: string;
+  discount_percentage: number;
+  minimum_order_amount: number;
 }
 
 interface FormErrors {
@@ -51,6 +58,15 @@ export function UniversalCheckout() {
   const [selectedPayment, setSelectedPayment] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
+  
+  // Promo code state
+  const [promoCode, setPromoCode] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<PromoCode | null>(null);
+  const [isPromoApplied, setIsPromoApplied] = useState(false);
+  
+  // Payment type state
+  const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
+  const [paidAmount, setPaidAmount] = useState('');
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -130,6 +146,53 @@ export function UniversalCheckout() {
     }
   };
 
+  const applyPromoCode = async () => {
+    if (!promoCode || isPromoApplied) return;
+
+    const subtotal = getTotalPrice();
+    const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
+    const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
+    const totalWithDelivery = subtotal + deliveryPrice;
+
+    const { data: promo, error } = await supabase
+      .from('promocodes')
+      .select('*')
+      .eq('code', promoCode.toUpperCase())
+      .eq('is_active', true)
+      .single();
+
+    if (error || !promo) {
+      toast({
+        title: "Invalid Promo Code",
+        description: "Promo code not found or expired",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (promo.minimum_order_amount && totalWithDelivery < promo.minimum_order_amount) {
+      toast({
+        title: "Invalid Promo Code",
+        description: `Minimum order amount is Rs. ${promo.minimum_order_amount}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAppliedPromo(promo);
+    setIsPromoApplied(true);
+    toast({
+      title: "Promo Code Applied!",
+      description: `${promo.discount_percentage}% discount applied`,
+    });
+  };
+
+  const removePromoCode = () => {
+    setAppliedPromo(null);
+    setIsPromoApplied(false);
+    setPromoCode('');
+  };
+
   const validateForm = (): boolean => {
     const errors: FormErrors = {};
 
@@ -144,6 +207,13 @@ export function UniversalCheckout() {
     // Email validation
     if (customerInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email)) {
       errors.email = 'Please enter a valid email address';
+    }
+
+    // Payment amount validation for partial payment
+    if (paymentType === 'partial') {
+      if (!paidAmount || parseFloat(paidAmount) <= 0) {
+        errors.paidAmount = 'Please enter a valid payment amount';
+      }
     }
 
     setFormErrors(errors);
@@ -211,7 +281,12 @@ export function UniversalCheckout() {
       const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
       const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
       const subtotal = getTotalPrice();
-      const totalAmount = subtotal + deliveryPrice;
+      const totalWithDelivery = subtotal + deliveryPrice;
+      const promoDiscount = appliedPromo 
+        ? (totalWithDelivery * appliedPromo.discount_percentage) / 100 
+        : 0;
+      const finalTotal = totalWithDelivery - promoDiscount;
+      const actualPaidAmount = paymentType === 'full' ? finalTotal : parseFloat(paidAmount);
 
       // Upload payment screenshot if provided
       let paymentScreenshotUrl = null;
@@ -221,7 +296,7 @@ export function UniversalCheckout() {
 
       // Prepare order data - for guest orders, set user_id to null explicitly
       const orderData = {
-        user_id: user?.id || null, // This will be null for guest orders
+        user_id: user?.id || null,
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
         contact_number: customerInfo.contact,
@@ -230,15 +305,15 @@ export function UniversalCheckout() {
         delivery_address: customerInfo.address,
         delivery_charge: deliveryPrice,
         subtotal: subtotal,
-        total_amount: totalAmount,
-        paid_amount: 0,
-        remaining_amount: totalAmount,
+        total_amount: finalTotal,
+        paid_amount: actualPaidAmount,
+        remaining_amount: finalTotal - actualPaidAmount,
         payment_method_id: selectedPayment,
-        payment_notes: paymentNotes || null,
         payment_screenshot_url: paymentScreenshotUrl,
         status: 'pending_payment' as const,
         combo_applied: false,
-        promocode_discount: 0
+        promocode_used: appliedPromo?.code || null,
+        promocode_discount: promoDiscount
       };
 
       console.log('Creating order with data:', orderData);
@@ -367,8 +442,22 @@ export function UniversalCheckout() {
   const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
   const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
   const subtotal = getTotalPrice();
-  const totalAmount = subtotal + deliveryPrice;
+  const totalWithDelivery = subtotal + deliveryPrice;
+  const promoDiscount = appliedPromo 
+    ? (totalWithDelivery * appliedPromo.discount_percentage) / 100 
+    : 0;
+  const finalTotal = totalWithDelivery - promoDiscount;
+  const minimumPayment = finalTotal * 0.2; // 20% minimum
   const selectedPaymentMethod = paymentMethods.find(p => p.id === selectedPayment);
+
+  const handlePaymentTypeChange = (type: 'full' | 'partial') => {
+    setPaymentType(type);
+    if (type === 'full') {
+      setPaidAmount(finalTotal.toString());
+    } else {
+      setPaidAmount('');
+    }
+  };
 
   if (loading) {
     return (
@@ -493,6 +582,38 @@ export function UniversalCheckout() {
               </CardContent>
             </Card>
 
+            {/* Promo Code Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Promo Code</CardTitle>
+                <CardDescription>Apply a promo code to get discount on your order</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2">
+                  <Input
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value)}
+                    placeholder="Enter promo code"
+                    disabled={isPromoApplied}
+                  />
+                  {!isPromoApplied ? (
+                    <Button onClick={applyPromoCode} disabled={!promoCode}>
+                      Apply
+                    </Button>
+                  ) : (
+                    <Button variant="outline" onClick={removePromoCode}>
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                {appliedPromo && (
+                  <p className="text-sm text-green-600 mt-1">
+                    Promo code "{appliedPromo.code}" applied - {appliedPromo.discount_percentage}% discount
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Payment Method</CardTitle>
@@ -521,10 +642,48 @@ export function UniversalCheckout() {
                       className="mx-auto max-w-48 h-48 object-contain border rounded"
                     />
                     <p className="text-sm text-gray-600 mt-2">
-                      Scan this QR code to make payment of <strong>Rs. {totalAmount.toFixed(2)}</strong>
+                      Scan this QR code to make payment
                     </p>
                   </div>
                 )}
+
+                {/* Payment Amount Options */}
+                <div>
+                  <Label>Payment Amount *</Label>
+                  <RadioGroup
+                    value={paymentType}
+                    onValueChange={handlePaymentTypeChange}
+                    className="mt-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="full" id="full" />
+                      <Label htmlFor="full">Pay Full Amount (Rs. {finalTotal.toFixed(2)})</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="partial" id="partial" />
+                      <Label htmlFor="partial">Pay Partial Amount (Min: Rs. {minimumPayment.toFixed(2)} - 20%)</Label>
+                    </div>
+                  </RadioGroup>
+
+                  {paymentType === 'partial' && (
+                    <div className="mt-3">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min={minimumPayment}
+                        max={finalTotal}
+                        value={paidAmount}
+                        onChange={(e) => setPaidAmount(e.target.value)}
+                        placeholder={`Enter amount (Min: Rs. ${minimumPayment.toFixed(2)})`}
+                        className={formErrors.paidAmount ? 'border-red-500' : ''}
+                      />
+                      {formErrors.paidAmount && <p className="text-sm text-red-500 mt-1">{formErrors.paidAmount}</p>}
+                      <p className="text-sm text-gray-600 mt-1">
+                        Range: Rs. {minimumPayment.toFixed(2)} - Rs. {finalTotal.toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 <div>
                   <Label>Payment Screenshot</Label>
@@ -598,10 +757,19 @@ export function UniversalCheckout() {
                     <span>Delivery Charge:</span>
                     <span>Rs. {deliveryPrice.toFixed(2)}</span>
                   </div>
+                  {appliedPromo && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Promo Discount ({appliedPromo.discount_percentage}%):</span>
+                      <span>-Rs. {promoDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
                     <span>Total:</span>
-                    <span>Rs. {totalAmount.toFixed(2)}</span>
+                    <span>Rs. {finalTotal.toFixed(2)}</span>
                   </div>
+                  <p className="text-sm text-gray-600">
+                    Minimum payment: Rs. {minimumPayment.toFixed(2)} (20%)
+                  </p>
                 </div>
 
                 <Button 
@@ -616,7 +784,7 @@ export function UniversalCheckout() {
                       Placing Order...
                     </>
                   ) : (
-                    `Place Order - Rs. ${totalAmount.toFixed(2)}`
+                    `Place Order - Rs. ${paymentType === 'full' ? finalTotal.toFixed(2) : (paidAmount ? parseFloat(paidAmount).toFixed(2) : minimumPayment.toFixed(2))}`
                   )}
                 </Button>
 
