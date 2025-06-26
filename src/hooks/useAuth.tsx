@@ -24,19 +24,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let initialLoadComplete = false;
 
     // Get initial session
     const getInitialSession = async () => {
       try {
+        console.log('Fetching initial session...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Error getting session:', error);
-          return;
+        } else {
+          console.log('Initial session:', session?.user?.email || 'No session');
         }
 
         if (mounted) {
-          console.log('Initial session:', session?.user?.email);
           setSession(session);
           setUser(session?.user ?? null);
           
@@ -48,19 +50,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Session fetch error:', error);
       } finally {
         if (mounted) {
+          initialLoadComplete = true;
           setIsLoading(false);
+          console.log('Initial auth check complete');
         }
       }
     };
-
-    getInitialSession();
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
 
-        console.log('Auth state changed:', event, session?.user?.email);
+        console.log('Auth state changed:', event, session?.user?.email || 'No session');
         
         setSession(session);
         setUser(session?.user ?? null);
@@ -71,10 +73,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUserProfile(null);
         }
         
-        // Only set loading to false after handling the auth state change
-        setIsLoading(false);
+        // Only set loading to false if initial load is complete
+        if (initialLoadComplete) {
+          setIsLoading(false);
+        }
       }
     );
+
+    getInitialSession();
 
     return () => {
       mounted = false;
@@ -84,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log('Fetching user profile for:', userId);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -95,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      console.log('User profile fetched:', data);
       setUserProfile(data);
     } catch (error) {
       console.error('Profile fetch error:', error);
