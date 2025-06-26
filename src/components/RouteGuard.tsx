@@ -20,19 +20,22 @@ export function RouteGuard({
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Don't redirect while still loading
     if (isLoading) return;
 
+    // Only redirect after we have confirmed the auth state
     if (requireAuth && !user) {
-      navigate(redirectTo);
+      navigate(redirectTo, { replace: true });
       return;
     }
 
-    if (requireAdmin && (!user || userProfile?.role !== 'admin')) {
-      navigate('/');
+    if (requireAdmin && (!user || !userProfile || userProfile.role !== 'admin')) {
+      navigate('/', { replace: true });
       return;
     }
   }, [user, userProfile, isLoading, requireAuth, requireAdmin, navigate, redirectTo]);
 
+  // Show loading while authentication is being checked
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -44,8 +47,9 @@ export function RouteGuard({
     );
   }
 
+  // Don't render anything if user should be redirected
   if (requireAuth && !user) return null;
-  if (requireAdmin && (!user || userProfile?.role !== 'admin')) return null;
+  if (requireAdmin && (!user || !userProfile || userProfile.role !== 'admin')) return null;
 
   return <>{children}</>;
 }
