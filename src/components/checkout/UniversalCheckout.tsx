@@ -245,19 +245,73 @@ export function UniversalCheckout() {
 
       console.log('Order created successfully:', orderResult);
 
-      // Create order items with proper pricing
-      const orderItems = cartItems.map(item => {
-        return {
+      // Create order items with better error handling and validation
+      const orderItems = [];
+      const orderItemDetails = [];
+
+      for (const item of cartItems) {
+        // Validate that the variant IDs exist if they're provided
+        let validColorVariantId = null;
+        let validSizeVariantId = null;
+
+        if (item.colorVariantId) {
+          const { data: colorVariant } = await supabase
+            .from('color_variants')
+            .select('id')
+            .eq('id', item.colorVariantId)
+            .single();
+          
+          if (colorVariant) {
+            validColorVariantId = item.colorVariantId;
+          } else {
+            console.warn(`Color variant ${item.colorVariantId} not found, setting to null`);
+          }
+        }
+
+        if (item.sizeVariantId) {
+          const { data: sizeVariant } = await supabase
+            .from('size_variants')
+            .select('id')
+            .eq('id', item.sizeVariantId)
+            .single();
+          
+          if (sizeVariant) {
+            validSizeVariantId = item.sizeVariantId;
+          } else {
+            console.warn(`Size variant ${item.sizeVariantId} not found, setting to null`);
+          }
+        }
+
+        // Create order item with validated variant IDs
+        const orderItem = {
           order_id: orderResult.id,
           product_id: item.productId,
-          color_variant_id: item.colorVariantId,
-          size_variant_id: item.sizeVariantId,
+          color_variant_id: validColorVariantId,
+          size_variant_id: validSizeVariantId,
           quantity: item.quantity
         };
-      });
+
+        orderItems.push(orderItem);
+
+        // Create order item details
+        const pricing = getItemPricing(item);
+        const orderItemDetail = {
+          order_id: orderResult.id,
+          product_name: item.productName,
+          color_name: item.colorName || '',
+          size_name: item.sizeName || '',
+          quantity: item.quantity,
+          unit_price: pricing.finalPrice,
+          total_price: pricing.finalPrice * item.quantity,
+          pricing_mode: pricing.mode
+        };
+
+        orderItemDetails.push(orderItemDetail);
+      }
 
       console.log('Creating order items:', orderItems.length);
 
+      // Insert order items
       const { error: itemsError } = await supabase
         .from('order_items')
         .insert(orderItems);
@@ -271,20 +325,6 @@ export function UniversalCheckout() {
       }
 
       // Create order item details
-      const orderItemDetails = cartItems.map(item => {
-        const pricing = getItemPricing(item);
-        return {
-          order_id: orderResult.id,
-          product_name: item.productName,
-          color_name: item.colorName || '',
-          size_name: item.sizeName || '',
-          quantity: item.quantity,
-          unit_price: pricing.finalPrice,
-          total_price: pricing.finalPrice * item.quantity,
-          pricing_mode: pricing.mode
-        };
-      });
-
       const { error: detailsError } = await supabase
         .from('order_item_details')
         .insert(orderItemDetails);
