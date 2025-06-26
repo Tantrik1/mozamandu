@@ -24,7 +24,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    let initialLoadComplete = false;
 
     // Get initial session
     const getInitialSession = async () => {
@@ -45,14 +44,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (session?.user) {
             await fetchUserProfile(session.user.id);
           }
+          
+          setIsLoading(false);
         }
       } catch (error) {
         console.error('Session fetch error:', error);
-      } finally {
         if (mounted) {
-          initialLoadComplete = true;
           setIsLoading(false);
-          console.log('Initial auth check complete');
         }
       }
     };
@@ -73,10 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUserProfile(null);
         }
         
-        // Only set loading to false if initial load is complete
-        if (initialLoadComplete) {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       }
     );
 
