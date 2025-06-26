@@ -265,7 +265,7 @@ export function UniversalCheckout() {
       console.log('Uploading payment screenshot:', filePath);
 
       const { error: uploadError } = await supabase.storage
-        .from('product-images')
+        .from('uploads')
         .upload(filePath, paymentScreenshot, {
           cacheControl: '3600',
           upsert: false
@@ -277,7 +277,7 @@ export function UniversalCheckout() {
       }
 
       const { data } = supabase.storage
-        .from('product-images')
+        .from('uploads')
         .getPublicUrl(filePath);
 
       console.log('Payment screenshot uploaded successfully:', data.publicUrl);
