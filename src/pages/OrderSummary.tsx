@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -82,9 +81,9 @@ export default function OrderSummary() {
         return;
       }
 
-      // Fetch order items
+      // Fetch order item details (formatted data)
       const { data: items, error: itemsError } = await supabase
-        .from('order_items')
+        .from('order_item_details')
         .select('*')
         .eq('order_id', orderId);
 
