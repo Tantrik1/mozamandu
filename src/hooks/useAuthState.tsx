@@ -15,6 +15,31 @@ export function useAuthState() {
 
     console.log('🔄 AuthState: Initializing auth state');
 
+    // Set up auth state listener first
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!isMounted) return;
+
+        console.log('🔄 AuthState: Auth state changed:', event, session?.user?.email || 'No session');
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // Use setTimeout to avoid blocking the auth state change
+          setTimeout(() => {
+            if (isMounted) {
+              fetchUserProfile(session.user.id);
+            }
+          }, 0);
+        } else {
+          clearUserProfile();
+        }
+        
+        setIsLoading(false);
+      }
+    );
+
     // Get initial session
     const getInitialSession = async () => {
       try {
@@ -28,14 +53,19 @@ export function useAuthState() {
 
         if (!isMounted) return;
 
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          await fetchUserProfile(session.user.id);
+        // Only set state if we don't already have a session from the listener
+        if (!user && !session) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setIsLoading(false);
+        } else if (session?.user) {
+          // Fetch profile for initial session
+          setTimeout(() => {
+            if (isMounted) {
+              fetchUserProfile(session.user.id);
+            }
+          }, 0);
         }
-        
-        setIsLoading(false);
       } catch (error) {
         console.error('❌ AuthState: Session initialization error:', error);
         if (isMounted) {
@@ -43,26 +73,6 @@ export function useAuthState() {
         }
       }
     };
-
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!isMounted) return;
-
-        console.log('🔄 AuthState: Auth state changed:', event, session?.user?.email || 'No session');
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          await fetchUserProfile(session.user.id);
-        } else {
-          clearUserProfile();
-        }
-        
-        setIsLoading(false);
-      }
-    );
 
     getInitialSession();
 

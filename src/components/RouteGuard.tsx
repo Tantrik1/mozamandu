@@ -39,12 +39,14 @@ export function RouteGuard({
     if (requireAuth && !user) {
       console.log('🔄 RouteGuard: Redirecting to auth - no user');
       navigate(redirectTo, { replace: true });
+      setShouldRender(false);
       return;
     }
 
     if (requireAdmin && (!user || !userProfile || userProfile.role !== 'admin')) {
       console.log('🔄 RouteGuard: Redirecting to home - not admin');
       navigate('/', { replace: true });
+      setShouldRender(false);
       return;
     }
 
@@ -65,7 +67,7 @@ export function RouteGuard({
   }
 
   // Don't render anything if we shouldn't
-  if (!shouldRender) {
+  if (!shouldRender && (requireAuth || requireAdmin)) {
     return null;
   }
 

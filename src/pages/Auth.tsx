@@ -48,15 +48,18 @@ export default function Auth() {
       userRole: userProfile?.role 
     });
 
-    // Only redirect if we have user data and auth is not loading
-    if (!isLoading && user && userProfile) {
-      console.log('✅ Auth page: User authenticated, redirecting to dashboard');
+    // Only redirect if we have user and auth is not loading
+    if (!isLoading && user) {
+      console.log('✅ Auth page: User authenticated, redirecting');
       
-      if (userProfile.role === 'admin') {
-        navigate('/admin', { replace: true });
-      } else {
-        navigate('/dashboard', { replace: true });
-      }
+      // Give a small delay to ensure profile is loaded
+      setTimeout(() => {
+        if (userProfile?.role === 'admin') {
+          navigate('/admin', { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
+      }, 100);
     }
   }, [user, userProfile, isLoading, navigate]);
 
