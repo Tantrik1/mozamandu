@@ -157,7 +157,10 @@ export function FeaturedProductsCarousel() {
             >
               {products.map((product) => (
                 <div key={product.id} className="w-1/4 flex-shrink-0 px-3">
-                  <ProductCard product={product} />
+                  <ProductCard 
+                    product={product} 
+                    subcategoryPrice={product.selling_price} 
+                  />
                 </div>
               ))}
             </div>
