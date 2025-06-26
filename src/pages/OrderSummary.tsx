@@ -28,6 +28,7 @@ interface OrderDetails {
   promocode_used: string | null;
   promocode_discount: number;
   payment_screenshot_url: string | null;
+  pricing_breakdown?: any;
 }
 
 interface OrderItem {
@@ -39,6 +40,7 @@ interface OrderItem {
   unit_price: number;
   total_price: number;
   pricing_mode: string;
+  pricing_details?: any;
 }
 
 export default function OrderSummary() {
@@ -80,14 +82,14 @@ export default function OrderSummary() {
         return;
       }
 
-      // Fetch order items
+      // Fetch order item details (for display)
       const { data: items, error: itemsError } = await supabase
-        .from('order_items')
+        .from('order_item_details')
         .select('*')
         .eq('order_id', orderId);
 
       if (itemsError) {
-        console.error('Error fetching order items:', itemsError);
+        console.error('Error fetching order item details:', itemsError);
         toast({
           title: "Error",
           description: "Failed to load order items",

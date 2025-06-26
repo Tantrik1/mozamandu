@@ -323,9 +323,32 @@ export function UniversalCheckout() {
         paymentScreenshotUrl = await uploadPaymentScreenshot();
       }
 
-      // Prepare order data - for guest orders, set user_id to null explicitly
+      // Create pricing breakdown
+      const pricingBreakdown = {
+        subtotal: subtotal,
+        delivery_charge: deliveryPrice,
+        promocode_discount: promocodeDiscount,
+        promocode_used: promocodeApplied ? promocode.toUpperCase() : null,
+        total_before_discount: beforeDiscountTotal,
+        final_total: totalAmount,
+        items: cartItems.map(item => {
+          const pricing = getItemPricing(item);
+          return {
+            product_name: item.productName,
+            color_name: item.colorName || null,
+            size_name: item.sizeName || null,
+            quantity: item.quantity,
+            unit_price: pricing.finalPrice,
+            total_price: pricing.finalPrice * item.quantity,
+            pricing_mode: pricing.mode,
+            pricing_description: pricing.description
+          };
+        })
+      };
+
+      // Prepare order data
       const orderData = {
-        user_id: user?.id || null, // This will be null for guest orders
+        user_id: user?.id || null,
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
         contact_number: customerInfo.contact,
@@ -340,10 +363,11 @@ export function UniversalCheckout() {
         payment_method_id: selectedPayment,
         payment_notes: paymentNotes || null,
         payment_screenshot_url: paymentScreenshotUrl,
-        status: 'pending',
+        status: 'pending_payment',
         combo_applied: false,
         promocode_used: promocodeApplied ? promocode.toUpperCase() : null,
-        promocode_discount: promocodeDiscount
+        promocode_discount: promocodeDiscount,
+        pricing_breakdown: pricingBreakdown
       };
 
       console.log('Creating order with data:', orderData);
@@ -362,23 +386,14 @@ export function UniversalCheckout() {
 
       console.log('Order created successfully:', order);
 
-      // Create order items with proper pricing
-      const orderItems = cartItems.map(item => {
-        const pricing = getItemPricing(item);
-        return {
-          order_id: order.id,
-          product_id: item.productId,
-          color_variant_id: item.colorVariantId,
-          size_variant_id: item.sizeVariantId,
-          product_name: item.productName,
-          color_name: item.colorName || '',
-          size_name: item.sizeName || '',
-          quantity: item.quantity,
-          unit_price: pricing.finalPrice,
-          total_price: pricing.finalPrice * item.quantity,
-          pricing_mode: pricing.mode
-        };
-      });
+      // Create order items for inventory management
+      const orderItems = cartItems.map(item => ({
+        order_id: order.id,
+        product_id: item.productId,
+        color_variant_id: item.colorVariantId,
+        size_variant_id: item.sizeVariantId,
+        quantity: item.quantity
+      }));
 
       console.log('Creating order items:', orderItems.length);
 
@@ -388,13 +403,47 @@ export function UniversalCheckout() {
 
       if (itemsError) {
         console.error('Order items creation error:', itemsError);
-        
         // Try to cleanup the order if items creation fails
         await supabase.from('orders').delete().eq('id', order.id);
         throw new Error(`Failed to create order items: ${itemsError.message}`);
       }
 
-      console.log('Order items created successfully');
+      // Create order item details for pricing and display
+      const orderItemDetails = cartItems.map(item => {
+        const pricing = getItemPricing(item);
+        return {
+          order_id: order.id,
+          product_name: item.productName,
+          color_name: item.colorName || null,
+          size_name: item.sizeName || null,
+          quantity: item.quantity,
+          unit_price: pricing.finalPrice,
+          total_price: pricing.finalPrice * item.quantity,
+          pricing_mode: pricing.mode,
+          pricing_details: {
+            description: pricing.description,
+            base_price: item.basePrice,
+            final_price: pricing.finalPrice,
+            discount_applied: pricing.finalPrice < item.basePrice,
+            breakdown: pricing.breakdown || []
+          }
+        };
+      });
+
+      console.log('Creating order item details:', orderItemDetails.length);
+
+      const { error: detailsError } = await supabase
+        .from('order_item_details')
+        .insert(orderItemDetails);
+
+      if (detailsError) {
+        console.error('Order item details creation error:', detailsError);
+        // Try to cleanup if details creation fails
+        await supabase.from('orders').delete().eq('id', order.id);
+        throw new Error(`Failed to create order item details: ${detailsError.message}`);
+      }
+
+      console.log('Order completed successfully');
 
       // Clear cart and redirect to order summary
       clearCart();

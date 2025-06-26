@@ -12,6 +12,13 @@ interface OrderItem {
   unit_price: number;
   total_price: number;
   pricing_mode: string;
+  pricing_details?: {
+    description?: string;
+    base_price?: number;
+    final_price?: number;
+    discount_applied?: boolean;
+    breakdown?: string[];
+  };
 }
 
 interface OrderDetails {
@@ -32,6 +39,15 @@ interface OrderDetails {
   combo_applied: boolean;
   promocode_used: string | null;
   promocode_discount: number;
+  pricing_breakdown?: {
+    subtotal: number;
+    delivery_charge: number;
+    promocode_discount: number;
+    promocode_used: string | null;
+    total_before_discount: number;
+    final_total: number;
+    items: any[];
+  };
 }
 
 interface OrderSummaryCardProps {
@@ -49,10 +65,27 @@ export function OrderSummaryCard({
 }: OrderSummaryCardProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
+      case 'processing': return 'bg-blue-100 text-blue-800';
+      case 'verified': return 'bg-purple-100 text-purple-800';
+      case 'in_delivery': return 'bg-orange-100 text-orange-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
+      case 'refunded': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending_payment': return 'Pending Payment';
+      case 'processing': return 'Processing';
+      case 'verified': return 'Verified';
+      case 'in_delivery': return 'In Delivery';
+      case 'delivered': return 'Delivered';
+      case 'cancelled': return 'Cancelled';
+      case 'refunded': return 'Refunded';
+      default: return status.toUpperCase();
     }
   };
 
@@ -62,7 +95,7 @@ export function OrderSummaryCard({
         <div className="flex justify-between items-center">
           <CardTitle>Order Summary</CardTitle>
           <Badge className={getStatusColor(orderDetails.status)}>
-            {orderDetails.status.toUpperCase()}
+            {getStatusLabel(orderDetails.status)}
           </Badge>
         </div>
       </CardHeader>
@@ -74,7 +107,7 @@ export function OrderSummaryCard({
             <div className="space-y-2 text-sm">
               <p><strong>Order Number:</strong> {orderDetails.order_number}</p>
               <p><strong>Order Date:</strong> {new Date(orderDetails.created_at).toLocaleDateString()}</p>
-              <p><strong>Status:</strong> {orderDetails.status}</p>
+              <p><strong>Status:</strong> {getStatusLabel(orderDetails.status)}</p>
             </div>
           </div>
           <div>
@@ -116,14 +149,24 @@ export function OrderSummaryCard({
                   )}
                   <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
                   {item.pricing_mode !== 'normal' && (
-                    <Badge variant="outline" className="text-xs">
-                      {item.pricing_mode}
-                    </Badge>
+                    <div className="mt-1">
+                      <Badge variant="outline" className="text-xs">
+                        {item.pricing_mode}
+                      </Badge>
+                      {item.pricing_details?.description && (
+                        <p className="text-xs text-green-600 mt-1">{item.pricing_details.description}</p>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div className="text-right">
                   <p className="font-medium">Rs. {item.total_price.toFixed(2)}</p>
                   <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
+                  {item.pricing_details?.discount_applied && item.pricing_details?.base_price && (
+                    <p className="text-xs text-gray-500 line-through">
+                      Rs. {(item.pricing_details.base_price * item.quantity).toFixed(2)}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
@@ -136,25 +179,53 @@ export function OrderSummaryCard({
         <div>
           <h3 className="font-semibold mb-3">Payment Summary</h3>
           <div className="space-y-2">
-            <div className="flex justify-between">
-              <span>Subtotal:</span>
-              <span>Rs. {orderDetails.subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Delivery Charge:</span>
-              <span>Rs. {orderDetails.delivery_charge.toFixed(2)}</span>
-            </div>
-            {orderDetails.promocode_discount > 0 && (
-              <div className="flex justify-between text-green-600">
-                <span>Discount ({orderDetails.promocode_used}):</span>
-                <span>-Rs. {orderDetails.promocode_discount.toFixed(2)}</span>
-              </div>
+            {/* Use pricing breakdown if available, otherwise fallback to individual fields */}
+            {orderDetails.pricing_breakdown ? (
+              <>
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>Rs. {orderDetails.pricing_breakdown.subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Delivery Charge:</span>
+                  <span>Rs. {orderDetails.pricing_breakdown.delivery_charge.toFixed(2)}</span>
+                </div>
+                {orderDetails.pricing_breakdown.promocode_discount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Discount ({orderDetails.pricing_breakdown.promocode_used}):</span>
+                    <span>-Rs. {orderDetails.pricing_breakdown.promocode_discount.toFixed(2)}</span>
+                  </div>
+                )}
+                <Separator />
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total Amount:</span>
+                  <span>Rs. {orderDetails.pricing_breakdown.final_total.toFixed(2)}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>Rs. {orderDetails.subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Delivery Charge:</span>
+                  <span>Rs. {orderDetails.delivery_charge.toFixed(2)}</span>
+                </div>
+                {orderDetails.promocode_discount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Discount ({orderDetails.promocode_used}):</span>
+                    <span>-Rs. {orderDetails.promocode_discount.toFixed(2)}</span>
+                  </div>
+                )}
+                <Separator />
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total Amount:</span>
+                  <span>Rs. {orderDetails.total_amount.toFixed(2)}</span>
+                </div>
+              </>
             )}
-            <Separator />
-            <div className="flex justify-between text-lg font-bold">
-              <span>Total Amount:</span>
-              <span>Rs. {orderDetails.total_amount.toFixed(2)}</span>
-            </div>
+            
             <div className="flex justify-between text-green-600">
               <span>Paid Amount:</span>
               <span>Rs. {orderDetails.paid_amount.toFixed(2)}</span>
