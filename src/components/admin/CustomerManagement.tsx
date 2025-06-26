@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -350,7 +349,7 @@ export function CustomerManagement() {
                                           <TableHead>Status</TableHead>
                                           <TableHead>Date</TableHead>
                                         </TableRow>
-                                      </TableTableHeader>
+                                      </TableHeader>
                                       <TableBody>
                                         {customerOrders.map((order) => (
                                           <TableRow key={order.id}>
