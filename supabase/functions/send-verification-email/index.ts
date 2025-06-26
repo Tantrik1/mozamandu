@@ -86,6 +86,18 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (signUpError) {
       console.error('Error creating user:', signUpError);
+      
+      // Handle specific error cases
+      if (signUpError.message.includes('User already registered')) {
+        return new Response(JSON.stringify({ 
+          success: false,
+          error: "An account with this email already exists. Please sign in instead or use a different email."
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+      
       return new Response(JSON.stringify({ 
         success: false,
         error: signUpError.message || "Failed to create user account"
@@ -115,9 +127,10 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const confirmationToken = linkData.properties.hashed_token;
-    console.log('Generated confirmation token for email verification');
+    const confirmationUrl = linkData.properties.action_link;
+    console.log('Generated confirmation token and URL for email verification');
 
-    // Send custom confirmation email with the token
+    // Send custom confirmation email with both token and link
     const emailResponse = await resend.emails.send({
       from: "Mozamandu <onboarding@resend.dev>",
       to: [email.trim()],
@@ -132,15 +145,26 @@ const handler = async (req: Request): Promise<Response> => {
           <h2 style="color: #333; text-align: center;">Welcome ${name || 'there'}!</h2>
           
           <p style="color: #333; font-size: 16px;">
-            Thank you for signing up! Please use the confirmation token below to activate your account:
+            Thank you for signing up! Please click the button below to verify your email address:
           </p>
           
-          <div style="background: #f8f9fa; padding: 20px; text-align: center; margin: 30px 0; border-radius: 8px; border: 2px dashed #dc2626;">
-            <h1 style="color: #dc2626; font-size: 24px; margin: 0; letter-spacing: 2px; font-family: monospace; word-break: break-all;">${confirmationToken}</h1>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${confirmationUrl}" 
+               style="background: #dc2626; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+              Verify Email Address
+            </a>
           </div>
           
           <p style="color: #666; font-size: 14px;">
-            This token will expire in 24 hours for security reasons.
+            If the button doesn't work, you can also copy and paste this link into your browser:
+          </p>
+          
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; word-break: break-all;">
+            <a href="${confirmationUrl}" style="color: #dc2626; text-decoration: none;">${confirmationUrl}</a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px;">
+            This link will expire in 24 hours for security reasons.
           </p>
           
           <p style="color: #666; font-size: 14px;">
@@ -160,7 +184,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     return new Response(JSON.stringify({ 
       success: true,
-      message: "Account created! Please check your email for the confirmation token."
+      message: "Account created! Please check your email for the verification link."
     }), {
       status: 200,
       headers: {

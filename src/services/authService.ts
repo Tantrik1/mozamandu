@@ -49,42 +49,38 @@ export const authService = {
 
   async signUp(email: string, password: string, fullName: string) {
     try {
-      console.log('🔄 AuthService: Starting sign up');
+      console.log('🔄 AuthService: Starting sign up via custom edge function');
       
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          data: {
-            full_name: fullName.trim(),
-            role: 'customer'
-          },
-          emailRedirectTo: `${window.location.origin}/auth?confirmed=true`
+      // Call the custom edge function to handle user creation and email sending
+      const { data, error } = await supabase.functions.invoke('send-verification-email', {
+        body: {
+          email: email.trim().toLowerCase(),
+          password,
+          name: fullName.trim(),
         }
       });
 
       if (error) {
         console.error('❌ AuthService: Sign up error:', error);
-        
-        if (error.message.includes('User already registered')) {
-          return { error: { message: 'An account with this email already exists. Please sign in instead or use a different email.' } };
-        }
-        
-        return { error };
+        return { error: { message: error.message || 'Failed to create account. Please try again.' } };
       }
 
-      console.log('✅ AuthService: Sign up successful', data);
+      if (data && !data.success) {
+        console.error('❌ AuthService: Sign up failed:', data.error);
+        return { error: { message: data.error || 'Failed to create account. Please try again.' } };
+      }
+
+      console.log('✅ AuthService: Sign up successful via edge function');
       
-      // Always show email verification message for new signups
       toast({
-        title: "Check Your Email",
-        description: "We've sent you a verification link. Please check your email and click the link to verify your account before signing in.",
+        title: "Account Created!",
+        description: "We've sent you a verification email. Please check your inbox and verify your account before signing in.",
       });
       
       return { error: null };
     } catch (error) {
       console.error('❌ AuthService: Sign up exception:', error);
-      return { error };
+      return { error: { message: 'Failed to create account. Please try again.' } };
     }
   },
 
