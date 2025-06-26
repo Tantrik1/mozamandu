@@ -25,10 +25,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // Get initial session
-    const getInitialSession = async () => {
+    const initializeAuth = async () => {
       try {
-        console.log('Fetching initial session...');
+        console.log('Initializing auth...');
+        
+        // Get initial session
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -42,12 +43,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(session?.user ?? null);
           
           if (session?.user) {
-            await fetchUserProfile(session.user.id);
+            // Fetch user profile without waiting
+            fetchUserProfile(session.user.id).catch(console.error);
           }
+          
+          // Set loading to false regardless of profile fetch
+          setIsLoading(false);
         }
       } catch (error) {
-        console.error('Session fetch error:', error);
-      } finally {
+        console.error('Auth initialization error:', error);
         if (mounted) {
           setIsLoading(false);
         }
@@ -65,14 +69,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          fetchUserProfile(session.user.id);
+          fetchUserProfile(session.user.id).catch(console.error);
         } else {
           setUserProfile(null);
         }
+        
+        // Auth state change means we're no longer loading
+        setIsLoading(false);
       }
     );
 
-    getInitialSession();
+    initializeAuth();
 
     return () => {
       mounted = false;
@@ -110,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       
       if (error) {
+        setIsLoading(false);
         return { error };
       }
       
@@ -120,9 +128,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       return { error: null };
     } catch (error) {
-      return { error };
-    } finally {
       setIsLoading(false);
+      return { error };
     }
   };
 
@@ -143,14 +150,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
+        setIsLoading(false);
         return { error };
       }
 
+      setIsLoading(false);
       return { error: null };
     } catch (error) {
-      return { error };
-    } finally {
       setIsLoading(false);
+      return { error };
     }
   };
 

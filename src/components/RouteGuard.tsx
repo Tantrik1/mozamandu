@@ -21,18 +21,27 @@ export function RouteGuard({
 
   useEffect(() => {
     // Don't redirect while still loading
-    if (isLoading) return;
+    if (isLoading) {
+      console.log('RouteGuard: Still loading auth state...');
+      return;
+    }
+
+    console.log('RouteGuard: Auth loaded, checking permissions...', { user: !!user, userProfile, requireAuth, requireAdmin });
 
     // Only redirect after we have confirmed the auth state
     if (requireAuth && !user) {
+      console.log('RouteGuard: Auth required but no user, redirecting to', redirectTo);
       navigate(redirectTo, { replace: true });
       return;
     }
 
     if (requireAdmin && (!user || !userProfile || userProfile.role !== 'admin')) {
+      console.log('RouteGuard: Admin required but user is not admin, redirecting to home');
       navigate('/', { replace: true });
       return;
     }
+
+    console.log('RouteGuard: All checks passed, rendering children');
   }, [user, userProfile, isLoading, requireAuth, requireAdmin, navigate, redirectTo]);
 
   // Show loading while authentication is being checked

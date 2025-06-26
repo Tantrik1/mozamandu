@@ -32,46 +32,59 @@ export function LatestProducts() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchLatestProducts();
-  }, []);
+    let mounted = true;
+    
+    const fetchLatestProducts = async () => {
+      try {
+        console.log('Fetching latest products...');
+        const { data, error } = await supabase
+          .from('products')
+          .select(`
+            id,
+            name,
+            description,
+            selling_price,
+            cost_price,
+            created_at,
+            image_url,
+            has_color_variants,
+            has_size_variants,
+            stock_quantity,
+            category_id,
+            subcategory_id,
+            is_featured,
+            categories (name),
+            subcategories (name, selling_price)
+          `)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(8);
 
-  const fetchLatestProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          description,
-          selling_price,
-          cost_price,
-          created_at,
-          image_url,
-          has_color_variants,
-          has_size_variants,
-          stock_quantity,
-          category_id,
-          subcategory_id,
-          is_featured,
-          categories (name),
-          subcategories (name, selling_price)
-        `)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(8);
-
-      if (error) {
+        if (error) {
+          console.error('Error fetching latest products:', error);
+          throw error;
+        }
+        
+        console.log('Latest products fetched:', data?.length || 0);
+        
+        if (mounted) {
+          setLatestProducts(data || []);
+        }
+      } catch (error) {
         console.error('Error fetching latest products:', error);
-        throw error;
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-      
-      setLatestProducts(data || []);
-    } catch (error) {
-      console.error('Error fetching latest products:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    fetchLatestProducts();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   if (loading) {
     return (

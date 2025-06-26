@@ -18,29 +18,42 @@ export function BrowseSubcategories() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchSubcategories();
-  }, []);
+    let mounted = true;
+    
+    const fetchSubcategories = async () => {
+      try {
+        console.log('Fetching subcategories...');
+        const { data, error } = await supabase
+          .from('subcategories')
+          .select('id, name, description, image_url, selling_price, minimum_quantity')
+          .eq('status', 'on')
+          .limit(6);
 
-  const fetchSubcategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('subcategories')
-        .select('id, name, description, image_url, selling_price, minimum_quantity')
-        .eq('status', 'on')
-        .limit(6);
-
-      if (error) {
+        if (error) {
+          console.error('Error fetching subcategories:', error);
+          throw error;
+        }
+        
+        console.log('Subcategories fetched:', data?.length || 0);
+        
+        if (mounted) {
+          setSubcategories(data || []);
+        }
+      } catch (error) {
         console.error('Error fetching subcategories:', error);
-        throw error;
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-      
-      setSubcategories(data || []);
-    } catch (error) {
-      console.error('Error fetching subcategories:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    fetchSubcategories();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   if (loading) {
     return (

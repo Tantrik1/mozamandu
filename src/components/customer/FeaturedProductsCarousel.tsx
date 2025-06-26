@@ -32,45 +32,58 @@ export function FeaturedProductsCarousel() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchFeaturedProducts();
-  }, []);
+    let mounted = true;
+    
+    const fetchFeaturedProducts = async () => {
+      try {
+        console.log('Fetching featured products...');
+        const { data, error } = await supabase
+          .from('products')
+          .select(`
+            id,
+            name,
+            description,
+            selling_price,
+            cost_price,
+            is_featured,
+            image_url,
+            has_color_variants,
+            has_size_variants,
+            stock_quantity,
+            category_id,
+            subcategory_id,
+            categories (name),
+            subcategories (name, selling_price)
+          `)
+          .eq('is_featured', true)
+          .eq('status', 'active')
+          .limit(8);
 
-  const fetchFeaturedProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          description,
-          selling_price,
-          cost_price,
-          is_featured,
-          image_url,
-          has_color_variants,
-          has_size_variants,
-          stock_quantity,
-          category_id,
-          subcategory_id,
-          categories (name),
-          subcategories (name, selling_price)
-        `)
-        .eq('is_featured', true)
-        .eq('status', 'active')
-        .limit(8);
-
-      if (error) {
+        if (error) {
+          console.error('Error fetching featured products:', error);
+          throw error;
+        }
+        
+        console.log('Featured products fetched:', data?.length || 0);
+        
+        if (mounted) {
+          setFeaturedProducts(data || []);
+        }
+      } catch (error) {
         console.error('Error fetching featured products:', error);
-        throw error;
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-      
-      setFeaturedProducts(data || []);
-    } catch (error) {
-      console.error('Error fetching featured products:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    fetchFeaturedProducts();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   if (loading) {
     return (
