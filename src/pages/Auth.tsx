@@ -39,16 +39,31 @@ export default function Auth() {
     }
   }, [searchParams]);
 
+  // Handle redirect for authenticated users - improved logic
   useEffect(() => {
-    if (user && userProfile && !isLoading) {
-      // Role-based redirect
-      if (userProfile.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
+    console.log('🔄 Auth page: Checking auth state', { 
+      user: !!user, 
+      userProfile: !!userProfile, 
+      isLoading,
+      userRole: userProfile?.role 
+    });
+
+    // Only redirect if we have both user and profile data and auth is not loading
+    if (user && userProfile && !isLoading && !authLoading) {
+      console.log('✅ Auth page: User authenticated, redirecting...', userProfile.role);
+      
+      // Small delay to ensure auth state is fully settled
+      setTimeout(() => {
+        if (userProfile.role === 'admin') {
+          console.log('🔄 Auth page: Redirecting to admin dashboard');
+          navigate('/admin', { replace: true });
+        } else {
+          console.log('🔄 Auth page: Redirecting to customer dashboard');
+          navigate('/dashboard', { replace: true });
+        }
+      }, 100);
     }
-  }, [user, userProfile, isLoading, navigate]);
+  }, [user, userProfile, isLoading, authLoading, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,21 +73,26 @@ export default function Auth() {
       return;
     }
     
+    console.log('🔄 Auth page: Starting sign in process');
     setAuthLoading(true);
     setErrors({});
     
     const { error } = await signIn(signInData.email, signInData.password);
     if (error) {
+      console.error('❌ Auth page: Sign in error:', error);
       setErrors({ form: error.message });
+    } else {
+      console.log('✅ Auth page: Sign in successful');
     }
     
     setAuthLoading(false);
   };
 
   const handleSignUpSuccess = () => {
-    // User will be redirected to home by SignUpForm
+    console.log('✅ Auth page: Sign up successful, will redirect via useEffect');
   };
 
+  // Show loading while auth is initializing
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">

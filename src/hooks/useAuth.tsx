@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (session?.user) {
           console.log('🔄 AuthProvider: Fetching user profile');
-          fetchUserProfile(session.user.id).catch(console.error);
+          await fetchUserProfile(session.user.id);
         }
         
       } catch (error) {
@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (!isMounted) return;
 
         console.log('🔄 AuthProvider: Auth state changed:', event, session?.user?.email || 'No session');
@@ -80,7 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          fetchUserProfile(session.user.id).catch(console.error);
+          console.log('🔄 AuthProvider: Fetching user profile after auth change');
+          await fetchUserProfile(session.user.id);
         } else {
           setUserProfile(null);
         }
