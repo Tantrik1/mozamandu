@@ -10,38 +10,10 @@ import { Eye, Search, Filter, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { OrderSummaryCard } from '@/components/shared/OrderSummaryCard';
+import { BaseOrder, OrderItem, OrderStatus } from '@/types/order';
 
-interface Order {
-  id: string;
-  order_number: string;
-  customer_name: string;
-  customer_email: string;
-  contact_number: string;
-  whatsapp_number: string | null;
-  total_amount: number;
-  status: string;
-  created_at: string;
-  combo_applied: boolean;
-  promocode_used: string | null;
-  promocode_discount: number;
-  payment_screenshot_url: string | null;
+interface Order extends BaseOrder {
   user_id: string | null;
-  delivery_address: string;
-  delivery_charge: number;
-  subtotal: number;
-  pricing_breakdown?: any;
-}
-
-interface OrderItem {
-  id: string;
-  product_name: string;
-  color_name: string | null;
-  size_name: string | null;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  pricing_mode: string;
-  pricing_details?: any;
 }
 
 export function OrderManagement() {
@@ -114,7 +86,7 @@ export function OrderManagement() {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
       const { error } = await supabase
         .from('orders')
@@ -167,7 +139,7 @@ export function OrderManagement() {
       case 'delivered': return 'Delivered';
       case 'cancelled': return 'Cancelled';
       case 'refunded': return 'Refunded';
-      default: return status.toUpperCase();
+      default: return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
     }
   };
 
@@ -293,7 +265,6 @@ export function OrderManagement() {
                 <TableHead>Customer</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Total</TableHead>
-                <TableHead>Paid</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Actions</TableHead>
@@ -316,14 +287,9 @@ export function OrderManagement() {
                   </TableCell>
                   <TableCell>Rs. {order.total_amount.toFixed(2)}</TableCell>
                   <TableCell>
-                    <div>
-                      <p className="text-green-600">Rs. {order.total_amount.toFixed(2)}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
                     <Select
                       value={order.status}
-                      onValueChange={(value) => updateOrderStatus(order.id, value)}
+                      onValueChange={(value) => updateOrderStatus(order.id, value as OrderStatus)}
                     >
                       <SelectTrigger className="w-40">
                         <SelectValue>
@@ -364,10 +330,7 @@ export function OrderManagement() {
                         </DialogHeader>
                         {selectedOrder && orderItems[selectedOrder.id] && (
                           <OrderSummaryCard
-                            orderDetails={{
-                              ...selectedOrder,
-                              whatsapp_number: selectedOrder.whatsapp_number || selectedOrder.contact_number
-                            }}
+                            orderDetails={selectedOrder}
                             orderItems={orderItems[selectedOrder.id]}
                             showActions={false}
                           />

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,37 +7,10 @@ import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
 import { OrderSummaryCard } from '@/components/shared/OrderSummaryCard';
 import { toast } from '@/hooks/use-toast';
+import { BaseOrder, OrderItem } from '@/types/order';
 
-interface OrderDetails {
-  id: string;
-  order_number: string;
-  customer_name: string;
-  customer_email: string;
-  contact_number: string;
-  whatsapp_number: string;
-  delivery_address: string;
-  total_amount: number;
-  subtotal: number;
-  delivery_charge: number;
-  status: string;
-  created_at: string;
-  combo_applied: boolean;
-  promocode_used: string | null;
-  promocode_discount: number;
-  payment_screenshot_url: string | null;
-  pricing_breakdown?: any;
-}
-
-interface OrderItem {
-  id: string;
-  product_name: string;
-  color_name: string | null;
-  size_name: string | null;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  pricing_mode: string;
-  pricing_details?: any;
+interface OrderDetails extends BaseOrder {
+  // OrderDetails is now just an alias for BaseOrder
 }
 
 export default function OrderSummary() {

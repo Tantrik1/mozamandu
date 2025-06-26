@@ -2,57 +2,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-
-interface OrderItem {
-  id: string;
-  product_name: string;
-  color_name: string | null;
-  size_name: string | null;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  pricing_mode: string;
-  pricing_details?: {
-    description?: string;
-    base_price?: number;
-    final_price?: number;
-    discount_applied?: boolean;
-    breakdown?: string[];
-  };
-}
-
-interface OrderDetails {
-  id: string;
-  order_number: string;
-  customer_name: string;
-  customer_email: string;
-  contact_number: string;
-  whatsapp_number: string | null;
-  delivery_address: string;
-  total_amount: number;
-  paid_amount: number;
-  remaining_amount: number;
-  subtotal: number;
-  delivery_charge: number;
-  status: string;
-  created_at: string;
-  combo_applied: boolean;
-  promocode_used: string | null;
-  promocode_discount: number;
-  payment_screenshot_url?: string | null;
-  pricing_breakdown?: {
-    subtotal: number;
-    delivery_charge: number;
-    promocode_discount: number;
-    promocode_used: string | null;
-    total_before_discount: number;
-    final_total: number;
-    items: any[];
-  };
-}
+import { BaseOrder, OrderItem } from '@/types/order';
 
 interface OrderSummaryCardProps {
-  orderDetails: OrderDetails;
+  orderDetails: BaseOrder;
   orderItems: OrderItem[];
   showActions?: boolean;
   className?: string;
@@ -229,17 +182,6 @@ export function OrderSummaryCard({
                   <span>Rs. {Number(orderDetails.total_amount).toFixed(2)}</span>
                 </div>
               </>
-            )}
-            
-            <div className="flex justify-between text-green-600">
-              <span>Paid Amount:</span>
-              <span>Rs. {Number(orderDetails.paid_amount).toFixed(2)}</span>
-            </div>
-            {orderDetails.remaining_amount > 0 && (
-              <div className="flex justify-between text-orange-600">
-                <span>Remaining Amount:</span>
-                <span>Rs. {Number(orderDetails.remaining_amount).toFixed(2)}</span>
-              </div>
             )}
           </div>
         </div>

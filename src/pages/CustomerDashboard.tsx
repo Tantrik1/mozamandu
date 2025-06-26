@@ -6,28 +6,12 @@ import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, CreditCard, MapPin, Package, Receipt } from 'lucide-react';
+import { CalendarDays, CreditCard, MapPin, Package, Receipt, User } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { BaseOrder } from '@/types/order';
 
-interface CustomerOrder {
-  id: string;
-  order_number: string;
-  customer_name: string;
-  customer_email: string;
-  contact_number: string;
-  whatsapp_number: string | null;
-  delivery_address: string;
-  total_amount: number;
-  subtotal: number;
-  delivery_charge: number;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  combo_applied: boolean;
-  promocode_used: string | null;
-  promocode_discount: number;
-  payment_screenshot_url: string | null;
-  pricing_breakdown?: any;
+interface CustomerOrder extends BaseOrder {
+  user_id?: string;
 }
 
 export default function CustomerDashboard() {
@@ -168,7 +152,6 @@ export default function CustomerDashboard() {
                 <User className="h-5 w-5 text-gray-500" />
                 <span>{user.email}</span>
               </div>
-              {/* Add more account details here */}
             </CardContent>
           </Card>
         </section>

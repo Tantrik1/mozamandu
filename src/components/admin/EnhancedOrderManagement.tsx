@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,40 +11,10 @@ import { Eye, Search, Filter, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { OrderSummaryCard } from '@/components/shared/OrderSummaryCard';
+import { BaseOrder, OrderItem, OrderStatus } from '@/types/order';
 
-type OrderStatus = 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled';
-
-interface Order {
-  id: string;
-  order_number: string;
-  customer_name: string;
-  customer_email: string;
-  contact_number: string;
-  whatsapp_number: string | null;
-  delivery_address: string;
-  total_amount: number;
-  subtotal: number;
-  delivery_charge: number;
-  status: OrderStatus;
-  created_at: string;
-  updated_at: string;
-  combo_applied: boolean;
-  promocode_used: string | null;
-  promocode_discount: number;
-  payment_screenshot_url: string | null;
-  pricing_breakdown?: any;
-}
-
-interface OrderItem {
-  id: string;
-  product_name: string;
-  color_name: string | null;
-  size_name: string | null;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  pricing_mode: string;
-  pricing_details?: any;
+interface Order extends BaseOrder {
+  // Order is now just an alias for BaseOrder
 }
 
 export function EnhancedOrderManagement() {
@@ -161,25 +132,29 @@ export function EnhancedOrderManagement() {
     }
   };
 
-  const getStatusColor = (status: OrderStatus) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
-      case 'payment_confirmed': return 'bg-blue-100 text-blue-800';
-      case 'on_delivery': return 'bg-orange-100 text-orange-800';
+      case 'processing': return 'bg-blue-100 text-blue-800';
+      case 'verified': return 'bg-purple-100 text-purple-800';
+      case 'in_delivery': return 'bg-orange-100 text-orange-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
+      case 'refunded': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getStatusLabel = (status: OrderStatus) => {
+  const getStatusLabel = (status: string) => {
     switch (status) {
       case 'pending_payment': return 'Pending Payment';
-      case 'payment_confirmed': return 'Payment Confirmed';
-      case 'on_delivery': return 'On Delivery';
+      case 'processing': return 'Processing';
+      case 'verified': return 'Verified';
+      case 'in_delivery': return 'In Delivery';
       case 'delivered': return 'Delivered';
       case 'cancelled': return 'Cancelled';
-      default: return status;
+      case 'refunded': return 'Refunded';
+      default: return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
     }
   };
 
@@ -273,10 +248,12 @@ export function EnhancedOrderManagement() {
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                  <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
-                  <SelectItem value="on_delivery">On Delivery</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="verified">Verified</SelectItem>
+                  <SelectItem value="in_delivery">In Delivery</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="refunded">Refunded</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -330,10 +307,12 @@ export function EnhancedOrderManagement() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                        <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
-                        <SelectItem value="on_delivery">On Delivery</SelectItem>
+                        <SelectItem value="processing">Processing</SelectItem>
+                        <SelectItem value="verified">Verified</SelectItem>
+                        <SelectItem value="in_delivery">In Delivery</SelectItem>
                         <SelectItem value="delivered">Delivered</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="refunded">Refunded</SelectItem>
                       </SelectContent>
                     </Select>
                   </TableCell>
