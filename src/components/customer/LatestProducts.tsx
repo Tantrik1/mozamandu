@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductCard } from './ProductCard';
@@ -49,7 +50,7 @@ export function LatestProducts() {
             stock_quantity,
             category_id,
             subcategory_id,
-            subcategory:subcategories(id, name)
+            subcategory:subcategories!inner(id, name)
           `)
           .eq('status', 'active')
           .order('created_at', { ascending: false })
@@ -61,8 +62,22 @@ export function LatestProducts() {
           console.error('❌ LatestProducts: Fetch error:', error);
           setProducts([]);
         } else {
-          console.log('✅ LatestProducts: Latest products loaded:', data?.length || 0);
-          setProducts(data || []);
+          console.log('✅ LatestProducts: Raw data received:', data);
+          
+          // Transform the data to ensure proper structure
+          const transformedProducts = (data || []).map(product => ({
+            ...product,
+            selling_price: product.selling_price || 0,
+            cost_price: product.cost_price || 0,
+            is_featured: product.is_featured || false,
+            has_color_variants: product.has_color_variants || false,
+            has_size_variants: product.has_size_variants || false,
+            stock_quantity: product.stock_quantity || 0,
+            subcategory: product.subcategory || { id: '', name: 'Unknown' }
+          }));
+          
+          console.log('✅ LatestProducts: Transformed products:', transformedProducts.length);
+          setProducts(transformedProducts);
         }
 
       } catch (error) {
@@ -121,6 +136,7 @@ export function LatestProducts() {
           </div>
           <div className="text-center py-12">
             <p className="text-gray-500">No products available at the moment.</p>
+            <p className="text-sm text-gray-400 mt-2">Please check back later or contact support if this issue persists.</p>
           </div>
         </div>
       </section>
@@ -141,7 +157,7 @@ export function LatestProducts() {
             <ProductCard 
               key={product.id} 
               product={product} 
-              subcategoryPrice={product.selling_price} 
+              subcategoryPrice={product.selling_price || 0} 
             />
           ))}
         </div>

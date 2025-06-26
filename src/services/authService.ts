@@ -16,8 +16,12 @@ export const authService = {
         console.error('❌ AuthService: Sign in error:', error);
         
         // Handle specific error cases
-        if (error.message.includes('Email not confirmed')) {
+        if (error.message.includes('Email not confirmed') || error.message.includes('email_not_confirmed')) {
           return { error: { message: 'Please verify your email before signing in. Check your inbox for the verification link.' } };
+        }
+        
+        if (error.message.includes('Invalid login credentials')) {
+          return { error: { message: 'Invalid email or password. Please check your credentials and try again.' } };
         }
         
         return { error };
@@ -61,18 +65,21 @@ export const authService = {
 
       if (error) {
         console.error('❌ AuthService: Sign up error:', error);
+        
+        if (error.message.includes('User already registered')) {
+          return { error: { message: 'An account with this email already exists. Please sign in instead or use a different email.' } };
+        }
+        
         return { error };
       }
 
       console.log('✅ AuthService: Sign up successful', data);
       
-      // If user needs to confirm email
-      if (data.user && !data.user.email_confirmed_at) {
-        toast({
-          title: "Check Your Email",
-          description: "We've sent you a verification link. Please check your email and click the link to verify your account before signing in.",
-        });
-      }
+      // Always show email verification message for new signups
+      toast({
+        title: "Check Your Email",
+        description: "We've sent you a verification link. Please check your email and click the link to verify your account before signing in.",
+      });
       
       return { error: null };
     } catch (error) {
@@ -86,7 +93,9 @@ export const authService = {
       console.log('🔄 AuthService: Starting sign out');
       
       // Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({
+        scope: 'local' // Only sign out locally, not from all sessions
+      });
       
       if (error) {
         console.error('❌ AuthService: Sign out error:', error);

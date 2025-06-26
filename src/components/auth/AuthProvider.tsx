@@ -18,22 +18,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     let isMounted = true;
-    let loadingTimeout: NodeJS.Timeout;
 
     console.log('🔄 AuthProvider: Starting auth initialization');
 
-    // Set timeout fallback for loading state
-    loadingTimeout = setTimeout(() => {
-      if (isMounted && isLoading) {
-        console.warn('⚠️ AuthProvider: Loading timeout after 10 seconds, forcing completion');
-        setIsLoading(false);
-      }
-    }, 10000);
-
     const initializeAuth = async () => {
       try {
-        console.log('🔄 AuthProvider: Getting initial session');
-        
+        // Get initial session
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -44,24 +34,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (!isMounted) return;
 
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          console.log('🔄 AuthProvider: Fetching user profile');
+        // Only set session if user email is confirmed
+        if (session?.user?.email_confirmed_at) {
+          setSession(session);
+          setUser(session.user);
+          
+          // Fetch user profile
           const profile = await authService.fetchUserProfile(session.user.id);
           if (isMounted) {
             setUserProfile(profile);
+          }
+        } else {
+          // Clear any invalid session
+          setSession(null);
+          setUser(null);
+          setUserProfile(null);
+          if (session) {
+            console.log('🔄 AuthProvider: Clearing unconfirmed session');
+            await supabase.auth.signOut();
           }
         }
         
       } catch (error) {
         console.error('❌ AuthProvider: Auth initialization error:', error);
+        if (isMounted) {
+          setSession(null);
+          setUser(null);
+          setUserProfile(null);
+        }
       } finally {
         if (isMounted) {
-          console.log('✅ AuthProvider: Auth initialization complete, setting loading to false');
+          console.log('✅ AuthProvider: Auth initialization complete');
           setIsLoading(false);
-          clearTimeout(loadingTimeout);
         }
       }
     };
@@ -73,34 +77,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         console.log('🔄 AuthProvider: Auth state changed:', event, session?.user?.email || 'No session');
         
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Check if user email is confirmed
-          if (!session.user.email_confirmed_at) {
-            console.warn('⚠️ AuthProvider: User email not confirmed');
-            toast({
-              title: "Email Not Verified",
-              description: "Please check your email and verify your account before signing in.",
-              variant: "destructive",
-            });
-            await supabase.auth.signOut();
-            return;
-          }
-          
-          const profile = await authService.fetchUserProfile(session.user.id);
-          if (isMounted) {
-            setUserProfile(profile);
-          }
-        } else {
+        // Handle different auth events
+        if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
           setUserProfile(null);
+          setIsLoading(false);
+          return;
+        }
+
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          // Only proceed if email is confirmed
+          if (session?.user?.email_confirmed_at) {
+            setSession(session);
+            setUser(session.user);
+            
+            // Fetch user profile asynchronously
+            setTimeout(async () => {
+              if (isMounted) {
+                const profile = await authService.fetchUserProfile(session.user.id);
+                if (isMounted) {
+                  setUserProfile(profile);
+                }
+              }
+            }, 0);
+          } else {
+            console.warn('⚠️ AuthProvider: User email not confirmed');
+            setSession(null);
+            setUser(null);
+            setUserProfile(null);
+            if (session) {
+              await supabase.auth.signOut();
+            }
+          }
         }
         
-        // Ensure loading is always set to false after auth state change
-        console.log('✅ AuthProvider: Auth state change complete, setting loading to false');
         setIsLoading(false);
-        clearTimeout(loadingTimeout);
       }
     );
 
@@ -109,7 +121,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       console.log('🧹 AuthProvider: Cleanup');
       isMounted = false;
-      clearTimeout(loadingTimeout);
       subscription.unsubscribe();
     };
   }, []);
@@ -131,7 +142,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signOut = async () => {
     setIsLoading(true);
     
-    // Clear local state first
+    // Clear local state immediately
     setUser(null);
     setSession(null);
     setUserProfile(null);

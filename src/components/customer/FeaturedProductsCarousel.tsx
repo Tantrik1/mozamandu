@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductCard } from './ProductCard';
@@ -52,7 +53,7 @@ export function FeaturedProductsCarousel() {
             stock_quantity,
             category_id,
             subcategory_id,
-            subcategory:subcategories(id, name)
+            subcategory:subcategories!inner(id, name)
           `)
           .eq('status', 'active')
           .eq('is_featured', true)
@@ -65,8 +66,22 @@ export function FeaturedProductsCarousel() {
           console.error('❌ FeaturedProductsCarousel: Fetch error:', error);
           setProducts([]);
         } else {
-          console.log('✅ FeaturedProductsCarousel: Featured products loaded:', data?.length || 0);
-          setProducts(data || []);
+          console.log('✅ FeaturedProductsCarousel: Raw data received:', data);
+          
+          // Transform the data to ensure proper structure
+          const transformedProducts = (data || []).map(product => ({
+            ...product,
+            selling_price: product.selling_price || 0,
+            cost_price: product.cost_price || 0,
+            is_featured: product.is_featured || false,
+            has_color_variants: product.has_color_variants || false,
+            has_size_variants: product.has_size_variants || false,
+            stock_quantity: product.stock_quantity || 0,
+            subcategory: product.subcategory || { id: '', name: 'Unknown' }
+          }));
+          
+          console.log('✅ FeaturedProductsCarousel: Transformed products:', transformedProducts.length);
+          setProducts(transformedProducts);
         }
 
       } catch (error) {
@@ -104,7 +119,7 @@ export function FeaturedProductsCarousel() {
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
             <p className="mt-4 text-lg text-gray-600">
-              Discover our handpicked selection of premium socks
+              Discover our handpicked selection of premium products
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -128,11 +143,12 @@ export function FeaturedProductsCarousel() {
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
             <p className="mt-4 text-lg text-gray-600">
-              Discover our handpicked selection of premium socks
+              Discover our handpicked selection of premium products
             </p>
           </div>
           <div className="text-center py-12">
             <p className="text-gray-500">No featured products available at the moment.</p>
+            <p className="text-sm text-gray-400 mt-2">Please check back later or contact support if this issue persists.</p>
           </div>
         </div>
       </section>
@@ -145,7 +161,7 @@ export function FeaturedProductsCarousel() {
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
           <p className="mt-4 text-lg text-gray-600">
-            Discover our handpicked selection of premium socks
+            Discover our handpicked selection of premium products
           </p>
         </div>
         
@@ -159,7 +175,7 @@ export function FeaturedProductsCarousel() {
                 <div key={product.id} className="w-1/4 flex-shrink-0 px-3">
                   <ProductCard 
                     product={product} 
-                    subcategoryPrice={product.selling_price} 
+                    subcategoryPrice={product.selling_price || 0} 
                   />
                 </div>
               ))}

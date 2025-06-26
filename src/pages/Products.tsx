@@ -15,6 +15,7 @@ interface Product {
   selling_price: number;
   is_featured: boolean;
   image_url: string;
+  stock_quantity: number;
   categories: { name: string };
   subcategories: { name: string; selling_price: number };
 }
@@ -28,26 +29,42 @@ export default function Products() {
   }, []);
 
   const fetchProducts = async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select(`
-        *,
-        categories (name),
-        subcategories (name, selling_price)
-      `)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false });
+    try {
+      console.log('🔄 Products: Starting data fetch');
+      
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          categories!inner (name),
+          subcategories!inner (name, selling_price)
+        `)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
 
-    if (error) {
+      if (error) {
+        console.error('❌ Products: Fetch error:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch products. Please try again later.",
+          variant: "destructive",
+        });
+        setProducts([]);
+      } else {
+        console.log('✅ Products: Data loaded:', data?.length || 0);
+        setProducts(data || []);
+      }
+    } catch (error) {
+      console.error('❌ Products: Unexpected error:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch products",
+        description: "An unexpected error occurred while loading products.",
         variant: "destructive",
       });
-    } else {
-      setProducts(data || []);
+      setProducts([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const getProductPrice = (product: Product) => {
@@ -59,8 +76,12 @@ export default function Products() {
       <div className="min-h-screen bg-gray-50">
         <CustomerHeader />
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-          <div className="text-center">Loading products...</div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading products...</p>
+          </div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -89,12 +110,16 @@ export default function Products() {
                       src={product.image_url} 
                       alt={product.name}
                       className="w-full h-48 object-cover rounded-t-lg"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.nextElementSibling?.classList.remove('hidden');
+                      }}
                     />
-                  ) : (
-                    <div className="w-full h-48 bg-gray-200 rounded-t-lg flex items-center justify-center">
-                      <span className="text-gray-400">No Image</span>
-                    </div>
-                  )}
+                  ) : null}
+                  <div className="w-full h-48 bg-gray-200 rounded-t-lg flex items-center justify-center">
+                    <span className="text-gray-400">No Image</span>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-2">
@@ -120,6 +145,11 @@ export default function Products() {
                     <span className="text-xl font-bold text-red-600">
                       Rs. {getProductPrice(product)}
                     </span>
+                    {product.stock_quantity !== null && (
+                      <span className="text-sm text-gray-500">
+                        Stock: {product.stock_quantity}
+                      </span>
+                    )}
                   </div>
                 </CardContent>
               </Card>
