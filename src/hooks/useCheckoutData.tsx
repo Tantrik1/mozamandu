@@ -19,11 +19,27 @@ export function useCheckoutData() {
   const [deliveryCharges, setDeliveryCharges] = useState<DeliveryCharge[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchCheckoutData = async () => {
+    let isMounted = true;
+    let loadingTimeout: NodeJS.Timeout;
+
+    console.log('🔄 useCheckoutData: Starting checkout data fetch');
     setLoading(true);
+    setError(null);
+
+    // Set timeout fallback
+    loadingTimeout = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn('⚠️ useCheckoutData: Loading timeout after 10 seconds');
+        setError('Loading took too long. Please try again.');
+        setLoading(false);
+      }
+    }, 10000);
+
     try {
-      console.log('Fetching checkout data...');
+      console.log('🔄 useCheckoutData: Fetching delivery charges and payment methods...');
       
       const [deliveryRes, paymentRes] = await Promise.all([
         supabase
@@ -38,37 +54,65 @@ export function useCheckoutData() {
           .order('name')
       ]);
 
+      if (!isMounted) return;
+
       if (deliveryRes.error) {
-        console.error('Error fetching delivery charges:', deliveryRes.error);
+        console.error('❌ useCheckoutData: Error fetching delivery charges:', deliveryRes.error);
+        // Check for RLS issues
+        if (deliveryRes.error.code === 'PGRST116' || deliveryRes.error.message.includes('row-level security')) {
+          console.warn('⚠️ useCheckoutData: RLS may be blocking delivery charges access');
+        }
         toast({
           title: "Error",
           description: "Failed to load delivery options",
           variant: "destructive",
         });
       } else {
+        console.log('✅ useCheckoutData: Delivery charges fetched:', deliveryRes.data?.length || 0);
         setDeliveryCharges(deliveryRes.data || []);
       }
 
       if (paymentRes.error) {
-        console.error('Error fetching payment methods:', paymentRes.error);
+        console.error('❌ useCheckoutData: Error fetching payment methods:', paymentRes.error);
+        // Check for RLS issues
+        if (paymentRes.error.code === 'PGRST116' || paymentRes.error.message.includes('row-level security')) {
+          console.warn('⚠️ useCheckoutData: RLS may be blocking payment methods access');
+        }
         toast({
           title: "Error",
           description: "Failed to load payment methods",
           variant: "destructive",
         });
       } else {
+        console.log('✅ useCheckoutData: Payment methods fetched:', paymentRes.data?.length || 0);
         setPaymentMethods(paymentRes.data || []);
       }
+
+      if (deliveryRes.error || paymentRes.error) {
+        setError('Some checkout data could not be loaded. Please try again.');
+      }
     } catch (error) {
-      console.error('Unexpected error fetching checkout data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load checkout data",
-        variant: "destructive",
-      });
+      console.error('❌ useCheckoutData: Unexpected error fetching checkout data:', error);
+      if (isMounted) {
+        setError('Failed to load checkout data. Please try again.');
+        toast({
+          title: "Error",
+          description: "Failed to load checkout data",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setLoading(false);
+      if (isMounted) {
+        console.log('✅ useCheckoutData: Setting loading to false');
+        setLoading(false);
+        clearTimeout(loadingTimeout);
+      }
     }
+
+    return () => {
+      isMounted = false;
+      clearTimeout(loadingTimeout);
+    };
   };
 
   useEffect(() => {
@@ -79,6 +123,7 @@ export function useCheckoutData() {
     deliveryCharges,
     paymentMethods,
     loading,
+    error,
     refetch: fetchCheckoutData
   };
 }

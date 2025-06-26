@@ -19,36 +19,92 @@ export function DashboardStats() {
     totalRevenue: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+    let loadingTimeout: NodeJS.Timeout;
+
+    console.log('🔄 DashboardStats: Starting stats fetch');
+
+    // Set timeout fallback
+    loadingTimeout = setTimeout(() => {
+      if (isMounted && isLoading) {
+        console.warn('⚠️ DashboardStats: Loading timeout after 10 seconds');
+        setError('Loading took too long. Please try again.');
+        setIsLoading(false);
+      }
+    }, 10000);
+
+    const fetchStats = async () => {
+      try {
+        console.log('🔄 DashboardStats: Fetching dashboard stats...');
+        const [ordersResponse, productsResponse, customersResponse] = await Promise.all([
+          supabase.from('orders').select('total_amount'),
+          supabase.from('products').select('id'),
+          supabase.from('profiles').select('id').eq('role', 'customer'),
+        ]);
+
+        if (!isMounted) return;
+
+        // Check for errors
+        if (ordersResponse.error) {
+          console.error('❌ DashboardStats: Error fetching orders:', ordersResponse.error);
+          if (ordersResponse.error.code === 'PGRST116' || ordersResponse.error.message.includes('row-level security')) {
+            console.warn('⚠️ DashboardStats: RLS may be blocking orders access');
+          }
+        }
+
+        if (productsResponse.error) {
+          console.error('❌ DashboardStats: Error fetching products:', productsResponse.error);
+          if (productsResponse.error.code === 'PGRST116' || productsResponse.error.message.includes('row-level security')) {
+            console.warn('⚠️ DashboardStats: RLS may be blocking products access');
+          }
+        }
+
+        if (customersResponse.error) {
+          console.error('❌ DashboardStats: Error fetching customers:', customersResponse.error);
+          if (customersResponse.error.code === 'PGRST116' || customersResponse.error.message.includes('row-level security')) {
+            console.warn('⚠️ DashboardStats: RLS may be blocking customers access');
+          }
+        }
+
+        const totalOrders = ordersResponse.data?.length || 0;
+        const totalProducts = productsResponse.data?.length || 0;
+        const totalCustomers = customersResponse.data?.length || 0;
+        const totalRevenue = ordersResponse.data?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
+
+        console.log('✅ DashboardStats: Stats calculated:', { totalOrders, totalProducts, totalCustomers, totalRevenue });
+
+        setStats({
+          totalOrders,
+          totalProducts,
+          totalCustomers,
+          totalRevenue,
+        });
+        setError(null);
+      } catch (error) {
+        console.error('❌ DashboardStats: Exception during stats fetch:', error);
+        if (isMounted) {
+          setError('Failed to load dashboard stats. Please try again.');
+        }
+      } finally {
+        if (isMounted) {
+          console.log('✅ DashboardStats: Setting loading to false');
+          setIsLoading(false);
+          clearTimeout(loadingTimeout);
+        }
+      }
+    };
+
     fetchStats();
+
+    return () => {
+      console.log('🧹 DashboardStats: Cleanup');
+      isMounted = false;
+      clearTimeout(loadingTimeout);
+    };
   }, []);
-
-  const fetchStats = async () => {
-    try {
-      const [ordersResponse, productsResponse, customersResponse] = await Promise.all([
-        supabase.from('orders').select('total_amount'),
-        supabase.from('products').select('id'),
-        supabase.from('profiles').select('id').eq('role', 'customer'),
-      ]);
-
-      const totalOrders = ordersResponse.data?.length || 0;
-      const totalProducts = productsResponse.data?.length || 0;
-      const totalCustomers = customersResponse.data?.length || 0;
-      const totalRevenue = ordersResponse.data?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
-
-      setStats({
-        totalOrders,
-        totalProducts,
-        totalCustomers,
-        totalRevenue,
-      });
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const statCards = [
     {
@@ -94,6 +150,24 @@ export function DashboardStats() {
             </CardContent>
           </Card>
         ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <Card className="col-span-full">
+          <CardContent className="p-6 text-center">
+            <p className="text-red-600 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+            >
+              Retry
+            </button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

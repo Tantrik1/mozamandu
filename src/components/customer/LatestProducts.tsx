@@ -30,13 +30,26 @@ interface Product {
 export function LatestProducts() {
   const [latestProducts, setLatestProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
+    let isMounted = true;
+    let loadingTimeout: NodeJS.Timeout;
+
+    console.log('🔄 LatestProducts: Starting data fetch');
+
+    // Set timeout fallback
+    loadingTimeout = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn('⚠️ LatestProducts: Loading timeout after 10 seconds');
+        setError('Loading took too long. Please refresh the page.');
+        setLoading(false);
+      }
+    }, 10000);
     
     const fetchLatestProducts = async () => {
       try {
-        console.log('Fetching latest products...');
+        console.log('🔄 LatestProducts: Fetching latest products...');
         const { data, error } = await supabase
           .from('products')
           .select(`
@@ -61,20 +74,29 @@ export function LatestProducts() {
           .limit(8);
 
         if (error) {
-          console.error('Error fetching latest products:', error);
+          console.error('❌ LatestProducts: Error fetching latest products:', error);
+          // Check for RLS issues
+          if (error.code === 'PGRST116' || error.message.includes('row-level security')) {
+            console.warn('⚠️ LatestProducts: RLS may be blocking access');
+          }
           throw error;
         }
         
-        console.log('Latest products fetched:', data?.length || 0);
-        
-        if (mounted) {
-          setLatestProducts(data || []);
-        }
+        if (!isMounted) return;
+
+        console.log('✅ LatestProducts: Latest products fetched:', data?.length || 0);
+        setLatestProducts(data || []);
+        setError(null);
       } catch (error) {
-        console.error('Error fetching latest products:', error);
+        console.error('❌ LatestProducts: Exception during fetch:', error);
+        if (isMounted) {
+          setError('Failed to load latest products. Please try again.');
+        }
       } finally {
-        if (mounted) {
+        if (isMounted) {
+          console.log('✅ LatestProducts: Setting loading to false');
           setLoading(false);
+          clearTimeout(loadingTimeout);
         }
       }
     };
@@ -82,7 +104,9 @@ export function LatestProducts() {
     fetchLatestProducts();
 
     return () => {
-      mounted = false;
+      console.log('🧹 LatestProducts: Cleanup');
+      isMounted = false;
+      clearTimeout(loadingTimeout);
     };
   }, []);
 
@@ -103,6 +127,25 @@ export function LatestProducts() {
                 <Skeleton className="h-4 w-1/2" />
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold mb-4">Latest Products</h2>
+            <p className="text-red-600 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+            >
+              Retry
+            </button>
           </div>
         </div>
       </section>

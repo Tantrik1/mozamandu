@@ -1,5 +1,5 @@
 
-import { useEffect, ReactNode } from 'react';
+import { useEffect, ReactNode, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
@@ -18,34 +18,66 @@ export function RouteGuard({
 }: RouteGuardProps) {
   const { user, userProfile, isLoading } = useAuth();
   const navigate = useNavigate();
+  const [guardLoading, setGuardLoading] = useState(true);
 
   useEffect(() => {
-    // Don't redirect while still loading
-    if (isLoading) {
-      console.log('RouteGuard: Still loading auth state...');
-      return;
-    }
+    let isMounted = true;
+    let loadingTimeout: NodeJS.Timeout;
 
-    console.log('RouteGuard: Auth loaded, checking permissions...', { user: !!user, userProfile, requireAuth, requireAdmin });
+    console.log('🔄 RouteGuard: Starting guard check');
 
-    // Only redirect after we have confirmed the auth state
-    if (requireAuth && !user) {
-      console.log('RouteGuard: Auth required but no user, redirecting to', redirectTo);
-      navigate(redirectTo, { replace: true });
-      return;
-    }
+    // Set timeout fallback
+    loadingTimeout = setTimeout(() => {
+      if (isMounted && guardLoading) {
+        console.warn('⚠️ RouteGuard: Loading timeout after 10 seconds, forcing completion');
+        setGuardLoading(false);
+      }
+    }, 10000);
 
-    if (requireAdmin && (!user || !userProfile || userProfile.role !== 'admin')) {
-      console.log('RouteGuard: Admin required but user is not admin, redirecting to home');
-      navigate('/', { replace: true });
-      return;
-    }
+    const checkPermissions = () => {
+      // Wait for auth to finish loading
+      if (isLoading) {
+        console.log('🔄 RouteGuard: Waiting for auth to complete');
+        return;
+      }
 
-    console.log('RouteGuard: All checks passed, rendering children');
+      if (!isMounted) return;
+
+      console.log('🔄 RouteGuard: Auth loaded, checking permissions...', { 
+        user: !!user, 
+        userProfile: !!userProfile, 
+        requireAuth, 
+        requireAdmin 
+      });
+
+      // Check auth requirements
+      if (requireAuth && !user) {
+        console.log('🔄 RouteGuard: Auth required but no user, redirecting to', redirectTo);
+        navigate(redirectTo, { replace: true });
+        return;
+      }
+
+      if (requireAdmin && (!user || !userProfile || userProfile.role !== 'admin')) {
+        console.log('🔄 RouteGuard: Admin required but user is not admin, redirecting to home');
+        navigate('/', { replace: true });
+        return;
+      }
+
+      console.log('✅ RouteGuard: All checks passed, clearing guard loading');
+      setGuardLoading(false);
+      clearTimeout(loadingTimeout);
+    };
+
+    checkPermissions();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(loadingTimeout);
+    };
   }, [user, userProfile, isLoading, requireAuth, requireAdmin, navigate, redirectTo]);
 
-  // Show loading while authentication is being checked
-  if (isLoading) {
+  // Show loading while authentication or guard is checking
+  if (isLoading || guardLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">

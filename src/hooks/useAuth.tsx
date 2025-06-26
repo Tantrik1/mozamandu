@@ -23,37 +23,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    let mounted = true;
+    let isMounted = true;
+    let loadingTimeout: NodeJS.Timeout;
+
+    console.log('🔄 AuthProvider: Starting auth initialization');
+
+    // Set timeout fallback for loading state
+    loadingTimeout = setTimeout(() => {
+      if (isMounted && isLoading) {
+        console.warn('⚠️ AuthProvider: Loading timeout after 10 seconds, forcing completion');
+        setIsLoading(false);
+      }
+    }, 10000);
 
     const initializeAuth = async () => {
       try {
-        console.log('Initializing auth...');
+        console.log('🔄 AuthProvider: Getting initial session');
         
-        // Get initial session
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Error getting session:', error);
+          console.error('❌ AuthProvider: Error getting session:', error);
         } else {
-          console.log('Initial session:', session?.user?.email || 'No session');
+          console.log('✅ AuthProvider: Initial session retrieved:', session?.user?.email || 'No session');
         }
 
-        if (mounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
-          
-          if (session?.user) {
-            // Fetch user profile without waiting
-            fetchUserProfile(session.user.id).catch(console.error);
-          }
-          
-          // Set loading to false regardless of profile fetch
-          setIsLoading(false);
+        if (!isMounted) return;
+
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          console.log('🔄 AuthProvider: Fetching user profile');
+          fetchUserProfile(session.user.id).catch(console.error);
         }
+        
       } catch (error) {
-        console.error('Auth initialization error:', error);
-        if (mounted) {
+        console.error('❌ AuthProvider: Auth initialization error:', error);
+      } finally {
+        if (isMounted) {
+          console.log('✅ AuthProvider: Auth initialization complete, setting loading to false');
           setIsLoading(false);
+          clearTimeout(loadingTimeout);
         }
       }
     };
@@ -61,9 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (!mounted) return;
+        if (!isMounted) return;
 
-        console.log('Auth state changed:', event, session?.user?.email || 'No session');
+        console.log('🔄 AuthProvider: Auth state changed:', event, session?.user?.email || 'No session');
         
         setSession(session);
         setUser(session?.user ?? null);
@@ -74,22 +85,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUserProfile(null);
         }
         
-        // Auth state change means we're no longer loading
+        // Ensure loading is always set to false after auth state change
+        console.log('✅ AuthProvider: Auth state change complete, setting loading to false');
         setIsLoading(false);
+        clearTimeout(loadingTimeout);
       }
     );
 
     initializeAuth();
 
     return () => {
-      mounted = false;
+      console.log('🧹 AuthProvider: Cleanup');
+      isMounted = false;
+      clearTimeout(loadingTimeout);
       subscription.unsubscribe();
     };
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
+    let isMounted = true;
+    
     try {
-      console.log('Fetching user profile for:', userId);
+      console.log('🔄 AuthProvider: Fetching user profile for:', userId);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -97,30 +114,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (error) {
-        console.error('Error fetching user profile:', error);
+        console.error('❌ AuthProvider: Error fetching user profile:', error);
+        // Check if it's an RLS issue
+        if (error.code === 'PGRST116' || error.message.includes('row-level security')) {
+          console.warn('⚠️ AuthProvider: RLS may be blocking profile access');
+        }
         return;
       }
 
-      console.log('User profile fetched:', data);
+      if (!isMounted) return;
+
+      console.log('✅ AuthProvider: User profile fetched:', data);
       setUserProfile(data);
     } catch (error) {
-      console.error('Profile fetch error:', error);
+      console.error('❌ AuthProvider: Profile fetch error:', error);
     }
+    
+    return () => {
+      isMounted = false;
+    };
   };
 
   const signIn = async (email: string, password: string) => {
+    let isMounted = true;
+    
     try {
+      console.log('🔄 AuthProvider: Starting sign in');
       setIsLoading(true);
+      
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
       
+      if (!isMounted) return { error };
+      
       if (error) {
+        console.error('❌ AuthProvider: Sign in error:', error);
         setIsLoading(false);
         return { error };
       }
       
+      console.log('✅ AuthProvider: Sign in successful');
       toast({
         title: "Welcome back!",
         description: "You have successfully signed in.",
@@ -128,13 +163,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       return { error: null };
     } catch (error) {
-      setIsLoading(false);
+      console.error('❌ AuthProvider: Sign in exception:', error);
+      if (isMounted) {
+        setIsLoading(false);
+      }
       return { error };
     }
+    
+    return () => {
+      isMounted = false;
+    };
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
+    let isMounted = true;
+    
     try {
+      console.log('🔄 AuthProvider: Starting sign up');
       setIsLoading(true);
       
       const { error } = await supabase.auth.signUp({
@@ -149,21 +194,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
 
+      if (!isMounted) return { error };
+
       if (error) {
+        console.error('❌ AuthProvider: Sign up error:', error);
         setIsLoading(false);
         return { error };
       }
 
+      console.log('✅ AuthProvider: Sign up successful');
       setIsLoading(false);
       return { error: null };
     } catch (error) {
-      setIsLoading(false);
+      console.error('❌ AuthProvider: Sign up exception:', error);
+      if (isMounted) {
+        setIsLoading(false);
+      }
       return { error };
     }
+    
+    return () => {
+      isMounted = false;
+    };
   };
 
   const signOut = async () => {
+    let isMounted = true;
+    
     try {
+      console.log('🔄 AuthProvider: Starting sign out');
       setIsLoading(true);
       
       // Clear local state first
@@ -175,7 +234,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        console.error('Sign out error:', error);
+        console.error('❌ AuthProvider: Sign out error:', error);
+      } else {
+        console.log('✅ AuthProvider: Sign out successful');
       }
       
       toast({
@@ -186,10 +247,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Force redirect to home page
       window.location.href = '/';
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error('❌ AuthProvider: Sign out exception:', error);
     } finally {
-      setIsLoading(false);
+      if (isMounted) {
+        setIsLoading(false);
+      }
     }
+    
+    return () => {
+      isMounted = false;
+    };
   };
 
   return (
