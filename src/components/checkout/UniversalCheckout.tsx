@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,7 +37,7 @@ interface PromoCode {
 export function UniversalCheckout() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { cartItems, getTotalPrice, clearCart } = useRobustCart();
+  const { cartItems, getTotalPrice, clearCart, getItemPricing } = useRobustCart();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -254,7 +255,7 @@ export function UniversalCheckout() {
       const promocodeDiscount = getPromocodeDiscount();
       const totalAmount = getFinalTotal();
 
-      // Create pricing breakdown
+      // Create pricing breakdown with correct property names
       const pricingBreakdown = {
         subtotal,
         delivery_charge: deliveryCharge,
@@ -262,14 +263,17 @@ export function UniversalCheckout() {
         promocode_used: selectedPromocode?.code || null,
         total_before_discount: subtotal + deliveryCharge,
         final_total: totalAmount,
-        items: cartItems.map(item => ({
-          product_name: item.product_name,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          total_price: item.total_price,
-          pricing_mode: item.pricing_mode || 'normal',
-          pricing_details: item.pricing_details || null
-        }))
+        items: cartItems.map(item => {
+          const pricing = getItemPricing(item);
+          return {
+            product_name: item.productName,
+            quantity: item.quantity,
+            unit_price: pricing.finalPrice / item.quantity,
+            total_price: pricing.finalPrice,
+            pricing_mode: pricing.mode,
+            pricing_details: pricing.breakdown || null
+          };
+        })
       };
 
       // Create order
@@ -311,12 +315,12 @@ export function UniversalCheckout() {
 
       console.log('Order created successfully:', orderResult);
 
-      // Create order items (for inventory tracking)
+      // Create order items (for inventory tracking) with correct property names
       const orderItemsData = cartItems.map(item => ({
         order_id: orderResult.id,
-        product_id: item.product_id,
-        color_variant_id: item.color_variant_id || null,
-        size_variant_id: item.size_variant_id || null,
+        product_id: item.productId,
+        color_variant_id: item.colorVariantId || null,
+        size_variant_id: item.sizeVariantId || null,
         quantity: item.quantity
       }));
 
@@ -329,18 +333,21 @@ export function UniversalCheckout() {
         throw itemsError;
       }
 
-      // Create order item details (for display)
-      const orderItemDetailsData = cartItems.map(item => ({
-        order_id: orderResult.id,
-        product_name: item.product_name,
-        color_name: item.color_name || null,
-        size_name: item.size_name || null,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        total_price: item.total_price,
-        pricing_mode: item.pricing_mode || 'normal',
-        pricing_details: item.pricing_details || null
-      }));
+      // Create order item details (for display) with correct property names
+      const orderItemDetailsData = cartItems.map(item => {
+        const pricing = getItemPricing(item);
+        return {
+          order_id: orderResult.id,
+          product_name: item.productName,
+          color_name: item.colorName || null,
+          size_name: item.sizeName || null,
+          quantity: item.quantity,
+          unit_price: pricing.finalPrice / item.quantity,
+          total_price: pricing.finalPrice,
+          pricing_mode: pricing.mode,
+          pricing_details: pricing.breakdown || null
+        };
+      });
 
       const { error: detailsError } = await supabase
         .from('order_item_details')
@@ -596,18 +603,21 @@ export function UniversalCheckout() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {cartItems.map((item) => (
-                  <div key={`${item.product_id}-${item.color_variant_id || 'no-color'}-${item.size_variant_id || 'no-size'}`} 
-                       className="flex justify-between">
-                    <div>
-                      <p className="font-medium">{item.product_name}</p>
-                      {item.color_name && <p className="text-sm text-gray-600">Color: {item.color_name}</p>}
-                      {item.size_name && <p className="text-sm text-gray-600">Size: {item.size_name}</p>}
-                      <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                {cartItems.map((item) => {
+                  const pricing = getItemPricing(item);
+                  return (
+                    <div key={`${item.productId}-${item.colorVariantId || 'no-color'}-${item.sizeVariantId || 'no-size'}`} 
+                         className="flex justify-between">
+                      <div>
+                        <p className="font-medium">{item.productName}</p>
+                        {item.colorName && <p className="text-sm text-gray-600">Color: {item.colorName}</p>}
+                        {item.sizeName && <p className="text-sm text-gray-600">Size: {item.sizeName}</p>}
+                        <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                      </div>
+                      <p className="font-medium">Rs. {pricing.finalPrice.toFixed(2)}</p>
                     </div>
-                    <p className="font-medium">Rs. {Number(item.total_price).toFixed(2)}</p>
-                  </div>
-                ))}
+                  );
+                })}
                 
                 <Separator />
                 
