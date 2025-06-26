@@ -1,3 +1,4 @@
+
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,7 +25,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // Get initial session first
     const initializeAuth = async () => {
       try {
         console.log('Initializing auth...');
@@ -43,14 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (session?.user) {
             await fetchUserProfile(session.user.id);
           }
-          
-          // Set loading to false after initial check
-          setIsLoading(false);
-          console.log('Auth initialization complete');
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
+      } finally {
         if (mounted) {
+          console.log('Auth initialization complete, setting loading to false');
           setIsLoading(false);
         }
       }
