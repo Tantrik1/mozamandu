@@ -305,83 +305,51 @@ export type Database = {
         }
         Relationships: []
       }
-      order_item_details: {
+      order_items: {
         Row: {
           color_name: string | null
-          created_at: string | null
+          color_variant_id: string | null
+          created_at: string
           id: string
           order_id: string
-          pricing_details: Json | null
           pricing_mode: string
+          product_id: string
           product_name: string
           quantity: number
           size_name: string | null
+          size_variant_id: string | null
           total_price: number
           unit_price: number
         }
         Insert: {
           color_name?: string | null
-          created_at?: string | null
+          color_variant_id?: string | null
+          created_at?: string
           id?: string
           order_id: string
-          pricing_details?: Json | null
           pricing_mode?: string
+          product_id: string
           product_name: string
           quantity: number
           size_name?: string | null
+          size_variant_id?: string | null
           total_price: number
           unit_price: number
         }
         Update: {
           color_name?: string | null
-          created_at?: string | null
+          color_variant_id?: string | null
+          created_at?: string
           id?: string
           order_id?: string
-          pricing_details?: Json | null
           pricing_mode?: string
+          product_id?: string
           product_name?: string
           quantity?: number
           size_name?: string | null
+          size_variant_id?: string | null
           total_price?: number
           unit_price?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_item_details_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      order_items: {
-        Row: {
-          color_variant_id: string | null
-          created_at: string | null
-          id: string
-          order_id: string
-          product_id: string
-          quantity: number
-          size_variant_id: string | null
-        }
-        Insert: {
-          color_variant_id?: string | null
-          created_at?: string | null
-          id?: string
-          order_id: string
-          product_id: string
-          quantity: number
-          size_variant_id?: string | null
-        }
-        Update: {
-          color_variant_id?: string | null
-          created_at?: string | null
-          id?: string
-          order_id?: string
-          product_id?: string
-          quantity?: number
-          size_variant_id?: string | null
         }
         Relationships: [
           {
@@ -417,8 +385,9 @@ export type Database = {
       orders: {
         Row: {
           combo_applied: boolean | null
+          combo_details: Json | null
           contact_number: string
-          created_at: string | null
+          created_at: string
           customer_email: string
           customer_name: string
           delivery_address: string
@@ -428,23 +397,23 @@ export type Database = {
           order_number: string
           paid_amount: number
           payment_method_id: string | null
-          payment_percentage: number
+          payment_notes: string | null
           payment_screenshot_url: string | null
-          pricing_breakdown: Json | null
           promocode_discount: number | null
           promocode_used: string | null
           remaining_amount: number
-          status: Database["public"]["Enums"]["order_status"]
+          status: string
           subtotal: number
           total_amount: number
-          updated_at: string | null
+          updated_at: string
           user_id: string | null
           whatsapp_number: string | null
         }
         Insert: {
           combo_applied?: boolean | null
+          combo_details?: Json | null
           contact_number: string
-          created_at?: string | null
+          created_at?: string
           customer_email: string
           customer_name: string
           delivery_address: string
@@ -454,23 +423,23 @@ export type Database = {
           order_number?: string
           paid_amount?: number
           payment_method_id?: string | null
-          payment_percentage?: number
+          payment_notes?: string | null
           payment_screenshot_url?: string | null
-          pricing_breakdown?: Json | null
           promocode_discount?: number | null
           promocode_used?: string | null
           remaining_amount?: number
-          status?: Database["public"]["Enums"]["order_status"]
-          subtotal?: number
-          total_amount?: number
-          updated_at?: string | null
+          status?: string
+          subtotal: number
+          total_amount: number
+          updated_at?: string
           user_id?: string | null
           whatsapp_number?: string | null
         }
         Update: {
           combo_applied?: boolean | null
+          combo_details?: Json | null
           contact_number?: string
-          created_at?: string | null
+          created_at?: string
           customer_email?: string
           customer_name?: string
           delivery_address?: string
@@ -480,16 +449,15 @@ export type Database = {
           order_number?: string
           paid_amount?: number
           payment_method_id?: string | null
-          payment_percentage?: number
+          payment_notes?: string | null
           payment_screenshot_url?: string | null
-          pricing_breakdown?: Json | null
           promocode_discount?: number | null
           promocode_used?: string | null
           remaining_amount?: number
-          status?: Database["public"]["Enums"]["order_status"]
+          status?: string
           subtotal?: number
           total_amount?: number
-          updated_at?: string | null
+          updated_at?: string
           user_id?: string | null
           whatsapp_number?: string | null
         }
@@ -876,12 +844,6 @@ export type Database = {
     }
     Enums: {
       category_status: "on" | "off"
-      order_status:
-        | "pending_payment"
-        | "payment_confirmed"
-        | "on_delivery"
-        | "delivered"
-        | "cancelled"
       product_status: "active" | "inactive"
       user_role: "admin" | "customer"
     }
@@ -1000,13 +962,6 @@ export const Constants = {
   public: {
     Enums: {
       category_status: ["on", "off"],
-      order_status: [
-        "pending_payment",
-        "payment_confirmed",
-        "on_delivery",
-        "delivered",
-        "cancelled",
-      ],
       product_status: ["active", "inactive"],
       user_role: ["admin", "customer"],
     },

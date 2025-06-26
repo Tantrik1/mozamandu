@@ -2,36 +2,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Eye, Search, Filter, RefreshCw } from 'lucide-react';
+import { Eye, Search, Phone, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-
-// Updated interface to match new database schema
-interface CustomerOrder {
-  id: string;
-  order_number: string;
-  customer_name: string;
-  customer_email: string;
-  contact_number: string;
-  whatsapp_number: string | null;
-  delivery_address: string;
-  total_amount: number;
-  subtotal: number;
-  delivery_charge: number;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  combo_applied: boolean;
-  promocode_used: string | null;
-  promocode_discount: number;
-  payment_screenshot_url: string | null;
-  pricing_breakdown?: any;
-}
 
 interface Customer {
   id: string;
@@ -39,14 +15,23 @@ interface Customer {
   full_name: string | null;
   contact_number: string | null;
   whatsapp_number: string | null;
-  created_at: string;
   role: string;
-  orders?: CustomerOrder[];
+  created_at: string;
+  total_orders: number;
+  total_spent: number;
+}
+
+interface CustomerOrder {
+  id: string;
+  order_number: string;
+  total_amount: number;
+  status: string;
+  created_at: string;
 }
 
 export function CustomerManagement() {
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [customerOrders, setCustomerOrders] = useState<{ [key: string]: CustomerOrder[] }>({});
+  const [customerOrders, setCustomerOrders] = useState<CustomerOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -57,30 +42,92 @@ export function CustomerManagement() {
 
   const fetchCustomers = async () => {
     setLoading(true);
+    
+    console.log('Fetching customers...');
+    
     try {
-      console.log('Fetching customers...');
-      const { data, error } = await supabase
+      // First, let's check what profiles exist
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('role', 'customer')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching customers:', error);
+      if (profilesError) {
+        console.error('Profile fetch error:', profilesError);
         toast({
           title: "Error",
-          description: "Failed to fetch customers",
+          description: "Failed to fetch customer profiles: " + profilesError.message,
           variant: "destructive",
         });
-      } else {
-        console.log('Customers fetched successfully:', data?.length || 0);
-        setCustomers(data || []);
+        setLoading(false);
+        return;
       }
+
+      console.log('Raw profiles data:', profiles);
+
+      if (!profiles || profiles.length === 0) {
+        console.log('No profiles found in database');
+        setCustomers([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get order statistics for each profile
+      const customersWithStats = await Promise.all(
+        profiles.map(async (profile) => {
+          try {
+            console.log(`Fetching orders for user ${profile.id}...`);
+            
+            const { data: orders, error: ordersError } = await supabase
+              .from('orders')
+              .select('total_amount')
+              .eq('user_id', profile.id);
+
+            if (ordersError) {
+              console.error('Orders fetch error for user', profile.id, ':', ordersError);
+            }
+
+            const totalOrders = orders?.length || 0;
+            const totalSpent = orders?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
+
+            console.log(`User ${profile.email}: ${totalOrders} orders, Rs. ${totalSpent} spent`);
+
+            return {
+              id: profile.id,
+              email: profile.email,
+              full_name: profile.full_name,
+              contact_number: profile.contact_number,
+              whatsapp_number: profile.whatsapp_number,
+              role: profile.role || 'customer',
+              created_at: profile.created_at,
+              total_orders: totalOrders,
+              total_spent: totalSpent,
+            };
+          } catch (error) {
+            console.error('Error processing profile', profile.id, ':', error);
+            return {
+              id: profile.id,
+              email: profile.email,
+              full_name: profile.full_name,
+              contact_number: profile.contact_number,
+              whatsapp_number: profile.whatsapp_number,
+              role: profile.role || 'customer',
+              created_at: profile.created_at,
+              total_orders: 0,
+              total_spent: 0,
+            };
+          }
+        })
+      );
+
+      console.log('Final customers with stats:', customersWithStats);
+      setCustomers(customersWithStats);
+      
     } catch (error) {
-      console.error('Unexpected error fetching customers:', error);
+      console.error('Error in fetchCustomers:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch customers",
+        description: "Failed to fetch customers: " + (error as Error).message,
         variant: "destructive",
       });
     } finally {
@@ -89,68 +136,41 @@ export function CustomerManagement() {
   };
 
   const fetchCustomerOrders = async (customerId: string) => {
-    if (customerOrders[customerId]) return; // Already fetched
+    console.log('Fetching orders for customer:', customerId);
+    
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id, order_number, total_amount, status, created_at')
+      .eq('user_id', customerId)
+      .order('created_at', { ascending: false });
 
-    try {
-      console.log('Fetching orders for customer:', customerId);
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', customerId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching customer orders:', error);
-      } else {
-        console.log('Customer orders fetched:', data?.length || 0);
-        setCustomerOrders(prev => ({ 
-          ...prev, 
-          [customerId]: data || [] 
-        }));
-      }
-    } catch (error) {
-      console.error('Unexpected error fetching customer orders:', error);
+    if (error) {
+      console.error('Customer orders fetch error:', error);
+    } else {
+      console.log('Customer orders:', data);
+      setCustomerOrders(data || []);
     }
   };
-
-  const filteredCustomers = customers.filter(customer =>
-    customer.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.contact_number?.includes(searchQuery)
-  );
 
   const handleViewCustomer = async (customer: Customer) => {
     setSelectedCustomer(customer);
     await fetchCustomerOrders(customer.id);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
-      case 'payment_confirmed': return 'bg-blue-100 text-blue-800';
-      case 'on_delivery': return 'bg-orange-100 text-orange-800';
-      case 'delivered': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending_payment': return 'Pending Payment';
-      case 'payment_confirmed': return 'Payment Confirmed';
-      case 'on_delivery': return 'On Delivery';
-      case 'delivered': return 'Delivered';
-      case 'cancelled': return 'Cancelled';
-      default: return status.toUpperCase();
-    }
-  };
+  const filteredCustomers = customers.filter(customer => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      customer.email.toLowerCase().includes(searchLower) ||
+      (customer.full_name && customer.full_name.toLowerCase().includes(searchLower)) ||
+      (customer.contact_number && customer.contact_number.includes(searchQuery))
+    );
+  });
 
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <RefreshCw className="h-4 w-4 animate-spin" />
+      <div className="p-6">
+        <div className="flex items-center justify-center h-32">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mr-4"></div>
           <span>Loading customers...</span>
         </div>
       </div>
@@ -161,36 +181,7 @@ export function CustomerManagement() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Customer Management</h1>
-        <Button onClick={fetchCustomers} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">{customers.length}</div>
-            <p className="text-xs text-muted-foreground">Total Customers</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">
-              {customers.filter(c => c.contact_number).length}
-            </div>
-            <p className="text-xs text-muted-foreground">With Contact Info</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">
-              {Object.values(customerOrders).reduce((sum, orders) => sum + orders.length, 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">Total Orders</p>
-          </CardContent>
-        </Card>
+        <Button onClick={fetchCustomers}>Refresh</Button>
       </div>
 
       {/* Search */}
@@ -208,139 +199,212 @@ export function CustomerManagement() {
         </CardContent>
       </Card>
 
+      {/* Stats Cards */}
+      <div className="grid md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Total Customers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{customers.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Active Customers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">
+              {customers.filter(c => c.total_orders > 0).length}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Total Revenue</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">
+              Rs. {customers.reduce((sum, c) => sum + c.total_spent, 0).toFixed(2)}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Customers Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Customers ({filteredCustomers.length})</CardTitle>
+          <CardTitle>Registered Customers ({filteredCustomers.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>WhatsApp</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCustomers.map((customer) => (
-                <TableRow key={customer.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{customer.full_name || 'N/A'}</p>
-                      <Badge variant="secondary" className="text-xs">
-                        {customer.role}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>{customer.email}</TableCell>
-                  <TableCell>{customer.contact_number || 'N/A'}</TableCell>
-                  <TableCell>{customer.whatsapp_number || 'N/A'}</TableCell>
-                  <TableCell>
-                    {new Date(customer.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewCustomer(customer)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle>Customer Details - {selectedCustomer?.full_name || selectedCustomer?.email}</DialogTitle>
-                        </DialogHeader>
-                        {selectedCustomer && (
-                          <div className="space-y-6">
-                            {/* Customer Info */}
-                            <Card>
-                              <CardHeader>
-                                <CardTitle>Contact Information</CardTitle>
-                              </CardHeader>
-                              <CardContent className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <p className="text-sm font-medium">Full Name</p>
-                                  <p>{selectedCustomer.full_name || 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium">Email</p>
-                                  <p>{selectedCustomer.email}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium">Contact Number</p>
-                                  <p>{selectedCustomer.contact_number || 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium">WhatsApp</p>
-                                  <p>{selectedCustomer.whatsapp_number || 'N/A'}</p>
-                                </div>
-                              </CardContent>
-                            </Card>
-
-                            {/* Orders */}
-                            <Card>
-                              <CardHeader>
-                                <CardTitle>Order History</CardTitle>
-                              </CardHeader>
-                              <CardContent>
-                                {customerOrders[selectedCustomer.id]?.length > 0 ? (
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow>
-                                        <TableHead>Order #</TableHead>
-                                        <TableHead>Total</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Date</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {customerOrders[selectedCustomer.id].map((order) => (
-                                        <TableRow key={order.id}>
-                                          <TableCell className="font-medium">
-                                            {order.order_number}
-                                          </TableCell>
-                                          <TableCell>Rs. {order.total_amount.toFixed(2)}</TableCell>
-                                          <TableCell>
-                                            <Badge className={getStatusColor(order.status)}>
-                                              {getStatusLabel(order.status)}
-                                            </Badge>
-                                          </TableCell>
-                                          <TableCell>
-                                            {new Date(order.created_at).toLocaleDateString()}
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                ) : (
-                                  <p className="text-gray-500 text-center py-4">No orders found</p>
-                                )}
-                              </CardContent>
-                            </Card>
+          {filteredCustomers.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Contact Info</TableHead>
+                  <TableHead>Orders</TableHead>
+                  <TableHead>Total Spent</TableHead>
+                  <TableHead>Joined</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCustomers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <p className="font-medium">
+                            {customer.full_name || 'Unnamed Customer'}
+                          </p>
+                          <p className="text-sm text-gray-600">{customer.email}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        {customer.contact_number && (
+                          <div className="flex items-center gap-1 text-sm">
+                            <Phone className="h-3 w-3 text-gray-400" />
+                            {customer.contact_number}
                           </div>
                         )}
-                      </DialogContent>
-                    </Dialog>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredCustomers.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                    No customers found matching your criteria.
-                  </TableCell>
-                </TableRow>
+                        {customer.whatsapp_number && (
+                          <div className="flex items-center gap-1 text-sm text-green-600">
+                            <Phone className="h-3 w-3" />
+                            WhatsApp: {customer.whatsapp_number}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium">{customer.total_orders}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium">Rs. {customer.total_spent.toFixed(2)}</span>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(customer.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewCustomer(customer)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>
+                              Customer Details - {selectedCustomer?.full_name || selectedCustomer?.email}
+                            </DialogTitle>
+                          </DialogHeader>
+                          {selectedCustomer && (
+                            <div className="space-y-6">
+                              {/* Customer Info */}
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="text-lg">Customer Information</CardTitle>
+                                </CardHeader>
+                                <CardContent className="grid md:grid-cols-2 gap-4">
+                                  <div>
+                                    <p><strong>Name:</strong> {selectedCustomer.full_name || 'N/A'}</p>
+                                    <p><strong>Email:</strong> {selectedCustomer.email}</p>
+                                    <p><strong>Role:</strong> {selectedCustomer.role || 'customer'}</p>
+                                  </div>
+                                  <div>
+                                    <p><strong>Contact:</strong> {selectedCustomer.contact_number || 'N/A'}</p>
+                                    <p><strong>WhatsApp:</strong> {selectedCustomer.whatsapp_number || 'N/A'}</p>
+                                    <p><strong>Joined:</strong> {new Date(selectedCustomer.created_at).toLocaleDateString()}</p>
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <p><strong>Total Orders:</strong> {selectedCustomer.total_orders}</p>
+                                    <p><strong>Total Spent:</strong> Rs. {selectedCustomer.total_spent.toFixed(2)}</p>
+                                  </div>
+                                </CardContent>
+                              </Card>
+
+                              {/* Customer Orders */}
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="text-lg">Order History</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  {customerOrders.length > 0 ? (
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead>Order #</TableHead>
+                                          <TableHead>Amount</TableHead>
+                                          <TableHead>Status</TableHead>
+                                          <TableHead>Date</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {customerOrders.map((order) => (
+                                          <TableRow key={order.id}>
+                                            <TableCell className="font-medium">
+                                              {order.order_number}
+                                            </TableCell>
+                                            <TableCell>Rs. {order.total_amount.toFixed(2)}</TableCell>
+                                            <TableCell>
+                                              <span className={`px-2 py-1 rounded text-xs ${
+                                                order.status === 'delivered' 
+                                                  ? 'bg-green-100 text-green-800'
+                                                  : order.status === 'cancelled'
+                                                  ? 'bg-red-100 text-red-800'
+                                                  : 'bg-yellow-100 text-yellow-800'
+                                              }`}>
+                                                {order.status}
+                                              </span>
+                                            </TableCell>
+                                            <TableCell>
+                                              {new Date(order.created_at).toLocaleDateString()}
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  ) : (
+                                    <p className="text-gray-500">No orders found for this customer.</p>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            </div>
+                          )}
+                        </DialogContent>
+                      </Dialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500 mb-4">
+                {searchQuery 
+                  ? "No customers found matching your search criteria."
+                  : "No customer profiles found in the database."
+                }
+              </p>
+              {!searchQuery && (
+                <div className="text-sm text-gray-400 space-y-1">
+                  <p>• No users have signed up yet, or</p>
+                  <p>• There might be a database connectivity issue</p>
+                  <Button onClick={fetchCustomers} variant="outline" className="mt-2">
+                    Try Again
+                  </Button>
+                </div>
               )}
-            </TableBody>
-          </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

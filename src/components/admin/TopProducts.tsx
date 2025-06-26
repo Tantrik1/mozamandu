@@ -20,21 +20,15 @@ export function TopProducts() {
 
   const fetchTopProducts = async () => {
     try {
-      console.log('Fetching top products...');
-      const { data: orderItemDetails, error } = await supabase
-        .from('order_item_details')
+      const { data: orderItems, error } = await supabase
+        .from('order_items')
         .select('product_name, quantity, total_price');
 
-      if (error) {
-        console.error('Error fetching order item details:', error);
-        throw error;
-      }
-
-      console.log('Fetched order item details:', orderItemDetails?.length || 0);
+      if (error) throw error;
 
       const productStats: { [key: string]: { quantity: number; revenue: number } } = {};
       
-      orderItemDetails?.forEach((item) => {
+      orderItems?.forEach((item) => {
         if (!productStats[item.product_name]) {
           productStats[item.product_name] = { quantity: 0, revenue: 0 };
         }
@@ -51,7 +45,6 @@ export function TopProducts() {
         .sort((a, b) => b.total_quantity - a.total_quantity)
         .slice(0, 5);
 
-      console.log('Top products calculated:', topProducts);
       setProducts(topProducts);
     } catch (error) {
       console.error('Error fetching top products:', error);
@@ -101,7 +94,7 @@ export function TopProducts() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="font-semibold">Rs. {product.total_revenue.toFixed(2)}</p>
+                <p className="font-semibold">${product.total_revenue.toFixed(2)}</p>
               </div>
             </div>
           ))}

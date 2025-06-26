@@ -81,29 +81,16 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
     const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
 
     if (error) {
-      console.error('Signup error:', error);
-      let errorMessage = error.message;
-      
-      // Handle specific error cases
-      if (error.message.includes('User already registered')) {
-        errorMessage = 'An account with this email already exists. Please sign in instead.';
-      } else if (error.message.includes('Invalid email')) {
-        errorMessage = 'Please enter a valid email address.';
-      } else if (error.message.includes('Password')) {
-        errorMessage = 'Password must be at least 6 characters long.';
-      }
-      
-      setErrors({ form: errorMessage });
+      setErrors({ form: error.message });
       toast({
         title: "Error",
-        description: errorMessage,
+        description: error.message,
         variant: "destructive",
       });
     } else {
       toast({
         title: "Account Created!",
-        description: "We've sent you a confirmation email. Please check your inbox and spam folder to verify your account.",
-        duration: 6000,
+        description: "We've sent you a confirmation email. Please check your inbox to verify your account.",
       });
       // Redirect to home page
       navigate('/');

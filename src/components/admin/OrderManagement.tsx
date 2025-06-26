@@ -10,17 +10,47 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Eye, Search, Filter, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { OrderSummaryCard } from '@/components/shared/OrderSummaryCard';
-import { BaseOrder, OrderItem, OrderStatus } from '@/types/order';
+
+interface Order {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  customer_email: string;
+  contact_number: string;
+  total_amount: number;
+  paid_amount: number;
+  remaining_amount: number;
+  status: string;
+  created_at: string;
+  combo_applied: boolean;
+  promocode_used: string | null;
+  promocode_discount: number;
+  payment_screenshot_url: string | null;
+  user_id: string | null;
+  delivery_address: string;
+  delivery_charge: number;
+  subtotal: number;
+}
+
+interface OrderItem {
+  id: string;
+  product_name: string;
+  color_name: string | null;
+  size_name: string | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  pricing_mode: string;
+}
 
 export function OrderManagement() {
-  const [orders, setOrders] = useState<BaseOrder[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<{ [key: string]: OrderItem[] }>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedOrder, setSelectedOrder] = useState<BaseOrder | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -36,9 +66,29 @@ export function OrderManagement() {
     try {
       console.log('Fetching orders for admin dashboard...');
       
+      // Fetch all orders including guest orders (user_id can be null)
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select(`
+          id,
+          order_number,
+          customer_name,
+          customer_email,
+          contact_number,
+          total_amount,
+          paid_amount,
+          remaining_amount,
+          status,
+          created_at,
+          combo_applied,
+          promocode_used,
+          promocode_discount,
+          payment_screenshot_url,
+          user_id,
+          delivery_address,
+          delivery_charge,
+          subtotal
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -50,10 +100,7 @@ export function OrderManagement() {
         });
       } else {
         console.log('Orders fetched successfully:', data?.length || 0);
-        setOrders((data || []).map(order => ({
-          ...order,
-          status: order.status as OrderStatus
-        })));
+        setOrders(data || []);
       }
     } catch (error) {
       console.error('Unexpected error fetching orders:', error);
@@ -69,11 +116,11 @@ export function OrderManagement() {
   };
 
   const fetchOrderItems = async (orderId: string) => {
-    if (orderItems[orderId]) return;
+    if (orderItems[orderId]) return; // Already fetched
 
     try {
       const { data, error } = await supabase
-        .from('order_item_details')
+        .from('order_items')
         .select('*')
         .eq('order_id', orderId);
 
@@ -85,7 +132,7 @@ export function OrderManagement() {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
       const { error } = await supabase
         .from('orders')
@@ -104,7 +151,7 @@ export function OrderManagement() {
           title: "Success",
           description: "Order status updated successfully",
         });
-        fetchOrders(true);
+        fetchOrders(true); // Refresh with loading indicator
       }
     } catch (error) {
       console.error('Unexpected error updating order status:', error);
@@ -118,24 +165,15 @@ export function OrderManagement() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
-      case 'payment_confirmed': return 'bg-blue-100 text-blue-800';
-      case 'on_delivery': return 'bg-orange-100 text-orange-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending_payment': return 'Pending Payment';
-      case 'payment_confirmed': return 'Payment Confirmed';
-      case 'on_delivery': return 'On Delivery';
-      case 'delivered': return 'Delivered';
-      case 'cancelled': return 'Cancelled';
-      default: return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
-    }
+  const getCustomerType = (order: Order) => {
+    return order.user_id ? 'Registered' : 'Guest';
   };
 
   const filteredOrders = orders.filter(order => {
@@ -146,7 +184,7 @@ export function OrderManagement() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleViewOrder = async (order: BaseOrder) => {
+  const handleViewOrder = async (order: Order) => {
     setSelectedOrder(order);
     await fetchOrderItems(order.id);
   };
@@ -173,7 +211,7 @@ export function OrderManagement() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{orders.length}</div>
@@ -182,26 +220,20 @@ export function OrderManagement() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold">{orders.filter(o => o.status === 'pending_payment').length}</div>
-            <p className="text-xs text-muted-foreground">Pending Payment</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">{orders.filter(o => o.status === 'payment_confirmed').length}</div>
-            <p className="text-xs text-muted-foreground">Payment Confirmed</p>
+            <div className="text-2xl font-bold">{orders.filter(o => o.status === 'pending').length}</div>
+            <p className="text-xs text-muted-foreground">Pending Orders</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{orders.filter(o => o.status === 'delivered').length}</div>
-            <p className="text-xs text-muted-foreground">Delivered</p>
+            <p className="text-xs text-muted-foreground">Delivered Orders</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold">{orders.filter(o => o.remaining_amount > 0).length}</div>
-            <p className="text-xs text-muted-foreground">Partial Payments</p>
+            <div className="text-2xl font-bold">{orders.filter(o => !o.user_id).length}</div>
+            <p className="text-xs text-muted-foreground">Guest Orders</p>
           </CardContent>
         </Card>
       </div>
@@ -224,14 +256,12 @@ export function OrderManagement() {
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-32">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                  <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
-                  <SelectItem value="on_delivery">On Delivery</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
@@ -252,8 +282,9 @@ export function OrderManagement() {
               <TableRow>
                 <TableHead>Order #</TableHead>
                 <TableHead>Customer</TableHead>
-                <TableHead>Payment Status</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Total</TableHead>
+                <TableHead>Paid</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Actions</TableHead>
@@ -270,41 +301,35 @@ export function OrderManagement() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {order.remaining_amount > 0 ? (
-                      <div className="text-sm">
-                        <div className="text-green-600 font-medium">
-                          Paid: Rs. {order.paid_amount.toFixed(2)}
-                        </div>
-                        <div className="text-orange-600">
-                          Due: Rs. {order.remaining_amount.toFixed(2)}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          ({order.payment_percentage}% paid)
-                        </div>
-                      </div>
-                    ) : (
-                      <Badge variant="outline" className="text-green-600">
-                        Fully Paid
-                      </Badge>
-                    )}
+                    <Badge variant={order.user_id ? "default" : "secondary"}>
+                      {getCustomerType(order)}
+                    </Badge>
                   </TableCell>
                   <TableCell>Rs. {order.total_amount.toFixed(2)}</TableCell>
                   <TableCell>
+                    <div>
+                      <p className="text-green-600">Rs. {order.paid_amount.toFixed(2)}</p>
+                      {order.remaining_amount > 0 && (
+                        <p className="text-sm text-orange-600">
+                          Remaining: Rs. {order.remaining_amount.toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     <Select
                       value={order.status}
-                      onValueChange={(value) => updateOrderStatus(order.id, value as OrderStatus)}
+                      onValueChange={(value) => updateOrderStatus(order.id, value)}
                     >
-                      <SelectTrigger className="w-40">
+                      <SelectTrigger className="w-32">
                         <SelectValue>
                           <Badge className={getStatusColor(order.status)}>
-                            {getStatusLabel(order.status)}
+                            {order.status}
                           </Badge>
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                        <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
-                        <SelectItem value="on_delivery">On Delivery</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="delivered">Delivered</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
@@ -329,12 +354,124 @@ export function OrderManagement() {
                         <DialogHeader>
                           <DialogTitle>Order Details - {selectedOrder?.order_number}</DialogTitle>
                         </DialogHeader>
-                        {selectedOrder && orderItems[selectedOrder.id] && (
-                          <OrderSummaryCard
-                            orderDetails={selectedOrder}
-                            orderItems={orderItems[selectedOrder.id]}
-                            showActions={false}
-                          />
+                        {selectedOrder && (
+                          <div className="space-y-6">
+                            {/* Customer Info */}
+                            <Card>
+                              <CardHeader>
+                                <CardTitle className="text-lg">Customer Information</CardTitle>
+                              </CardHeader>
+                              <CardContent className="grid md:grid-cols-2 gap-4">
+                                <div>
+                                  <p><strong>Name:</strong> {selectedOrder.customer_name}</p>
+                                  <p><strong>Email:</strong> {selectedOrder.customer_email}</p>
+                                  <p><strong>Contact:</strong> {selectedOrder.contact_number}</p>
+                                  <p><strong>Customer Type:</strong> 
+                                    <Badge className="ml-2" variant={selectedOrder.user_id ? "default" : "secondary"}>
+                                      {getCustomerType(selectedOrder)}
+                                    </Badge>
+                                  </p>
+                                </div>
+                                <div>
+                                  <p><strong>Order Date:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
+                                  <p><strong>Status:</strong> 
+                                    <Badge className={`ml-2 ${getStatusColor(selectedOrder.status)}`}>
+                                      {selectedOrder.status}
+                                    </Badge>
+                                  </p>
+                                  <p><strong>Delivery Address:</strong></p>
+                                  <p className="text-sm text-gray-600">{selectedOrder.delivery_address}</p>
+                                </div>
+                              </CardContent>
+                            </Card>
+
+                            {/* Order Items */}
+                            <Card>
+                              <CardHeader>
+                                <CardTitle className="text-lg">Order Items</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                {orderItems[selectedOrder.id] && (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Product</TableHead>
+                                        <TableHead>Qty</TableHead>
+                                        <TableHead>Unit Price</TableHead>
+                                        <TableHead>Total</TableHead>
+                                        <TableHead>Type</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {orderItems[selectedOrder.id].map((item) => (
+                                        <TableRow key={item.id}>
+                                          <TableCell>
+                                            <div>
+                                              <p className="font-medium">{item.product_name}</p>
+                                              {item.color_name && (
+                                                <p className="text-sm text-gray-600">Color: {item.color_name}</p>
+                                              )}
+                                              {item.size_name && (
+                                                <p className="text-sm text-gray-600">Size: {item.size_name}</p>
+                                              )}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>{item.quantity}</TableCell>
+                                          <TableCell>Rs. {item.unit_price.toFixed(2)}</TableCell>
+                                          <TableCell>Rs. {item.total_price.toFixed(2)}</TableCell>
+                                          <TableCell>
+                                            <Badge variant="outline">
+                                              {item.pricing_mode}
+                                            </Badge>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                )}
+                              </CardContent>
+                            </Card>
+
+                            {/* Payment Info */}
+                            <Card>
+                              <CardHeader>
+                                <CardTitle className="text-lg">Payment Information</CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-4">
+                                <div className="grid md:grid-cols-2 gap-4">
+                                  <div>
+                                    <p><strong>Subtotal:</strong> Rs. {selectedOrder.subtotal.toFixed(2)}</p>
+                                    <p><strong>Delivery Charge:</strong> Rs. {selectedOrder.delivery_charge.toFixed(2)}</p>
+                                    <p><strong>Total Amount:</strong> Rs. {selectedOrder.total_amount.toFixed(2)}</p>
+                                  </div>
+                                  <div>
+                                    <p><strong>Paid Amount:</strong> Rs. {selectedOrder.paid_amount.toFixed(2)}</p>
+                                    <p><strong>Remaining:</strong> Rs. {selectedOrder.remaining_amount.toFixed(2)}</p>
+                                    {selectedOrder.combo_applied && (
+                                      <p><strong>Combo Applied:</strong> Yes</p>
+                                    )}
+                                    {selectedOrder.promocode_used && (
+                                      <div>
+                                        <p><strong>Promo Code:</strong> {selectedOrder.promocode_used}</p>
+                                        <p><strong>Discount:</strong> Rs. {selectedOrder.promocode_discount.toFixed(2)}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {selectedOrder.payment_screenshot_url && (
+                                  <div>
+                                    <h4 className="font-medium mb-2">Payment Screenshot:</h4>
+                                    <img
+                                      src={selectedOrder.payment_screenshot_url}
+                                      alt="Payment Screenshot"
+                                      className="max-w-md border rounded-lg"
+                                    />
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          </div>
                         )}
                       </DialogContent>
                     </Dialog>

@@ -10,17 +10,43 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Eye, Search, Filter, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { OrderSummaryCard } from '@/components/shared/OrderSummaryCard';
-import { BaseOrder, OrderItem, OrderStatus } from '@/types/order';
+
+interface Order {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  customer_email: string;
+  contact_number: string;
+  total_amount: number;
+  paid_amount: number;
+  remaining_amount: number;
+  status: string;
+  created_at: string;
+  combo_applied: boolean;
+  promocode_used: string | null;
+  promocode_discount: number;
+  payment_screenshot_url: string | null;
+}
+
+interface OrderItem {
+  id: string;
+  product_name: string;
+  color_name: string | null;
+  size_name: string | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  pricing_mode: string;
+}
 
 export function EnhancedOrderManagement() {
-  const [orders, setOrders] = useState<BaseOrder[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<{ [key: string]: OrderItem[] }>({});
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedOrder, setSelectedOrder] = useState<BaseOrder | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -32,7 +58,22 @@ export function EnhancedOrderManagement() {
       console.log('Fetching orders...');
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select(`
+          id,
+          order_number,
+          customer_name,
+          customer_email,
+          contact_number,
+          total_amount,
+          paid_amount,
+          remaining_amount,
+          status,
+          created_at,
+          combo_applied,
+          promocode_used,
+          promocode_discount,
+          payment_screenshot_url
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -44,10 +85,7 @@ export function EnhancedOrderManagement() {
         });
       } else {
         console.log('Fetched orders:', data?.length || 0);
-        setOrders((data || []).map(order => ({
-          ...order,
-          status: order.status as OrderStatus
-        })));
+        setOrders(data || []);
       }
     } catch (error) {
       console.error('Unexpected error fetching orders:', error);
@@ -62,12 +100,12 @@ export function EnhancedOrderManagement() {
   };
 
   const fetchOrderItems = async (orderId: string) => {
-    if (orderItems[orderId]) return;
+    if (orderItems[orderId]) return; // Already fetched
 
     try {
       console.log('Fetching order items for:', orderId);
       const { data, error } = await supabase
-        .from('order_item_details')
+        .from('order_items')
         .select('*')
         .eq('order_id', orderId);
 
@@ -82,7 +120,7 @@ export function EnhancedOrderManagement() {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
     setUpdating(orderId);
     try {
       console.log('Updating order status:', orderId, 'to', newStatus);
@@ -109,12 +147,14 @@ export function EnhancedOrderManagement() {
           description: "Order status updated successfully",
         });
         
+        // Update local state
         setOrders(prev => prev.map(order => 
           order.id === orderId 
             ? { ...order, status: newStatus }
             : order
         ));
         
+        // Also update selected order if it's the one being updated
         if (selectedOrder?.id === orderId) {
           setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
         }
@@ -133,23 +173,10 @@ export function EnhancedOrderManagement() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
-      case 'payment_confirmed': return 'bg-blue-100 text-blue-800';
-      case 'on_delivery': return 'bg-orange-100 text-orange-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending_payment': return 'Pending Payment';
-      case 'payment_confirmed': return 'Payment Confirmed';
-      case 'on_delivery': return 'On Delivery';
-      case 'delivered': return 'Delivered';
-      case 'cancelled': return 'Cancelled';
-      default: return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
     }
   };
 
@@ -161,7 +188,7 @@ export function EnhancedOrderManagement() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleViewOrder = async (order: BaseOrder) => {
+  const handleViewOrder = async (order: Order) => {
     setSelectedOrder(order);
     await fetchOrderItems(order.id);
   };
@@ -186,7 +213,7 @@ export function EnhancedOrderManagement() {
       </div>
 
       {/* Stats */}
-      <div className="grid md:grid-cols-5 gap-4">
+      <div className="grid md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{orders.length}</div>
@@ -196,9 +223,9 @@ export function EnhancedOrderManagement() {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-yellow-600">
-              {orders.filter(o => o.status === 'pending_payment').length}
+              {orders.filter(o => o.status === 'pending').length}
             </div>
-            <div className="text-sm text-gray-600">Pending Payment</div>
+            <div className="text-sm text-gray-600">Pending</div>
           </CardContent>
         </Card>
         <Card>
@@ -207,14 +234,6 @@ export function EnhancedOrderManagement() {
               {orders.filter(o => o.status === 'delivered').length}
             </div>
             <div className="text-sm text-gray-600">Delivered</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-orange-600">
-              {orders.filter(o => o.remaining_amount > 0).length}
-            </div>
-            <div className="text-sm text-gray-600">Partial Payments</div>
           </CardContent>
         </Card>
         <Card>
@@ -245,14 +264,12 @@ export function EnhancedOrderManagement() {
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-32">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                  <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
-                  <SelectItem value="on_delivery">On Delivery</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
@@ -273,8 +290,8 @@ export function EnhancedOrderManagement() {
               <TableRow>
                 <TableHead>Order #</TableHead>
                 <TableHead>Customer</TableHead>
-                <TableHead>Payment</TableHead>
                 <TableHead>Total</TableHead>
+                <TableHead>Paid</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Actions</TableHead>
@@ -290,43 +307,35 @@ export function EnhancedOrderManagement() {
                       <p className="text-sm text-gray-600">{order.customer_email}</p>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    {order.remaining_amount > 0 ? (
-                      <div className="text-sm">
-                        <div className="text-green-600 font-medium">
-                          Rs. {order.paid_amount.toFixed(2)} ({order.payment_percentage}%)
-                        </div>
-                        <div className="text-orange-600">
-                          Due: Rs. {order.remaining_amount.toFixed(2)}
-                        </div>
-                      </div>
-                    ) : (
-                      <Badge variant="outline" className="text-green-600">
-                        Fully Paid
-                      </Badge>
-                    )}
-                  </TableCell>
                   <TableCell>Rs. {Number(order.total_amount).toFixed(2)}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="text-green-600">Rs. {Number(order.paid_amount).toFixed(2)}</p>
+                      {order.remaining_amount > 0 && (
+                        <p className="text-sm text-orange-600">
+                          Remaining: Rs. {Number(order.remaining_amount).toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Select
                       value={order.status}
-                      onValueChange={(value: OrderStatus) => updateOrderStatus(order.id, value)}
+                      onValueChange={(value) => updateOrderStatus(order.id, value)}
                       disabled={updating === order.id}
                     >
-                      <SelectTrigger className="w-40">
+                      <SelectTrigger className="w-32">
                         <SelectValue>
                           <Badge className={getStatusColor(order.status)}>
                             {updating === order.id ? (
                               <RefreshCw className="h-3 w-3 animate-spin mr-1" />
                             ) : null}
-                            {getStatusLabel(order.status)}
+                            {order.status}
                           </Badge>
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                        <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
-                        <SelectItem value="on_delivery">On Delivery</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="delivered">Delivered</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
@@ -352,11 +361,119 @@ export function EnhancedOrderManagement() {
                           <DialogTitle>Order Details - {selectedOrder?.order_number}</DialogTitle>
                         </DialogHeader>
                         {selectedOrder && (
-                          <OrderSummaryCard 
-                            orderDetails={selectedOrder}
-                            orderItems={orderItems[selectedOrder.id] || []}
-                            showActions={false}
-                          />
+                          <div className="space-y-6">
+                            {/* Customer Info */}
+                            <Card>
+                              <CardHeader>
+                                <CardTitle className="text-lg">Customer Information</CardTitle>
+                              </CardHeader>
+                              <CardContent className="grid md:grid-cols-2 gap-4">
+                                <div>
+                                  <p><strong>Name:</strong> {selectedOrder.customer_name}</p>
+                                  <p><strong>Email:</strong> {selectedOrder.customer_email}</p>
+                                  <p><strong>Contact:</strong> {selectedOrder.contact_number}</p>
+                                </div>
+                                <div>
+                                  <p><strong>Order Date:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
+                                  <p><strong>Status:</strong> 
+                                    <Badge className={`ml-2 ${getStatusColor(selectedOrder.status)}`}>
+                                      {selectedOrder.status}
+                                    </Badge>
+                                  </p>
+                                </div>
+                              </CardContent>
+                            </Card>
+
+                            {/* Order Items */}
+                            <Card>
+                              <CardHeader>
+                                <CardTitle className="text-lg">Order Items</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                {orderItems[selectedOrder.id] ? (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Product</TableHead>
+                                        <TableHead>Qty</TableHead>
+                                        <TableHead>Unit Price</TableHead>
+                                        <TableHead>Total</TableHead>
+                                        <TableHead>Type</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {orderItems[selectedOrder.id].map((item) => (
+                                        <TableRow key={item.id}>
+                                          <TableCell>
+                                            <div>
+                                              <p className="font-medium">{item.product_name}</p>
+                                              {item.color_name && (
+                                                <p className="text-sm text-gray-600">Color: {item.color_name}</p>
+                                              )}
+                                              {item.size_name && (
+                                                <p className="text-sm text-gray-600">Size: {item.size_name}</p>
+                                              )}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>{item.quantity}</TableCell>
+                                          <TableCell>Rs. {Number(item.unit_price).toFixed(2)}</TableCell>
+                                          <TableCell>Rs. {Number(item.total_price).toFixed(2)}</TableCell>
+                                          <TableCell>
+                                            <Badge variant="outline">
+                                              {item.pricing_mode}
+                                            </Badge>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                ) : (
+                                  <div className="flex items-center justify-center py-4">
+                                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                                    Loading order items...
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+
+                            {/* Payment Info */}
+                            <Card>
+                              <CardHeader>
+                                <CardTitle className="text-lg">Payment Information</CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-4">
+                                <div className="grid md:grid-cols-2 gap-4">
+                                  <div>
+                                    <p><strong>Total Amount:</strong> Rs. {Number(selectedOrder.total_amount).toFixed(2)}</p>
+                                    <p><strong>Paid Amount:</strong> Rs. {Number(selectedOrder.paid_amount).toFixed(2)}</p>
+                                    <p><strong>Remaining:</strong> Rs. {Number(selectedOrder.remaining_amount).toFixed(2)}</p>
+                                  </div>
+                                  <div>
+                                    {selectedOrder.combo_applied && (
+                                      <p><strong>Combo Applied:</strong> Yes</p>
+                                    )}
+                                    {selectedOrder.promocode_used && (
+                                      <div>
+                                        <p><strong>Promo Code:</strong> {selectedOrder.promocode_used}</p>
+                                        <p><strong>Discount:</strong> Rs. {Number(selectedOrder.promocode_discount).toFixed(2)}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {selectedOrder.payment_screenshot_url && (
+                                  <div>
+                                    <h4 className="font-medium mb-2">Payment Screenshot:</h4>
+                                    <img
+                                      src={selectedOrder.payment_screenshot_url}
+                                      alt="Payment Screenshot"
+                                      className="max-w-md border rounded-lg"
+                                    />
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          </div>
                         )}
                       </DialogContent>
                     </Dialog>

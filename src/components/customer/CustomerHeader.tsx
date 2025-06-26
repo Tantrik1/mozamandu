@@ -6,7 +6,7 @@ import { User, LogOut, LayoutDashboard, Menu, X, ChevronDown } from 'lucide-reac
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
-import { CartButton } from './CartButton';
+import { CartSidebar } from './CartSidebar';
 
 interface Category {
   id: string;
@@ -92,10 +92,6 @@ export function CustomerHeader() {
               Home
             </Link>
 
-            <Link to="/products" className={`transition-colors ${isActive('/products') ? 'text-red-600 font-medium' : 'text-gray-700 hover:text-red-600'}`}>
-              All Products
-            </Link>
-
             {/* Category Megamenus */}
             {categories.map(category => (
               <div key={category.id} className="relative group" onMouseEnter={() => setHoveredCategory(category.id)} onMouseLeave={() => setHoveredCategory(null)}>
@@ -125,15 +121,19 @@ export function CustomerHeader() {
               </div>
             ))}
 
-            <Link to="/contact-us" className={`transition-colors ${isActive('/contact-us') ? 'text-red-600 font-medium' : 'text-gray-700 hover:text-red-600'}`}>
+            <Link to="/faq" className={`transition-colors ${isActive('/faq') ? 'text-red-600 font-medium' : 'text-gray-700 hover:text-red-600'}`}>
+              FAQ
+            </Link>
+
+            <Link to="/contact" className={`transition-colors ${isActive('/contact') ? 'text-red-600 font-medium' : 'text-gray-700 hover:text-red-600'}`}>
               Contact Us
             </Link>
           </nav>
 
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
-            {/* Cart Button */}
-            <CartButton />
+            {/* Cart Sidebar */}
+            <CartSidebar />
 
             {user ? (
               <DropdownMenu>
@@ -175,10 +175,6 @@ export function CustomerHeader() {
                 Home
               </Link>
               
-              <Link to="/products" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-red-600" onClick={() => setMobileMenuOpen(false)}>
-                All Products
-              </Link>
-              
               {categories.map(category => (
                 <div key={category.id} className="space-y-1">
                   <Link to={`/categories/${category.id}`} className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-red-600" onClick={() => setMobileMenuOpen(false)}>
@@ -192,7 +188,11 @@ export function CustomerHeader() {
                 </div>
               ))}
               
-              <Link to="/contact-us" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-red-600" onClick={() => setMobileMenuOpen(false)}>
+              <Link to="/faq" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-red-600" onClick={() => setMobileMenuOpen(false)}>
+                FAQ
+              </Link>
+              
+              <Link to="/contact" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-red-600" onClick={() => setMobileMenuOpen(false)}>
                 Contact Us
               </Link>
             </div>
