@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,8 +19,6 @@ interface Order {
   contact_number: string;
   whatsapp_number: string | null;
   total_amount: number;
-  paid_amount: number;
-  remaining_amount: number;
   status: string;
   created_at: string;
   combo_applied: boolean;
@@ -320,12 +317,7 @@ export function OrderManagement() {
                   <TableCell>Rs. {order.total_amount.toFixed(2)}</TableCell>
                   <TableCell>
                     <div>
-                      <p className="text-green-600">Rs. {order.paid_amount.toFixed(2)}</p>
-                      {order.remaining_amount > 0 && (
-                        <p className="text-sm text-orange-600">
-                          Remaining: Rs. {order.remaining_amount.toFixed(2)}
-                        </p>
-                      )}
+                      <p className="text-green-600">Rs. {order.total_amount.toFixed(2)}</p>
                     </div>
                   </TableCell>
                   <TableCell>

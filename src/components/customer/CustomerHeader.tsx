@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -28,6 +27,7 @@ export function CustomerHeader() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+  const [cartSidebarOpen, setCartSidebarOpen] = useState(false);
 
   useEffect(() => {
     fetchCategoriesAndSubcategories();
@@ -133,7 +133,10 @@ export function CustomerHeader() {
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
             {/* Cart Sidebar */}
-            <CartSidebar />
+            <CartSidebar 
+              isOpen={cartSidebarOpen} 
+              onClose={() => setCartSidebarOpen(false)} 
+            />
 
             {user ? (
               <DropdownMenu>

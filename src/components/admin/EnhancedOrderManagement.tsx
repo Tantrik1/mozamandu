@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -180,7 +179,7 @@ export function EnhancedOrderManagement() {
       case 'on_delivery': return 'On Delivery';
       case 'delivered': return 'Delivered';
       case 'cancelled': return 'Cancelled';
-      default: return status.toUpperCase();
+      default: return status;
     }
   };
 
