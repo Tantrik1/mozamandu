@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Eye, Search, Phone, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { OrderSummaryCard } from '@/components/shared/OrderSummaryCard';
 import { toast } from '@/hooks/use-toast';
 
 interface Customer {
@@ -24,14 +25,38 @@ interface Customer {
 interface CustomerOrder {
   id: string;
   order_number: string;
+  customer_name: string;
+  customer_email: string;
+  contact_number: string;
+  whatsapp_number: string | null;
+  delivery_address: string;
   total_amount: number;
+  paid_amount: number;
+  remaining_amount: number;
+  subtotal: number;
+  delivery_charge: number;
   status: string;
   created_at: string;
+  combo_applied: boolean;
+  promocode_used: string | null;
+  promocode_discount: number;
+}
+
+interface CustomerOrderItem {
+  id: string;
+  product_name: string;
+  color_name: string | null;
+  size_name: string | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  pricing_mode: string;
 }
 
 export function CustomerManagement() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerOrders, setCustomerOrders] = useState<CustomerOrder[]>([]);
+  const [customerOrderItems, setCustomerOrderItems] = useState<{ [orderId: string]: CustomerOrderItem[] }>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -46,7 +71,7 @@ export function CustomerManagement() {
     console.log('Fetching customers...');
     
     try {
-      // First, let's check what profiles exist
+      // Get all profiles (registered users)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
@@ -140,15 +165,34 @@ export function CustomerManagement() {
     
     const { data, error } = await supabase
       .from('orders')
-      .select('id, order_number, total_amount, status, created_at')
+      .select('*')
       .eq('user_id', customerId)
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Customer orders fetch error:', error);
+      setCustomerOrders([]);
     } else {
       console.log('Customer orders:', data);
       setCustomerOrders(data || []);
+      
+      // Fetch order items for each order
+      if (data && data.length > 0) {
+        const orderItemsMap: { [orderId: string]: CustomerOrderItem[] } = {};
+        
+        for (const order of data) {
+          const { data: items, error: itemsError } = await supabase
+            .from('order_items')
+            .select('*')
+            .eq('order_id', order.id);
+            
+          if (!itemsError && items) {
+            orderItemsMap[order.id] = items;
+          }
+        }
+        
+        setCustomerOrderItems(orderItemsMap);
+      }
     }
   };
 
@@ -300,7 +344,7 @@ export function CustomerManagement() {
                             View
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
                           <DialogHeader>
                             <DialogTitle>
                               Customer Details - {selectedCustomer?.full_name || selectedCustomer?.email}
@@ -331,52 +375,23 @@ export function CustomerManagement() {
                                 </CardContent>
                               </Card>
 
-                              {/* Customer Orders */}
-                              <Card>
-                                <CardHeader>
-                                  <CardTitle className="text-lg">Order History</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  {customerOrders.length > 0 ? (
-                                    <Table>
-                                      <TableHeader>
-                                        <TableRow>
-                                          <TableHead>Order #</TableHead>
-                                          <TableHead>Amount</TableHead>
-                                          <TableHead>Status</TableHead>
-                                          <TableHead>Date</TableHead>
-                                        </TableRow>
-                                      </TableHeader>
-                                      <TableBody>
-                                        {customerOrders.map((order) => (
-                                          <TableRow key={order.id}>
-                                            <TableCell className="font-medium">
-                                              {order.order_number}
-                                            </TableCell>
-                                            <TableCell>Rs. {order.total_amount.toFixed(2)}</TableCell>
-                                            <TableCell>
-                                              <span className={`px-2 py-1 rounded text-xs ${
-                                                order.status === 'delivered' 
-                                                  ? 'bg-green-100 text-green-800'
-                                                  : order.status === 'cancelled'
-                                                  ? 'bg-red-100 text-red-800'
-                                                  : 'bg-yellow-100 text-yellow-800'
-                                              }`}>
-                                                {order.status}
-                                              </span>
-                                            </TableCell>
-                                            <TableCell>
-                                              {new Date(order.created_at).toLocaleDateString()}
-                                            </TableCell>
-                                          </TableRow>
-                                        ))}
-                                      </TableBody>
-                                    </Table>
-                                  ) : (
-                                    <p className="text-gray-500">No orders found for this customer.</p>
-                                  )}
-                                </CardContent>
-                              </Card>
+                              {/* Customer Orders using reusable component */}
+                              <div>
+                                <h3 className="text-lg font-semibold mb-4">Order History</h3>
+                                {customerOrders.length > 0 ? (
+                                  <div className="space-y-4">
+                                    {customerOrders.map((order) => (
+                                      <OrderSummaryCard 
+                                        key={order.id}
+                                        orderDetails={order}
+                                        orderItems={customerOrderItems[order.id] || []}
+                                      />
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-gray-500">No orders found for this customer.</p>
+                                )}
+                              </div>
                             </div>
                           )}
                         </DialogContent>

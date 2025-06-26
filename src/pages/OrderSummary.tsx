@@ -2,13 +2,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { CheckCircle, Package, Phone, Mail, Download, ArrowLeft, Printer } from 'lucide-react';
+import { CheckCircle, Download, ArrowLeft, Printer } from 'lucide-react';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
+import { OrderSummaryCard } from '@/components/shared/OrderSummaryCard';
 import { toast } from '@/hooks/use-toast';
 
 interface OrderDetails {
@@ -116,15 +114,6 @@ export default function OrderSummary() {
     window.print();
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'delivered': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -177,140 +166,12 @@ export default function OrderSummary() {
           <p className="text-gray-600">Thank you for your order. We'll process it shortly.</p>
         </div>
 
-        {/* Order Summary Card */}
-        <Card className="mb-8">
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>Order Summary</CardTitle>
-              <Badge className={getStatusColor(orderDetails.status)}>
-                {orderDetails.status.toUpperCase()}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Order Info */}
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="font-semibold mb-3">Order Information</h3>
-                <div className="space-y-2 text-sm">
-                  <p><strong>Order Number:</strong> {orderDetails.order_number}</p>
-                  <p><strong>Order Date:</strong> {new Date(orderDetails.created_at).toLocaleDateString()}</p>
-                  <p><strong>Status:</strong> {orderDetails.status}</p>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-3">Customer Information</h3>
-                <div className="space-y-2 text-sm">
-                  <p><strong>Name:</strong> {orderDetails.customer_name}</p>
-                  <p><strong>Email:</strong> {orderDetails.customer_email}</p>
-                  <p><strong>Contact:</strong> {orderDetails.contact_number}</p>
-                  {orderDetails.whatsapp_number && (
-                    <p><strong>WhatsApp:</strong> {orderDetails.whatsapp_number}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Delivery Address */}
-            <div>
-              <h3 className="font-semibold mb-3">Delivery Address</h3>
-              <p className="text-sm text-gray-600">{orderDetails.delivery_address}</p>
-            </div>
-
-            <Separator />
-
-            {/* Order Items */}
-            <div>
-              <h3 className="font-semibold mb-3">Order Items</h3>
-              <div className="space-y-3">
-                {orderItems.map((item) => (
-                  <div key={item.id} className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <div>
-                      <p className="font-medium">{item.product_name}</p>
-                      {item.color_name && (
-                        <p className="text-sm text-gray-600">Color: {item.color_name}</p>
-                      )}
-                      {item.size_name && (
-                        <p className="text-sm text-gray-600">Size: {item.size_name}</p>
-                      )}
-                      <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
-                      {item.pricing_mode !== 'normal' && (
-                        <Badge variant="outline" className="text-xs">
-                          {item.pricing_mode}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">Rs. {item.total_price.toFixed(2)}</p>
-                      <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Payment Summary */}
-            <div>
-              <h3 className="font-semibold mb-3">Payment Summary</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>Rs. {orderDetails.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Delivery Charge:</span>
-                  <span>Rs. {orderDetails.delivery_charge.toFixed(2)}</span>
-                </div>
-                {orderDetails.promocode_discount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount ({orderDetails.promocode_used}):</span>
-                    <span>-Rs. {orderDetails.promocode_discount.toFixed(2)}</span>
-                  </div>
-                )}
-                <Separator />
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total Amount:</span>
-                  <span>Rs. {orderDetails.total_amount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-green-600">
-                  <span>Paid Amount:</span>
-                  <span>Rs. {orderDetails.paid_amount.toFixed(2)}</span>
-                </div>
-                {orderDetails.remaining_amount > 0 && (
-                  <div className="flex justify-between text-orange-600">
-                    <span>Remaining Amount:</span>
-                    <span>Rs. {orderDetails.remaining_amount.toFixed(2)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* What's Next */}
-            <div>
-              <h3 className="font-semibold mb-3">What happens next?</h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Package className="w-5 h-5 text-blue-600" />
-                  <p className="text-sm">We'll review your payment and prepare your order</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-blue-600" />
-                  <p className="text-sm">Our team will contact you at {orderDetails.contact_number}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Mail className="w-5 h-5 text-blue-600" />
-                  <p className="text-sm">Order updates will be sent to {orderDetails.customer_email}</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Order Summary using reusable component */}
+        <OrderSummaryCard 
+          orderDetails={orderDetails}
+          orderItems={orderItems}
+          className="mb-8"
+        />
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center no-print">

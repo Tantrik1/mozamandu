@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle, AlertCircle, Percent } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface DeliveryCharge {
@@ -51,6 +51,12 @@ export function UniversalCheckout() {
   const [selectedPayment, setSelectedPayment] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
+  
+  // Promocode state
+  const [promocode, setPromocode] = useState('');
+  const [promocodeDiscount, setPromocodeDiscount] = useState(0);
+  const [validatingPromocode, setValidatingPromocode] = useState(false);
+  const [promocodeApplied, setPromocodeApplied] = useState(false);
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -128,6 +134,103 @@ export function UniversalCheckout() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const validatePromocode = async () => {
+    if (!promocode.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a promocode",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setValidatingPromocode(true);
+    try {
+      const { data: promo, error } = await supabase
+        .from('promocodes')
+        .select('*')
+        .eq('code', promocode.toUpperCase())
+        .eq('is_active', true)
+        .single();
+
+      if (error || !promo) {
+        toast({
+          title: "Invalid Promocode",
+          description: "The promocode you entered is invalid or expired",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if promo code is still valid
+      const now = new Date();
+      const validFrom = new Date(promo.valid_from);
+      const validUntil = promo.valid_until ? new Date(promo.valid_until) : null;
+
+      if (now < validFrom) {
+        toast({
+          title: "Promocode Not Active",
+          description: "This promocode is not yet active",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (validUntil && now > validUntil) {
+        toast({
+          title: "Promocode Expired",
+          description: "This promocode has expired",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
+      const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
+      const subtotal = getTotalPrice();
+      const beforeDiscountTotal = subtotal + deliveryPrice;
+
+      // Check minimum order amount
+      if (promo.minimum_order_amount && beforeDiscountTotal < promo.minimum_order_amount) {
+        toast({
+          title: "Minimum Order Not Met",
+          description: `Minimum order amount for this promocode is Rs. ${promo.minimum_order_amount}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const discount = (beforeDiscountTotal * promo.discount_percentage) / 100;
+      setPromocodeDiscount(discount);
+      setPromocodeApplied(true);
+      
+      toast({
+        title: "Promocode Applied!",
+        description: `${promo.discount_percentage}% discount applied - You saved Rs. ${discount.toFixed(2)}`,
+      });
+
+    } catch (error) {
+      console.error('Error validating promocode:', error);
+      toast({
+        title: "Error",
+        description: "Failed to validate promocode",
+        variant: "destructive",
+      });
+    } finally {
+      setValidatingPromocode(false);
+    }
+  };
+
+  const removePromocode = () => {
+    setPromocodeDiscount(0);
+    setPromocodeApplied(false);
+    setPromocode('');
+    toast({
+      title: "Promocode Removed",
+      description: "Promocode has been removed from your order",
+    });
   };
 
   const validateForm = (): boolean => {
@@ -211,7 +314,8 @@ export function UniversalCheckout() {
       const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
       const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
       const subtotal = getTotalPrice();
-      const totalAmount = subtotal + deliveryPrice;
+      const beforeDiscountTotal = subtotal + deliveryPrice;
+      const totalAmount = beforeDiscountTotal - promocodeDiscount;
 
       // Upload payment screenshot if provided
       let paymentScreenshotUrl = null;
@@ -238,13 +342,13 @@ export function UniversalCheckout() {
         payment_screenshot_url: paymentScreenshotUrl,
         status: 'pending',
         combo_applied: false,
-        promocode_discount: 0
+        promocode_used: promocodeApplied ? promocode.toUpperCase() : null,
+        promocode_discount: promocodeDiscount
       };
 
       console.log('Creating order with data:', orderData);
 
-      // Create order - fix the constant assignment error
-      let orderResult = null;
+      // Create order
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert(orderData)
@@ -253,46 +357,16 @@ export function UniversalCheckout() {
 
       if (orderError) {
         console.error('Order creation error:', orderError);
-        
-        // Better error handling for RLS issues
-        if (orderError.code === '42501' || orderError.message.includes('row-level security')) {
-          console.log('Retrying as explicit guest order...');
-          const guestOrderData = {
-            ...orderData,
-            user_id: null // Force null for guest orders
-          };
-          
-          const { data: guestOrder, error: guestOrderError } = await supabase
-            .from('orders')
-            .insert(guestOrderData)
-            .select()
-            .single();
-            
-          if (guestOrderError) {
-            console.error('Guest order creation also failed:', guestOrderError);
-            throw new Error('Unable to create order. Please try again or contact support.');
-          }
-          
-          // Use the guest order if successful
-          orderResult = guestOrder;
-        } else {
-          throw new Error(`Order creation failed: ${orderError.message}`);
-        }
-      } else {
-        orderResult = order;
+        throw new Error(`Order creation failed: ${orderError.message}`);
       }
 
-      if (!orderResult) {
-        throw new Error('Order was not created properly');
-      }
-
-      console.log('Order created successfully:', orderResult);
+      console.log('Order created successfully:', order);
 
       // Create order items with proper pricing
       const orderItems = cartItems.map(item => {
         const pricing = getItemPricing(item);
         return {
-          order_id: orderResult.id,
+          order_id: order.id,
           product_id: item.productId,
           color_variant_id: item.colorVariantId,
           size_variant_id: item.sizeVariantId,
@@ -316,7 +390,7 @@ export function UniversalCheckout() {
         console.error('Order items creation error:', itemsError);
         
         // Try to cleanup the order if items creation fails
-        await supabase.from('orders').delete().eq('id', orderResult.id);
+        await supabase.from('orders').delete().eq('id', order.id);
         throw new Error(`Failed to create order items: ${itemsError.message}`);
       }
 
@@ -327,11 +401,11 @@ export function UniversalCheckout() {
       
       toast({
         title: "Order Placed Successfully!",
-        description: `Your order #${orderResult.order_number} has been placed successfully.`,
+        description: `Your order #${order.order_number} has been placed successfully.`,
       });
 
       // Redirect to order summary page with order ID
-      navigate(`/order-summary/${orderResult.id}`);
+      navigate(`/order-summary/${order.id}`);
       
     } catch (error) {
       console.error('Error creating order:', error);
@@ -349,7 +423,8 @@ export function UniversalCheckout() {
   const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
   const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
   const subtotal = getTotalPrice();
-  const totalAmount = subtotal + deliveryPrice;
+  const beforeDiscountTotal = subtotal + deliveryPrice;
+  const totalAmount = beforeDiscountTotal - promocodeDiscount;
   const selectedPaymentMethod = paymentMethods.find(p => p.id === selectedPayment);
 
   if (loading) {
@@ -394,6 +469,7 @@ export function UniversalCheckout() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Customer Info & Delivery */}
           <div className="space-y-6">
+            {/* Customer Information */}
             <Card>
               <CardHeader>
                 <CardTitle>Customer Information</CardTitle>
@@ -453,6 +529,7 @@ export function UniversalCheckout() {
               </CardContent>
             </Card>
 
+            {/* Delivery Location */}
             <Card>
               <CardHeader>
                 <CardTitle>Delivery Location</CardTitle>
@@ -475,6 +552,53 @@ export function UniversalCheckout() {
               </CardContent>
             </Card>
 
+            {/* Promocode */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Promocode</CardTitle>
+                <CardDescription>Apply a promocode to get discount on your order</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!promocodeApplied ? (
+                  <div className="flex gap-2">
+                    <Input
+                      value={promocode}
+                      onChange={(e) => setPromocode(e.target.value.toUpperCase())}
+                      placeholder="Enter promocode"
+                      disabled={validatingPromocode}
+                    />
+                    <Button 
+                      onClick={validatePromocode}
+                      disabled={validatingPromocode || !promocode.trim()}
+                    >
+                      {validatingPromocode ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Percent className="h-4 w-4 mr-2" />
+                          Apply
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <div>
+                        <p className="font-medium text-green-800">Promocode Applied: {promocode}</p>
+                        <p className="text-sm text-green-600">You saved Rs. {promocodeDiscount.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={removePromocode}>
+                      Remove
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Payment Method */}
             <Card>
               <CardHeader>
                 <CardTitle>Payment Method</CardTitle>
@@ -580,6 +704,12 @@ export function UniversalCheckout() {
                     <span>Delivery Charge:</span>
                     <span>Rs. {deliveryPrice.toFixed(2)}</span>
                   </div>
+                  {promocodeDiscount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Discount ({promocode}):</span>
+                      <span>-Rs. {promocodeDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
                     <span>Total:</span>
                     <span>Rs. {totalAmount.toFixed(2)}</span>
