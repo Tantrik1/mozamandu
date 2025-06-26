@@ -40,6 +40,7 @@ interface CustomerOrder {
   combo_applied: boolean;
   promocode_used: string | null;
   promocode_discount: number;
+  pricing_breakdown?: any;
 }
 
 interface CustomerOrderItem {
@@ -51,6 +52,7 @@ interface CustomerOrderItem {
   unit_price: number;
   total_price: number;
   pricing_mode: string;
+  pricing_details?: any;
 }
 
 export function CustomerManagement() {
@@ -182,7 +184,7 @@ export function CustomerManagement() {
         
         for (const order of data) {
           const { data: items, error: itemsError } = await supabase
-            .from('order_items')
+            .from('order_item_details')
             .select('*')
             .eq('order_id', order.id);
             

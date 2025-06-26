@@ -18,6 +18,7 @@ interface Order {
   customer_name: string;
   customer_email: string;
   contact_number: string;
+  whatsapp_number: string | null;
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;
@@ -371,7 +372,10 @@ export function OrderManagement() {
                         </DialogHeader>
                         {selectedOrder && orderItems[selectedOrder.id] && (
                           <OrderSummaryCard
-                            orderDetails={selectedOrder}
+                            orderDetails={{
+                              ...selectedOrder,
+                              whatsapp_number: selectedOrder.whatsapp_number || selectedOrder.contact_number
+                            }}
                             orderItems={orderItems[selectedOrder.id]}
                             showActions={false}
                           />
