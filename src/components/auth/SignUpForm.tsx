@@ -7,7 +7,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, AlertTriangle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -17,7 +16,6 @@ interface SignUpFormProps {
 
 export function SignUpForm({ onSuccess }: SignUpFormProps) {
   const { signUp } = useAuth();
-  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
@@ -90,10 +88,9 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
     } else {
       toast({
         title: "Account Created!",
-        description: "We've sent you a confirmation email. Please check your inbox to verify your account.",
+        description: "We've sent you a verification email. Please check your inbox and verify your account before signing in.",
       });
-      // Redirect to home page
-      navigate('/');
+      onSuccess();
     }
 
     setIsLoading(false);

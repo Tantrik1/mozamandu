@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SignUpForm } from '@/components/auth/SignUpForm';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle, Mail } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 export default function Auth() {
@@ -19,6 +19,7 @@ export default function Auth() {
   const [authLoading, setAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
   const [showPassword, setShowPassword] = useState(false);
+  const [showEmailSent, setShowEmailSent] = useState(false);
   
   const [signInData, setSignInData] = useState({
     email: '',
@@ -39,13 +40,16 @@ export default function Auth() {
     }
   }, [searchParams]);
 
+  // Redirect authenticated users
   useEffect(() => {
     if (user && userProfile && !isLoading) {
-      // Role-based redirect
-      if (userProfile.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
+      // Only redirect if email is confirmed
+      if (user.email_confirmed_at) {
+        if (userProfile.role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
       }
     }
   }, [user, userProfile, isLoading, navigate]);
@@ -70,7 +74,8 @@ export default function Auth() {
   };
 
   const handleSignUpSuccess = () => {
-    // User will be redirected to home by SignUpForm
+    setShowEmailSent(true);
+    setActiveTab('signin');
   };
 
   if (isLoading) {
@@ -91,6 +96,17 @@ export default function Auth() {
           <h2 className="text-3xl font-bold text-gray-900">Mozamandu</h2>
           <p className="mt-2 text-gray-600">Your premium gear destination</p>
         </div>
+
+        {/* Show email sent confirmation */}
+        {showEmailSent && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center space-x-3">
+            <Mail className="h-5 w-5 text-blue-600" />
+            <div>
+              <p className="text-sm font-medium text-blue-800">Check Your Email!</p>
+              <p className="text-sm text-blue-600">We've sent you a verification link. Please verify your email before signing in.</p>
+            </div>
+          </div>
+        )}
 
         {/* Show confirmation message if coming from email verification */}
         {searchParams.get('confirmed') === 'true' && (

@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (!isMounted) return;
 
         console.log('🔄 AuthProvider: Auth state changed:', event, session?.user?.email || 'No session');
@@ -80,6 +80,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          // Check if user email is confirmed
+          if (!session.user.email_confirmed_at) {
+            console.warn('⚠️ AuthProvider: User email not confirmed');
+            toast({
+              title: "Email Not Verified",
+              description: "Please check your email and verify your account before signing in.",
+              variant: "destructive",
+            });
+            await supabase.auth.signOut();
+            return;
+          }
+          
           fetchUserProfile(session.user.id).catch(console.error);
         } else {
           setUserProfile(null);
@@ -113,10 +125,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('❌ AuthProvider: Error fetching user profile:', error);
-        // Check if it's an RLS issue
-        if (error.code === 'PGRST116' || error.message.includes('row-level security')) {
-          console.warn('⚠️ AuthProvider: RLS may be blocking profile access');
-        }
         return;
       }
 
@@ -132,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('🔄 AuthProvider: Starting sign in');
       setIsLoading(true);
       
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
@@ -140,7 +148,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         console.error('❌ AuthProvider: Sign in error:', error);
         setIsLoading(false);
+        
+        // Handle specific error cases
+        if (error.message.includes('Email not confirmed')) {
+          return { error: { message: 'Please verify your email before signing in. Check your inbox for the verification link.' } };
+        }
+        
         return { error };
+      }
+      
+      // Check if email is confirmed
+      if (data.user && !data.user.email_confirmed_at) {
+        console.warn('⚠️ AuthProvider: User email not confirmed');
+        await supabase.auth.signOut();
+        setIsLoading(false);
+        return { error: { message: 'Please verify your email before signing in. Check your inbox for the verification link.' } };
       }
       
       console.log('✅ AuthProvider: Sign in successful');
@@ -162,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('🔄 AuthProvider: Starting sign up');
       setIsLoading(true);
       
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         options: {
@@ -180,7 +202,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error };
       }
 
-      console.log('✅ AuthProvider: Sign up successful');
+      console.log('✅ AuthProvider: Sign up successful', data);
+      
+      // If user needs to confirm email
+      if (data.user && !data.user.email_confirmed_at) {
+        toast({
+          title: "Check Your Email",
+          description: "We've sent you a verification link. Please check your email and click the link to verify your account before signing in.",
+        });
+      }
+      
       setIsLoading(false);
       return { error: null };
     } catch (error) {
@@ -214,7 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: "You have been successfully signed out.",
       });
       
-      // Force redirect to home page
+      // Redirect to home page
       window.location.href = '/';
     } catch (error) {
       console.error('❌ AuthProvider: Sign out exception:', error);
