@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,10 +45,11 @@ export function CustomerManagement() {
     console.log('Fetching customers...');
     
     try {
-      // First, let's check what profiles exist
+      // Fetch only customer profiles (exclude admin users)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
+        .eq('role', 'customer')  // Only fetch customers, not admins
         .order('created_at', { ascending: false });
 
       if (profilesError) {
@@ -63,20 +63,20 @@ export function CustomerManagement() {
         return;
       }
 
-      console.log('Raw profiles data:', profiles);
+      console.log('Raw customer profiles data:', profiles);
 
       if (!profiles || profiles.length === 0) {
-        console.log('No profiles found in database');
+        console.log('No customer profiles found in database');
         setCustomers([]);
         setLoading(false);
         return;
       }
 
-      // Get order statistics for each profile
+      // Get order statistics for each customer profile
       const customersWithStats = await Promise.all(
         profiles.map(async (profile) => {
           try {
-            console.log(`Fetching orders for user ${profile.id}...`);
+            console.log(`Fetching orders for customer ${profile.id}...`);
             
             const { data: orders, error: ordersError } = await supabase
               .from('orders')
@@ -84,13 +84,13 @@ export function CustomerManagement() {
               .eq('user_id', profile.id);
 
             if (ordersError) {
-              console.error('Orders fetch error for user', profile.id, ':', ordersError);
+              console.error('Orders fetch error for customer', profile.id, ':', ordersError);
             }
 
             const totalOrders = orders?.length || 0;
             const totalSpent = orders?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
 
-            console.log(`User ${profile.email}: ${totalOrders} orders, Rs. ${totalSpent} spent`);
+            console.log(`Customer ${profile.email}: ${totalOrders} orders, Rs. ${totalSpent} spent`);
 
             return {
               id: profile.id,
@@ -104,7 +104,7 @@ export function CustomerManagement() {
               total_spent: totalSpent,
             };
           } catch (error) {
-            console.error('Error processing profile', profile.id, ':', error);
+            console.error('Error processing customer profile', profile.id, ':', error);
             return {
               id: profile.id,
               email: profile.email,
@@ -396,7 +396,7 @@ export function CustomerManagement() {
               </p>
               {!searchQuery && (
                 <div className="text-sm text-gray-400 space-y-1">
-                  <p>• No users have signed up yet, or</p>
+                  <p>• No customers have signed up yet, or</p>
                   <p>• There might be a database connectivity issue</p>
                   <Button onClick={fetchCustomers} variant="outline" className="mt-2">
                     Try Again
