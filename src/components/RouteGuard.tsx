@@ -35,6 +35,12 @@ export function RouteGuard({
       return;
     }
 
+    // For routes that don't require auth, always render
+    if (!requireAuth && !requireAdmin) {
+      setShouldRender(true);
+      return;
+    }
+
     // Check auth requirements
     if (requireAuth && !user) {
       console.log('🔄 RouteGuard: Redirecting to auth - no user');
@@ -66,8 +72,8 @@ export function RouteGuard({
     );
   }
 
-  // Don't render anything if we shouldn't
-  if (!shouldRender && (requireAuth || requireAdmin)) {
+  // Don't render anything if we're redirecting
+  if (!shouldRender) {
     return null;
   }
 

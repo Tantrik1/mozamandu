@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { RobustCartProvider } from "@/providers/RobustCartProvider";
 import { RouteGuard } from "@/components/RouteGuard";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
@@ -47,42 +48,44 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <SidebarProvider>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/home" element={<Home />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/categories" element={<Categories />} />
-                <Route path="/category/:categoryId" element={<CategoryPage />} />
-                <Route path="/subcategory/:subcategoryId" element={<SubcategoryPage />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route 
-                  path="/dashboard" 
-                  element={
-                    <RouteGuard requireAuth>
-                      <CustomerDashboard />
-                    </RouteGuard>
-                  } 
-                />
-                <Route 
-                  path="/admin/*" 
-                  element={
-                    <RouteGuard requireAuth requireAdmin>
-                      <EnhancedAdmin />
-                    </RouteGuard>
-                  } 
-                />
-                <Route path="/checkout" element={<Checkout />} />
-                <Route path="/order-summary" element={<OrderSummary />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/faq" element={<FAQ />} />
-                <Route path="/privacy" element={<PrivacyPolicy />} />
-                <Route path="/terms" element={<TermsConditions />} />
-                <Route path="/shipping" element={<ShippingPolicy />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </SidebarProvider>
+            <RobustCartProvider>
+              <SidebarProvider>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/home" element={<Home />} />
+                  <Route path="/products" element={<Products />} />
+                  <Route path="/categories" element={<Categories />} />
+                  <Route path="/category/:categoryId" element={<CategoryPage />} />
+                  <Route path="/subcategory/:subcategoryId" element={<SubcategoryPage />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route 
+                    path="/dashboard" 
+                    element={
+                      <RouteGuard requireAuth>
+                        <CustomerDashboard />
+                      </RouteGuard>
+                    } 
+                  />
+                  <Route 
+                    path="/admin/*" 
+                    element={
+                      <RouteGuard requireAuth requireAdmin>
+                        <EnhancedAdmin />
+                      </RouteGuard>
+                    } 
+                  />
+                  <Route path="/checkout" element={<Checkout />} />
+                  <Route path="/order-summary" element={<OrderSummary />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/faq" element={<FAQ />} />
+                  <Route path="/privacy" element={<PrivacyPolicy />} />
+                  <Route path="/terms" element={<TermsConditions />} />
+                  <Route path="/shipping" element={<ShippingPolicy />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </SidebarProvider>
+            </RobustCartProvider>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

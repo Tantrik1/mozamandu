@@ -52,14 +52,16 @@ export default function Auth() {
     if (!isLoading && user) {
       console.log('✅ Auth page: User authenticated, redirecting');
       
-      // Give a small delay to ensure profile is loaded
-      setTimeout(() => {
+      // Wait a bit for profile to load, then redirect
+      const timer = setTimeout(() => {
         if (userProfile?.role === 'admin') {
           navigate('/admin', { replace: true });
         } else {
           navigate('/dashboard', { replace: true });
         }
-      }, 100);
+      }, 500);
+
+      return () => clearTimeout(timer);
     }
   }, [user, userProfile, isLoading, navigate]);
 

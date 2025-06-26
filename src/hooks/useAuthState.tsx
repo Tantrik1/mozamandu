@@ -17,7 +17,7 @@ export function useAuthState() {
 
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!isMounted) return;
 
         console.log('🔄 AuthState: Auth state changed:', event, session?.user?.email || 'No session');
@@ -36,7 +36,12 @@ export function useAuthState() {
           clearUserProfile();
         }
         
-        setIsLoading(false);
+        // Only set loading to false after we've processed the auth change
+        setTimeout(() => {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+        }, 100);
       }
     );
 
@@ -53,12 +58,11 @@ export function useAuthState() {
 
         if (!isMounted) return;
 
-        // Only set state if we don't already have a session from the listener
-        if (!user && !session) {
-          setSession(session);
-          setUser(session?.user ?? null);
-          setIsLoading(false);
-        } else if (session?.user) {
+        // Set initial state
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
           // Fetch profile for initial session
           setTimeout(() => {
             if (isMounted) {
@@ -66,6 +70,13 @@ export function useAuthState() {
             }
           }, 0);
         }
+        
+        // Set loading to false after initial check
+        setTimeout(() => {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+        }, 100);
       } catch (error) {
         console.error('❌ AuthState: Session initialization error:', error);
         if (isMounted) {
