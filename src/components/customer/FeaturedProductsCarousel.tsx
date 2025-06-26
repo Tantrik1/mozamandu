@@ -16,6 +16,8 @@ interface Product {
   has_size_variants: boolean | null;
   status: string | null;
   stock_quantity: number | null;
+  category_id: string;
+  subcategory_id: string;
   subcategory: {
     id: string;
     name: string;
@@ -48,6 +50,8 @@ export function FeaturedProductsCarousel() {
             has_size_variants,
             status,
             stock_quantity,
+            category_id,
+            subcategory_id,
             subcategory:subcategories(id, name)
           `)
           .eq('status', 'active')
