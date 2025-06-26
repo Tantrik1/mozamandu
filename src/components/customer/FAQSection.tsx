@@ -7,7 +7,7 @@ interface FAQ {
   id: string;
   question: string;
   answer: string;
-  order_index: number;
+  display_order: number;
 }
 
 export function FAQSection() {
@@ -25,7 +25,7 @@ export function FAQSection() {
           .from('faqs')
           .select('*')
           .eq('is_active', true)
-          .order('order_index', { ascending: true });
+          .order('display_order', { ascending: true });
 
         if (!isMounted) return;
 

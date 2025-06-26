@@ -9,6 +9,8 @@ interface Subcategory {
   description: string | null;
   image_url: string | null;
   category_id: string;
+  selling_price: number;
+  minimum_quantity: number;
   category: {
     name: string;
   };
@@ -33,9 +35,11 @@ export function BrowseSubcategories() {
             description,
             image_url,
             category_id,
+            selling_price,
+            minimum_quantity,
             category:categories(name)
           `)
-          .eq('is_active', true)
+          .eq('status', 'on')
           .order('name');
 
         if (!isMounted) return;

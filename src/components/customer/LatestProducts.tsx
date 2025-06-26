@@ -6,7 +6,7 @@ import { ProductCard } from './ProductCard';
 interface Product {
   id: string;
   name: string;
-  base_price: number;
+  selling_price: number;
   image_url: string | null;
   subcategory: {
     id: string;
@@ -30,11 +30,11 @@ export function LatestProducts() {
           .select(`
             id,
             name,
-            base_price,
+            selling_price,
             image_url,
             subcategory:subcategories(id, name)
           `)
-          .eq('is_active', true)
+          .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(8);
 

@@ -5,8 +5,8 @@ import { toast } from '@/hooks/use-toast';
 
 interface DeliveryCharge {
   id: string;
-  location: string;
-  charge: number;
+  place_name: string;
+  delivery_price: number;
   is_active: boolean;
 }
 
@@ -14,7 +14,7 @@ interface PaymentMethod {
   id: string;
   name: string;
   is_active: boolean;
-  description?: string;
+  qr_code_url: string;
 }
 
 export function useCheckoutData() {
@@ -35,7 +35,7 @@ export function useCheckoutData() {
             .from('delivery_charges')
             .select('*')
             .eq('is_active', true)
-            .order('location'),
+            .order('place_name'),
           supabase
             .from('payment_methods')
             .select('*')
