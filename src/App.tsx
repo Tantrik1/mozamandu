@@ -3,98 +3,79 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/providers/AuthProvider";
-import { RobustCartProvider } from "@/providers/RobustCartProvider";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/hooks/useAuth";
+import { RobustCartProvider } from "@/hooks/useRobustCart";
 import { RouteGuard } from "@/components/RouteGuard";
-import { SidebarProvider } from "@/components/ui/sidebar";
-
 import Index from "./pages/Index";
-import Home from "./pages/Home";
-import Products from "./pages/Products";
+import Auth from "./pages/Auth";
+import Admin from "./pages/Admin";
 import Categories from "./pages/Categories";
 import CategoryPage from "./pages/CategoryPage";
 import SubcategoryPage from "./pages/SubcategoryPage";
-import Auth from "./pages/Auth";
+import Products from "./pages/Products";
 import CustomerDashboard from "./pages/CustomerDashboard";
-import EnhancedAdmin from "./pages/EnhancedAdmin";
 import Checkout from "./pages/Checkout";
 import OrderSummary from "./pages/OrderSummary";
-import Contact from "./pages/Contact";
-import About from "./pages/About";
-import FAQ from "./pages/FAQ";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
-import TermsConditions from "./pages/TermsConditions";
 import ShippingPolicy from "./pages/ShippingPolicy";
+import TermsConditions from "./pages/TermsConditions";
 import NotFound from "./pages/NotFound";
+import Home from "./pages/Home";
+import FAQ from "./pages/FAQ";
+import About from "./pages/About";  
+import Contact from "./pages/Contact";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+const queryClient = new QueryClient();
 
-const App = () => {
-  console.log('🚀 App: Initializing');
-  
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <RobustCartProvider>
-              <SidebarProvider>
-                <Routes>
-                  {/* Public routes - no RouteGuard needed */}
-                  <Route path="/" element={<Index />} />
-                  <Route path="/home" element={<Home />} />
-                  <Route path="/products" element={<Products />} />
-                  <Route path="/categories" element={<Categories />} />
-                  <Route path="/category/:categoryId" element={<CategoryPage />} />
-                  <Route path="/subcategory/:subcategoryId" element={<SubcategoryPage />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/checkout" element={<Checkout />} />
-                  <Route path="/order-summary" element={<OrderSummary />} />
-                  <Route path="/contact" element={<Contact />} />
-                  <Route path="/about" element={<About />} />
-                  <Route path="/faq" element={<FAQ />} />
-                  <Route path="/privacy" element={<PrivacyPolicy />} />
-                  <Route path="/terms" element={<TermsConditions />} />
-                  <Route path="/shipping" element={<ShippingPolicy />} />
-                  
-                  {/* Protected routes */}
-                  <Route 
-                    path="/dashboard" 
-                    element={
-                      <RouteGuard requireAuth>
-                        <CustomerDashboard />
-                      </RouteGuard>
-                    } 
-                  />
-                  <Route 
-                    path="/admin/*" 
-                    element={
-                      <RouteGuard requireAuth requireAdmin>
-                        <EnhancedAdmin />
-                      </RouteGuard>
-                    } 
-                  />
-                  
-                  {/* 404 page */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </SidebarProvider>
-            </RobustCartProvider>
-          </AuthProvider>
-        </BrowserRouter>
+        <AuthProvider>
+          <RobustCartProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route 
+                  path="/admin/*" 
+                  element={
+                    <RouteGuard requireAuth requireAdmin>
+                      <Admin />
+                    </RouteGuard>
+                  } 
+                />
+                <Route path="/categories" element={<Categories />} />
+                <Route path="/categories/:categoryId" element={<CategoryPage />} />
+                <Route path="/subcategories/:subcategoryId" element={<SubcategoryPage />} />
+                <Route path="/products" element={<Products />} />
+                <Route 
+                  path="/dashboard" 
+                  element={
+                    <RouteGuard requireAuth>
+                      <CustomerDashboard />
+                    </RouteGuard>
+                  } 
+                />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/order-summary/:orderId" element={<OrderSummary />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/shipping" element={<ShippingPolicy />} />
+                <Route path="/terms" element={<TermsConditions />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/faq" element={<FAQ />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </RobustCartProvider>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
-};
+}
 
 export default App;

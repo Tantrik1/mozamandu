@@ -18,56 +18,66 @@ export function RouteGuard({
 }: RouteGuardProps) {
   const { user, userProfile, isLoading } = useAuth();
   const navigate = useNavigate();
-  const [shouldRender, setShouldRender] = useState(false);
+  const [guardLoading, setGuardLoading] = useState(true);
 
   useEffect(() => {
-    console.log('🔄 RouteGuard: Checking permissions', { 
-      user: !!user, 
-      userProfile: !!userProfile, 
-      isLoading, 
-      requireAuth, 
-      requireAdmin 
-    });
+    let isMounted = true;
+    let loadingTimeout: NodeJS.Timeout;
 
-    // Show loading while auth is checking, but with timeout
-    if (isLoading) {
-      setShouldRender(false);
-      // Set a timeout to prevent infinite loading
-      const timeout = setTimeout(() => {
-        console.log('⏰ RouteGuard: Loading timeout - allowing render');
-        setShouldRender(true);
-      }, 2000);
-      return () => clearTimeout(timeout);
-    }
+    console.log('🔄 RouteGuard: Starting guard check');
 
-    // For routes that don't require auth, always render
-    if (!requireAuth && !requireAdmin) {
-      console.log('✅ RouteGuard: Public route - allowing access');
-      setShouldRender(true);
-      return;
-    }
+    // Set timeout fallback
+    loadingTimeout = setTimeout(() => {
+      if (isMounted && guardLoading) {
+        console.warn('⚠️ RouteGuard: Loading timeout after 10 seconds, forcing completion');
+        setGuardLoading(false);
+      }
+    }, 10000);
 
-    // Check auth requirements
-    if (requireAuth && !user) {
-      console.log('🔄 RouteGuard: Redirecting to auth - no user');
-      navigate(redirectTo, { replace: true });
-      setShouldRender(false);
-      return;
-    }
+    const checkPermissions = () => {
+      // Wait for auth to finish loading
+      if (isLoading) {
+        console.log('🔄 RouteGuard: Waiting for auth to complete');
+        return;
+      }
 
-    if (requireAdmin && (!user || !userProfile || userProfile.role !== 'admin')) {
-      console.log('🔄 RouteGuard: Redirecting to home - not admin');
-      navigate('/', { replace: true });
-      setShouldRender(false);
-      return;
-    }
+      if (!isMounted) return;
 
-    console.log('✅ RouteGuard: Access granted');
-    setShouldRender(true);
+      console.log('🔄 RouteGuard: Auth loaded, checking permissions...', { 
+        user: !!user, 
+        userProfile: !!userProfile, 
+        requireAuth, 
+        requireAdmin 
+      });
+
+      // Check auth requirements
+      if (requireAuth && !user) {
+        console.log('🔄 RouteGuard: Auth required but no user, redirecting to', redirectTo);
+        navigate(redirectTo, { replace: true });
+        return;
+      }
+
+      if (requireAdmin && (!user || !userProfile || userProfile.role !== 'admin')) {
+        console.log('🔄 RouteGuard: Admin required but user is not admin, redirecting to home');
+        navigate('/', { replace: true });
+        return;
+      }
+
+      console.log('✅ RouteGuard: All checks passed, clearing guard loading');
+      setGuardLoading(false);
+      clearTimeout(loadingTimeout);
+    };
+
+    checkPermissions();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(loadingTimeout);
+    };
   }, [user, userProfile, isLoading, requireAuth, requireAdmin, navigate, redirectTo]);
 
-  // Show loading while auth is checking (with shorter timeout)
-  if (isLoading) {
+  // Show loading while authentication or guard is checking
+  if (isLoading || guardLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -78,17 +88,9 @@ export function RouteGuard({
     );
   }
 
-  // Don't render anything if we're redirecting
-  if (!shouldRender) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Checking permissions...</p>
-        </div>
-      </div>
-    );
-  }
+  // Don't render anything if user should be redirected
+  if (requireAuth && !user) return null;
+  if (requireAdmin && (!user || !userProfile || userProfile.role !== 'admin')) return null;
 
   return <>{children}</>;
 }

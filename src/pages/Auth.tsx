@@ -19,7 +19,6 @@ export default function Auth() {
   const [authLoading, setAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
   const [showPassword, setShowPassword] = useState(false);
-  const [hasRedirected, setHasRedirected] = useState(false);
   
   const [signInData, setSignInData] = useState({
     email: '',
@@ -40,36 +39,16 @@ export default function Auth() {
     }
   }, [searchParams]);
 
-  // Handle redirect for authenticated users - with proper checks
   useEffect(() => {
-    console.log('🔄 Auth page: Checking auth state for redirect', { 
-      user: !!user, 
-      userProfile: !!userProfile, 
-      isLoading, 
-      hasRedirected,
-      userRole: userProfile?.role 
-    });
-
-    // Don't redirect if we're still loading or already redirected
-    if (isLoading || hasRedirected) {
-      return;
+    if (user && userProfile && !isLoading) {
+      // Role-based redirect
+      if (userProfile.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     }
-
-    // Only redirect if we have a user
-    if (user) {
-      console.log('✅ Auth page: User authenticated, preparing redirect');
-      setHasRedirected(true);
-      
-      // Use a longer delay to allow profile to load
-      const timer = setTimeout(() => {
-        const targetPath = userProfile?.role === 'admin' ? '/admin' : '/dashboard';
-        console.log('🔄 Auth page: Redirecting to:', targetPath);
-        navigate(targetPath, { replace: true });
-      }, 1000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [user, userProfile, isLoading, navigate, hasRedirected]);
+  }, [user, userProfile, isLoading, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,40 +58,27 @@ export default function Auth() {
       return;
     }
     
-    console.log('🔄 Auth page: Starting sign in process');
     setAuthLoading(true);
     setErrors({});
     
     const { error } = await signIn(signInData.email, signInData.password);
     if (error) {
-      console.error('❌ Auth page: Sign in error:', error);
       setErrors({ form: error.message });
-      setAuthLoading(false);
-    } else {
-      console.log('✅ Auth page: Sign in successful');
-      // Don't set authLoading to false here - let the redirect happen
     }
+    
+    setAuthLoading(false);
   };
 
-  // Show loading while auth is initializing - but with timeout
+  const handleSignUpSuccess = () => {
+    // User will be redirected to home by SignUpForm
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If user is authenticated and we haven't redirected yet, show loading
-  if (user && !hasRedirected) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirecting...</p>
         </div>
       </div>
     );
@@ -208,7 +174,7 @@ export default function Auth() {
                 <CardTitle>Create Your Account</CardTitle>
               </CardHeader>
               <CardContent>
-                <SignUpForm onSuccess={() => {}} />
+                <SignUpForm onSuccess={handleSignUpSuccess} />
               </CardContent>
             </Card>
           </TabsContent>
