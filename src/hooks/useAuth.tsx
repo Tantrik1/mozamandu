@@ -44,11 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (session?.user) {
             await fetchUserProfile(session.user.id);
           }
-          
-          setIsLoading(false);
         }
       } catch (error) {
         console.error('Session fetch error:', error);
+      } finally {
         if (mounted) {
           setIsLoading(false);
         }
@@ -57,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!mounted) return;
 
         console.log('Auth state changed:', event, session?.user?.email || 'No session');
@@ -66,12 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          await fetchUserProfile(session.user.id);
+          fetchUserProfile(session.user.id);
         } else {
           setUserProfile(null);
         }
-        
-        setIsLoading(false);
       }
     );
 
