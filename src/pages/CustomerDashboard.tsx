@@ -50,7 +50,7 @@ export default function CustomerDashboard() {
 
     setOrdersLoading(true);
     try {
-      console.log('Fetching orders for user:', user.id);
+      console.log('🔄 CustomerDashboard: Fetching orders for user:', user.id);
 
       const { data, error } = await supabase
         .from('orders')
@@ -59,23 +59,25 @@ export default function CustomerDashboard() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching user orders:', error);
+        console.error('❌ CustomerDashboard: Error fetching user orders:', error);
         toast({
           title: "Error",
           description: "Failed to fetch your orders",
           variant: "destructive",
         });
+        setOrders([]);
       } else {
-        console.log('User orders fetched:', data?.length || 0);
+        console.log('✅ CustomerDashboard: User orders fetched:', data?.length || 0);
         setOrders(data || []);
       }
     } catch (error) {
-      console.error('Unexpected error fetching orders:', error);
+      console.error('❌ CustomerDashboard: Unexpected error fetching orders:', error);
       toast({
         title: "Error",
         description: "Failed to fetch your orders",
         variant: "destructive",
       });
+      setOrders([]);
     } finally {
       setOrdersLoading(false);
     }

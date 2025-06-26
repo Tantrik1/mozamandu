@@ -1,101 +1,66 @@
 
 import { useState, useEffect } from 'react';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductCard } from './ProductCard';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface Product {
   id: string;
   name: string;
-  description: string;
-  selling_price: number;
-  is_featured: boolean;
-  image_url: string;
-  has_color_variants: boolean;
-  has_size_variants: boolean;
-  stock_quantity: number;
-  category_id: string;
-  subcategory_id: string;
-  cost_price: number;
-  categories: {
+  base_price: number;
+  image_url: string | null;
+  subcategory: {
+    id: string;
     name: string;
-  };
-  subcategories: {
-    name: string;
-    selling_price: number;
   };
 }
 
 export function FeaturedProductsCarousel() {
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
-    let loadingTimeout: NodeJS.Timeout;
 
-    console.log('🔄 FeaturedProductsCarousel: Starting data fetch');
-
-    // Set timeout fallback
-    loadingTimeout = setTimeout(() => {
-      if (isMounted && loading) {
-        console.warn('⚠️ FeaturedProductsCarousel: Loading timeout after 10 seconds');
-        setError('Loading took too long. Please refresh the page.');
-        setLoading(false);
-      }
-    }, 10000);
-    
     const fetchFeaturedProducts = async () => {
       try {
-        console.log('🔄 FeaturedProductsCarousel: Fetching featured products...');
+        console.log('🔄 FeaturedProductsCarousel: Starting data fetch');
+
         const { data, error } = await supabase
           .from('products')
           .select(`
             id,
             name,
-            description,
-            selling_price,
-            cost_price,
-            is_featured,
+            base_price,
             image_url,
-            has_color_variants,
-            has_size_variants,
-            stock_quantity,
-            category_id,
-            subcategory_id,
-            categories (name),
-            subcategories (name, selling_price)
+            subcategory:subcategories(id, name)
           `)
+          .eq('is_active', true)
           .eq('is_featured', true)
-          .eq('status', 'active')
+          .order('created_at', { ascending: false })
           .limit(8);
 
-        if (error) {
-          console.error('❌ FeaturedProductsCarousel: Error fetching featured products:', error);
-          // Check for RLS issues
-          if (error.code === 'PGRST116' || error.message.includes('row-level security')) {
-            console.warn('⚠️ FeaturedProductsCarousel: RLS may be blocking access');
-          }
-          throw error;
-        }
-        
         if (!isMounted) return;
 
-        console.log('✅ FeaturedProductsCarousel: Featured products fetched:', data?.length || 0);
-        setFeaturedProducts(data || []);
-        setError(null);
+        if (error) {
+          console.error('❌ FeaturedProductsCarousel: Fetch error:', error);
+          setProducts([]);
+        } else {
+          console.log('✅ FeaturedProductsCarousel: Featured products loaded:', data?.length || 0);
+          setProducts(data || []);
+        }
+
       } catch (error) {
-        console.error('❌ FeaturedProductsCarousel: Exception during fetch:', error);
+        console.error('❌ FeaturedProductsCarousel: Unexpected error:', error);
         if (isMounted) {
-          setError('Failed to load featured products. Please try again.');
+          setProducts([]);
         }
       } finally {
         if (isMounted) {
-          console.log('✅ FeaturedProductsCarousel: Setting loading to false');
+          console.log('✅ FeaturedProductsCarousel: Data fetch complete');
           setLoading(false);
-          clearTimeout(loadingTimeout);
         }
       }
     };
@@ -103,27 +68,34 @@ export function FeaturedProductsCarousel() {
     fetchFeaturedProducts();
 
     return () => {
-      console.log('🧹 FeaturedProductsCarousel: Cleanup');
       isMounted = false;
-      clearTimeout(loadingTimeout);
     };
   }, []);
 
+  const nextSlide = () => {
+    setCurrentIndex((prev) => (prev + 1) % Math.max(1, products.length - 3));
+  };
+
+  const prevSlide = () => {
+    setCurrentIndex((prev) => (prev - 1 + Math.max(1, products.length - 3)) % Math.max(1, products.length - 3));
+  };
+
   if (loading) {
     return (
-      <section className="py-16 bg-white">
+      <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Featured Products</h2>
-            <p className="text-gray-600">Discover our handpicked selection of premium products</p>
+            <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
+            <p className="mt-4 text-lg text-gray-600">
+              Discover our handpicked selection of premium socks
+            </p>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="space-y-3">
-                <Skeleton className="h-48 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="animate-pulse">
+                <div className="bg-gray-200 h-64 rounded-lg mb-4"></div>
+                <div className="h-6 bg-gray-200 rounded mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
               </div>
             ))}
           </div>
@@ -132,19 +104,18 @@ export function FeaturedProductsCarousel() {
     );
   }
 
-  if (error) {
+  if (products.length === 0) {
     return (
-      <section className="py-16 bg-white">
+      <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold mb-4">Featured Products</h2>
-            <p className="text-red-600 mb-4">{error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-            >
-              Retry
-            </button>
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
+            <p className="mt-4 text-lg text-gray-600">
+              Discover our handpicked selection of premium socks
+            </p>
+          </div>
+          <div className="text-center py-12">
+            <p className="text-gray-500">No featured products available at the moment.</p>
           </div>
         </div>
       </section>
@@ -152,25 +123,50 @@ export function FeaturedProductsCarousel() {
   }
 
   return (
-    <section className="py-16 bg-white">
+    <section className="py-16 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-4">Featured Products</h2>
-          <p className="text-gray-600">Discover our handpicked selection of premium products</p>
+          <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
+          <p className="mt-4 text-lg text-gray-600">
+            Discover our handpicked selection of premium socks
+          </p>
         </div>
         
-        <Carousel className="w-full">
-          <CarouselContent className="-ml-2 md:-ml-4">
-            {featuredProducts.map((product) => (
-              <CarouselItem key={product.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3 xl:basis-1/4">
-                <ProductCard 
-                  product={product} 
-                  subcategoryPrice={product.subcategories?.selling_price || 0} 
-                />
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-        </Carousel>
+        <div className="relative">
+          <div className="overflow-hidden">
+            <div 
+              className="flex transition-transform duration-300 ease-in-out"
+              style={{ transform: `translateX(-${currentIndex * 25}%)` }}
+            >
+              {products.map((product) => (
+                <div key={product.id} className="w-1/4 flex-shrink-0 px-3">
+                  <ProductCard product={product} />
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {products.length > 4 && (
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-4 bg-white shadow-lg hover:bg-gray-50"
+                onClick={prevSlide}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-4 bg-white shadow-lg hover:bg-gray-50"
+                onClick={nextSlide}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </section>
   );

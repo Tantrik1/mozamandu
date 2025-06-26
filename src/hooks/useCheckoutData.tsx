@@ -5,125 +5,87 @@ import { toast } from '@/hooks/use-toast';
 
 interface DeliveryCharge {
   id: string;
-  place_name: string;
-  delivery_price: number;
+  location: string;
+  charge: number;
+  is_active: boolean;
 }
 
 interface PaymentMethod {
   id: string;
   name: string;
-  qr_code_url: string;
+  is_active: boolean;
+  description?: string;
 }
 
 export function useCheckoutData() {
   const [deliveryCharges, setDeliveryCharges] = useState<DeliveryCharge[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const fetchCheckoutData = async () => {
+  useEffect(() => {
     let isMounted = true;
-    let loadingTimeout: NodeJS.Timeout;
 
-    console.log('🔄 useCheckoutData: Starting checkout data fetch');
-    setLoading(true);
-    setError(null);
+    const fetchCheckoutData = async () => {
+      try {
+        console.log('🔄 useCheckoutData: Starting checkout data fetch');
 
-    // Set timeout fallback
-    loadingTimeout = setTimeout(() => {
-      if (isMounted && loading) {
-        console.warn('⚠️ useCheckoutData: Loading timeout after 10 seconds');
-        setError('Loading took too long. Please try again.');
-        setLoading(false);
-      }
-    }, 10000);
+        // Fetch delivery charges and payment methods in parallel
+        const [deliveryResponse, paymentResponse] = await Promise.all([
+          supabase
+            .from('delivery_charges')
+            .select('*')
+            .eq('is_active', true)
+            .order('location'),
+          supabase
+            .from('payment_methods')
+            .select('*')
+            .eq('is_active', true)
+            .order('name')
+        ]);
 
-    try {
-      console.log('🔄 useCheckoutData: Fetching delivery charges and payment methods...');
-      
-      const [deliveryRes, paymentRes] = await Promise.all([
-        supabase
-          .from('delivery_charges')
-          .select('*')
-          .eq('is_active', true)
-          .order('place_name'),
-        supabase
-          .from('payment_methods')
-          .select('*')
-          .eq('is_active', true)
-          .order('name')
-      ]);
+        if (!isMounted) return;
 
-      if (!isMounted) return;
-
-      if (deliveryRes.error) {
-        console.error('❌ useCheckoutData: Error fetching delivery charges:', deliveryRes.error);
-        // Check for RLS issues
-        if (deliveryRes.error.code === 'PGRST116' || deliveryRes.error.message.includes('row-level security')) {
-          console.warn('⚠️ useCheckoutData: RLS may be blocking delivery charges access');
+        if (deliveryResponse.error) {
+          console.error('❌ useCheckoutData: Delivery charges error:', deliveryResponse.error);
+        } else {
+          console.log('✅ useCheckoutData: Delivery charges loaded:', deliveryResponse.data?.length || 0);
+          setDeliveryCharges(deliveryResponse.data || []);
         }
-        toast({
-          title: "Error",
-          description: "Failed to load delivery options",
-          variant: "destructive",
-        });
-      } else {
-        console.log('✅ useCheckoutData: Delivery charges fetched:', deliveryRes.data?.length || 0);
-        setDeliveryCharges(deliveryRes.data || []);
-      }
 
-      if (paymentRes.error) {
-        console.error('❌ useCheckoutData: Error fetching payment methods:', paymentRes.error);
-        // Check for RLS issues
-        if (paymentRes.error.code === 'PGRST116' || paymentRes.error.message.includes('row-level security')) {
-          console.warn('⚠️ useCheckoutData: RLS may be blocking payment methods access');
+        if (paymentResponse.error) {
+          console.error('❌ useCheckoutData: Payment methods error:', paymentResponse.error);
+        } else {
+          console.log('✅ useCheckoutData: Payment methods loaded:', paymentResponse.data?.length || 0);
+          setPaymentMethods(paymentResponse.data || []);
         }
-        toast({
-          title: "Error",
-          description: "Failed to load payment methods",
-          variant: "destructive",
-        });
-      } else {
-        console.log('✅ useCheckoutData: Payment methods fetched:', paymentRes.data?.length || 0);
-        setPaymentMethods(paymentRes.data || []);
-      }
 
-      if (deliveryRes.error || paymentRes.error) {
-        setError('Some checkout data could not be loaded. Please try again.');
+      } catch (error) {
+        console.error('❌ useCheckoutData: Unexpected error:', error);
+        if (isMounted) {
+          toast({
+            title: "Error",
+            description: "Failed to load checkout data",
+            variant: "destructive",
+          });
+        }
+      } finally {
+        if (isMounted) {
+          console.log('✅ useCheckoutData: Checkout data fetch complete');
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('❌ useCheckoutData: Unexpected error fetching checkout data:', error);
-      if (isMounted) {
-        setError('Failed to load checkout data. Please try again.');
-        toast({
-          title: "Error",
-          description: "Failed to load checkout data",
-          variant: "destructive",
-        });
-      }
-    } finally {
-      if (isMounted) {
-        console.log('✅ useCheckoutData: Setting loading to false');
-        setLoading(false);
-        clearTimeout(loadingTimeout);
-      }
-    }
+    };
+
+    fetchCheckoutData();
 
     return () => {
       isMounted = false;
-      clearTimeout(loadingTimeout);
     };
-  };
-
-  useEffect(() => {
-    fetchCheckoutData();
   }, []);
 
   return {
     deliveryCharges,
     paymentMethods,
     loading,
-    error,
-    refetch: fetchCheckoutData
   };
 }

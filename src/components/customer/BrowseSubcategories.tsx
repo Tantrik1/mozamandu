@@ -2,70 +2,61 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { SubcategoryCard } from './SubcategoryCard';
-import { Skeleton } from '@/components/ui/skeleton';
 
 interface Subcategory {
   id: string;
   name: string;
-  description?: string;
-  image_url?: string;
-  selling_price: number;
-  minimum_quantity: number;
+  description: string | null;
+  image_url: string | null;
+  category_id: string;
+  category: {
+    name: string;
+  };
 }
 
 export function BrowseSubcategories() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
-    let loadingTimeout: NodeJS.Timeout;
 
-    console.log('🔄 BrowseSubcategories: Starting data fetch');
-
-    // Set timeout fallback
-    loadingTimeout = setTimeout(() => {
-      if (isMounted && loading) {
-        console.warn('⚠️ BrowseSubcategories: Loading timeout after 10 seconds');
-        setError('Loading took too long. Please refresh the page.');
-        setLoading(false);
-      }
-    }, 10000);
-    
     const fetchSubcategories = async () => {
       try {
-        console.log('🔄 BrowseSubcategories: Fetching subcategories...');
+        console.log('🔄 BrowseSubcategories: Starting data fetch');
+
         const { data, error } = await supabase
           .from('subcategories')
-          .select('id, name, description, image_url, selling_price, minimum_quantity')
-          .eq('status', 'on')
-          .limit(6);
+          .select(`
+            id,
+            name,
+            description,
+            image_url,
+            category_id,
+            category:categories(name)
+          `)
+          .eq('is_active', true)
+          .order('name');
 
-        if (error) {
-          console.error('❌ BrowseSubcategories: Error fetching subcategories:', error);
-          // Check for RLS issues
-          if (error.code === 'PGRST116' || error.message.includes('row-level security')) {
-            console.warn('⚠️ BrowseSubcategories: RLS may be blocking access');
-          }
-          throw error;
-        }
-        
         if (!isMounted) return;
 
-        console.log('✅ BrowseSubcategories: Subcategories fetched:', data?.length || 0);
-        setSubcategories(data || []);
-        setError(null);
+        if (error) {
+          console.error('❌ BrowseSubcategories: Fetch error:', error);
+          setSubcategories([]);
+        } else {
+          console.log('✅ BrowseSubcategories: Subcategories loaded:', data?.length || 0);
+          setSubcategories(data || []);
+        }
+
       } catch (error) {
-        console.error('❌ BrowseSubcategories: Exception during fetch:', error);
+        console.error('❌ BrowseSubcategories: Unexpected error:', error);
         if (isMounted) {
-          setError('Failed to load subcategories. Please try again.');
+          setSubcategories([]);
         }
       } finally {
         if (isMounted) {
-          console.log('✅ BrowseSubcategories: Setting loading to false');
+          console.log('✅ BrowseSubcategories: Data fetch complete');
           setLoading(false);
-          clearTimeout(loadingTimeout);
         }
       }
     };
@@ -73,9 +64,7 @@ export function BrowseSubcategories() {
     fetchSubcategories();
 
     return () => {
-      console.log('🧹 BrowseSubcategories: Cleanup');
       isMounted = false;
-      clearTimeout(loadingTimeout);
     };
   }, []);
 
@@ -84,18 +73,17 @@ export function BrowseSubcategories() {
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">Browse by Categories</h2>
-            <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+            <h2 className="text-3xl font-bold text-gray-900">Browse by Categories</h2>
+            <p className="mt-4 text-lg text-gray-600">
               Explore our diverse range of sock categories, each crafted with precision and style
             </p>
           </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="space-y-3">
-                <Skeleton className="h-48 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="animate-pulse">
+                <div className="bg-gray-200 h-64 rounded-lg mb-4"></div>
+                <div className="h-6 bg-gray-200 rounded mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
               </div>
             ))}
           </div>
@@ -104,19 +92,18 @@ export function BrowseSubcategories() {
     );
   }
 
-  if (error) {
+  if (subcategories.length === 0) {
     return (
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">Browse by Categories</h2>
-            <p className="text-red-600 mb-4">{error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-            >
-              Retry
-            </button>
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900">Browse by Categories</h2>
+            <p className="mt-4 text-lg text-gray-600">
+              Explore our diverse range of sock categories, each crafted with precision and style
+            </p>
+          </div>
+          <div className="text-center py-12">
+            <p className="text-gray-500">No categories available at the moment.</p>
           </div>
         </div>
       </section>
@@ -127,13 +114,12 @@ export function BrowseSubcategories() {
     <section className="py-16 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">Browse by Categories</h2>
-          <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+          <h2 className="text-3xl font-bold text-gray-900">Browse by Categories</h2>
+          <p className="mt-4 text-lg text-gray-600">
             Explore our diverse range of sock categories, each crafted with precision and style
           </p>
         </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {subcategories.map((subcategory) => (
             <SubcategoryCard key={subcategory.id} subcategory={subcategory} />
           ))}
