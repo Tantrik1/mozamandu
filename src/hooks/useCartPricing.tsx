@@ -1,6 +1,5 @@
 
 import { useMemo } from 'react';
-import { usePricing } from './usePricing';
 
 interface CartItem {
   id: string;
@@ -48,69 +47,68 @@ interface UseCartPricingProps {
 }
 
 export function useCartPricing({ cartItems, activeCombo, discountTiers }: UseCartPricingProps) {
-  const { calculateTieredPricing } = usePricing();
+  
+  const getItemPricing = (item: CartItem): PricingInfo => {
+    const subcategoryQuantity = cartItems
+      .filter(cartItem => cartItem.subcategoryId === item.subcategoryId)
+      .reduce((sum, cartItem) => sum + cartItem.quantity, 0);
 
-  const subcategoryQuantities = useMemo(() => {
-    const quantities: { [key: string]: number } = {};
-    cartItems.forEach(item => {
-      quantities[item.subcategoryId] = (quantities[item.subcategoryId] || 0) + item.quantity;
-    });
-    return quantities;
-  }, [cartItems]);
-
-  const getItemPricing = useMemo(() => {
-    return (item: CartItem): PricingInfo => {
-      const subcategoryTotalQty = subcategoryQuantities[item.subcategoryId] || 0;
+    // Check for combo pricing first
+    if (activeCombo) {
+      const comboSubcategory = activeCombo.combo_subcategories.find(
+        cs => cs.subcategory_id === item.subcategoryId
+      );
       
-      // Priority 1: Check if combo is active and applies to this subcategory
-      if (activeCombo) {
-        const comboSubcategory = activeCombo.combo_subcategories.find(
-          cs => cs.subcategory_id === item.subcategoryId
-        );
-        
-        if (comboSubcategory && subcategoryTotalQty >= comboSubcategory.min_units) {
-          return {
-            finalPrice: comboSubcategory.price,
-            description: `Combo: Rs. ${comboSubcategory.price.toFixed(2)} each`,
-            mode: 'combo',
-            isCombo: true
-          };
-        }
-      }
-
-      // Priority 2: Check for discount tiers based on subcategory total (MOQ)
-      const tiers = discountTiers[item.subcategoryId];
-      if (tiers && tiers.length > 0 && subcategoryTotalQty >= tiers[0].min_quantity) {
-        const pricing = calculateTieredPricing(item.basePrice, subcategoryTotalQty, tiers);
+      if (comboSubcategory && subcategoryQuantity >= comboSubcategory.min_units) {
         return {
-          finalPrice: pricing.finalPrice,
-          description: `MOQ Discount: ${pricing.description}`,
-          mode: 'discount',
-          breakdown: pricing.breakdown
+          finalPrice: comboSubcategory.price,
+          description: `Combo: ${activeCombo.name}`,
+          mode: 'combo',
+          isCombo: true,
+          breakdown: [`Combo Price: Rs. ${comboSubcategory.price}`]
         };
       }
+    }
 
-      // Priority 3: Normal pricing
+    // Check for discount tiers
+    const tierDiscounts = discountTiers[item.subcategoryId] || [];
+    const applicableTier = tierDiscounts.find(tier => 
+      subcategoryQuantity >= tier.min_quantity && 
+      (tier.max_quantity === null || subcategoryQuantity <= tier.max_quantity)
+    );
+
+    if (applicableTier) {
+      const discountedPrice = Math.max(0, item.basePrice - applicableTier.discount_amount);
       return {
-        finalPrice: item.basePrice,
-        description: `Rs. ${item.basePrice.toFixed(2)} each`,
-        mode: 'normal'
+        finalPrice: discountedPrice,
+        description: `Bulk Discount (${subcategoryQuantity} units)`,
+        mode: 'discount',
+        breakdown: [
+          `Base Price: Rs. ${item.basePrice}`,
+          `Discount: -Rs. ${applicableTier.discount_amount}`,
+          `Final Price: Rs. ${discountedPrice}`
+        ]
       };
-    };
-  }, [subcategoryQuantities, activeCombo, discountTiers, calculateTieredPricing]);
+    }
 
-  const getTotalPrice = useMemo(() => {
-    return (): number => {
-      return cartItems.reduce((total, item) => {
-        const pricing = getItemPricing(item);
-        return total + (pricing.finalPrice * item.quantity);
-      }, 0);
+    // Normal pricing
+    return {
+      finalPrice: item.basePrice,
+      description: 'Regular Price',
+      mode: 'normal',
+      breakdown: [`Regular Price: Rs. ${item.basePrice}`]
     };
-  }, [cartItems, getItemPricing]);
+  };
+
+  const getTotalPrice = (): number => {
+    return cartItems.reduce((total, item) => {
+      const pricing = getItemPricing(item);
+      return total + (pricing.finalPrice * item.quantity);
+    }, 0);
+  };
 
   return {
     getItemPricing,
-    getTotalPrice,
-    subcategoryQuantities
+    getTotalPrice
   };
 }

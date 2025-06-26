@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
 
 interface CartItem {
   id: string;
@@ -33,29 +32,25 @@ interface UseComboManagerProps {
 }
 
 export function useComboManager({ cartItems }: UseComboManagerProps) {
+  const [combos, setCombos] = useState<ComboData[]>([]);
   const [activeCombo, setActiveCombo] = useState<ComboData | null>(null);
-  const [previousComboId, setPreviousComboId] = useState<string | null>(null);
 
-  const checkComboEligibility = async () => {
+  useEffect(() => {
+    fetchCombos();
+  }, []);
+
+  useEffect(() => {
+    checkForActiveCombo();
+  }, [cartItems, combos]);
+
+  const fetchCombos = async () => {
     try {
-      if (cartItems.length === 0) {
-        if (activeCombo) {
-          setActiveCombo(null);
-          setPreviousComboId(null);
-        }
-        return;
-      }
-
-      console.log('🔍 Checking combo eligibility...');
-      console.log('📦 Cart items:', cartItems);
-
-      const { data: combos, error: combosError } = await supabase
+      const { data, error } = await supabase
         .from('combos')
         .select(`
           id,
           name,
           description,
-          status,
           combo_subcategories (
             subcategory_id,
             min_units,
@@ -64,134 +59,59 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
         `)
         .eq('status', 'active');
 
-      if (combosError) {
-        console.error('❌ Error fetching combos:', combosError);
+      if (error) {
+        console.error('Error fetching combos:', error);
         return;
       }
 
-      console.log('📋 Available combos:', combos);
-
-      // Calculate subcategory quantities
-      const subcategoryCounts: { [key: string]: number } = {};
-      for (const cartItem of cartItems) {
-        const subcategoryId = cartItem.subcategoryId;
-        subcategoryCounts[subcategoryId] = (subcategoryCounts[subcategoryId] || 0) + cartItem.quantity;
-      }
-
-      console.log('📊 Subcategory counts in cart:', subcategoryCounts);
-
-      // Get subcategory names for better debugging
-      const subcategoryIds = Object.keys(subcategoryCounts);
-      if (subcategoryIds.length > 0) {
-        const { data: subcategoryNames } = await supabase
-          .from('subcategories')
-          .select('id, name')
-          .in('id', subcategoryIds);
-        
-        if (subcategoryNames) {
-          const nameMap = subcategoryNames.reduce((acc, sub) => {
-            acc[sub.id] = sub.name;
-            return acc;
-          }, {} as { [key: string]: string });
-          
-          console.log('📝 Cart subcategories with names:', 
-            Object.entries(subcategoryCounts).map(([id, count]) => ({
-              id,
-              name: nameMap[id] || 'Unknown',
-              count
-            }))
-          );
-        }
-      }
-
-      let newActiveCombo: ComboData | null = null;
-      
-      // Check each combo for eligibility
-      for (const combo of combos || []) {
-        console.log(`🎯 Checking combo: ${combo.name}`);
-        console.log(`📋 Combo requirements:`, combo.combo_subcategories);
-        
-        let isEligible = true;
-        const missingRequirements: string[] = [];
-        
-        for (const comboSubcategory of combo.combo_subcategories) {
-          const requiredUnits = comboSubcategory.min_units;
-          const availableUnits = subcategoryCounts[comboSubcategory.subcategory_id] || 0;
-          
-          console.log(`📏 Subcategory ${comboSubcategory.subcategory_id}: needs ${requiredUnits}, has ${availableUnits}`);
-          
-          if (availableUnits < requiredUnits) {
-            isEligible = false;
-            missingRequirements.push(`Subcategory ${comboSubcategory.subcategory_id}: needs ${requiredUnits}, has ${availableUnits}`);
-          }
-        }
-
-        if (isEligible) {
-          console.log(`✅ Combo "${combo.name}" is eligible!`);
-          newActiveCombo = combo;
-          break; // Take the first eligible combo
-        } else {
-          console.log(`❌ Combo "${combo.name}" not eligible. Missing:`, missingRequirements);
-        }
-      }
-
-      // Handle combo state changes and notifications
-      if (newActiveCombo && (!activeCombo || activeCombo.id !== newActiveCombo.id)) {
-        // New combo activated
-        console.log(`🎉 Activating combo: ${newActiveCombo.name}`);
-        toast({
-          title: "🎉 Combo Applied!",
-          description: `${newActiveCombo.name}: ${newActiveCombo.description}`,
-          duration: 4000,
-        });
-        setActiveCombo(newActiveCombo);
-        setPreviousComboId(newActiveCombo.id);
-      } else if (activeCombo && !newActiveCombo) {
-        // Combo lost
-        console.log('💔 Combo lost');
-        toast({
-          title: "💰 Normal Pricing Applied",
-          description: "Combo requirements no longer met. Add more items to reactivate combo pricing.",
-          duration: 3000,
-        });
-        setActiveCombo(null);
-        setPreviousComboId(null);
-      } else if (!newActiveCombo && !activeCombo) {
-        // No combo, maintain state
-        console.log('🚫 No combo eligible');
-        setActiveCombo(null);
-      } else {
-        // Same combo still active, no notification needed
-        console.log(`✨ Combo "${newActiveCombo?.name}" still active`);
-        setActiveCombo(newActiveCombo);
-      }
-
+      setCombos(data || []);
     } catch (error) {
-      console.error('💥 Error checking combo eligibility:', error);
+      console.error('Error fetching combos:', error);
     }
   };
 
-  useEffect(() => {
-    checkComboEligibility();
-  }, [cartItems]);
+  const checkForActiveCombo = () => {
+    if (cartItems.length === 0 || combos.length === 0) {
+      setActiveCombo(null);
+      return;
+    }
 
-  const isComboActive = (subcategoryId: string): boolean => {
-    if (!activeCombo) return false;
-    return activeCombo.combo_subcategories.some(cs => cs.subcategory_id === subcategoryId);
-  };
+    // Group cart items by subcategory
+    const subcategoryQuantities = cartItems.reduce((acc, item) => {
+      acc[item.subcategoryId] = (acc[item.subcategoryId] || 0) + item.quantity;
+      return acc;
+    }, {} as { [key: string]: number });
 
-  const getComboPrice = (subcategoryId: string): number | null => {
-    if (!activeCombo) return null;
-    const comboSubcategory = activeCombo.combo_subcategories.find(
-      cs => cs.subcategory_id === subcategoryId
-    );
-    return comboSubcategory ? comboSubcategory.price : null;
+    // Find the best applicable combo
+    let bestCombo: ComboData | null = null;
+    let bestComboScore = 0;
+
+    for (const combo of combos) {
+      let comboScore = 0;
+      let allRequirementsMet = true;
+
+      for (const comboSubcategory of combo.combo_subcategories) {
+        const availableQuantity = subcategoryQuantities[comboSubcategory.subcategory_id] || 0;
+        
+        if (availableQuantity >= comboSubcategory.min_units) {
+          comboScore += availableQuantity;
+        } else {
+          allRequirementsMet = false;
+          break;
+        }
+      }
+
+      if (allRequirementsMet && comboScore > bestComboScore) {
+        bestCombo = combo;
+        bestComboScore = comboScore;
+      }
+    }
+
+    setActiveCombo(bestCombo);
   };
 
   return {
     activeCombo,
-    isComboActive,
-    getComboPrice,
-    checkComboEligibility
+    combos
   };
 }
