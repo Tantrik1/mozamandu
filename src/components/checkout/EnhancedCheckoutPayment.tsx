@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,7 +63,7 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
   const [paymentData, setPaymentData] = useState({
     promoCode: '',
     paymentMethodId: '',
-    paymentType: 'partial' as 'full' | 'partial',
+    paymentType: 'full' as 'full' | 'partial',
     paidAmount: '',
     paymentNotes: '',
     paymentScreenshot: null as File | null,
@@ -324,6 +325,7 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
           payment_method_id: paymentData.paymentMethodId,
           payment_screenshot_url: paymentScreenshotUrl,
           payment_notes: paymentData.paymentNotes,
+          status: 'pending_payment'
         })
         .select()
         .single();
@@ -349,7 +351,7 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
       });
 
       const { error: itemsError } = await supabase
-        .from('order_items')
+        .from('order_item_details')
         .insert(orderItems);
 
       if (itemsError) throw itemsError;
@@ -570,6 +572,11 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
                   </Button>
                 )}
               </div>
+              {appliedPromo && (
+                <p className="text-sm text-green-600 mt-1">
+                  Promo code "{appliedPromo.code}" applied - {appliedPromo.discount_percentage}% discount
+                </p>
+              )}
             </div>
 
             {/* Payment Method */}
@@ -623,7 +630,7 @@ export function EnhancedCheckoutPayment({ isGuest, onComplete, onBack }: Checkou
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="partial" id="partial" />
-                  <Label htmlFor="partial">Pay Custom Amount (Min: Rs. {totals.minimumPayment.toFixed(2)})</Label>
+                  <Label htmlFor="partial">Pay Partial Amount (Min: Rs. {totals.minimumPayment.toFixed(2)} - 20%)</Label>
                 </div>
               </RadioGroup>
 
