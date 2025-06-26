@@ -426,15 +426,12 @@ export type Database = {
           delivery_location_id: string | null
           id: string
           order_number: string
-          paid_amount: number
           payment_method_id: string | null
-          payment_notes: string | null
           payment_screenshot_url: string | null
           pricing_breakdown: Json | null
           promocode_discount: number | null
           promocode_used: string | null
-          remaining_amount: number
-          status: string
+          status: Database["public"]["Enums"]["order_status"]
           subtotal: number
           total_amount: number
           updated_at: string | null
@@ -452,15 +449,12 @@ export type Database = {
           delivery_location_id?: string | null
           id?: string
           order_number?: string
-          paid_amount?: number
           payment_method_id?: string | null
-          payment_notes?: string | null
           payment_screenshot_url?: string | null
           pricing_breakdown?: Json | null
           promocode_discount?: number | null
           promocode_used?: string | null
-          remaining_amount?: number
-          status?: string
+          status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           total_amount?: number
           updated_at?: string | null
@@ -478,15 +472,12 @@ export type Database = {
           delivery_location_id?: string | null
           id?: string
           order_number?: string
-          paid_amount?: number
           payment_method_id?: string | null
-          payment_notes?: string | null
           payment_screenshot_url?: string | null
           pricing_breakdown?: Json | null
           promocode_discount?: number | null
           promocode_used?: string | null
-          remaining_amount?: number
-          status?: string
+          status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           total_amount?: number
           updated_at?: string | null
@@ -876,6 +867,12 @@ export type Database = {
     }
     Enums: {
       category_status: "on" | "off"
+      order_status:
+        | "pending_payment"
+        | "payment_confirmed"
+        | "on_delivery"
+        | "delivered"
+        | "cancelled"
       product_status: "active" | "inactive"
       user_role: "admin" | "customer"
     }
@@ -994,6 +991,13 @@ export const Constants = {
   public: {
     Enums: {
       category_status: ["on", "off"],
+      order_status: [
+        "pending_payment",
+        "payment_confirmed",
+        "on_delivery",
+        "delivered",
+        "cancelled",
+      ],
       product_status: ["active", "inactive"],
       user_role: ["admin", "customer"],
     },
