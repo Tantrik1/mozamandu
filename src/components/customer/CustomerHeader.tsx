@@ -16,7 +16,14 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { CategoriesMegaMenu } from './CategoriesMegaMenu';
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+} from '@/components/ui/navigation-menu';
+import { ChevronDown, Package } from 'lucide-react';
 
 interface NavbarItem {
   id: string;
@@ -118,6 +125,52 @@ export function CustomerHeader() {
     }
   };
 
+  const renderCategoryItem = (item: NavbarItem) => {
+    const category = item.category;
+    if (!category) return null;
+
+    return (
+      <NavigationMenu key={item.id}>
+        <NavigationMenuList>
+          <NavigationMenuItem>
+            <NavigationMenuTrigger className="text-gray-700 hover:text-red-600 font-medium transition-colors">
+              {category.name}
+              <ChevronDown className="ml-1 h-4 w-4" />
+            </NavigationMenuTrigger>
+            <NavigationMenuContent>
+              <div className="w-screen bg-white border-t shadow-lg">
+                <div className="max-w-7xl mx-auto p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    {category.subcategories?.map((subcategory) => (
+                      <Link
+                        key={subcategory.id}
+                        to={`/subcategories/${subcategory.id}`}
+                        className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        {subcategory.image_url ? (
+                          <img 
+                            src={subcategory.image_url} 
+                            alt={subcategory.name}
+                            className="w-12 h-12 object-cover rounded-lg"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                            <Package className="w-6 h-6 text-red-300" />
+                          </div>
+                        )}
+                        <span className="font-medium text-gray-900">{subcategory.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </NavigationMenuContent>
+          </NavigationMenuItem>
+        </NavigationMenuList>
+      </NavigationMenu>
+    );
+  };
+
   return (
     <header className="bg-white shadow-sm sticky top-0 z-40">
       <div className="border-b">
@@ -129,7 +182,7 @@ export function CustomerHeader() {
             
             <nav className="hidden md:flex items-center space-x-8">
               {otherItems.map(renderNavItem)}
-              <CategoriesMegaMenu categories={categoryItems} />
+              {categoryItems.map(renderCategoryItem)}
             </nav>
 
             <div className="flex items-center space-x-4">
