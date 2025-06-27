@@ -1,14 +1,33 @@
 
-import { Home, Package, ShoppingCart, Users, Gift, Percent, CreditCard, Truck, Bell, Type, Settings, HelpCircle, List, Menu } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
-  SidebarHeader,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@/components/ui/sidebar"
+import { 
+  Home, 
+  Package, 
+  Users, 
+  Gift, 
+  Tag, 
+  CreditCard, 
+  Truck, 
+  Bell, 
+  Type, 
+  Settings,
+  ShoppingCart,
+  UserCheck,
+  LogOut,
+  HelpCircle
+} from "lucide-react"
+import { Link, useLocation } from "react-router-dom"
+import { useAuth } from "@/hooks/useAuth"
 
 const menuItems = [
   {
@@ -19,10 +38,10 @@ const menuItems = [
   {
     title: "Categories",
     url: "/admin/categories",
-    icon: List,
+    icon: Package,
   },
   {
-    title: "Subcategories",
+    title: "Subcategories", 
     url: "/admin/subcategories",
     icon: Package,
   },
@@ -39,7 +58,7 @@ const menuItems = [
   {
     title: "Customers",
     url: "/admin/customers",
-    icon: Users,
+    icon: UserCheck,
   },
   {
     title: "Combos",
@@ -47,9 +66,9 @@ const menuItems = [
     icon: Gift,
   },
   {
-    title: "Promocodes",
+    title: "Promo Codes",
     url: "/admin/promocodes",
-    icon: Percent,
+    icon: Tag,
   },
   {
     title: "Payment Methods",
@@ -72,11 +91,6 @@ const menuItems = [
     icon: Type,
   },
   {
-    title: "Navbar",
-    url: "/admin/navbar",
-    icon: Menu,
-  },
-  {
     title: "FAQs",
     url: "/admin/faqs",
     icon: HelpCircle,
@@ -86,30 +100,47 @@ const menuItems = [
     url: "/admin/settings",
     icon: Settings,
   },
-];
+]
 
 export function AdminSidebar() {
-  const location = useLocation();
+  const location = useLocation()
+  const { signOut } = useAuth()
+
+  const handleSignOut = () => {
+    signOut()
+  }
 
   return (
     <Sidebar>
-      <SidebarHeader className="border-b p-4">
-        <h2 className="text-lg font-semibold">Admin Panel</h2>
-      </SidebarHeader>
       <SidebarContent>
-        <SidebarMenu>
-          {menuItems.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                <Link to={item.url}>
-                  <item.icon />
-                  <span>{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
+        <SidebarGroup>
+          <SidebarGroupLabel>Admin Panel</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
+                    <Link to={item.url}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={handleSignOut}>
+              <LogOut />
+              <span>Sign Out</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
-  );
+  )
 }

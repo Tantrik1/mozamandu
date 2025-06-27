@@ -13,7 +13,6 @@ import { PaymentMethodManagement } from '@/components/admin/PaymentMethodManagem
 import { DeliveryChargeManagement } from '@/components/admin/DeliveryChargeManagement';
 import { NoticeManagement } from '@/components/admin/NoticeManagement';
 import { TopBarTextManagement } from '@/components/admin/TopBarTextManagement';
-import { NavbarManagement } from '@/components/admin/NavbarManagement';
 import { AdminSettings } from '@/components/admin/AdminSettings';
 import { FAQManagement } from '@/components/admin/FAQManagement';
 import { SidebarProvider } from '@/components/ui/sidebar';
@@ -81,7 +80,6 @@ export default function Admin() {
             <Route path="delivery-charges" element={<DeliveryChargeManagement />} />
             <Route path="notices" element={<NoticeManagement />} />
             <Route path="top-bar-text" element={<TopBarTextManagement />} />
-            <Route path="navbar" element={<NavbarManagement />} />
             <Route path="faqs" element={<FAQManagement />} />
             <Route path="settings" element={<AdminSettings />} />
           </Routes>
