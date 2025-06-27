@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useAuth } from '@/hooks/useAuth';
@@ -97,6 +96,11 @@ export function UniversalCheckout() {
       if (!paidAmount || parseFloat(paidAmount) <= 0) {
         errors.paidAmount = 'Please enter a valid payment amount';
       }
+    }
+
+    // Make payment screenshot compulsory
+    if (!paymentScreenshot) {
+      errors.paymentScreenshot = 'Payment screenshot is required';
     }
 
     setFormErrors(errors);

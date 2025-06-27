@@ -1,4 +1,3 @@
-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -121,15 +120,16 @@ export function PaymentMethodSection({
         </div>
 
         <div>
-          <Label>Payment Screenshot</Label>
+          <Label>Payment Screenshot *</Label>
           <Input
             type="file"
             accept="image/*"
             onChange={(e) => setPaymentScreenshot(e.target.files?.[0] || null)}
             disabled={uploadingScreenshot}
+            required
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Upload screenshot of your payment (optional but recommended)
+          <p className="text-xs text-red-500 mt-1">
+            Payment screenshot is required to complete your order
           </p>
           {uploadingScreenshot && (
             <div className="flex items-center mt-2 text-sm text-blue-600">

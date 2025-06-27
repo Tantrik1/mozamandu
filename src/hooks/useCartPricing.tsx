@@ -71,16 +71,17 @@ export function useCartPricing({ cartItems, activeCombo, discountTiers }: UseCar
         if (comboSubcategory && subcategoryTotalQty >= comboSubcategory.min_units) {
           return {
             finalPrice: comboSubcategory.price,
-            description: `Combo: Rs. ${comboSubcategory.price.toFixed(2)} each`,
+            description: `Combo: Rs. ${comboSubcategory.price.toFixed(2)} each (Min qty requirements waived)`,
             mode: 'combo',
-            isCombo: true
+            isCombo: true,
+            breakdown: [`Base price: Rs. ${item.basePrice.toFixed(2)}`, `Combo price: Rs. ${comboSubcategory.price.toFixed(2)}`, 'Minimum quantity requirements waived for combo']
           };
         }
       }
 
-      // Priority 2: Check for discount tiers based on subcategory total (MOQ)
+      // Priority 2: Check for discount tiers based on subcategory total (MOQ) - only if combo is not active
       const tiers = discountTiers[item.subcategoryId];
-      if (tiers && tiers.length > 0 && subcategoryTotalQty >= tiers[0].min_quantity) {
+      if (tiers && tiers.length > 0 && subcategoryTotalQty >= tiers[0].min_quantity && !activeCombo) {
         const pricing = calculateTieredPricing(item.basePrice, subcategoryTotalQty, tiers);
         return {
           finalPrice: pricing.finalPrice,
