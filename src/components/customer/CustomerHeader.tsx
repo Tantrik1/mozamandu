@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,7 +17,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { ImprovedMegaMenu } from './ImprovedMegaMenu';
+import { CategoriesMegaMenu } from './CategoriesMegaMenu';
 
 export function CustomerHeader() {
   const { user, signOut, userProfile } = useAuth();
@@ -64,7 +65,7 @@ export function CustomerHeader() {
                 Home
               </Link>
               
-              <ImprovedMegaMenu />
+              <CategoriesMegaMenu />
               
               <Link to="/faqs" className="text-gray-700 hover:text-red-600 font-medium transition-colors">
                 FAQs
