@@ -27,6 +27,11 @@ interface NavbarItem {
   category?: {
     id: string;
     name: string;
+    subcategories: Array<{
+      id: string;
+      name: string;
+      image_url?: string;
+    }>;
   };
 }
 
@@ -44,7 +49,11 @@ export function CustomerHeader() {
       .from('navbar_items')
       .select(`
         *,
-        category:categories(id, name)
+        category:categories!inner(
+          id,
+          name,
+          subcategories(id, name, image_url)
+        )
       `)
       .eq('is_visible', true)
       .order('display_order');
@@ -79,6 +88,9 @@ export function CustomerHeader() {
     }
   };
 
+  const categoryItems = navbarItems.filter(item => item.item_type === 'category' && item.category);
+  const otherItems = navbarItems.filter(item => item.item_type !== 'category');
+
   const renderNavItem = (item: NavbarItem) => {
     switch (item.item_type) {
       case 'home':
@@ -101,8 +113,6 @@ export function CustomerHeader() {
             FAQs
           </Link>
         );
-      case 'category':
-        return null; // Categories are handled by CategoriesMegaMenu
       default:
         return null;
     }
@@ -110,7 +120,6 @@ export function CustomerHeader() {
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-40">
-      
       <div className="border-b">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
@@ -119,8 +128,8 @@ export function CustomerHeader() {
             </Link>
             
             <nav className="hidden md:flex items-center space-x-8">
-              {navbarItems.map(renderNavItem)}
-              <CategoriesMegaMenu />
+              {otherItems.map(renderNavItem)}
+              <CategoriesMegaMenu categories={categoryItems} />
             </nav>
 
             <div className="flex items-center space-x-4">
