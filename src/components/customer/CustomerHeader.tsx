@@ -110,15 +110,6 @@ export function CustomerHeader() {
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-40">
-      <div className="bg-gray-50 border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-end h-8">
-            <p className="text-gray-500 text-sm">
-              Free shipping on orders over Rs. 2000
-            </p>
-          </div>
-        </div>
-      </div>
       
       <div className="border-b">
         <div className="max-w-7xl mx-auto px-4">
