@@ -1,10 +1,11 @@
+
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from '@/components/ui/button';
 import { ShoppingCart } from 'lucide-react';
-import { useRobustCart } from '@/hooks/useRobustCart';
+import { CartSidebar } from './CartSidebar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,13 +16,43 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
-import { ImprovedMegaMenu } from './ImprovedMegaMenu';
+import { CategoriesMegaMenu } from './CategoriesMegaMenu';
+
+interface NavbarItem {
+  id: string;
+  item_type: string;
+  category_id?: string;
+  is_visible: boolean;
+  display_order: number;
+  category?: {
+    id: string;
+    name: string;
+  };
+}
 
 export function CustomerHeader() {
   const { user, signOut, userProfile } = useAuth();
-  const { getTotalItems } = useRobustCart();
   const navigate = useNavigate();
+  const [navbarItems, setNavbarItems] = useState<NavbarItem[]>([]);
+
+  useEffect(() => {
+    fetchNavbarItems();
+  }, []);
+
+  const fetchNavbarItems = async () => {
+    const { data } = await supabase
+      .from('navbar_items')
+      .select(`
+        *,
+        category:categories(id, name)
+      `)
+      .eq('is_visible', true)
+      .order('display_order');
+
+    if (data) {
+      setNavbarItems(data);
+    }
+  };
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -37,6 +68,43 @@ export function CustomerHeader() {
         description: "Signed out successfully",
       });
       navigate('/');
+    }
+  };
+
+  const handleDashboardClick = () => {
+    if (userProfile?.role === 'admin') {
+      navigate('/admin');
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
+  const renderNavItem = (item: NavbarItem) => {
+    switch (item.item_type) {
+      case 'home':
+        return (
+          <Link 
+            key={item.id}
+            to="/" 
+            className="text-gray-700 hover:text-red-600 font-medium transition-colors"
+          >
+            Home
+          </Link>
+        );
+      case 'faq':
+        return (
+          <Link 
+            key={item.id}
+            to="/faqs" 
+            className="text-gray-700 hover:text-red-600 font-medium transition-colors"
+          >
+            FAQs
+          </Link>
+        );
+      case 'category':
+        return null; // Categories are handled by CategoriesMegaMenu
+      default:
+        return null;
     }
   };
 
@@ -60,28 +128,12 @@ export function CustomerHeader() {
             </Link>
             
             <nav className="hidden md:flex items-center space-x-8">
-              <Link to="/" className="text-gray-700 hover:text-red-600 font-medium transition-colors">
-                Home
-              </Link>
-              
-              <ImprovedMegaMenu />
-              
-              <Link to="/faqs" className="text-gray-700 hover:text-red-600 font-medium transition-colors">
-                FAQs
-              </Link>
+              {navbarItems.map(renderNavItem)}
+              <CategoriesMegaMenu />
             </nav>
 
             <div className="flex items-center space-x-4">
-              <Link to="/cart" className="relative">
-                <Button variant="outline" size="icon">
-                  <ShoppingCart className="h-5 w-5" />
-                </Button>
-                {getTotalItems() > 0 && (
-                  <div className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full text-xs px-1.5 py-0.5">
-                    {getTotalItems()}
-                  </div>
-                )}
-              </Link>
+              <CartSidebar />
 
               {user ? (
                 <DropdownMenu>
@@ -98,14 +150,16 @@ export function CustomerHeader() {
                   <DropdownMenuContent className="w-56" align="end" forceMount>
                     <DropdownMenuLabel>My Account</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => navigate('/profile')}>Profile</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleDashboardClick}>
+                      {userProfile?.role === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate('/orders')}>Orders</DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleSignOut}>Logout</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Link to="/login">
+                <Link to="/auth">
                   <Button variant="outline">
                     Login
                   </Button>

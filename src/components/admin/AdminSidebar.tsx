@@ -91,6 +91,11 @@ const menuItems = [
     icon: Type,
   },
   {
+    title: "Navbar",
+    url: "/admin/navbar",
+    icon: Type,
+  },
+  {
     title: "FAQs",
     url: "/admin/faqs",
     icon: HelpCircle,

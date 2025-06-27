@@ -1,4 +1,3 @@
-
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
@@ -21,6 +20,7 @@ import { OrdersChart } from '@/components/admin/OrdersChart';
 import { TopProducts } from '@/components/admin/TopProducts';
 import { TopCustomers } from '@/components/admin/TopCustomers';
 import { RecentNotifications } from '@/components/admin/RecentNotifications';
+import { NavbarManagement } from '@/components/admin/NavbarManagement';
 
 function AdminDashboard() {
   return (
@@ -80,6 +80,7 @@ export default function Admin() {
             <Route path="delivery-charges" element={<DeliveryChargeManagement />} />
             <Route path="notices" element={<NoticeManagement />} />
             <Route path="top-bar-text" element={<TopBarTextManagement />} />
+            <Route path="navbar" element={<NavbarManagement />} />
             <Route path="faqs" element={<FAQManagement />} />
             <Route path="settings" element={<AdminSettings />} />
           </Routes>
