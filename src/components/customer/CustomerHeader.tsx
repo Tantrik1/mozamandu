@@ -39,7 +39,7 @@ interface NavbarItem {
       name: string;
       image_url?: string;
     }>;
-  };
+  } | null;
 }
 
 export function CustomerHeader() {
@@ -52,11 +52,12 @@ export function CustomerHeader() {
   }, []);
 
   const fetchNavbarItems = async () => {
+    // Changed from INNER JOIN to LEFT JOIN to include items without categories
     const { data } = await supabase
       .from('navbar_items')
       .select(`
         *,
-        category:categories!inner(
+        category:categories(
           id,
           name,
           subcategories(id, name, image_url)
@@ -66,6 +67,7 @@ export function CustomerHeader() {
       .order('display_order');
 
     if (data) {
+      console.log('Fetched navbar items:', data);
       setNavbarItems(data);
     }
   };

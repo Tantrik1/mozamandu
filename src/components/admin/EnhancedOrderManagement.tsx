@@ -29,6 +29,7 @@ interface Order {
   subtotal: number;
   delivery_charge: number;
   user_id: string | null;
+  user_role?: string;
 }
 
 interface OrderItemDetail {
@@ -59,8 +60,8 @@ export function EnhancedOrderManagement() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      console.log('Fetching all orders...');
-      // Fetch ALL orders - customer, admin, and guest orders
+      console.log('Fetching all orders with user profiles...');
+      // Fetch ALL orders with user profile information to determine order type
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -81,7 +82,8 @@ export function EnhancedOrderManagement() {
           delivery_address,
           subtotal,
           delivery_charge,
-          user_id
+          user_id,
+          profiles!left(role)
         `)
         .order('created_at', { ascending: false });
 
@@ -94,7 +96,12 @@ export function EnhancedOrderManagement() {
         });
       } else {
         console.log('Fetched orders:', data?.length || 0);
-        setOrders(data || []);
+        // Transform the data to include user_role
+        const transformedOrders = data?.map(order => ({
+          ...order,
+          user_role: order.profiles?.role || null
+        })) || [];
+        setOrders(transformedOrders);
       }
     } catch (error) {
       console.error('Unexpected error fetching orders:', error);
@@ -191,8 +198,17 @@ export function EnhancedOrderManagement() {
 
   const getOrderType = (order: Order) => {
     if (!order.user_id) return 'Guest';
-    // You could add logic here to check if user is admin vs customer
+    if (order.user_role === 'admin') return 'Admin';
     return 'Customer';
+  };
+
+  const getOrderTypeBadgeColor = (orderType: string) => {
+    switch (orderType) {
+      case 'Admin': return 'bg-red-100 text-red-800';
+      case 'Customer': return 'bg-blue-100 text-blue-800';
+      case 'Guest': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   const filteredOrders = orders.filter(order => {
@@ -208,7 +224,6 @@ export function EnhancedOrderManagement() {
     await fetchOrderItemDetails(order.id);
   };
 
-  // Group items for detailed breakdown in order view
   const getGroupedOrderItems = (items: OrderItemDetail[]) => {
     const grouped: { [key: string]: OrderItemDetail[] } = {};
     items.forEach(item => {
@@ -233,7 +248,11 @@ export function EnhancedOrderManagement() {
             <p><strong>Name:</strong> {order.customer_name}</p>
             <p><strong>Email:</strong> {order.customer_email}</p>
             <p><strong>Contact:</strong> {order.contact_number}</p>
-            <p><strong>Type:</strong> <Badge variant="outline">{getOrderType(order)}</Badge></p>
+            <p><strong>Type:</strong> 
+              <Badge variant="outline" className={`ml-2 ${getOrderTypeBadgeColor(getOrderType(order))}`}>
+                {getOrderType(order)}
+              </Badge>
+            </p>
           </div>
           <div>
             <h4 className="font-semibold mb-2">Order Information</h4>
@@ -382,7 +401,7 @@ export function EnhancedOrderManagement() {
       </div>
 
       {/* Stats */}
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{orders.length}</div>
@@ -391,18 +410,26 @@ export function EnhancedOrderManagement() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-yellow-600">
-              {orders.filter(o => o.status === 'pending_payment').length}
+            <div className="text-2xl font-bold text-blue-600">
+              {orders.filter(o => getOrderType(o) === 'Customer').length}
             </div>
-            <div className="text-sm text-gray-600">Pending Payment</div>
+            <div className="text-sm text-gray-600">Customer Orders</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">
-              {orders.filter(o => o.status === 'delivered').length}
+            <div className="text-2xl font-bold text-red-600">
+              {orders.filter(o => getOrderType(o) === 'Admin').length}
             </div>
-            <div className="text-sm text-gray-600">Delivered</div>
+            <div className="text-sm text-gray-600">Admin Orders</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-gray-600">
+              {orders.filter(o => getOrderType(o) === 'Guest').length}
+            </div>
+            <div className="text-sm text-gray-600">Guest Orders</div>
           </CardContent>
         </Card>
         <Card>
@@ -480,7 +507,9 @@ export function EnhancedOrderManagement() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{getOrderType(order)}</Badge>
+                    <Badge variant="outline" className={getOrderTypeBadgeColor(getOrderType(order))}>
+                      {getOrderType(order)}
+                    </Badge>
                   </TableCell>
                   <TableCell>Rs. {Number(order.total_amount).toFixed(2)}</TableCell>
                   <TableCell>
