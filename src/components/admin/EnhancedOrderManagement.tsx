@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Eye, Search, Filter, RefreshCw, Gift, Tag } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { PaymentScreenshotViewer } from './PaymentScreenshotViewer';
 
 interface Order {
   id: string;
@@ -369,14 +370,15 @@ export function EnhancedOrderManagement() {
           </div>
         </div>
 
-        {/* Payment Screenshot */}
+        {/* Enhanced Payment Screenshot Viewer */}
         {order.payment_screenshot_url && (
           <div className="p-4 bg-gray-50 rounded">
-            <h4 className="font-semibold mb-2">Payment Screenshot</h4>
-            <img
-              src={order.payment_screenshot_url}
-              alt="Payment Screenshot"
-              className="max-w-sm border rounded"
+            <h4 className="font-semibold mb-3">Payment Screenshot</h4>
+            <PaymentScreenshotViewer
+              imageUrl={order.payment_screenshot_url}
+              orderNumber={order.order_number}
+              customerName={order.customer_name}
+              uploadedAt={order.created_at}
             />
           </div>
         )}
