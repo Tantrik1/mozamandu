@@ -40,7 +40,7 @@ interface OrderItem {
   unit_price: number;
   total_price: number;
   pricing_mode: string;
-  pricing_details: any; // For additional pricing information
+  pricing_details: any;
 }
 
 export default function OrderSummary() {
@@ -64,7 +64,6 @@ export default function OrderSummary() {
     try {
       console.log('Fetching order details for:', orderId);
 
-      // Fetch order details
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .select('*')
@@ -82,7 +81,6 @@ export default function OrderSummary() {
         return;
       }
 
-      // Fetch order item details (formatted data)
       const { data: items, error: itemsError } = await supabase
         .from('order_item_details')
         .select('*')
@@ -125,39 +123,94 @@ export default function OrderSummary() {
     }
   };
 
-  const renderPricingDetails = (item: OrderItem) => {
-    const basePrice = item.pricing_details?.base_price || item.unit_price;
-    const isDiscounted = item.unit_price < basePrice;
-    
+  // Group items by product for detailed breakdown
+  const getGroupedItems = () => {
+    const grouped: { [key: string]: OrderItem[] } = {};
+    orderItems.forEach(item => {
+      const key = `${item.product_name}-${item.color_name || 'no-color'}-${item.size_name || 'no-size'}`;
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(item);
+    });
+    return grouped;
+  };
+
+  const renderDetailedPricingBreakdown = (items: OrderItem[]) => {
+    const firstItem = items[0];
+    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+    const totalPrice = items.reduce((sum, item) => sum + item.total_price, 0);
+    const basePrice = firstItem.pricing_details?.base_price || firstItem.unit_price;
+    const totalSavings = items.reduce((sum, item) => {
+      const basePriceForItem = item.pricing_details?.base_price || item.unit_price;
+      return sum + ((basePriceForItem - item.unit_price) * item.quantity);
+    }, 0);
+
     return (
-      <div className="text-right">
-        <div className="space-y-1">
-          <p className="font-medium">Rs. {item.total_price.toFixed(2)}</p>
-          <div className="text-sm text-gray-600">
-            <p>Rs. {item.unit_price.toFixed(2)} × {item.quantity}</p>
-            {isDiscounted && (
-              <p className="text-red-500">
-                Saved: Rs. {((basePrice - item.unit_price) * item.quantity).toFixed(2)}
+      <div className="p-4 bg-gray-50 rounded-lg border space-y-3">
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
+            <p className="font-medium text-lg">{firstItem.product_name}</p>
+            <div className="mt-1 space-y-1">
+              {firstItem.color_name && (
+                <p className="text-sm text-gray-600">Color: <span className="font-medium">{firstItem.color_name}</span></p>
+              )}
+              {firstItem.size_name && (
+                <p className="text-sm text-gray-600">Size: <span className="font-medium">{firstItem.size_name}</span></p>
+              )}
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="font-bold text-xl">Rs. {totalPrice.toFixed(2)}</p>
+            {totalSavings > 0 && (
+              <p className="text-sm text-gray-500 line-through">
+                Was: Rs. {(basePrice * totalQuantity).toFixed(2)}
               </p>
             )}
           </div>
-          {item.pricing_mode !== 'normal' && (
-            <div className="text-xs">
-              {item.pricing_mode === 'combo' && (
-                <Badge variant="secondary" className="bg-green-100 text-green-800">
-                  <Gift className="w-2 h-2 mr-1" />
-                  Combo Price
-                </Badge>
-              )}
-              {item.pricing_mode === 'discount' && (
-                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                  <Tag className="w-2 h-2 mr-1" />
-                  MOQ Discount
-                </Badge>
-              )}
-            </div>
-          )}
         </div>
+
+        {/* Detailed Item Breakdown */}
+        <div className="space-y-2">
+          {items.map((item, index) => (
+            <div key={index} className="flex justify-between items-center p-2 bg-white rounded border">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  {item.pricing_mode === 'combo' && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                      <Gift className="w-2 h-2 mr-1" />
+                      Combo
+                    </Badge>
+                  )}
+                  {item.pricing_mode === 'discount' && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+                      <Tag className="w-2 h-2 mr-1" />
+                      MOQ
+                    </Badge>
+                  )}
+                  <span className="text-sm">Qty: {item.quantity}</span>
+                </div>
+                <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
+              </div>
+              <div className="text-right">
+                <p className="font-medium">Rs. {item.total_price.toFixed(2)}</p>
+                {item.unit_price < (item.pricing_details?.base_price || item.unit_price) && (
+                  <p className="text-xs text-green-600">
+                    Saved: Rs. {((item.pricing_details?.base_price || item.unit_price) - item.unit_price).toFixed(2)} each
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Total Savings Summary */}
+        {totalSavings > 0 && (
+          <div className="bg-green-50 p-3 rounded border border-green-200">
+            <p className="text-green-800 font-medium">Total Savings: Rs. {totalSavings.toFixed(2)}</p>
+            <p className="text-xs text-green-600">You saved compared to regular pricing</p>
+          </div>
+        )}
       </div>
     );
   };
@@ -189,6 +242,8 @@ export default function OrderSummary() {
       </div>
     );
   }
+
+  const groupedItems = getGroupedItems();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -258,61 +313,15 @@ export default function OrderSummary() {
 
             <Separator />
 
-            {/* Enhanced Order Items with detailed pricing */}
+            {/* Enhanced Order Items with Detailed Pricing Breakdown */}
             <div>
-              <h3 className="font-semibold mb-3">Order Items - Detailed Pricing</h3>
+              <h3 className="font-semibold mb-4">Order Items - Detailed Pricing Breakdown</h3>
               <div className="space-y-4">
-                {orderItems.map((item) => (
-                  <div key={item.id} className="p-4 bg-gray-50 rounded-lg border">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <p className="font-medium text-lg">{item.product_name}</p>
-                        <div className="mt-1 space-y-1">
-                          {item.color_name && (
-                            <p className="text-sm text-gray-600">Color: <span className="font-medium">{item.color_name}</span></p>
-                          )}
-                          {item.size_name && (
-                            <p className="text-sm text-gray-600">Size: <span className="font-medium">{item.size_name}</span></p>
-                          )}
-                          <p className="text-sm text-gray-600">Quantity: <span className="font-medium">{item.quantity}</span></p>
-                        </div>
-                        
-                        {/* Pricing Mode Explanation */}
-                        <div className="mt-2">
-                          {item.pricing_mode === 'combo' && (
-                            <div className="text-sm text-green-700 bg-green-50 p-2 rounded">
-                              <Gift className="w-4 h-4 inline mr-1" />
-                              <strong>Combo Applied:</strong> Special combo pricing activated for bulk purchase
-                            </div>
-                          )}
-                          {item.pricing_mode === 'discount' && (
-                            <div className="text-sm text-blue-700 bg-blue-50 p-2 rounded">
-                              <Tag className="w-4 h-4 inline mr-1" />
-                              <strong>MOQ Discount:</strong> Minimum quantity discount applied
-                            </div>
-                          )}
-                          {item.pricing_mode === 'normal' && (
-                            <div className="text-sm text-gray-600 bg-gray-100 p-2 rounded">
-                              <strong>Regular Price:</strong> Standard pricing
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {renderPricingDetails(item)}
-                    </div>
+                {Object.entries(groupedItems).map(([itemKey, items]) => (
+                  <div key={itemKey}>
+                    {renderDetailedPricingBreakdown(items)}
                   </div>
                 ))}
-              </div>
-              
-              {/* Pricing Summary */}
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                <h4 className="font-semibold text-blue-800 mb-2">Pricing Summary</h4>
-                <div className="text-sm space-y-1">
-                  <p>• Items with combo pricing: {orderItems.filter(i => i.pricing_mode === 'combo').length}</p>
-                  <p>• Items with MOQ discount: {orderItems.filter(i => i.pricing_mode === 'discount').length}</p>
-                  <p>• Items with regular pricing: {orderItems.filter(i => i.pricing_mode === 'normal').length}</p>
-                </div>
               </div>
             </div>
 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Eye, Search, Filter, RefreshCw } from 'lucide-react';
+import { Eye, Search, Filter, RefreshCw, Gift, Tag } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -26,15 +25,10 @@ interface Order {
   promocode_used: string | null;
   promocode_discount: number;
   payment_screenshot_url: string | null;
-}
-
-interface OrderItem {
-  id: string;
-  product_id: string;
-  color_variant_id: string | null;
-  size_variant_id: string | null;
-  quantity: number;
-  created_at: string | null;
+  delivery_address: string;
+  subtotal: number;
+  delivery_charge: number;
+  user_id: string | null;
 }
 
 interface OrderItemDetail {
@@ -46,6 +40,7 @@ interface OrderItemDetail {
   unit_price: number;
   total_price: number;
   pricing_mode: string;
+  pricing_details: any;
 }
 
 export function EnhancedOrderManagement() {
@@ -64,7 +59,8 @@ export function EnhancedOrderManagement() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      console.log('Fetching orders...');
+      console.log('Fetching all orders...');
+      // Fetch ALL orders - customer, admin, and guest orders
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -81,7 +77,11 @@ export function EnhancedOrderManagement() {
           combo_applied,
           promocode_used,
           promocode_discount,
-          payment_screenshot_url
+          payment_screenshot_url,
+          delivery_address,
+          subtotal,
+          delivery_charge,
+          user_id
         `)
         .order('created_at', { ascending: false });
 
@@ -109,7 +109,7 @@ export function EnhancedOrderManagement() {
   };
 
   const fetchOrderItemDetails = async (orderId: string) => {
-    if (orderItemDetails[orderId]) return; // Already fetched
+    if (orderItemDetails[orderId]) return;
 
     try {
       console.log('Fetching order item details for:', orderId);
@@ -156,14 +156,12 @@ export function EnhancedOrderManagement() {
           description: "Order status updated successfully",
         });
         
-        // Update local state
         setOrders(prev => prev.map(order => 
           order.id === orderId 
             ? { ...order, status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled' }
             : order
         ));
         
-        // Also update selected order if it's the one being updated
         if (selectedOrder?.id === orderId) {
           setSelectedOrder(prev => prev ? { ...prev, status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled' } : null);
         }
@@ -191,6 +189,12 @@ export function EnhancedOrderManagement() {
     }
   };
 
+  const getOrderType = (order: Order) => {
+    if (!order.user_id) return 'Guest';
+    // You could add logic here to check if user is admin vs customer
+    return 'Customer';
+  };
+
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -202,6 +206,160 @@ export function EnhancedOrderManagement() {
   const handleViewOrder = async (order: Order) => {
     setSelectedOrder(order);
     await fetchOrderItemDetails(order.id);
+  };
+
+  // Group items for detailed breakdown in order view
+  const getGroupedOrderItems = (items: OrderItemDetail[]) => {
+    const grouped: { [key: string]: OrderItemDetail[] } = {};
+    items.forEach(item => {
+      const key = `${item.product_name}-${item.color_name || 'no-color'}-${item.size_name || 'no-size'}`;
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(item);
+    });
+    return grouped;
+  };
+
+  const renderDetailedOrderSummary = (order: Order, items: OrderItemDetail[]) => {
+    const groupedItems = getGroupedOrderItems(items);
+    
+    return (
+      <div className="space-y-6 max-h-[60vh] overflow-y-auto">
+        {/* Customer & Order Info */}
+        <div className="grid md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded">
+          <div>
+            <h4 className="font-semibold mb-2">Customer Information</h4>
+            <p><strong>Name:</strong> {order.customer_name}</p>
+            <p><strong>Email:</strong> {order.customer_email}</p>
+            <p><strong>Contact:</strong> {order.contact_number}</p>
+            <p><strong>Type:</strong> <Badge variant="outline">{getOrderType(order)}</Badge></p>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-2">Order Information</h4>
+            <p><strong>Order #:</strong> {order.order_number}</p>
+            <p><strong>Date:</strong> {new Date(order.created_at).toLocaleString()}</p>
+            <p><strong>Status:</strong> 
+              <Badge className={`ml-2 ${getStatusColor(order.status)}`}>
+                {order.status.replace('_', ' ')}
+              </Badge>
+            </p>
+          </div>
+        </div>
+
+        {/* Delivery Address */}
+        <div className="p-4 bg-gray-50 rounded">
+          <h4 className="font-semibold mb-2">Delivery Address</h4>
+          <p className="text-sm">{order.delivery_address}</p>
+        </div>
+
+        {/* Detailed Items Breakdown */}
+        <div>
+          <h4 className="font-semibold mb-3">Order Items - Detailed Breakdown</h4>
+          <div className="space-y-4">
+            {Object.entries(groupedItems).map(([itemKey, itemGroup]) => {
+              const firstItem = itemGroup[0];
+              const totalQuantity = itemGroup.reduce((sum, item) => sum + item.quantity, 0);
+              const totalPrice = itemGroup.reduce((sum, item) => sum + item.total_price, 0);
+              const totalSavings = itemGroup.reduce((sum, item) => {
+                const basePrice = item.pricing_details?.base_price || item.unit_price;
+                return sum + ((basePrice - item.unit_price) * item.quantity);
+              }, 0);
+
+              return (
+                <div key={itemKey} className="border rounded-lg p-4 bg-white">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h5 className="font-medium">{firstItem.product_name}</h5>
+                      {firstItem.color_name && <p className="text-sm text-gray-600">Color: {firstItem.color_name}</p>}
+                      {firstItem.size_name && <p className="text-sm text-gray-600">Size: {firstItem.size_name}</p>}
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-lg">Rs. {totalPrice.toFixed(2)}</p>
+                      {totalSavings > 0 && (
+                        <p className="text-sm text-green-600">Saved: Rs. {totalSavings.toFixed(2)}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Individual item breakdown */}
+                  <div className="space-y-2">
+                    {itemGroup.map((item, index) => (
+                      <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                        <div className="flex items-center gap-2">
+                          {item.pricing_mode === 'combo' && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                              <Gift className="w-2 h-2 mr-1" />
+                              Combo
+                            </Badge>
+                          )}
+                          {item.pricing_mode === 'discount' && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+                              <Tag className="w-2 h-2 mr-1" />
+                              MOQ
+                            </Badge>
+                          )}
+                          <span>Qty: {item.quantity}</span>
+                          <span>@ Rs. {item.unit_price.toFixed(2)}</span>
+                        </div>
+                        <span className="font-medium">Rs. {item.total_price.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Payment Summary */}
+        <div className="p-4 bg-gray-50 rounded">
+          <h4 className="font-semibold mb-3">Payment Summary</h4>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span>Subtotal:</span>
+              <span>Rs. {order.subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Delivery:</span>
+              <span>Rs. {order.delivery_charge.toFixed(2)}</span>
+            </div>
+            {order.promocode_discount > 0 && (
+              <div className="flex justify-between text-green-600">
+                <span>Discount ({order.promocode_used}):</span>
+                <span>-Rs. {order.promocode_discount.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-bold text-lg border-t pt-2">
+              <span>Total:</span>
+              <span>Rs. {order.total_amount.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-green-600">
+              <span>Paid:</span>
+              <span>Rs. {order.paid_amount.toFixed(2)}</span>
+            </div>
+            {order.remaining_amount > 0 && (
+              <div className="flex justify-between text-orange-600">
+                <span>Remaining:</span>
+                <span>Rs. {order.remaining_amount.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Payment Screenshot */}
+        {order.payment_screenshot_url && (
+          <div className="p-4 bg-gray-50 rounded">
+            <h4 className="font-semibold mb-2">Payment Screenshot</h4>
+            <img
+              src={order.payment_screenshot_url}
+              alt="Payment Screenshot"
+              className="max-w-sm border rounded"
+            />
+          </div>
+        )}
+      </div>
+    );
   };
 
   if (loading) {
@@ -295,7 +453,7 @@ export function EnhancedOrderManagement() {
       {/* Orders Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Orders ({filteredOrders.length})</CardTitle>
+          <CardTitle>All Orders ({filteredOrders.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -303,6 +461,7 @@ export function EnhancedOrderManagement() {
               <TableRow>
                 <TableHead>Order #</TableHead>
                 <TableHead>Customer</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Paid</TableHead>
                 <TableHead>Status</TableHead>
@@ -319,6 +478,9 @@ export function EnhancedOrderManagement() {
                       <p className="font-medium">{order.customer_name}</p>
                       <p className="text-sm text-gray-600">{order.customer_email}</p>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{getOrderType(order)}</Badge>
                   </TableCell>
                   <TableCell>Rs. {Number(order.total_amount).toFixed(2)}</TableCell>
                   <TableCell>
@@ -368,126 +530,19 @@ export function EnhancedOrderManagement() {
                           onClick={() => handleViewOrder(order)}
                         >
                           <Eye className="h-4 w-4 mr-1" />
-                          View
+                          View Details
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
                         <DialogHeader>
                           <DialogTitle>Order Details - {selectedOrder?.order_number}</DialogTitle>
                         </DialogHeader>
-                        {selectedOrder && (
-                          <div className="space-y-6">
-                            {/* Customer Info */}
-                            <Card>
-                              <CardHeader>
-                                <CardTitle className="text-lg">Customer Information</CardTitle>
-                              </CardHeader>
-                              <CardContent className="grid md:grid-cols-2 gap-4">
-                                <div>
-                                  <p><strong>Name:</strong> {selectedOrder.customer_name}</p>
-                                  <p><strong>Email:</strong> {selectedOrder.customer_email}</p>
-                                  <p><strong>Contact:</strong> {selectedOrder.contact_number}</p>
-                                </div>
-                                <div>
-                                  <p><strong>Order Date:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
-                                  <p><strong>Status:</strong> 
-                                    <Badge className={`ml-2 ${getStatusColor(selectedOrder.status)}`}>
-                                      {selectedOrder.status.replace('_', ' ')}
-                                    </Badge>
-                                  </p>
-                                </div>
-                              </CardContent>
-                            </Card>
-
-                            {/* Order Items */}
-                            <Card>
-                              <CardHeader>
-                                <CardTitle className="text-lg">Order Items</CardTitle>
-                              </CardHeader>
-                              <CardContent>
-                                {orderItemDetails[selectedOrder.id] ? (
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow>
-                                        <TableHead>Product</TableHead>
-                                        <TableHead>Qty</TableHead>
-                                        <TableHead>Unit Price</TableHead>
-                                        <TableHead>Total</TableHead>
-                                        <TableHead>Type</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {orderItemDetails[selectedOrder.id].map((item) => (
-                                        <TableRow key={item.id}>
-                                          <TableCell>
-                                            <div>
-                                              <p className="font-medium">{item.product_name}</p>
-                                              {item.color_name && (
-                                                <p className="text-sm text-gray-600">Color: {item.color_name}</p>
-                                              )}
-                                              {item.size_name && (
-                                                <p className="text-sm text-gray-600">Size: {item.size_name}</p>
-                                              )}
-                                            </div>
-                                          </TableCell>
-                                          <TableCell>{item.quantity}</TableCell>
-                                          <TableCell>Rs. {Number(item.unit_price).toFixed(2)}</TableCell>
-                                          <TableCell>Rs. {Number(item.total_price).toFixed(2)}</TableCell>
-                                          <TableCell>
-                                            <Badge variant="outline">
-                                              {item.pricing_mode}
-                                            </Badge>
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                ) : (
-                                  <div className="flex items-center justify-center py-4">
-                                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                                    Loading order items...
-                                  </div>
-                                )}
-                              </CardContent>
-                            </Card>
-
-                            {/* Payment Info */}
-                            <Card>
-                              <CardHeader>
-                                <CardTitle className="text-lg">Payment Information</CardTitle>
-                              </CardHeader>
-                              <CardContent className="space-y-4">
-                                <div className="grid md:grid-cols-2 gap-4">
-                                  <div>
-                                    <p><strong>Total Amount:</strong> Rs. {Number(selectedOrder.total_amount).toFixed(2)}</p>
-                                    <p><strong>Paid Amount:</strong> Rs. {Number(selectedOrder.paid_amount).toFixed(2)}</p>
-                                    <p><strong>Remaining:</strong> Rs. {Number(selectedOrder.remaining_amount).toFixed(2)}</p>
-                                  </div>
-                                  <div>
-                                    {selectedOrder.combo_applied && (
-                                      <p><strong>Combo Applied:</strong> Yes</p>
-                                    )}
-                                    {selectedOrder.promocode_used && (
-                                      <div>
-                                        <p><strong>Promo Code:</strong> {selectedOrder.promocode_used}</p>
-                                        <p><strong>Discount:</strong> Rs. {Number(selectedOrder.promocode_discount).toFixed(2)}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {selectedOrder.payment_screenshot_url && (
-                                  <div>
-                                    <h4 className="font-medium mb-2">Payment Screenshot:</h4>
-                                    <img
-                                      src={selectedOrder.payment_screenshot_url}
-                                      alt="Payment Screenshot"
-                                      className="max-w-md border rounded-lg"
-                                    />
-                                  </div>
-                                )}
-                              </CardContent>
-                            </Card>
+                        {selectedOrder && orderItemDetails[selectedOrder.id] ? (
+                          renderDetailedOrderSummary(selectedOrder, orderItemDetails[selectedOrder.id])
+                        ) : (
+                          <div className="flex items-center justify-center py-8">
+                            <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                            Loading order details...
                           </div>
                         )}
                       </DialogContent>
@@ -497,7 +552,7 @@ export function EnhancedOrderManagement() {
               ))}
               {filteredOrders.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                     No orders found matching your criteria.
                   </TableCell>
                 </TableRow>

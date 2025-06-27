@@ -224,9 +224,12 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
           </div>
         )}
         
-        {/* Price Badge - Top Right */}
+        {/* Dynamic Price Badge - Top Right */}
         <div className="absolute top-3 right-3 bg-red-600 text-white px-3 py-1 rounded-full shadow-lg">
           <span className="text-sm font-bold">Rs. {currentPricing.finalPrice.toFixed(2)}</span>
+          {currentPricing.finalPrice < basePrice && (
+            <div className="text-xs line-through opacity-75">Rs. {basePrice.toFixed(2)}</div>
+          )}
         </div>
 
         {/* Featured Badge */}
@@ -235,6 +238,23 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
             <Star className="w-3 h-3 mr-1" />
             Featured
           </Badge>
+        )}
+
+        {/* Pricing Mode Badge */}
+        {currentPricing.mode !== 'normal' && (
+          <div className="absolute bottom-3 left-3">
+            {currentPricing.mode === 'combo' && (
+              <Badge className="bg-green-500 text-white text-xs">
+                Combo Price
+              </Badge>
+            )}
+            {currentPricing.mode === 'discount' && (
+              <Badge className="bg-blue-500 text-white text-xs">
+                <Tag className="w-3 h-3 mr-1" />
+                MOQ Discount
+              </Badge>
+            )}
+          </div>
         )}
 
         {/* Stock Info */}
