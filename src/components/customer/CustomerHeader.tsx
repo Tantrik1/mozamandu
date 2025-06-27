@@ -19,10 +19,58 @@ import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { CategoriesMegaMenu } from './CategoriesMegaMenu';
 
+interface Category {
+  id: string;
+  name: string;
+  description: string;
+  subcategories: Subcategory[];
+}
+
+interface Subcategory {
+  id: string;
+  name: string;
+  description: string;
+  image_url: string;
+  selling_price: number;
+  minimum_quantity: number;
+}
+
 export function CustomerHeader() {
   const { user, signOut, userProfile } = useAuth();
   const { getTotalItems } = useRobustCart();
   const navigate = useNavigate();
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select(`
+          id,
+          name,
+          description,
+          subcategories (
+            id,
+            name,
+            description,
+            image_url,
+            selling_price,
+            minimum_quantity
+          )
+        `)
+        .eq('status', 'on');
+
+      if (categoriesError) throw categoriesError;
+
+      setCategories(categoriesData || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -43,35 +91,35 @@ export function CustomerHeader() {
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-40">
-      <div className="bg-gray-50 border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-end h-8">
-            <p className="text-gray-500 text-sm">
-              Free shipping on orders over Rs. 2000
-            </p>
-          </div>
-        </div>
-      </div>
-      
       <div className="border-b">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
-            <Link to="/" className="flex items-center font-bold text-xl">
-              Mozamandu
+            {/* Logo */}
+            <Link to="/" className="flex items-center">
+              <img 
+                src="/lovable-uploads/ccb0f113-502c-4857-8820-0f1af3358037.png" 
+                alt="Mozamandu Logo" 
+                className="h-12 w-auto"
+              />
             </Link>
             
+            {/* Navigation */}
             <nav className="hidden md:flex items-center space-x-8">
               <Link to="/" className="text-gray-700 hover:text-red-600 font-medium transition-colors">
                 Home
               </Link>
               
-              <CategoriesMegaMenu />
+              {/* Dynamic Categories with Mega Menu */}
+              {categories.map((category) => (
+                <CategoriesMegaMenu key={category.id} category={category} />
+              ))}
               
               <Link to="/faqs" className="text-gray-700 hover:text-red-600 font-medium transition-colors">
-                FAQs
+                FAQ
               </Link>
             </nav>
 
+            {/* Right Side - Cart and User */}
             <div className="flex items-center space-x-4">
               <Link to="/cart" className="relative">
                 <Button variant="outline" size="icon">
