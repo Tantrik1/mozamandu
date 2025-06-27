@@ -61,48 +61,51 @@ export function EnhancedOrderManagement() {
     setLoading(true);
     try {
       console.log('Fetching all orders with user profiles...');
-      // Fetch ALL orders with user profile information to determine order type
-      const { data, error } = await supabase
+      
+      // First fetch all orders
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select(`
-          id,
-          order_number,
-          customer_name,
-          customer_email,
-          contact_number,
-          total_amount,
-          paid_amount,
-          remaining_amount,
-          status,
-          created_at,
-          combo_applied,
-          promocode_used,
-          promocode_discount,
-          payment_screenshot_url,
-          delivery_address,
-          subtotal,
-          delivery_charge,
-          user_id,
-          profiles!left(role)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching orders:', error);
+      if (ordersError) {
+        console.error('Error fetching orders:', ordersError);
         toast({
           title: "Error",
-          description: "Failed to fetch orders: " + error.message,
+          description: "Failed to fetch orders: " + ordersError.message,
           variant: "destructive",
         });
-      } else {
-        console.log('Fetched orders:', data?.length || 0);
-        // Transform the data to include user_role
-        const transformedOrders = data?.map(order => ({
-          ...order,
-          user_role: order.profiles?.role || null
-        })) || [];
-        setOrders(transformedOrders);
+        return;
       }
+
+      // Then fetch user profiles for orders that have user_id
+      const userIds = ordersData?.filter(order => order.user_id).map(order => order.user_id) || [];
+      let profilesData: any[] = [];
+      
+      if (userIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, role')
+          .in('id', userIds);
+
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+        } else {
+          profilesData = profiles || [];
+        }
+      }
+
+      // Combine orders with profile data
+      const transformedOrders = ordersData?.map(order => {
+        const profile = profilesData.find(p => p.id === order.user_id);
+        return {
+          ...order,
+          user_role: profile?.role || null
+        };
+      }) || [];
+
+      console.log('Fetched orders:', transformedOrders.length);
+      setOrders(transformedOrders);
     } catch (error) {
       console.error('Unexpected error fetching orders:', error);
       toast({
