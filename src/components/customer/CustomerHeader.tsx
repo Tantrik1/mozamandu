@@ -1,31 +1,21 @@
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
 import { ShoppingCart } from 'lucide-react';
 import { useRobustCart } from '@/hooks/useRobustCart';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { CategoriesMegaMenu } from './CategoriesMegaMenu';
-
 interface Category {
   id: string;
   name: string;
   description: string;
   subcategories: Subcategory[];
 }
-
 interface Subcategory {
   id: string;
   name: string;
@@ -34,22 +24,26 @@ interface Subcategory {
   selling_price: number;
   minimum_quantity: number;
 }
-
 export function CustomerHeader() {
-  const { user, signOut, userProfile } = useAuth();
-  const { getTotalItems } = useRobustCart();
+  const {
+    user,
+    signOut,
+    userProfile
+  } = useAuth();
+  const {
+    getTotalItems
+  } = useRobustCart();
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
-
   useEffect(() => {
     fetchCategories();
   }, []);
-
   const fetchCategories = async () => {
     try {
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
-        .select(`
+      const {
+        data: categoriesData,
+        error: categoriesError
+      } = await supabase.from('categories').select(`
           id,
           name,
           description,
@@ -61,46 +55,38 @@ export function CustomerHeader() {
             selling_price,
             minimum_quantity
           )
-        `)
-        .eq('status', 'on');
-
+        `).eq('status', 'on');
       if (categoriesError) throw categoriesError;
-
       setCategories(categoriesData || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
   };
-
   const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
+    const {
+      error
+    } = await supabase.auth.signOut();
     if (error) {
       toast({
         title: "Error",
         description: "Failed to sign out",
-        variant: "destructive",
+        variant: "destructive"
       });
     } else {
       toast({
         title: "Success",
-        description: "Signed out successfully",
+        description: "Signed out successfully"
       });
       navigate('/');
     }
   };
-
-  return (
-    <header className="bg-white shadow-sm sticky top-0 z-40">
+  return <header className="bg-white shadow-sm sticky top-0 z-40">
       <div className="border-b">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center">
-              <img 
-                src="/lovable-uploads/ccb0f113-502c-4857-8820-0f1af3358037.png" 
-                alt="Mozamandu Logo" 
-                className="h-12 w-auto"
-              />
+              <img alt="Mozamandu Logo" src="/lovable-uploads/0ebc12de-30dd-4ab2-87ba-31f69b025360.png" className="h-14 w-auto" />
             </Link>
             
             {/* Navigation */}
@@ -110,9 +96,7 @@ export function CustomerHeader() {
               </Link>
               
               {/* Dynamic Categories with Mega Menu */}
-              {categories.map((category) => (
-                <CategoriesMegaMenu key={category.id} category={category} />
-              ))}
+              {categories.map(category => <CategoriesMegaMenu key={category.id} category={category} />)}
               
               <Link to="/faqs" className="text-gray-700 hover:text-red-600 font-medium transition-colors">
                 FAQ
@@ -125,15 +109,12 @@ export function CustomerHeader() {
                 <Button variant="outline" size="icon">
                   <ShoppingCart className="h-5 w-5" />
                 </Button>
-                {getTotalItems() > 0 && (
-                  <div className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full text-xs px-1.5 py-0.5">
+                {getTotalItems() > 0 && <div className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full text-xs px-1.5 py-0.5">
                     {getTotalItems()}
-                  </div>
-                )}
+                  </div>}
               </Link>
 
-              {user ? (
-                <DropdownMenu>
+              {user ? <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="h-8 w-8 p-0">
                       <Avatar className="h-8 w-8">
@@ -152,18 +133,14 @@ export function CustomerHeader() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleSignOut}>Logout</DropdownMenuItem>
                   </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <Link to="/login">
+                </DropdownMenu> : <Link to="/login">
                   <Button variant="outline">
                     Login
                   </Button>
-                </Link>
-              )}
+                </Link>}
             </div>
           </div>
         </div>
       </div>
-    </header>
-  );
+    </header>;
 }
