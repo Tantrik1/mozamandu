@@ -40,13 +40,14 @@ export function CategoriesMegaMenu({ category }: CategoriesMegaMenuProps) {
 
       {isMenuOpen && (
         <div
-          className="absolute top-full left-1/2 transform -translate-x-1/2 bg-white shadow-2xl border-t-2 border-red-500 z-50 min-w-96"
+          className="fixed left-0 right-0 top-full bg-white shadow-2xl border-t-2 border-red-500 z-50"
           onMouseEnter={() => setIsMenuOpen(true)}
           onMouseLeave={() => setIsMenuOpen(false)}
+          style={{ width: '100vw' }}
         >
-          <div className="p-6">
+          <div className="max-w-7xl mx-auto p-6">
             <h3 className="text-xl font-bold text-gray-800 mb-4">{category.name}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {category.subcategories?.map((subcategory) => (
                 <Link
                   key={subcategory.id}

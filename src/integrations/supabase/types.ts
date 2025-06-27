@@ -275,6 +275,44 @@ export type Database = {
         }
         Relationships: []
       }
+      navbar_items: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          display_order: number
+          id: string
+          is_visible: boolean
+          item_type: string
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_visible?: boolean
+          item_type: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_visible?: boolean
+          item_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "navbar_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notices: {
         Row: {
           created_at: string
