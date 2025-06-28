@@ -188,7 +188,7 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
     return comboSubcategory ? comboSubcategory.price : null;
   };
 
-  // New function to check if minimum quantity requirements should be ignored
+  // Function to check if minimum quantity requirements should be ignored
   const shouldIgnoreMinimumQuantity = (subcategoryId: string): boolean => {
     return isComboActive(subcategoryId);
   };

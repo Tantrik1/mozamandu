@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useAuth } from '@/hooks/useAuth';
@@ -86,6 +87,11 @@ export function UniversalCheckout() {
     }
     
     return 'customer-payments';
+  };
+
+  // Determine if this is a customer order (logged in non-admin user)
+  const isCustomerOrder = () => {
+    return user && userProfile?.role !== 'admin';
   };
 
   const validateForm = (): boolean => {
@@ -179,6 +185,7 @@ export function UniversalCheckout() {
       console.log('Starting order submission process...');
       console.log('User authenticated:', !!user);
       console.log('User ID:', user?.id);
+      console.log('Is customer order:', isCustomerOrder());
 
       const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
       const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
@@ -201,9 +208,8 @@ export function UniversalCheckout() {
         }
       }
 
-      // Prepare order data - for guest orders, set user_id to null explicitly
-      const orderData = {
-        user_id: user?.id || null,
+      // Prepare base order data
+      const baseOrderData = {
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
         contact_number: customerInfo.contact,
@@ -223,55 +229,85 @@ export function UniversalCheckout() {
         promocode_discount: promoDiscount
       };
 
-      console.log('Creating order with data:', orderData);
-
-      // Create order
       let orderResult = null;
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert(orderData)
-        .select()
-        .single();
 
-      if (orderError) {
-        console.error('Order creation error:', orderError);
-        
-        // Better error handling for RLS issues
-        if (orderError.code === '42501' || orderError.message.includes('row-level security')) {
-          console.log('Retrying as explicit guest order...');
-          const guestOrderData = {
-            ...orderData,
-            user_id: null // Force null for guest orders
-          };
-          
-          const { data: guestOrder, error: guestOrderError } = await supabase
-            .from('orders')
-            .insert(guestOrderData)
-            .select()
-            .single();
-            
-          if (guestOrderError) {
-            console.error('Guest order creation also failed:', guestOrderError);
-            throw new Error('Unable to create order. Please try again or contact support.');
-          }
-          
-          orderResult = guestOrder;
-        } else {
-          throw new Error(`Order creation failed: ${orderError.message}`);
+      // Submit to customer_orders table if logged in non-admin user
+      if (isCustomerOrder()) {
+        console.log('Creating customer order...');
+        const customerOrderData = {
+          ...baseOrderData,
+          user_id: user!.id
+        };
+
+        const { data: order, error: orderError } = await supabase
+          .from('customer_orders')
+          .insert(customerOrderData)
+          .select()
+          .single();
+
+        if (orderError) {
+          console.error('Customer order creation error:', orderError);
+          throw new Error(`Customer order creation failed: ${orderError.message}`);
         }
-      } else {
+
         orderResult = order;
+        console.log('Customer order created successfully:', orderResult);
+      } else {
+        // Submit to orders table for guest/admin orders
+        console.log('Creating regular order...');
+        const regularOrderData = {
+          ...baseOrderData,
+          user_id: user?.id || null
+        };
+
+        const { data: order, error: orderError } = await supabase
+          .from('orders')
+          .insert(regularOrderData)
+          .select()
+          .single();
+
+        if (orderError) {
+          console.error('Order creation error:', orderError);
+          
+          // Better error handling for RLS issues
+          if (orderError.code === '42501' || orderError.message.includes('row-level security')) {
+            console.log('Retrying as explicit guest order...');
+            const guestOrderData = {
+              ...regularOrderData,
+              user_id: null // Force null for guest orders
+            };
+            
+            const { data: guestOrder, error: guestOrderError } = await supabase
+              .from('orders')
+              .insert(guestOrderData)
+              .select()
+              .single();
+              
+            if (guestOrderError) {
+              console.error('Guest order creation also failed:', guestOrderError);
+              throw new Error('Unable to create order. Please try again or contact support.');
+            }
+            
+            orderResult = guestOrder;
+          } else {
+            throw new Error(`Order creation failed: ${orderError.message}`);
+          }
+        } else {
+          orderResult = order;
+        }
+
+        console.log('Regular order created successfully:', orderResult);
       }
 
       if (!orderResult) {
         throw new Error('Order was not created properly');
       }
 
-      console.log('Order created successfully:', orderResult);
-
       // Create order items with better error handling and validation
       const orderItems = [];
       const orderItemDetails = [];
+      const orderItemsTable = isCustomerOrder() ? 'customer_order_items' : 'order_items';
+      const orderItemDetailsTable = isCustomerOrder() ? 'customer_order_item_details' : 'order_item_details';
 
       for (const item of cartItems) {
         // Validate that the variant IDs exist if they're provided
@@ -333,24 +369,25 @@ export function UniversalCheckout() {
         orderItemDetails.push(orderItemDetail);
       }
 
-      console.log('Creating order items:', orderItems.length);
+      console.log(`Creating order items in ${orderItemsTable}:`, orderItems.length);
 
       // Insert order items
       const { error: itemsError } = await supabase
-        .from('order_items')
+        .from(orderItemsTable)
         .insert(orderItems);
 
       if (itemsError) {
         console.error('Order items creation error:', itemsError);
         
         // Try to cleanup the order if items creation fails
-        await supabase.from('orders').delete().eq('id', orderResult.id);
+        const deleteTable = isCustomerOrder() ? 'customer_orders' : 'orders';
+        await supabase.from(deleteTable).delete().eq('id', orderResult.id);
         throw new Error(`Failed to create order items: ${itemsError.message}`);
       }
 
       // Create order item details
       const { error: detailsError } = await supabase
-        .from('order_item_details')
+        .from(orderItemDetailsTable)
         .insert(orderItemDetails);
 
       if (detailsError) {
@@ -368,8 +405,9 @@ export function UniversalCheckout() {
         description: `Your order #${orderResult.order_number} has been placed successfully.`,
       });
 
-      // Redirect to order summary page with order ID
-      navigate(`/order-summary/${orderResult.id}`);
+      // Redirect to appropriate order summary page
+      const summaryRoute = isCustomerOrder() ? 'customer-order-summary' : 'order-summary';
+      navigate(`/${summaryRoute}/${orderResult.id}`);
       
     } catch (error) {
       console.error('Error creating order:', error);
@@ -436,6 +474,7 @@ export function UniversalCheckout() {
             <AlertDescription>
               Logged in as <strong>{userProfile?.full_name || user.email}</strong>
               {userProfile?.role === 'admin' && <span className="ml-2 text-blue-600">(Admin)</span>}
+              {isCustomerOrder() && <span className="ml-2 text-green-600">(Customer Order)</span>}
             </AlertDescription>
           </Alert>
         ) : (
