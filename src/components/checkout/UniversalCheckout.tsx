@@ -75,6 +75,19 @@ export function UniversalCheckout() {
     }
   }, [cartItems, user, userProfile, navigate]);
 
+  // Determine which bucket to use based on user type
+  const getBucketName = () => {
+    if (!user) {
+      return 'guest-payments';
+    }
+    
+    if (userProfile?.role === 'admin') {
+      return 'admin-payments';
+    }
+    
+    return 'customer-payments';
+  };
+
   const validateForm = (): boolean => {
     const errors: FormErrors = {};
 
@@ -115,12 +128,13 @@ export function UniversalCheckout() {
       const fileExt = paymentScreenshot.name.split('.').pop();
       const fileName = `payment-${Date.now()}.${fileExt}`;
       const filePath = `payment-screenshots/${fileName}`;
+      const bucketName = getBucketName();
 
-      console.log('Uploading payment screenshot to uploads bucket:', filePath);
+      console.log(`Uploading payment screenshot to ${bucketName} bucket:`, filePath);
 
-      // Upload to the correct 'uploads' bucket that supports guest uploads
+      // Upload to the appropriate bucket based on user type
       const { error: uploadError } = await supabase.storage
-        .from('uploads')
+        .from(bucketName)
         .upload(filePath, paymentScreenshot, {
           cacheControl: '3600',
           upsert: false
@@ -132,7 +146,7 @@ export function UniversalCheckout() {
       }
 
       const { data } = supabase.storage
-        .from('uploads')
+        .from(bucketName)
         .getPublicUrl(filePath);
 
       console.log('Payment screenshot uploaded successfully:', data.publicUrl);
@@ -421,6 +435,7 @@ export function UniversalCheckout() {
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>
               Logged in as <strong>{userProfile?.full_name || user.email}</strong>
+              {userProfile?.role === 'admin' && <span className="ml-2 text-blue-600">(Admin)</span>}
             </AlertDescription>
           </Alert>
         ) : (

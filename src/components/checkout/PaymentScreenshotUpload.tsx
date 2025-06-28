@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import imageCompression from 'browser-image-compression';
 
 interface PaymentScreenshotUploadProps {
@@ -23,6 +24,20 @@ export function PaymentScreenshotUpload({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const { user, userProfile } = useAuth();
+
+  // Determine which bucket to use based on user type
+  const getBucketName = () => {
+    if (!user) {
+      return 'guest-payments';
+    }
+    
+    if (userProfile?.role === 'admin') {
+      return 'admin-payments';
+    }
+    
+    return 'customer-payments';
+  };
 
   const compressImage = async (file: File): Promise<File> => {
     const options = {
@@ -80,17 +95,18 @@ export function PaymentScreenshotUpload({
       setCompressing(false);
       setUploading(true);
 
-      // Generate unique filename with timestamp
+      // Determine bucket and file path based on user type
+      const bucketName = getBucketName();
       const timestamp = new Date().toISOString().split('T')[0];
       const randomId = Math.random().toString(36).substring(7);
       const fileExt = compressedFile.name.split('.').pop();
       const fileName = `payment-screenshots/${timestamp}/payment_${randomId}.${fileExt}`;
 
-      console.log('Uploading to uploads bucket:', fileName);
+      console.log(`Uploading to ${bucketName} bucket:`, fileName);
 
-      // Upload to Supabase Storage using the correct 'uploads' bucket
+      // Upload to the appropriate bucket based on user type
       const { error: uploadError } = await supabase.storage
-        .from('uploads')
+        .from(bucketName)
         .upload(fileName, compressedFile, {
           cacheControl: '3600',
           upsert: false
@@ -102,7 +118,7 @@ export function PaymentScreenshotUpload({
       }
 
       // Get public URL
-      const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
+      const { data } = supabase.storage.from(bucketName).getPublicUrl(fileName);
       
       console.log('Upload successful, public URL:', data.publicUrl);
       
@@ -205,6 +221,12 @@ export function PaymentScreenshotUpload({
               </div>
               <p className="text-xs text-gray-500">
                 PNG, JPG, WebP up to 5MB (will be compressed automatically)
+              </p>
+              <p className="text-xs text-blue-500 mt-1">
+                {user ? 
+                  `Uploading as ${userProfile?.role === 'admin' ? 'Admin' : 'Customer'}` : 
+                  'Uploading as Guest'
+                }
               </p>
             </div>
           </CardContent>
