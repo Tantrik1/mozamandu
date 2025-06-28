@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -87,7 +86,9 @@ export function PaymentScreenshotUpload({
       const fileExt = compressedFile.name.split('.').pop();
       const fileName = `payment-screenshots/${timestamp}/payment_${randomId}.${fileExt}`;
 
-      // Upload to Supabase Storage
+      console.log('Uploading to uploads bucket:', fileName);
+
+      // Upload to Supabase Storage using the correct 'uploads' bucket
       const { error: uploadError } = await supabase.storage
         .from('uploads')
         .upload(fileName, compressedFile, {
@@ -96,11 +97,14 @@ export function PaymentScreenshotUpload({
         });
 
       if (uploadError) {
-        throw uploadError;
+        console.error('Upload error details:', uploadError);
+        throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
       // Get public URL
       const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
+      
+      console.log('Upload successful, public URL:', data.publicUrl);
       
       toast({
         title: "Upload Successful",

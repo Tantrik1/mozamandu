@@ -116,10 +116,11 @@ export function UniversalCheckout() {
       const fileName = `payment-${Date.now()}.${fileExt}`;
       const filePath = `payment-screenshots/${fileName}`;
 
-      console.log('Uploading payment screenshot:', filePath);
+      console.log('Uploading payment screenshot to uploads bucket:', filePath);
 
+      // Upload to the correct 'uploads' bucket that supports guest uploads
       const { error: uploadError } = await supabase.storage
-        .from('product-images')
+        .from('uploads')
         .upload(filePath, paymentScreenshot, {
           cacheControl: '3600',
           upsert: false
@@ -127,11 +128,11 @@ export function UniversalCheckout() {
 
       if (uploadError) {
         console.error('Error uploading payment screenshot:', uploadError);
-        throw new Error('Failed to upload payment screenshot');
+        throw new Error('Failed to upload payment screenshot: ' + uploadError.message);
       }
 
       const { data } = supabase.storage
-        .from('product-images')
+        .from('uploads')
         .getPublicUrl(filePath);
 
       console.log('Payment screenshot uploaded successfully:', data.publicUrl);
@@ -140,7 +141,7 @@ export function UniversalCheckout() {
       console.error('Error uploading payment screenshot:', error);
       toast({
         title: "Upload Error",
-        description: "Failed to upload payment screenshot. You can continue without it.",
+        description: error instanceof Error ? error.message : "Failed to upload payment screenshot",
         variant: "destructive",
       });
       return null;
@@ -179,6 +180,11 @@ export function UniversalCheckout() {
       let paymentScreenshotUrl = null;
       if (paymentScreenshot) {
         paymentScreenshotUrl = await uploadPaymentScreenshot();
+        
+        // If upload fails, we still continue with the order
+        if (!paymentScreenshotUrl) {
+          console.warn('Payment screenshot upload failed, but continuing with order');
+        }
       }
 
       // Prepare order data - for guest orders, set user_id to null explicitly
