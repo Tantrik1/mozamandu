@@ -45,7 +45,7 @@ export function CategoriesMegaMenu({ categories }: CategoriesMegaMenuProps) {
           <NavigationMenu key={item.id}>
             <NavigationMenuList>
               <NavigationMenuItem>
-                <NavigationMenuTrigger className="text-gray-700 hover:text-red-600 font-medium transition-colors">
+                <NavigationMenuTrigger className="flex text-gray-700 hover:text-red-600 font-medium transition-colors">
                   {category.name}
                   <ChevronDown className="ml-1 h-4 w-4" />
                 </NavigationMenuTrigger>
