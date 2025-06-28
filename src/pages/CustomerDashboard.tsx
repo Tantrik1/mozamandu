@@ -50,16 +50,16 @@ export default function CustomerDashboard() {
 
     setOrdersLoading(true);
     try {
-      console.log('🔄 CustomerDashboard: Fetching orders for user:', user.id);
+      console.log('🔄 CustomerDashboard: Fetching customer orders for user:', user.id);
 
       const { data, error } = await supabase
-        .from('orders')
+        .from('customer_orders')
         .select('id, order_number, total_amount, paid_amount, remaining_amount, status, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ CustomerDashboard: Error fetching user orders:', error);
+        console.error('❌ CustomerDashboard: Error fetching customer orders:', error);
         toast({
           title: "Error",
           description: "Failed to fetch your orders",
@@ -67,7 +67,7 @@ export default function CustomerDashboard() {
         });
         setOrders([]);
       } else {
-        console.log('✅ CustomerDashboard: User orders fetched:', data?.length || 0);
+        console.log('✅ CustomerDashboard: Customer orders fetched:', data?.length || 0);
         setOrders(data || []);
       }
     } catch (error) {
@@ -162,7 +162,7 @@ export default function CustomerDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {orders.filter(o => o.status === 'pending').length}
+                {orders.filter(o => o.status === 'pending_payment' || o.status === 'payment_confirmed').length}
               </div>
               <p className="text-xs text-muted-foreground">
                 Awaiting processing
@@ -250,12 +250,12 @@ export default function CustomerDashboard() {
                           </TableCell>
                           <TableCell>
                             <Badge className={getStatusColor(order.status)}>
-                              {order.status}
+                              {order.status.replace('_', ' ')}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <Button asChild variant="outline" size="sm">
-                              <Link to={`/order-summary/${order.id}`}>
+                              <Link to={`/customer-order-summary/${order.id}`}>
                                 <Eye className="h-4 w-4 mr-1" />
                                 View
                               </Link>

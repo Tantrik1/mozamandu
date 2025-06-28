@@ -17,6 +17,7 @@ import Products from "./pages/Products";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import Checkout from "./pages/Checkout";
 import OrderSummary from "./pages/OrderSummary";
+import CustomerOrderSummary from "./pages/CustomerOrderSummary";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import ShippingPolicy from "./pages/ShippingPolicy";
 import TermsConditions from "./pages/TermsConditions";
@@ -62,6 +63,7 @@ function App() {
                 />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/order-summary/:orderId" element={<OrderSummary />} />
+                <Route path="/customer-order-summary/:orderId" element={<CustomerOrderSummary />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/shipping" element={<ShippingPolicy />} />
                 <Route path="/terms" element={<TermsConditions />} />
