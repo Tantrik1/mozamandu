@@ -144,8 +144,8 @@ export function BrowseSubcategories() {
                   key={subcategory.id} 
                   className={`pl-2 md:pl-4 ${
                     isMobile 
-                      ? 'basis-1/2' 
-                      : 'basis-1/2 md:basis-1/3 lg:basis-1/4'
+                      ? 'basis-1/1' 
+                      : 'basis-1/1 md:basis-1/3 lg:basis-1/4'
                   }`}
                 >
                   <div className="h-full">
