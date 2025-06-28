@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from '@/components/ui/button';
@@ -37,13 +37,35 @@ interface NavbarItem {
 export function CustomerHeader() {
   const { user, signOut, userProfile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [navbarItems, setNavbarItems] = useState<NavbarItem[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openMegaMenu, setOpenMegaMenu] = useState<string | null>(null);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   useEffect(() => {
     fetchNavbarItems();
   }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+    setExpandedCategory(null);
+  }, [location.pathname]);
+
+  // Handle body scroll lock
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen]);
 
   const fetchNavbarItems = async () => {
     const { data } = await supabase
@@ -88,6 +110,15 @@ export function CustomerHeader() {
     } else {
       navigate('/dashboard');
     }
+  };
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+    setExpandedCategory(null);
+  };
+
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategory(expandedCategory === categoryId ? null : categoryId);
   };
 
   const categoryItems = navbarItems.filter(item => item.item_type === 'category' && item.category);
@@ -251,39 +282,166 @@ export function CustomerHeader() {
           </div>
         </div>
 
-        {/* Mobile Navigation */}
+        {/* Enhanced Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden bg-white border-t border-gray-100 py-4">
-            <div className="space-y-4">
-              {otherItems.map((item) => (
-                <div key={item.id}>
-                  {renderNavItem(item)}
-                </div>
-              ))}
-              {categoryItems.map((item) => {
-                const category = item.category;
-                if (!category) return null;
-                
-                return (
-                  <div key={item.id} className="space-y-2">
-                    <div className="font-medium text-gray-800 px-4 py-2">{category.name}</div>
-                    <div className="pl-6 space-y-2">
-                      {category.subcategories?.map((subcategory) => (
-                        <Link
-                          key={subcategory.id}
-                          to={`/subcategories/${subcategory.id}`}
-                          className="block text-gray-600 hover:text-red-600 py-2 transition-colors duration-200"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          {subcategory.name}
-                        </Link>
-                      ))}
-                    </div>
+          <>
+            {/* Overlay */}
+            <div 
+              className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden transition-opacity duration-300"
+              onClick={closeMobileMenu}
+            />
+            
+            {/* Mobile Menu Panel */}
+            <div className={`fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl z-50 lg:hidden transform transition-transform duration-300 ease-in-out ${
+              isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+            }`}>
+              
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                <h2 className="text-lg font-semibold text-gray-800">Menu</h2>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={closeMobileMenu}
+                  className="p-2 hover:bg-gray-100 rounded-full"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              {/* Menu Content */}
+              <div className="overflow-y-auto h-full pb-20">
+                <div className="p-6 space-y-6">
+                  
+                  {/* Regular Navigation Items */}
+                  <div className="space-y-4">
+                    {otherItems.map((item) => (
+                      <div key={item.id} onClick={closeMobileMenu}>
+                        {item.item_type === 'home' && (
+                          <Link 
+                            to="/" 
+                            className="block text-gray-800 hover:text-red-600 font-medium py-3 px-4 rounded-lg hover:bg-red-50 transition-all duration-200"
+                          >
+                            Home
+                          </Link>
+                        )}
+                        {item.item_type === 'faq' && (
+                          <Link 
+                            to="/faq" 
+                            className="block text-gray-800 hover:text-red-600 font-medium py-3 px-4 rounded-lg hover:bg-red-50 transition-all duration-200"
+                          >
+                            FAQs
+                          </Link>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                );
-              })}
+
+                  {/* Categories with Accordion */}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider px-4 mb-3">Categories</h3>
+                    {categoryItems.map((item) => {
+                      const category = item.category;
+                      if (!category) return null;
+                      
+                      const isExpanded = expandedCategory === category.id;
+                      
+                      return (
+                        <div key={item.id} className="border border-gray-100 rounded-lg overflow-hidden">
+                          {/* Category Button */}
+                          <button
+                            onClick={() => toggleCategory(category.id)}
+                            className="w-full flex items-center justify-between p-4 text-left font-medium text-gray-800 hover:bg-gray-50 transition-colors duration-200"
+                          >
+                            <span>{category.name}</span>
+                            <ChevronDown 
+                              className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${
+                                isExpanded ? 'rotate-180' : ''
+                              }`} 
+                            />
+                          </button>
+                          
+                          {/* Subcategories */}
+                          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                            isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                          }`}>
+                            <div className="bg-gray-50 border-t border-gray-100">
+                              {category.subcategories?.map((subcategory) => (
+                                <Link
+                                  key={subcategory.id}
+                                  to={`/subcategories/${subcategory.id}`}
+                                  className="flex items-center space-x-3 p-4 hover:bg-white transition-colors duration-200"
+                                  onClick={closeMobileMenu}
+                                >
+                                  <div className="flex-shrink-0">
+                                    {subcategory.image_url ? (
+                                      <img 
+                                        src={subcategory.image_url} 
+                                        alt={subcategory.name}
+                                        className="w-10 h-10 object-cover rounded-lg"
+                                      />
+                                    ) : (
+                                      <div className="w-10 h-10 bg-gradient-to-br from-red-100 to-red-200 rounded-lg flex items-center justify-center">
+                                        <Package className="w-5 h-5 text-red-500" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-gray-800 text-sm">
+                                      {subcategory.name}
+                                    </h4>
+                                    <p className="text-xs text-gray-500">
+                                      View products
+                                    </p>
+                                  </div>
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* User Actions */}
+                  {user && (
+                    <div className="pt-6 border-t border-gray-100 space-y-4">
+                      <button
+                        onClick={() => {
+                          handleDashboardClick();
+                          closeMobileMenu();
+                        }}
+                        className="block w-full text-left text-gray-800 hover:text-red-600 font-medium py-3 px-4 rounded-lg hover:bg-red-50 transition-all duration-200"
+                      >
+                        {userProfile?.role === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleSignOut();
+                          closeMobileMenu();
+                        }}
+                        className="block w-full text-left text-gray-800 hover:text-red-600 font-medium py-3 px-4 rounded-lg hover:bg-red-50 transition-all duration-200"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  )}
+
+                  {!user && (
+                    <div className="pt-6 border-t border-gray-100">
+                      <Link 
+                        to="/auth" 
+                        onClick={closeMobileMenu}
+                        className="block w-full text-center bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-medium py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+                      >
+                        Login
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </header>
