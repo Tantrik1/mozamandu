@@ -137,11 +137,7 @@ export function CustomerHeader() {
         </button>
         
         {openMegaMenu === category.id && (
-          <div className=" fixed 
-    top-[calc(100%+1px)] 
-    left-0 
-    w-full 
-    max-w-screen-xl 
+          <div className="fixed top-[calc(100%+1px)] left-0 w-full max-w-screen-xl 
     mx-auto 
     bg-white 
     shadow-2xl 
