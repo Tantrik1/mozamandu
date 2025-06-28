@@ -144,7 +144,7 @@ export function CustomerHeader() {
                 <div className="w-20 h-1 bg-gradient-to-r from-red-500 to-red-600 rounded-full"></div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
                 {category.subcategories?.map((subcategory) => (
                   <Link
                     key={subcategory.id}
