@@ -109,7 +109,7 @@ export function CustomerHeader() {
         return (
           <Link 
             key={item.id}
-            to="/faq" 
+            to="/faqs" 
             className="relative text-gray-700 hover:text-red-600 font-medium transition-all duration-300 py-2 px-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-red-600 after:transition-all after:duration-300 hover:after:w-full"
           >
             FAQs
@@ -137,7 +137,19 @@ export function CustomerHeader() {
         </button>
         
         {openMegaMenu === category.id && (
-          <div className="fixed top-[65px] left-1/2 transform -translate-x-1/2 w-full max-w-screen-xl bg-white shadow-2xl border-t-4 border-red-500 z-50 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
+          <div className="fixed top-[calc(100%+1px)] left-0 w-full max-w-screen-xl 
+    mx-auto 
+    bg-white 
+    shadow-2xl 
+    border-t-4 
+    border-red-500 
+    z-50 
+    opacity-0 
+    translate-y-2 
+    group-hover:opacity-100 
+    group-hover:translate-y-0 
+    transition-all 
+    duration-300">
             <div className="p-8">
               <div className="mb-6">
                 <h3 className="text-2xl font-bold text-gray-800 mb-2">{category.name}</h3>
@@ -189,11 +201,9 @@ export function CustomerHeader() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2 group">
-            <img 
-              src="/lovable-uploads/fd4fd25e-ccf5-42d0-a176-49b63583881b.png" 
-              alt="Mozamandu Logo" 
-              className="h-10 w-auto transition-transform duration-300 group-hover:scale-105"
-            />
+            <div className="text-2xl font-bold bg-gradient-to-r from-red-600 to-red-700 bg-clip-text text-transparent group-hover:from-red-700 group-hover:to-red-800 transition-all duration-300">
+              Mozamandu
+            </div>
           </Link>
           
           {/* Desktop Navigation */}
