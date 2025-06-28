@@ -137,7 +137,7 @@ export function CustomerHeader() {
         </button>
         
         {openMegaMenu === category.id && (
-          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-full max-w-[95vw] md:max-w-4xl lg:max-w-6xl bg-white shadow-2xl border-t-4 border-red-500 z-50 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 overflow-x-auto">
+          <div className=" absolute top-full left-0 w-screen max-w-[95vw] md:max-w-4xl lg:max-w-6xl bg-white shadow-2xl border-t-4 border-red-500 z-50 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 overflow-x-auto">
             <div className="p-8">
               <div className="mb-6">
                 <h3 className="text-2xl font-bold text-gray-800 mb-2">{category.name}</h3>
