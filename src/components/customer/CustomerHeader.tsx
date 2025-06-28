@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -42,10 +41,28 @@ export function CustomerHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openMegaMenu, setOpenMegaMenu] = useState<string | null>(null);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [isTopBarVisible, setIsTopBarVisible] = useState(true);
 
   useEffect(() => {
     fetchNavbarItems();
+    checkTopBarVisibility();
   }, []);
+
+  // Check if top bar is visible by looking for the top bar element
+  const checkTopBarVisibility = () => {
+    const topBar = document.querySelector('[data-testid="top-bar"]') || document.querySelector('.bg-red-600');
+    setIsTopBarVisible(!!topBar);
+    
+    // Set up a mutation observer to watch for top bar changes
+    const observer = new MutationObserver(() => {
+      const topBar = document.querySelector('[data-testid="top-bar"]') || document.querySelector('.bg-red-600');
+      setIsTopBarVisible(!!topBar);
+    });
+    
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    return () => observer.disconnect();
+  };
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -155,6 +172,9 @@ export function CustomerHeader() {
     const category = item.category;
     if (!category) return null;
 
+    // Dynamic positioning based on top bar visibility
+    const megaMenuTopPosition = isTopBarVisible ? 'top-20' : 'top-16';
+
     return (
       <div
         key={item.id}
@@ -168,8 +188,9 @@ export function CustomerHeader() {
         </button>
         
         {openMegaMenu === category.id && (
-          <div className="fixed left-1/2 transform -translate-x-1/2 top-16 w-full max-w-4xl bg-white shadow-2xl border-t-4 border-red-500 z-50 transition-all duration-300
-  ${openMegaMenu === category.id ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'}`}">
+          <div className={`fixed left-1/2 transform -translate-x-1/2 ${megaMenuTopPosition} w-full max-w-4xl bg-white shadow-2xl border-t-4 border-red-500 z-50 transition-all duration-300 ${
+            openMegaMenu === category.id ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'
+          }`}>
             <div className="p-8">
               <div className="mb-6">
                 <h3 className="text-2xl font-bold text-gray-800 mb-2">{category.name}</h3>
