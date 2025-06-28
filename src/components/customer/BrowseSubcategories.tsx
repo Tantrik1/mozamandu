@@ -156,7 +156,7 @@ export function BrowseSubcategories() {
             </CarouselContent>
             
             {/* Navigation Arrows - Hidden on mobile for better touch experience */}
-            <div className="hidden md:block">
+            <div className="">
               <CarouselPrevious className="absolute -left-4 lg:-left-12 top-1/2 -translate-y-1/2 bg-white shadow-lg hover:bg-gray-50 border-2 border-gray-200" />
               <CarouselNext className="absolute -right-4 lg:-right-12 top-1/2 -translate-y-1/2 bg-white shadow-lg hover:bg-gray-50 border-2 border-gray-200" />
             </div>
