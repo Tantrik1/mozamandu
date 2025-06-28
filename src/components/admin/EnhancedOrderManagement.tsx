@@ -61,9 +61,9 @@ export function EnhancedOrderManagement() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      console.log('Fetching all orders with user profiles...');
+      console.log('Fetching all orders...');
       
-      // First fetch all orders
+      // Fetch all orders first - simplified query
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('*')
@@ -79,39 +79,49 @@ export function EnhancedOrderManagement() {
         return;
       }
 
-      // Then fetch user profiles for orders that have user_id
-      const userIds = ordersData?.filter(order => order.user_id).map(order => order.user_id) || [];
-      let profilesData: any[] = [];
-      
-      if (userIds.length > 0) {
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, role')
-          .in('id', userIds);
+      console.log('Fetched orders count:', ordersData?.length || 0);
 
-        if (profilesError) {
-          console.error('Error fetching profiles:', profilesError);
-        } else {
-          profilesData = profiles || [];
+      // Get unique user IDs that are not null
+      const userIds = [...new Set(ordersData?.filter(order => order.user_id).map(order => order.user_id))] || [];
+      let profilesMap: { [key: string]: { role: string } } = {};
+      
+      // Only fetch profiles if we have user IDs
+      if (userIds.length > 0) {
+        try {
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, role')
+            .in('id', userIds);
+
+          if (profilesError) {
+            console.error('Error fetching profiles:', profilesError);
+            // Don't fail the entire operation if profiles fail
+          } else {
+            // Create a map for quick lookup
+            profilesMap = (profiles || []).reduce((acc, profile) => {
+              acc[profile.id] = { role: profile.role };
+              return acc;
+            }, {} as { [key: string]: { role: string } });
+          }
+        } catch (profileError) {
+          console.error('Profile fetch failed:', profileError);
+          // Continue without profile data
         }
       }
 
-      // Combine orders with profile data
-      const transformedOrders = ordersData?.map(order => {
-        const profile = profilesData.find(p => p.id === order.user_id);
-        return {
-          ...order,
-          user_role: profile?.role || null
-        };
-      }) || [];
+      // Transform orders with profile data
+      const transformedOrders = ordersData?.map(order => ({
+        ...order,
+        user_role: order.user_id ? profilesMap[order.user_id]?.role || 'customer' : null
+      })) || [];
 
-      console.log('Fetched orders:', transformedOrders.length);
+      console.log('Final transformed orders:', transformedOrders.length);
       setOrders(transformedOrders);
     } catch (error) {
       console.error('Unexpected error fetching orders:', error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: "Failed to load orders. Please try again.",
         variant: "destructive",
       });
     } finally {
