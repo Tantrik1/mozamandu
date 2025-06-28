@@ -150,6 +150,211 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_order_item_details: {
+        Row: {
+          color_name: string | null
+          created_at: string | null
+          id: string
+          order_id: string
+          pricing_details: Json | null
+          pricing_mode: string
+          product_name: string
+          quantity: number
+          size_name: string | null
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          color_name?: string | null
+          created_at?: string | null
+          id?: string
+          order_id: string
+          pricing_details?: Json | null
+          pricing_mode?: string
+          product_name: string
+          quantity: number
+          size_name?: string | null
+          total_price: number
+          unit_price: number
+        }
+        Update: {
+          color_name?: string | null
+          created_at?: string | null
+          id?: string
+          order_id?: string
+          pricing_details?: Json | null
+          pricing_mode?: string
+          product_name?: string
+          quantity?: number
+          size_name?: string | null
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_order_item_details_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "customer_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_order_items: {
+        Row: {
+          color_variant_id: string | null
+          created_at: string | null
+          id: string
+          order_id: string
+          product_id: string
+          quantity: number
+          size_variant_id: string | null
+        }
+        Insert: {
+          color_variant_id?: string | null
+          created_at?: string | null
+          id?: string
+          order_id: string
+          product_id: string
+          quantity: number
+          size_variant_id?: string | null
+        }
+        Update: {
+          color_variant_id?: string | null
+          created_at?: string | null
+          id?: string
+          order_id?: string
+          product_id?: string
+          quantity?: number
+          size_variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_order_items_color_variant_id_fkey"
+            columns: ["color_variant_id"]
+            isOneToOne: false
+            referencedRelation: "color_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "customer_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_order_items_size_variant_id_fkey"
+            columns: ["size_variant_id"]
+            isOneToOne: false
+            referencedRelation: "size_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_orders: {
+        Row: {
+          combo_applied: boolean | null
+          contact_number: string
+          created_at: string | null
+          customer_email: string
+          customer_name: string
+          delivery_address: string
+          delivery_charge: number
+          delivery_location_id: string | null
+          id: string
+          order_number: string
+          paid_amount: number
+          payment_method_id: string | null
+          payment_percentage: number
+          payment_screenshot_url: string | null
+          pricing_breakdown: Json | null
+          promocode_discount: number | null
+          promocode_used: string | null
+          remaining_amount: number
+          status: Database["public"]["Enums"]["order_status"]
+          subtotal: number
+          total_amount: number
+          updated_at: string | null
+          user_id: string
+          whatsapp_number: string | null
+        }
+        Insert: {
+          combo_applied?: boolean | null
+          contact_number: string
+          created_at?: string | null
+          customer_email: string
+          customer_name: string
+          delivery_address: string
+          delivery_charge?: number
+          delivery_location_id?: string | null
+          id?: string
+          order_number?: string
+          paid_amount?: number
+          payment_method_id?: string | null
+          payment_percentage?: number
+          payment_screenshot_url?: string | null
+          pricing_breakdown?: Json | null
+          promocode_discount?: number | null
+          promocode_used?: string | null
+          remaining_amount?: number
+          status?: Database["public"]["Enums"]["order_status"]
+          subtotal?: number
+          total_amount?: number
+          updated_at?: string | null
+          user_id: string
+          whatsapp_number?: string | null
+        }
+        Update: {
+          combo_applied?: boolean | null
+          contact_number?: string
+          created_at?: string | null
+          customer_email?: string
+          customer_name?: string
+          delivery_address?: string
+          delivery_charge?: number
+          delivery_location_id?: string | null
+          id?: string
+          order_number?: string
+          paid_amount?: number
+          payment_method_id?: string | null
+          payment_percentage?: number
+          payment_screenshot_url?: string | null
+          pricing_breakdown?: Json | null
+          promocode_discount?: number | null
+          promocode_used?: string | null
+          remaining_amount?: number
+          status?: Database["public"]["Enums"]["order_status"]
+          subtotal?: number
+          total_amount?: number
+          updated_at?: string | null
+          user_id?: string
+          whatsapp_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_orders_delivery_location_id_fkey"
+            columns: ["delivery_location_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_charges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_orders_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_charges: {
         Row: {
           created_at: string | null
