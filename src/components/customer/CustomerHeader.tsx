@@ -224,9 +224,6 @@ export function CustomerHeader() {
                   <DropdownMenuItem onClick={handleDashboardClick} className="hover:bg-red-50 hover:text-red-700 transition-colors duration-200">
                     {userProfile?.role === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/orders')} className="hover:bg-red-50 hover:text-red-700 transition-colors duration-200">
-                    Orders
-                  </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-gray-100" />
                   <DropdownMenuItem onClick={handleSignOut} className="hover:bg-red-50 hover:text-red-700 transition-colors duration-200">
                     Logout
