@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +10,7 @@ import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
 import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 interface OrderDetails {
   id: string;
@@ -48,9 +48,13 @@ interface OrderItem {
 export default function OrderSummary() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
+  const { userProfile } = useAuth();
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Check if user came from admin panel
+  const isAdminView = userProfile?.role === 'admin';
 
   useEffect(() => {
     if (!orderId) {
@@ -217,6 +221,14 @@ export default function OrderSummary() {
     );
   };
 
+  const handleBackNavigation = () => {
+    if (isAdminView) {
+      navigate('/admin/orders');
+    } else {
+      navigate('/');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -237,8 +249,8 @@ export default function OrderSummary() {
         <CustomerHeader />
         <div className="text-center py-20">
           <p className="text-red-600 text-lg">Order not found</p>
-          <Button asChild className="mt-4">
-            <Link to="/">Go Home</Link>
+          <Button onClick={handleBackNavigation} className="mt-4">
+            Go Back
           </Button>
         </div>
       </div>
@@ -254,9 +266,9 @@ export default function OrderSummary() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header Section */}
         <div className="flex items-center justify-between mb-8 no-print">
-          <Button variant="outline" onClick={() => navigate('/')}>
+          <Button variant="outline" onClick={handleBackNavigation}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Home
+            {isAdminView ? 'Back to Admin Orders' : 'Back to Home'}
           </Button>
           <Button onClick={handlePrintPDF} variant="outline">
             <Download className="h-4 w-4 mr-2" />
@@ -264,12 +276,22 @@ export default function OrderSummary() {
           </Button>
         </div>
 
-        {/* Success Message */}
-        <div className="text-center mb-8">
-          <CheckCircle className="w-20 h-20 text-green-600 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-green-600 mb-2">Order Placed Successfully!</h1>
-          <p className="text-gray-600">Thank you for your order. We'll process it shortly.</p>
-        </div>
+        {/* Success Message - only show for non-admin views */}
+        {!isAdminView && (
+          <div className="text-center mb-8">
+            <CheckCircle className="w-20 h-20 text-green-600 mx-auto mb-4" />
+            <h1 className="text-3xl font-bold text-green-600 mb-2">Order Placed Successfully!</h1>
+            <p className="text-gray-600">Thank you for your order. We'll process it shortly.</p>
+          </div>
+        )}
+
+        {/* Admin view header */}
+        {isAdminView && (
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Order Details</h1>
+            <p className="text-gray-600">Admin view - Order #{orderDetails.order_number}</p>
+          </div>
+        )}
 
         {/* Order Summary Card */}
         <Card className="mb-8">
@@ -384,36 +406,46 @@ export default function OrderSummary() {
 
             <Separator />
 
-            {/* What's Next */}
-            <div>
-              <h3 className="font-semibold mb-3">What happens next?</h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Package className="w-5 h-5 text-blue-600" />
-                  <p className="text-sm">We'll review your payment and prepare your order</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-blue-600" />
-                  <p className="text-sm">Our team will contact you at {orderDetails.contact_number}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Mail className="w-5 h-5 text-blue-600" />
-                  <p className="text-sm">Order updates will be sent to {orderDetails.customer_email}</p>
+            {/* What's Next - only show for non-admin views */}
+            {!isAdminView && (
+              <div>
+                <h3 className="font-semibold mb-3">What happens next?</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Package className="w-5 h-5 text-blue-600" />
+                    <p className="text-sm">We'll review your payment and prepare your order</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Phone className="w-5 h-5 text-blue-600" />
+                    <p className="text-sm">Our team will contact you at {orderDetails.contact_number}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Mail className="w-5 h-5 text-blue-600" />
+                    <p className="text-sm">Order updates will be sent to {orderDetails.customer_email}</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center no-print">
-          <Button asChild size="lg">
-            <Link to="/">Continue Shopping</Link>
-          </Button>
+          {!isAdminView && (
+            <Button asChild size="lg">
+              <Link to="/">Continue Shopping</Link>
+            </Button>
+          )}
           <Button onClick={handlePrintPDF} variant="outline" size="lg">
             <Printer className="h-4 w-4 mr-2" />
             Print Order
           </Button>
+          {isAdminView && (
+            <Button onClick={handleBackNavigation} variant="outline" size="lg">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Orders
+            </Button>
+          )}
         </div>
 
         {/* Contact Info */}
