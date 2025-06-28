@@ -100,30 +100,30 @@ export function FeaturedProductsCarousel() {
     setCurrentIndex(prev => (prev - 1 + Math.max(1, products.length - 3)) % Math.max(1, products.length - 3));
   };
   if (loading) {
-    return <section className="py-16 bg-gray-50">
+    return <section className="py-8 sm:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
-            <p className="mt-4 text-lg text-gray-600">
+          <div className="text-center mb-8 sm:mb-12">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Featured Products</h2>
+            <p className="mt-2 sm:mt-4 text-base sm:text-lg text-gray-600">
               Discover our handpicked selection of premium products
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
             {[1, 2, 3, 4].map(i => <div key={i} className="animate-pulse">
-                <div className="bg-gray-200 h-64 rounded-lg mb-4"></div>
-                <div className="h-6 bg-gray-200 rounded mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                <div className="bg-gray-200 h-40 sm:h-64 rounded-lg mb-4"></div>
+                <div className="h-4 sm:h-6 bg-gray-200 rounded mb-2"></div>
+                <div className="h-3 sm:h-4 bg-gray-200 rounded w-3/4"></div>
               </div>)}
           </div>
         </div>
       </section>;
   }
   if (products.length === 0) {
-    return <section className="py-16 bg-gray-50">
+    return <section className="py-8 sm:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
-            <p className="mt-4 text-lg text-gray-600">
+          <div className="text-center mb-8 sm:mb-12">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Featured Products</h2>
+            <p className="mt-2 sm:mt-4 text-base sm:text-lg text-gray-600">
               Discover our handpicked selection of premium products
             </p>
           </div>
@@ -134,11 +134,11 @@ export function FeaturedProductsCarousel() {
         </div>
       </section>;
   }
-  return <section className="py-16 bg-gray-50">
+  return <section className="py-8 sm:py-16 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
-          <p className="mt-4 text-lg text-gray-600">
+        <div className="text-center mb-8 sm:mb-12">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Featured Products</h2>
+          <p className="mt-2 sm:mt-4 text-base sm:text-lg text-gray-600">
             Discover our handpicked selection of premium products
           </p>
         </div>
@@ -148,18 +148,18 @@ export function FeaturedProductsCarousel() {
             <div className="flex transition-transform duration-300 ease-in-out" style={{
             transform: `translateX(-${currentIndex * 25}%)`
           }}>
-              {products.map(product => <div key={product.id} className="">
+              {products.map(product => <div key={product.id} className="w-1/2 sm:w-1/2 lg:w-1/4 flex-shrink-0 px-1.5 sm:px-3">
                   <ProductCard product={product} subcategoryPrice={product.selling_price || 0} />
                 </div>)}
             </div>
           </div>
           
           {products.length > 4 && <>
-              <Button variant="outline" size="icon" className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-4 bg-white shadow-lg hover:bg-gray-50" onClick={prevSlide}>
-                <ChevronLeft className="h-4 w-4" />
+              <Button variant="outline" size="icon" className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 sm:-translate-x-4 bg-white shadow-lg hover:bg-gray-50 h-8 w-8 sm:h-10 sm:w-10" onClick={prevSlide}>
+                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
-              <Button variant="outline" size="icon" className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-4 bg-white shadow-lg hover:bg-gray-50" onClick={nextSlide}>
-                <ChevronRight className="h-4 w-4" />
+              <Button variant="outline" size="icon" className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 sm:translate-x-4 bg-white shadow-lg hover:bg-gray-50 h-8 w-8 sm:h-10 sm:w-10" onClick={nextSlide}>
+                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </>}
         </div>

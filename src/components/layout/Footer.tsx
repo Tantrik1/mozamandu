@@ -38,9 +38,10 @@ export function Footer() {
             <h3 className="text-lg font-semibold">Quick Links</h3>
             <ul className="space-y-2 text-sm">
               <li><Link to="/" className="text-gray-300 hover:text-white transition-colors">Home</Link></li>
-              <li><Link to="/categories" className="text-gray-300 hover:text-white transition-colors">Categories</Link></li>
-              <li><Link to="/products" className="text-gray-300 hover:text-white transition-colors">All Products</Link></li>
-              <li><Link to="/auth" className="text-gray-300 hover:text-white transition-colors">My Account</Link></li>
+              <li><Link to="/faq" className="text-gray-300 hover:text-white transition-colors">FAQ</Link></li>
+              <li><Link to="/subcategories/full-socks" className="text-gray-300 hover:text-white transition-colors">Full Socks</Link></li>
+              <li><Link to="/subcategories/half-socks" className="text-gray-300 hover:text-white transition-colors">Half Socks</Link></li>
+              <li><Link to="/subcategories/ankle-socks" className="text-gray-300 hover:text-white transition-colors">Ankle Socks</Link></li>
             </ul>
           </div>
 

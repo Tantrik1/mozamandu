@@ -102,20 +102,20 @@ export function LatestProducts() {
 
   if (loading) {
     return (
-      <section className="py-16 bg-white">
+      <section className="py-8 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900">Latest Products</h2>
-            <p className="mt-4 text-lg text-gray-600">
+          <div className="text-center mb-8 sm:mb-12">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Latest Products</h2>
+            <p className="mt-2 sm:mt-4 text-base sm:text-lg text-gray-600">
               Check out our newest arrivals
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
               <div key={i} className="animate-pulse">
-                <div className="bg-gray-200 h-64 rounded-lg mb-4"></div>
-                <div className="h-6 bg-gray-200 rounded mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                <div className="bg-gray-200 h-40 sm:h-64 rounded-lg mb-4"></div>
+                <div className="h-4 sm:h-6 bg-gray-200 rounded mb-2"></div>
+                <div className="h-3 sm:h-4 bg-gray-200 rounded w-3/4"></div>
               </div>
             ))}
           </div>
@@ -126,11 +126,11 @@ export function LatestProducts() {
 
   if (products.length === 0) {
     return (
-      <section className="py-16 bg-white">
+      <section className="py-8 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900">Latest Products</h2>
-            <p className="mt-4 text-lg text-gray-600">
+          <div className="text-center mb-8 sm:mb-12">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Latest Products</h2>
+            <p className="mt-2 sm:mt-4 text-base sm:text-lg text-gray-600">
               Check out our newest arrivals
             </p>
           </div>
@@ -144,15 +144,15 @@ export function LatestProducts() {
   }
 
   return (
-    <section className="py-16 bg-white">
+    <section className="py-8 sm:py-16 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900">Latest Products</h2>
-          <p className="mt-4 text-lg text-gray-600">
+        <div className="text-center mb-8 sm:mb-12">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Latest Products</h2>
+          <p className="mt-2 sm:mt-4 text-base sm:text-lg text-gray-600">
             Check out our newest arrivals
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
           {products.map((product) => (
             <ProductCard 
               key={product.id} 

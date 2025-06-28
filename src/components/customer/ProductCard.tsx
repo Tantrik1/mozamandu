@@ -216,17 +216,17 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
           <img 
             src={currentImage} 
             alt={product.name}
-            className={`w-full ${isCompact ? 'h-32' : 'h-48'} object-cover group-hover:scale-110 transition-transform duration-300`}
+            className={`w-full ${isCompact ? 'h-32 sm:h-32' : 'h-40 sm:h-48'} object-cover group-hover:scale-110 transition-transform duration-300`}
           />
         ) : (
-          <div className={`w-full ${isCompact ? 'h-32' : 'h-48'} bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center`}>
-            <span className="text-4xl">🧦</span>
+          <div className={`w-full ${isCompact ? 'h-32 sm:h-32' : 'h-40 sm:h-48'} bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center`}>
+            <span className="text-2xl sm:text-4xl">🧦</span>
           </div>
         )}
         
         {/* Dynamic Price Badge - Top Right */}
-        <div className="absolute top-3 right-3 bg-red-600 text-white px-3 py-1 rounded-full shadow-lg">
-          <span className="text-sm font-bold">Rs. {currentPricing.finalPrice.toFixed(2)}</span>
+        <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded-full shadow-lg">
+          <span className="text-xs sm:text-sm font-bold">Rs. {currentPricing.finalPrice.toFixed(2)}</span>
           {currentPricing.finalPrice < basePrice && (
             <div className="text-xs line-through opacity-75">Rs. {basePrice.toFixed(2)}</div>
           )}
@@ -234,43 +234,45 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
 
         {/* Featured Badge */}
         {product.is_featured && (
-          <Badge className="absolute top-3 left-3 bg-yellow-500 text-black text-xs font-medium px-2 py-1">
-            <Star className="w-3 h-3 mr-1" />
-            Featured
+          <Badge className="absolute top-2 left-2 bg-yellow-500 text-black text-xs font-medium px-1.5 py-0.5">
+            <Star className="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
+            <span className="hidden sm:inline">Featured</span>
           </Badge>
         )}
 
         {/* Pricing Mode Badge */}
         {currentPricing.mode !== 'normal' && (
-          <div className="absolute bottom-3 left-3">
+          <div className="absolute bottom-2 left-2">
             {currentPricing.mode === 'combo' && (
-              <Badge className="bg-green-500 text-white text-xs">
-                Combo Price
+              <Badge className="bg-green-500 text-white text-xs px-1.5 py-0.5">
+                <span className="hidden sm:inline">Combo Price</span>
+                <span className="sm:hidden">Combo</span>
               </Badge>
             )}
             {currentPricing.mode === 'discount' && (
-              <Badge className="bg-blue-500 text-white text-xs">
-                <Tag className="w-3 h-3 mr-1" />
-                MOQ Discount
+              <Badge className="bg-blue-500 text-white text-xs px-1.5 py-0.5">
+                <Tag className="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
+                <span className="hidden sm:inline">MOQ Discount</span>
+                <span className="sm:hidden">Discount</span>
               </Badge>
             )}
           </div>
         )}
 
         {/* Stock Info */}
-        <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1">
+        <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm rounded-lg px-1.5 py-0.5 sm:px-2 sm:py-1">
           <span className="text-xs text-gray-600">Stock: {availableStock}</span>
         </div>
       </div>
       
-      <CardContent className="p-4 flex-1 flex flex-col">
+      <CardContent className="p-3 sm:p-4 flex-1 flex flex-col space-y-2 sm:space-y-3">
         {/* Product Info */}
-        <div className="mb-3">
-          <h3 className="font-semibold text-lg text-gray-900 mb-1 line-clamp-1">
+        <div>
+          <h3 className="font-semibold text-sm sm:text-lg text-gray-900 mb-1 line-clamp-1">
             {product.name}
           </h3>
           {product.description && (
-            <p className="text-sm text-gray-600 line-clamp-2">
+            <p className="text-xs sm:text-sm text-gray-600 line-clamp-2">
               {product.description}
             </p>
           )}
@@ -278,15 +280,15 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
 
         {/* Color Selection */}
         {product.has_color_variants && colorVariants.length > 0 && (
-          <div className="mb-3">
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Color:</label>
+          <div>
+            <label className="text-xs sm:text-sm font-medium text-gray-700 mb-1 block">Color:</label>
             <Select value={selectedColor} onValueChange={setSelectedColor}>
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm">
                 <SelectValue placeholder="Select color" />
               </SelectTrigger>
               <SelectContent>
                 {colorVariants.map((color) => (
-                  <SelectItem key={color.id} value={color.id}>
+                  <SelectItem key={color.id} value={color.id} className="text-xs sm:text-sm">
                     {color.color_name}
                   </SelectItem>
                 ))}
@@ -297,15 +299,15 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
 
         {/* Size Selection */}
         {product.has_size_variants && sizeVariants.length > 0 && (
-          <div className="mb-3">
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Size:</label>
+          <div>
+            <label className="text-xs sm:text-sm font-medium text-gray-700 mb-1 block">Size:</label>
             <Select value={selectedSize} onValueChange={setSelectedSize}>
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm">
                 <SelectValue placeholder="Select size" />
               </SelectTrigger>
               <SelectContent>
                 {sizeVariants.map((size) => (
-                  <SelectItem key={size.id} value={size.id}>
+                  <SelectItem key={size.id} value={size.id} className="text-xs sm:text-sm">
                     {size.size_name}
                   </SelectItem>
                 ))}
@@ -315,26 +317,26 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
         )}
 
         {/* Quantity Selection */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-1 sm:space-x-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
               disabled={quantity <= 1}
-              className="h-8 w-8 p-0"
+              className="h-6 w-6 sm:h-8 sm:w-8 p-0"
             >
-              <Minus className="h-3 w-3" />
+              <Minus className="h-2 w-2 sm:h-3 sm:w-3" />
             </Button>
-            <span className="px-3 py-1 border rounded text-sm min-w-[2rem] text-center font-medium">{quantity}</span>
+            <span className="px-2 py-1 border rounded text-xs sm:text-sm min-w-[1.5rem] sm:min-w-[2rem] text-center font-medium">{quantity}</span>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setQuantity(Math.min(availableStock, quantity + 1))}
               disabled={quantity >= availableStock}
-              className="h-8 w-8 p-0"
+              className="h-6 w-6 sm:h-8 sm:w-8 p-0"
             >
-              <Plus className="h-3 w-3" />
+              <Plus className="h-2 w-2 sm:h-3 sm:w-3" />
             </Button>
           </div>
         </div>
@@ -343,7 +345,7 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
         <Button 
           onClick={handleAddToCart}
           disabled={loading || availableStock === 0}
-          className="w-full bg-red-600 hover:bg-red-700 text-white h-10 mt-auto font-medium"
+          className="w-full bg-red-600 hover:bg-red-700 text-white h-8 sm:h-10 mt-auto font-medium text-xs sm:text-sm"
         >
           {loading ? (
             "Adding..."
@@ -351,8 +353,9 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
             "Out of Stock"
           ) : (
             <>
-              <ShoppingCart className="mr-2 h-4 w-4" />
-              Add to Cart
+              <ShoppingCart className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Add to Cart</span>
+              <span className="sm:hidden">Add</span>
             </>
           )}
         </Button>
