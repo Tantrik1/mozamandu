@@ -1,10 +1,8 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductCard } from './ProductCard';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
 interface Product {
   id: string;
   name: string;
@@ -24,22 +22,19 @@ interface Product {
     name: string;
   };
 }
-
 export function FeaturedProductsCarousel() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
-
   useEffect(() => {
     let isMounted = true;
-
     const fetchFeaturedProducts = async () => {
       try {
         console.log('🔄 FeaturedProductsCarousel: Starting data fetch');
-
-        const { data, error } = await supabase
-          .from('products')
-          .select(`
+        const {
+          data,
+          error
+        } = await supabase.from('products').select(`
             id,
             name,
             selling_price,
@@ -54,20 +49,16 @@ export function FeaturedProductsCarousel() {
             category_id,
             subcategory_id,
             subcategory:subcategories!inner(id, name)
-          `)
-          .eq('status', 'active')
-          .eq('is_featured', true)
-          .order('created_at', { ascending: false })
-          .limit(8);
-
+          `).eq('status', 'active').eq('is_featured', true).order('created_at', {
+          ascending: false
+        }).limit(8);
         if (!isMounted) return;
-
         if (error) {
           console.error('❌ FeaturedProductsCarousel: Fetch error:', error);
           setProducts([]);
         } else {
           console.log('✅ FeaturedProductsCarousel: Raw data received:', data);
-          
+
           // Transform the data to ensure proper structure
           const transformedProducts = (data || []).map(product => ({
             ...product,
@@ -77,13 +68,14 @@ export function FeaturedProductsCarousel() {
             has_color_variants: product.has_color_variants || false,
             has_size_variants: product.has_size_variants || false,
             stock_quantity: product.stock_quantity || 0,
-            subcategory: product.subcategory || { id: '', name: 'Unknown' }
+            subcategory: product.subcategory || {
+              id: '',
+              name: 'Unknown'
+            }
           }));
-          
           console.log('✅ FeaturedProductsCarousel: Transformed products:', transformedProducts.length);
           setProducts(transformedProducts);
         }
-
       } catch (error) {
         console.error('❌ FeaturedProductsCarousel: Unexpected error:', error);
         if (isMounted) {
@@ -96,25 +88,19 @@ export function FeaturedProductsCarousel() {
         }
       }
     };
-
     fetchFeaturedProducts();
-
     return () => {
       isMounted = false;
     };
   }, []);
-
   const nextSlide = () => {
-    setCurrentIndex((prev) => (prev + 1) % Math.max(1, products.length - 3));
+    setCurrentIndex(prev => (prev + 1) % Math.max(1, products.length - 3));
   };
-
   const prevSlide = () => {
-    setCurrentIndex((prev) => (prev - 1 + Math.max(1, products.length - 3)) % Math.max(1, products.length - 3));
+    setCurrentIndex(prev => (prev - 1 + Math.max(1, products.length - 3)) % Math.max(1, products.length - 3));
   };
-
   if (loading) {
-    return (
-      <section className="py-16 bg-gray-50">
+    return <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
@@ -123,22 +109,17 @@ export function FeaturedProductsCarousel() {
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="animate-pulse">
+            {[1, 2, 3, 4].map(i => <div key={i} className="animate-pulse">
                 <div className="bg-gray-200 h-64 rounded-lg mb-4"></div>
                 <div className="h-6 bg-gray-200 rounded mb-2"></div>
                 <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-              </div>
-            ))}
+              </div>)}
           </div>
         </div>
-      </section>
-    );
+      </section>;
   }
-
   if (products.length === 0) {
-    return (
-      <section className="py-16 bg-gray-50">
+    return <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
@@ -151,12 +132,9 @@ export function FeaturedProductsCarousel() {
             <p className="text-sm text-gray-400 mt-2">Please check back later or contact support if this issue persists.</p>
           </div>
         </div>
-      </section>
-    );
+      </section>;
   }
-
-  return (
-    <section className="py-16 bg-gray-50">
+  return <section className="py-16 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
@@ -167,43 +145,24 @@ export function FeaturedProductsCarousel() {
         
         <div className="relative">
           <div className="overflow-hidden">
-            <div 
-              className="flex transition-transform duration-300 ease-in-out"
-              style={{ transform: `translateX(-${currentIndex * 25}%)` }}
-            >
-              {products.map((product) => (
-                <div key={product.id} className="w-1/4 flex-shrink-0 px-3">
-                  <ProductCard 
-                    product={product} 
-                    subcategoryPrice={product.selling_price || 0} 
-                  />
-                </div>
-              ))}
+            <div className="flex transition-transform duration-300 ease-in-out" style={{
+            transform: `translateX(-${currentIndex * 25}%)`
+          }}>
+              {products.map(product => <div key={product.id} className="">
+                  <ProductCard product={product} subcategoryPrice={product.selling_price || 0} />
+                </div>)}
             </div>
           </div>
           
-          {products.length > 4 && (
-            <>
-              <Button
-                variant="outline"
-                size="icon"
-                className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-4 bg-white shadow-lg hover:bg-gray-50"
-                onClick={prevSlide}
-              >
+          {products.length > 4 && <>
+              <Button variant="outline" size="icon" className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-4 bg-white shadow-lg hover:bg-gray-50" onClick={prevSlide}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-4 bg-white shadow-lg hover:bg-gray-50"
-                onClick={nextSlide}
-              >
+              <Button variant="outline" size="icon" className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-4 bg-white shadow-lg hover:bg-gray-50" onClick={nextSlide}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
-            </>
-          )}
+            </>}
         </div>
       </div>
-    </section>
-  );
+    </section>;
 }
