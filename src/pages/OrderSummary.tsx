@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { CheckCircle, Package, Phone, Mail, Download, ArrowLeft, Printer, Gift, Tag } from 'lucide-react';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
+import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
 import { toast } from '@/hooks/use-toast';
 
 interface OrderDetails {
@@ -362,6 +364,23 @@ export default function OrderSummary() {
                 )}
               </div>
             </div>
+
+            <Separator />
+
+            {/* Payment Screenshot Section */}
+            {orderDetails.payment_screenshot_url && (
+              <div>
+                <h3 className="font-semibold mb-3">Payment Screenshot</h3>
+                <div className="flex justify-center">
+                  <PaymentScreenshotViewer
+                    imageUrl={orderDetails.payment_screenshot_url}
+                    orderNumber={orderDetails.order_number}
+                    customerName={orderDetails.customer_name}
+                    uploadedAt={orderDetails.created_at}
+                  />
+                </div>
+              </div>
+            )}
 
             <Separator />
 

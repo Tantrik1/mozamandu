@@ -2,7 +2,9 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { Loader2, Tag, Gift } from 'lucide-react';
+import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
 
 interface CartItem {
   id: string;
@@ -47,6 +49,9 @@ interface OrderSummaryCardProps {
   submitting: boolean;
   uploadingScreenshot: boolean;
   onSubmitOrder: () => void;
+  paymentScreenshotUrl?: string;
+  orderNumber?: string;
+  customerName?: string;
 }
 
 export function OrderSummaryCard({
@@ -62,7 +67,10 @@ export function OrderSummaryCard({
   paidAmount,
   submitting,
   uploadingScreenshot,
-  onSubmitOrder
+  onSubmitOrder,
+  paymentScreenshotUrl,
+  orderNumber,
+  customerName
 }: OrderSummaryCardProps) {
   // Group items by product and pricing for detailed breakdown
   const getItemBreakdown = () => {
@@ -214,6 +222,21 @@ export function OrderSummaryCard({
             Minimum payment: Rs. {minimumPayment.toFixed(2)} (20%)
           </p>
         </div>
+
+        {/* Payment Screenshot Section */}
+        {paymentScreenshotUrl && orderNumber && customerName && (
+          <div className="pt-4">
+            <Separator className="mb-4" />
+            <h4 className="font-semibold mb-3">Your Payment Screenshot</h4>
+            <div className="flex justify-center">
+              <PaymentScreenshotViewer
+                imageUrl={paymentScreenshotUrl}
+                orderNumber={orderNumber}
+                customerName={customerName}
+              />
+            </div>
+          </div>
+        )}
 
         <Button 
           onClick={onSubmitOrder} 
