@@ -52,7 +52,7 @@ export function CategoriesMegaMenu({ categories }: CategoriesMegaMenuProps) {
                 <NavigationMenuContent>
                   <div className="w-screen bg-white border-t shadow-lg">
                     <div className="mx-auto p-6">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {category.subcategories?.map((subcategory) => (
                           <Link
                             key={subcategory.id}
