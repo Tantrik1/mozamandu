@@ -137,14 +137,14 @@ export function CustomerHeader() {
         </button>
         
         {openMegaMenu === category.id && (
-          <div className="absolute top-full left-1/2 transform -translate-x-1/2 max-w-3xl bg-white shadow-2xl border-t-4 border-red-500 z-50 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-screen max-w-6xl bg-white shadow-2xl border-t-4 border-red-500 z-50 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
             <div className="p-8">
               <div className="mb-6">
                 <h3 className="text-2xl font-bold text-gray-800 mb-2">{category.name}</h3>
                 <div className="w-20 h-1 bg-gradient-to-r from-red-500 to-red-600 rounded-full"></div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {category.subcategories?.map((subcategory) => (
                   <Link
                     key={subcategory.id}
