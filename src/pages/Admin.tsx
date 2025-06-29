@@ -1,3 +1,4 @@
+
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
@@ -20,26 +21,58 @@ import { OrdersChart } from '@/components/admin/OrdersChart';
 import { TopProducts } from '@/components/admin/TopProducts';
 import { TopCustomers } from '@/components/admin/TopCustomers';
 import { RecentNotifications } from '@/components/admin/RecentNotifications';
+import { RevenueOverview } from '@/components/admin/RevenueOverview';
+import { OrderAnalytics } from '@/components/admin/OrderAnalytics';
+import { CustomerAnalytics } from '@/components/admin/CustomerAnalytics';
 import { NavbarManagement } from '@/components/admin/NavbarManagement';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 function AdminDashboard() {
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
-      
-      <DashboardStats />
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <OrdersChart />
-        <div className="grid grid-cols-1 gap-6">
-          <TopProducts />
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <p className="text-gray-600">Comprehensive business analytics and insights</p>
         </div>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TopCustomers />
-        <RecentNotifications />
-      </div>
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="revenue">Revenue</TabsTrigger>
+          <TabsTrigger value="orders">Orders</TabsTrigger>
+          <TabsTrigger value="customers">Customers</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          <DashboardStats />
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <OrdersChart />
+            <div className="grid grid-cols-1 gap-6">
+              <TopProducts />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <TopCustomers />
+            <RecentNotifications />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="revenue">
+          <RevenueOverview />
+        </TabsContent>
+
+        <TabsContent value="orders">
+          <OrderAnalytics />
+        </TabsContent>
+
+        <TabsContent value="customers">
+          <CustomerAnalytics />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

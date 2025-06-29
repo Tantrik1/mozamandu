@@ -1,15 +1,14 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { CreateProductForm } from './CreateProductForm';
 import { EditProductForm } from './EditProductForm';
 import { ProductDetailView } from './ProductDetailView';
-import { Pencil, Trash2, Plus, Search, Package, Eye } from 'lucide-react';
+import { ProductFilters, ProductFilters as ProductFiltersType } from './ProductFilters';
+import { Pencil, Trash2, Plus, Package, Eye } from 'lucide-react';
 import { getProductStockSummary } from '@/utils/stockCalculation';
 
 interface Product {
@@ -30,19 +29,47 @@ interface Product {
   subcategories: { name: string } | null;
 }
 
+interface Category {
+  id: string;
+  name: string;
+}
+
+interface Subcategory {
+  id: string;
+  name: string;
+  category_id: string;
+}
+
 export function ProductManagement() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [viewingProductId, setViewingProductId] = useState<string | null>(null);
   const [productStocks, setProductStocks] = useState<Record<string, number>>({});
+  const [filters, setFilters] = useState<ProductFiltersType>({
+    search: '',
+    category: '',
+    subcategory: '',
+    status: '',
+    priceMin: '',
+    priceMax: '',
+    stockMin: '',
+    stockMax: '',
+    featured: '',
+    hasVariants: '',
+    sortBy: 'created_at',
+    sortOrder: 'desc'
+  });
   const { toast } = useToast();
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+    fetchCategories();
+    fetchSubcategories();
+  }, [filters]);
 
   useEffect(() => {
     if (products.length > 0) {
@@ -50,16 +77,96 @@ export function ProductManagement() {
     }
   }, [products]);
 
+  const fetchCategories = async () => {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('id, name')
+      .eq('status', 'on')
+      .order('name');
+    
+    if (!error && data) {
+      setCategories(data);
+    }
+  };
+
+  const fetchSubcategories = async () => {
+    const { data, error } = await supabase
+      .from('subcategories')
+      .select('id, name, category_id')
+      .eq('status', 'on')
+      .order('name');
+    
+    if (!error && data) {
+      setSubcategories(data);
+    }
+  };
+
+  const buildQuery = () => {
+    let query = supabase
+      .from('products')
+      .select(`
+        *,
+        categories(name),
+        subcategories(name)
+      `);
+
+    // Apply filters
+    if (filters.search) {
+      query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+    }
+    
+    if (filters.category) {
+      query = query.eq('category_id', filters.category);
+    }
+    
+    if (filters.subcategory) {
+      query = query.eq('subcategory_id', filters.subcategory);
+    }
+    
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+    
+    if (filters.featured === 'true') {
+      query = query.eq('is_featured', true);
+    } else if (filters.featured === 'false') {
+      query = query.eq('is_featured', false);
+    }
+    
+    if (filters.hasVariants === 'true') {
+      query = query.or('has_color_variants.eq.true,has_size_variants.eq.true');
+    } else if (filters.hasVariants === 'false') {
+      query = query.eq('has_color_variants', false).eq('has_size_variants', false);
+    }
+    
+    if (filters.priceMin) {
+      query = query.gte('selling_price', parseFloat(filters.priceMin));
+    }
+    
+    if (filters.priceMax) {
+      query = query.lte('selling_price', parseFloat(filters.priceMax));
+    }
+    
+    if (filters.stockMin) {
+      query = query.gte('stock_quantity', parseInt(filters.stockMin));
+    }
+    
+    if (filters.stockMax) {
+      query = query.lte('stock_quantity', parseInt(filters.stockMax));
+    }
+
+    // Apply sorting
+    const ascending = filters.sortOrder === 'asc';
+    query = query.order(filters.sortBy, { ascending });
+
+    return query;
+  };
+
   const fetchProducts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          categories(name),
-          subcategories(name)
-        `)
-        .order('created_at', { ascending: false });
+      setLoading(true);
+      const query = buildQuery();
+      const { data, error } = await query;
 
       if (error) throw error;
       setProducts(data || []);
@@ -160,12 +267,6 @@ export function ProductManagement() {
     setViewingProductId(null);
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.categories?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.subcategories?.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   if (loading) {
     return <div className="flex justify-center p-8">Loading products...</div>;
   }
@@ -203,33 +304,36 @@ export function ProductManagement() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Product Management</h2>
+        <div>
+          <h2 className="text-2xl font-bold">Product Management</h2>
+          <p className="text-gray-600">Manage your product catalog with advanced filtering</p>
+        </div>
         <Button onClick={() => setIsCreateFormOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Product
         </Button>
       </div>
 
-      <div className="flex items-center space-x-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search products..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+      <ProductFilters
+        onFiltersChange={setFilters}
+        categories={categories}
+        subcategories={subcategories}
+      />
+
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          Showing {products.length} product{products.length !== 1 ? 's' : ''}
+        </p>
       </div>
 
       <div className="grid gap-4">
-        {filteredProducts.length === 0 ? (
+        {products.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <p>No products found</p>
+            <p>No products found matching your filters</p>
           </div>
         ) : (
-          filteredProducts.map((product) => (
+          products.map((product) => (
             <Card key={product.id}>
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
