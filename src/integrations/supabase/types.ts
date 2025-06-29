@@ -1120,6 +1120,18 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      update_color_variant_stock: {
+        Args: { variant_id: string; stock_change: number }
+        Returns: undefined
+      }
+      update_product_stock: {
+        Args: { product_id: string; stock_change: number }
+        Returns: undefined
+      }
+      update_size_variant_stock: {
+        Args: { variant_id: string; stock_change: number }
+        Returns: undefined
+      }
     }
     Enums: {
       category_status: "on" | "off"

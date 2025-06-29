@@ -71,7 +71,7 @@ export function AdminOrdersTable({
 
     const oldStatus = order.status;
     
-    // If changing to cancelled status, restore stock
+    // Enhanced stock restoration when cancelling orders
     if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
       try {
         console.log('Restoring stock for cancelled order...');
@@ -84,20 +84,34 @@ export function AdminOrdersTable({
 
         if (itemsError) {
           console.error('Error fetching order items:', itemsError);
-        } else if (orderItems) {
-          await restoreStockForOrder(orderItems.map(item => ({
+          toast({
+            title: "Error",
+            description: "Could not fetch order items for stock restoration",
+            variant: "destructive",
+          });
+        } else if (orderItems && orderItems.length > 0) {
+          const stockItems = orderItems.map(item => ({
             productId: item.product_id,
             colorVariantId: item.color_variant_id,
             sizeVariantId: item.size_variant_id,
             quantity: item.quantity
-          })));
+          }));
+
+          await restoreStockForOrder(stockItems);
           console.log('Stock restored successfully');
+          
+          toast({
+            title: "Stock Restored",
+            description: `Stock has been restored for ${orderItems.length} item(s) from the cancelled order.`,
+          });
+        } else {
+          console.log('No order items found to restore stock for');
         }
       } catch (stockError) {
         console.error('Error restoring stock:', stockError);
         toast({
           title: "Stock Restoration Error",
-          description: "Order was cancelled but stock could not be restored. Please check manually.",
+          description: stockError instanceof Error ? stockError.message : "Order was cancelled but stock could not be restored. Please check manually.",
           variant: "destructive",
         });
       }

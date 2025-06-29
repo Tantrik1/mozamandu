@@ -14,7 +14,7 @@ import { DeliveryLocationSelector } from './DeliveryLocationSelector';
 import { PromoCodeSection } from './PromoCodeSection';
 import { PaymentMethodSection } from './PaymentMethodSection';
 import { OrderSummaryCard } from './OrderSummaryCard';
-import { reduceStockForOrder } from '@/utils/stockManagement';
+import { reduceStockForOrder, restoreStockForOrder } from '@/utils/stockManagement';
 
 interface FormErrors {
   [key: string]: string;
@@ -202,22 +202,27 @@ export function UniversalCheckout() {
       if (paymentScreenshot) {
         paymentScreenshotUrl = await uploadPaymentScreenshot();
         
-        // If upload fails, we still continue with the order
         if (!paymentScreenshotUrl) {
           console.warn('Payment screenshot upload failed, but continuing with order');
         }
       }
 
-      // Reduce stock before creating order
-      console.log('Reducing stock for order items...');
+      // Enhanced stock reduction with better error handling
+      console.log('Validating and reducing stock for order items...');
       try {
         await reduceStockForOrder(cartItems);
         console.log('Stock reduced successfully');
+        
+        // Show success message for stock reduction
+        toast({
+          title: "Stock Updated",
+          description: "Product stock has been successfully reserved for your order.",
+        });
       } catch (stockError) {
         console.error('Stock reduction failed:', stockError);
         toast({
           title: "Stock Error",
-          description: "There was an error updating stock. Please try again.",
+          description: stockError instanceof Error ? stockError.message : "There was an error updating stock. Please try again.",
           variant: "destructive",
         });
         return;
@@ -449,15 +454,29 @@ export function UniversalCheckout() {
     } catch (error) {
       console.error('Error creating order:', error);
       
-      // If order creation fails after stock reduction, we should restore stock
+      // Enhanced stock restoration with better error handling
       try {
         console.log('Restoring stock due to order creation failure...');
-        await reduceStockForOrder(cartItems.map(item => ({
-          ...item,
-          quantity: -item.quantity // Reverse the reduction
-        })));
+        const stockItems = cartItems.map(item => ({
+          productId: item.productId,
+          colorVariantId: item.colorVariantId,
+          sizeVariantId: item.sizeVariantId,
+          quantity: item.quantity
+        }));
+        await restoreStockForOrder(stockItems);
+        console.log('Stock restored successfully after order failure');
+        
+        toast({
+          title: "Stock Restored",
+          description: "Product stock has been restored due to order creation failure.",
+        });
       } catch (restoreError) {
         console.error('Failed to restore stock:', restoreError);
+        toast({
+          title: "Critical Error",
+          description: "Order failed and stock could not be restored. Please contact support immediately.",
+          variant: "destructive",
+        });
       }
       
       toast({
