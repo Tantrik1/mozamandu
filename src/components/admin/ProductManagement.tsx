@@ -49,6 +49,7 @@ export function ProductManagement() {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [viewingProductId, setViewingProductId] = useState<string | null>(null);
   const [productStocks, setProductStocks] = useState<Record<string, number>>({});
+  const [stockLoading, setStockLoading] = useState<Record<string, boolean>>({});
   const [filters, setFilters] = useState<ProductFiltersType>({
     search: '',
     category: '',
@@ -183,18 +184,33 @@ export function ProductManagement() {
   };
 
   const calculateProductStocks = async () => {
+    console.log('Calculating stocks for', products.length, 'products');
     const stocks: Record<string, number> = {};
+    const loadingStates: Record<string, boolean> = {};
+    
+    // Set loading states
+    products.forEach(product => {
+      loadingStates[product.id] = true;
+    });
+    setStockLoading(loadingStates);
     
     for (const product of products) {
       try {
+        console.log(`Calculating stock for product: ${product.name} (${product.id})`);
         const stock = await getProductStockSummary(product.id);
         stocks[product.id] = stock;
+        console.log(`Stock calculated for ${product.name}: ${stock}`);
+        
+        // Update loading state for this product
+        setStockLoading(prev => ({ ...prev, [product.id]: false }));
       } catch (error) {
         console.error('Error calculating stock for product:', product.id, error);
         stocks[product.id] = product.stock_quantity || 0;
+        setStockLoading(prev => ({ ...prev, [product.id]: false }));
       }
     }
     
+    console.log('Final stock calculations:', stocks);
     setProductStocks(stocks);
   };
 
@@ -377,7 +393,11 @@ export function ProductManagement() {
                         <p>
                           <span className="font-medium">Stock:</span> 
                           <Badge variant="outline" className="ml-2">
-                            {productStocks[product.id] !== undefined ? productStocks[product.id] : 'Loading...'}
+                            {stockLoading[product.id] ? (
+                              <span className="animate-pulse">Calculating...</span>
+                            ) : (
+                              productStocks[product.id] !== undefined ? productStocks[product.id] : 'Unknown'
+                            )}
                           </Badge>
                           {(product.has_color_variants || product.has_size_variants) && (
                             <span className="text-xs text-gray-500 ml-2">

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -76,11 +77,11 @@ export function CustomerAnalytics() {
 
     const returningCustomers = Object.values(customerOrderCounts).filter(count => count > 1).length;
 
-    // Calculate average customer lifetime value
+    // Calculate average customer lifetime value - properly handle total_amount
     const customerTotalSpent = orders
       .filter(order => order.status !== 'cancelled')
       .reduce((acc, order) => {
-        const amount = parseFloat(String(order.total_amount)) || 0;
+        const amount = Number(order.total_amount) || 0;
         acc[order.user_id] = (acc[order.user_id] || 0) + amount;
         return acc;
       }, {} as Record<string, number>);
