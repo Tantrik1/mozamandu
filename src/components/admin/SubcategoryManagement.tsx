@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,19 +10,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, X, Upload } from 'lucide-react';
-
 interface Category {
   id: string;
   name: string;
 }
-
 interface DiscountTier {
   id?: string;
   min_quantity: number;
   max_quantity: number | null;
   discount_amount: number;
 }
-
 interface Subcategory {
   id: string;
   name: string;
@@ -33,10 +29,11 @@ interface Subcategory {
   status: 'on' | 'off';
   category_id: string;
   image_url?: string;
-  categories: { name: string };
+  categories: {
+    name: string;
+  };
   created_at: string;
 }
-
 export function SubcategoryManagement() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -51,69 +48,64 @@ export function SubcategoryManagement() {
     category_id: '',
     selling_price: '',
     minimum_quantity: '',
-    status: true,
+    status: true
   });
-
   useEffect(() => {
     fetchSubcategories();
     fetchCategories();
   }, []);
-
   const fetchSubcategories = async () => {
-    const { data, error } = await supabase
-      .from('subcategories')
-      .select(`
+    const {
+      data,
+      error
+    } = await supabase.from('subcategories').select(`
         *,
         categories (name)
-      `)
-      .order('created_at', { ascending: false });
-
+      `).order('created_at', {
+      ascending: false
+    });
     if (error) {
       toast({
         title: "Error",
         description: "Failed to fetch subcategories",
-        variant: "destructive",
+        variant: "destructive"
       });
     } else {
       setSubcategories(data || []);
     }
   };
-
   const fetchCategories = async () => {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('id, name')
-      .eq('status', 'on');
-
+    const {
+      data,
+      error
+    } = await supabase.from('categories').select('id, name').eq('status', 'on');
     if (error) {
       toast({
         title: "Error",
         description: "Failed to fetch categories",
-        variant: "destructive",
+        variant: "destructive"
       });
     } else {
       setCategories(data || []);
     }
   };
-
   const fetchDiscountTiers = async (subcategoryId: string) => {
-    const { data, error } = await supabase
-      .from('discount_tiers')
-      .select('*')
-      .eq('subcategory_id', subcategoryId)
-      .order('min_quantity', { ascending: true });
-
+    const {
+      data,
+      error
+    } = await supabase.from('discount_tiers').select('*').eq('subcategory_id', subcategoryId).order('min_quantity', {
+      ascending: true
+    });
     if (error) {
       toast({
         title: "Error",
         description: "Failed to fetch discount tiers",
-        variant: "destructive",
+        variant: "destructive"
       });
       return [];
     }
     return data || [];
   };
-
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -125,33 +117,27 @@ export function SubcategoryManagement() {
       reader.readAsDataURL(file);
     }
   };
-
   const uploadImage = async (file: File): Promise<string | null> => {
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('subcategory-images')
-        .upload(filePath, file);
-
+      const {
+        error: uploadError
+      } = await supabase.storage.from('subcategory-images').upload(filePath, file);
       if (uploadError) {
         console.error('Upload error:', uploadError);
         return null;
       }
-
-      const { data } = supabase.storage
-        .from('subcategory-images')
-        .getPublicUrl(filePath);
-
+      const {
+        data
+      } = supabase.storage.from('subcategory-images').getPublicUrl(filePath);
       return data.publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
       return null;
     }
   };
-
   const addDiscountTier = () => {
     setDiscountTiers([...discountTiers, {
       min_quantity: 1,
@@ -159,23 +145,19 @@ export function SubcategoryManagement() {
       discount_amount: 0
     }]);
   };
-
   const removeDiscountTier = (index: number) => {
     const newTiers = discountTiers.filter((_, i) => i !== index);
     setDiscountTiers(newTiers);
   };
-
   const updateDiscountTier = (index: number, field: keyof DiscountTier, value: any) => {
     const newTiers = [...discountTiers];
     (newTiers[index] as any)[field] = value;
     setDiscountTiers(newTiers);
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     let imageUrl = editingSubcategory?.image_url || null;
-    
+
     // Upload new image if selected
     if (selectedImage) {
       const uploadedUrl = await uploadImage(selectedImage);
@@ -185,12 +167,11 @@ export function SubcategoryManagement() {
         toast({
           title: "Error",
           description: "Failed to upload image",
-          variant: "destructive",
+          variant: "destructive"
         });
         return;
       }
     }
-
     const subcategoryData = {
       name: formData.name,
       description: formData.description,
@@ -198,33 +179,28 @@ export function SubcategoryManagement() {
       selling_price: parseFloat(formData.selling_price),
       minimum_quantity: parseInt(formData.minimum_quantity),
       status: formData.status ? 'on' : 'off' as 'on' | 'off',
-      image_url: imageUrl,
+      image_url: imageUrl
     };
-
     let error;
     let subcategoryId;
-    
     if (editingSubcategory) {
-      ({ error } = await supabase
-        .from('subcategories')
-        .update(subcategoryData)
-        .eq('id', editingSubcategory.id));
+      ({
+        error
+      } = await supabase.from('subcategories').update(subcategoryData).eq('id', editingSubcategory.id));
       subcategoryId = editingSubcategory.id;
     } else {
-      const { data, error: insertError } = await supabase
-        .from('subcategories')
-        .insert([subcategoryData])
-        .select('id')
-        .single();
+      const {
+        data,
+        error: insertError
+      } = await supabase.from('subcategories').insert([subcategoryData]).select('id').single();
       error = insertError;
       subcategoryId = data?.id;
     }
-
     if (error) {
       toast({
         title: "Error",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
@@ -233,10 +209,7 @@ export function SubcategoryManagement() {
     if (subcategoryId && discountTiers.length > 0) {
       // Delete existing tiers if editing
       if (editingSubcategory) {
-        await supabase
-          .from('discount_tiers')
-          .delete()
-          .eq('subcategory_id', subcategoryId);
+        await supabase.from('discount_tiers').delete().eq('subcategory_id', subcategoryId);
       }
 
       // Insert new tiers
@@ -246,30 +219,25 @@ export function SubcategoryManagement() {
         max_quantity: tier.max_quantity,
         discount_amount: tier.discount_amount
       }));
-
-      const { error: tiersError } = await supabase
-        .from('discount_tiers')
-        .insert(tiersToInsert);
-
+      const {
+        error: tiersError
+      } = await supabase.from('discount_tiers').insert(tiersToInsert);
       if (tiersError) {
         toast({
           title: "Warning",
           description: "Subcategory saved but discount tiers failed to save",
-          variant: "destructive",
+          variant: "destructive"
         });
       }
     }
-
     toast({
       title: "Success",
-      description: `Subcategory ${editingSubcategory ? 'updated' : 'created'} successfully`,
+      description: `Subcategory ${editingSubcategory ? 'updated' : 'created'} successfully`
     });
-    
     resetForm();
     setIsCreateModalOpen(false);
     fetchSubcategories();
   };
-
   const handleEdit = async (subcategory: Subcategory) => {
     setEditingSubcategory(subcategory);
     setFormData({
@@ -278,44 +246,38 @@ export function SubcategoryManagement() {
       category_id: subcategory.category_id,
       selling_price: subcategory.selling_price.toString(),
       minimum_quantity: subcategory.minimum_quantity.toString(),
-      status: subcategory.status === 'on',
+      status: subcategory.status === 'on'
     });
-    
+
     // Set existing image preview
     if (subcategory.image_url) {
       setImagePreview(subcategory.image_url);
     }
-    
+
     // Fetch existing discount tiers
     const tiers = await fetchDiscountTiers(subcategory.id);
     setDiscountTiers(tiers);
-    
     setIsCreateModalOpen(true);
   };
-
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this subcategory?')) return;
-
-    const { error } = await supabase
-      .from('subcategories')
-      .delete()
-      .eq('id', id);
-
+    const {
+      error
+    } = await supabase.from('subcategories').delete().eq('id', id);
     if (error) {
       toast({
         title: "Error",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     } else {
       toast({
         title: "Success",
-        description: "Subcategory deleted successfully",
+        description: "Subcategory deleted successfully"
       });
       fetchSubcategories();
     }
   };
-
   const resetForm = () => {
     setFormData({
       name: '',
@@ -323,16 +285,14 @@ export function SubcategoryManagement() {
       category_id: '',
       selling_price: '',
       minimum_quantity: '',
-      status: true,
+      status: true
     });
     setEditingSubcategory(null);
     setDiscountTiers([]);
     setSelectedImage(null);
     setImagePreview(null);
   };
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6 py-[10px] px-[10px]">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Subcategory Management</h2>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
@@ -352,28 +312,24 @@ export function SubcategoryManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">Subcategory Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
+                  <Input id="name" value={formData.name} onChange={e => setFormData({
+                  ...formData,
+                  name: e.target.value
+                })} required />
                 </div>
                 <div>
                   <Label htmlFor="category">Category</Label>
-                  <Select 
-                    value={formData.category_id} 
-                    onValueChange={(value) => setFormData({ ...formData, category_id: value })}
-                  >
+                  <Select value={formData.category_id} onValueChange={value => setFormData({
+                  ...formData,
+                  category_id: value
+                })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
+                      {categories.map(category => <SelectItem key={category.id} value={category.id}>
                           {category.name}
-                        </SelectItem>
-                      ))}
+                        </SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -381,63 +337,41 @@ export function SubcategoryManagement() {
               
               <div>
                 <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
+                <Textarea id="description" value={formData.description} onChange={e => setFormData({
+                ...formData,
+                description: e.target.value
+              })} />
               </div>
               
               {/* Image Upload Section */}
               <div className="space-y-2">
                 <Label htmlFor="image">Subcategory Image</Label>
                 <div className="flex items-center space-x-4">
-                  <Input
-                    id="image"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"
-                  />
+                  <Input id="image" type="file" accept="image/*" onChange={handleImageSelect} className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100" />
                   <Button type="button" variant="outline" size="sm">
                     <Upload className="h-4 w-4 mr-2" />
                     Choose Image
                   </Button>
                 </div>
-                {imagePreview && (
-                  <div className="mt-2">
-                    <img 
-                      src={imagePreview} 
-                      alt="Preview" 
-                      className="w-32 h-32 object-cover rounded-lg border"
-                    />
-                  </div>
-                )}
+                {imagePreview && <div className="mt-2">
+                    <img src={imagePreview} alt="Preview" className="w-32 h-32 object-cover rounded-lg border" />
+                  </div>}
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="selling_price">Selling Price ($)</Label>
-                  <Input
-                    id="selling_price"
-                    type="number"
-                    step="0.01"
-                    value={formData.selling_price}
-                    onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                    required
-                  />
+                  <Input id="selling_price" type="number" step="0.01" value={formData.selling_price} onChange={e => setFormData({
+                  ...formData,
+                  selling_price: e.target.value
+                })} required />
                 </div>
                 <div>
                   <Label htmlFor="minimum_quantity">Minimum Order Quantity (MOQ)</Label>
-                  <Input
-                    id="minimum_quantity"
-                    type="number"
-                    min="1"
-                    value={formData.minimum_quantity}
-                    onChange={(e) => setFormData({ ...formData, minimum_quantity: e.target.value })}
-                    placeholder="e.g., 3"
-                    required
-                  />
+                  <Input id="minimum_quantity" type="number" min="1" value={formData.minimum_quantity} onChange={e => setFormData({
+                  ...formData,
+                  minimum_quantity: e.target.value
+                })} placeholder="e.g., 3" required />
                   <p className="text-xs text-gray-500 mt-1">
                     Minimum items from this subcategory required for checkout
                   </p>
@@ -458,17 +392,11 @@ export function SubcategoryManagement() {
                   but can get discounts based on these tiers. The discount applies to ALL items when the tier quantity is reached.
                 </p>
                 
-                {discountTiers.map((tier, index) => (
-                  <Card key={index}>
+                {discountTiers.map((tier, index) => <Card key={index}>
                     <CardHeader>
                       <div className="flex justify-between items-center">
                         <CardTitle className="text-sm">Discount Tier {index + 1}</CardTitle>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeDiscountTier(index)}
-                        >
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeDiscountTier(index)}>
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
@@ -477,34 +405,15 @@ export function SubcategoryManagement() {
                       <div className="grid grid-cols-3 gap-4">
                         <div>
                           <Label>Quantity to reach to apply Discount</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={tier.min_quantity}
-                            onChange={(e) => updateDiscountTier(index, 'min_quantity', parseInt(e.target.value) || 1)}
-                            placeholder="e.g., 5"
-                          />
+                          <Input type="number" min="1" value={tier.min_quantity} onChange={e => updateDiscountTier(index, 'min_quantity', parseInt(e.target.value) || 1)} placeholder="e.g., 5" />
                         </div>
                         <div>
                           <Label>Max Quantity</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={tier.max_quantity || ''}
-                            onChange={(e) => updateDiscountTier(index, 'max_quantity', e.target.value ? parseInt(e.target.value) : null)}
-                            placeholder="Leave empty for no limit"
-                          />
+                          <Input type="number" min="1" value={tier.max_quantity || ''} onChange={e => updateDiscountTier(index, 'max_quantity', e.target.value ? parseInt(e.target.value) : null)} placeholder="Leave empty for no limit" />
                         </div>
                         <div>
                           <Label>Discount Amount ($)</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={tier.discount_amount}
-                            onChange={(e) => updateDiscountTier(index, 'discount_amount', parseFloat(e.target.value) || 0)}
-                            placeholder="e.g., 2"
-                          />
+                          <Input type="number" step="0.01" min="0" value={tier.discount_amount} onChange={e => updateDiscountTier(index, 'discount_amount', parseFloat(e.target.value) || 0)} placeholder="e.g., 2" />
                         </div>
                       </div>
                       <p className="text-xs text-gray-500">
@@ -512,22 +421,18 @@ export function SubcategoryManagement() {
                         ${tier.discount_amount} discount per item for ALL items in this quantity range
                       </p>
                     </CardContent>
-                  </Card>
-                ))}
+                  </Card>)}
                 
-                {discountTiers.length === 0 && (
-                  <p className="text-sm text-gray-500 text-center py-4">
+                {discountTiers.length === 0 && <p className="text-sm text-gray-500 text-center py-4">
                     No discount tiers added. Click "Add Discount Tier" to create quantity-based discounts.
-                  </p>
-                )}
+                  </p>}
               </div>
               
               <div className="flex items-center space-x-2">
-                <Switch
-                  id="status"
-                  checked={formData.status}
-                  onCheckedChange={(checked) => setFormData({ ...formData, status: checked })}
-                />
+                <Switch id="status" checked={formData.status} onCheckedChange={checked => setFormData({
+                ...formData,
+                status: checked
+              })} />
                 <Label htmlFor="status">Active</Label>
               </div>
               
@@ -540,72 +445,44 @@ export function SubcategoryManagement() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {subcategories.map((subcategory) => (
-          <SubcategoryCard 
-            key={subcategory.id} 
-            subcategory={subcategory}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
-        ))}
+        {subcategories.map(subcategory => <SubcategoryCard key={subcategory.id} subcategory={subcategory} onEdit={handleEdit} onDelete={handleDelete} />)}
       </div>
-    </div>
-  );
+    </div>;
 }
-
-function SubcategoryCard({ 
-  subcategory, 
-  onEdit, 
-  onDelete 
-}: { 
+function SubcategoryCard({
+  subcategory,
+  onEdit,
+  onDelete
+}: {
   subcategory: Subcategory;
   onEdit: (subcategory: Subcategory) => void;
   onDelete: (id: string) => void;
 }) {
   const [discountTiers, setDiscountTiers] = useState<DiscountTier[]>([]);
-
   useEffect(() => {
     fetchDiscountTiers();
   }, [subcategory.id]);
-
   const fetchDiscountTiers = async () => {
-    const { data } = await supabase
-      .from('discount_tiers')
-      .select('*')
-      .eq('subcategory_id', subcategory.id)
-      .order('min_quantity', { ascending: true });
-    
+    const {
+      data
+    } = await supabase.from('discount_tiers').select('*').eq('subcategory_id', subcategory.id).order('min_quantity', {
+      ascending: true
+    });
     setDiscountTiers(data || []);
   };
-
-  return (
-    <Card>
+  return <Card>
       <CardHeader>
         <div className="flex justify-between items-start">
           <div className="flex-1">
-            {subcategory.image_url && (
-              <img 
-                src={subcategory.image_url} 
-                alt={subcategory.name}
-                className="w-full h-32 object-cover rounded-lg mb-3"
-              />
-            )}
+            {subcategory.image_url && <img src={subcategory.image_url} alt={subcategory.name} className="w-full h-32 object-cover rounded-lg mb-3" />}
             <CardTitle className="text-lg">{subcategory.name}</CardTitle>
             <p className="text-sm text-gray-500">{subcategory.categories?.name}</p>
           </div>
           <div className="flex space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onEdit(subcategory)}
-            >
+            <Button variant="ghost" size="sm" onClick={() => onEdit(subcategory)}>
               <Edit className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onDelete(subcategory.id)}
-            >
+            <Button variant="ghost" size="sm" onClick={() => onDelete(subcategory.id)}>
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
@@ -624,26 +501,18 @@ function SubcategoryCard({
             <span className="font-semibold text-blue-600">{subcategory.minimum_quantity}</span>
           </div>
           
-          {discountTiers.length > 0 && (
-            <div className="space-y-1">
+          {discountTiers.length > 0 && <div className="space-y-1">
               <span className="text-sm font-medium">Discount Tiers:</span>
-              {discountTiers.map((tier, index) => (
-                <div key={index} className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+              {discountTiers.map((tier, index) => <div key={index} className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
                   <span className="font-medium">
                     {tier.min_quantity}{tier.max_quantity ? `-${tier.max_quantity}` : '+'} qty:
                   </span>
                   <span className="text-green-600 ml-2">${tier.discount_amount} off each</span>
-                </div>
-              ))}
-            </div>
-          )}
+                </div>)}
+            </div>}
           
           <div className="flex justify-between items-center">
-            <span className={`px-2 py-1 rounded text-sm ${
-              subcategory.status === 'on' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-red-100 text-red-800'
-            }`}>
+            <span className={`px-2 py-1 rounded text-sm ${subcategory.status === 'on' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
               {subcategory.status === 'on' ? 'Active' : 'Inactive'}
             </span>
             <span className="text-sm text-gray-500">
@@ -652,6 +521,5 @@ function SubcategoryCard({
           </div>
         </div>
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }
