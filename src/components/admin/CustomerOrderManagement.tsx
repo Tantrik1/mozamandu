@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +9,7 @@ import { Eye, RefreshCw, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { restoreStockForOrder } from '@/utils/stockManagement';
 
 interface CustomerOrder {
   id: string;
@@ -77,6 +77,38 @@ export function CustomerOrderManagement() {
 
     const oldStatus = order.status;
     
+    // If changing to cancelled status, restore stock
+    if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
+      try {
+        console.log('Restoring stock for cancelled customer order...');
+        
+        // Fetch customer order items to restore stock
+        const { data: orderItems, error: itemsError } = await supabase
+          .from('customer_order_items')
+          .select('product_id, color_variant_id, size_variant_id, quantity')
+          .eq('order_id', orderId);
+
+        if (itemsError) {
+          console.error('Error fetching customer order items:', itemsError);
+        } else if (orderItems) {
+          await restoreStockForOrder(orderItems.map(item => ({
+            productId: item.product_id,
+            colorVariantId: item.color_variant_id,
+            sizeVariantId: item.size_variant_id,
+            quantity: item.quantity
+          })));
+          console.log('Stock restored successfully for customer order');
+        }
+      } catch (stockError) {
+        console.error('Error restoring stock for customer order:', stockError);
+        toast({
+          title: "Stock Restoration Error",
+          description: "Order was cancelled but stock could not be restored. Please check manually.",
+          variant: "destructive",
+        });
+      }
+    }
+    
     setUpdating(orderId);
     try {
       console.log('Updating customer order status:', orderId, 'to', newStatus);
@@ -102,7 +134,9 @@ export function CustomerOrderManagement() {
       console.log('Customer order status updated successfully');
       toast({
         title: "Success",
-        description: "Order status updated successfully",
+        description: newStatus === 'cancelled' ? 
+          "Order cancelled successfully and stock has been restored" : 
+          "Order status updated successfully",
       });
       
       setOrders(prev => prev.map(order => 

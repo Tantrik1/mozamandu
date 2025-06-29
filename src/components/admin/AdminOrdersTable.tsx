@@ -7,6 +7,7 @@ import { Eye, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { restoreStockForOrder } from '@/utils/stockManagement';
 
 interface Order {
   id: string;
@@ -69,6 +70,38 @@ export function AdminOrdersTable({
     if (!order) return;
 
     const oldStatus = order.status;
+    
+    // If changing to cancelled status, restore stock
+    if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
+      try {
+        console.log('Restoring stock for cancelled order...');
+        
+        // Fetch order items to restore stock
+        const { data: orderItems, error: itemsError } = await supabase
+          .from('order_items')
+          .select('product_id, color_variant_id, size_variant_id, quantity')
+          .eq('order_id', orderId);
+
+        if (itemsError) {
+          console.error('Error fetching order items:', itemsError);
+        } else if (orderItems) {
+          await restoreStockForOrder(orderItems.map(item => ({
+            productId: item.product_id,
+            colorVariantId: item.color_variant_id,
+            sizeVariantId: item.size_variant_id,
+            quantity: item.quantity
+          })));
+          console.log('Stock restored successfully');
+        }
+      } catch (stockError) {
+        console.error('Error restoring stock:', stockError);
+        toast({
+          title: "Stock Restoration Error",
+          description: "Order was cancelled but stock could not be restored. Please check manually.",
+          variant: "destructive",
+        });
+      }
+    }
     
     // Call the parent update function
     await onUpdateStatus(orderId, newStatus);
