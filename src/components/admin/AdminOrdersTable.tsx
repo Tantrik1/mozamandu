@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -65,6 +64,38 @@ export function AdminOrdersTable({
     }
   };
 
+  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const oldStatus = order.status;
+    
+    // Call the parent update function
+    await onUpdateStatus(orderId, newStatus);
+    
+    // Send status update email
+    try {
+      console.log('Sending status update email...');
+      const { error: emailError } = await supabase.functions.invoke('send-order-email', {
+        body: {
+          type: 'status_updated',
+          orderId: orderId,
+          isCustomerOrder: false, // This is for admin orders table
+          oldStatus: oldStatus,
+          newStatus: newStatus
+        }
+      });
+
+      if (emailError) {
+        console.error('Status update email failed:', emailError);
+      } else {
+        console.log('Status update email sent successfully');
+      }
+    } catch (emailError) {
+      console.error('Email sending error:', emailError);
+    }
+  };
+
   const handleViewOrder = (orderId: string) => {
     navigate(`/order-summary/${orderId}`);
   };
@@ -112,7 +143,7 @@ export function AdminOrdersTable({
             <TableCell>
               <Select
                 value={order.status}
-                onValueChange={(value) => onUpdateStatus(order.id, value)}
+                onValueChange={(value) => handleStatusUpdate(order.id, value)}
                 disabled={updating === order.id}
               >
                 <SelectTrigger className="w-40">

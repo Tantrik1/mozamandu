@@ -72,6 +72,11 @@ export function CustomerOrderManagement() {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const oldStatus = order.status;
+    
     setUpdating(orderId);
     try {
       console.log('Updating customer order status:', orderId, 'to', newStatus);
@@ -91,19 +96,43 @@ export function CustomerOrderManagement() {
           description: "Failed to update order status: " + error.message,
           variant: "destructive",
         });
-      } else {
-        console.log('Customer order status updated successfully');
-        toast({
-          title: "Success",
-          description: "Order status updated successfully",
-        });
-        
-        setOrders(prev => prev.map(order => 
-          order.id === orderId 
-            ? { ...order, status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled' }
-            : order
-        ));
+        return;
       }
+
+      console.log('Customer order status updated successfully');
+      toast({
+        title: "Success",
+        description: "Order status updated successfully",
+      });
+      
+      setOrders(prev => prev.map(order => 
+        order.id === orderId 
+          ? { ...order, status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled' }
+          : order
+      ));
+
+      // Send status update email
+      try {
+        console.log('Sending customer order status update email...');
+        const { error: emailError } = await supabase.functions.invoke('send-order-email', {
+          body: {
+            type: 'status_updated',
+            orderId: orderId,
+            isCustomerOrder: true, // This is for customer orders
+            oldStatus: oldStatus,
+            newStatus: newStatus
+          }
+        });
+
+        if (emailError) {
+          console.error('Status update email failed:', emailError);
+        } else {
+          console.log('Status update email sent successfully');
+        }
+      } catch (emailError) {
+        console.error('Email sending error:', emailError);
+      }
+
     } catch (error) {
       console.error('Unexpected error updating customer order status:', error);
       toast({

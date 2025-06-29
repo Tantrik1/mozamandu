@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useAuth } from '@/hooks/useAuth';
@@ -397,12 +396,34 @@ export function UniversalCheckout() {
 
       console.log('Order items created successfully');
 
+      // Send order creation email
+      try {
+        console.log('Sending order creation email...');
+        const { error: emailError } = await supabase.functions.invoke('send-order-email', {
+          body: {
+            type: 'order_created',
+            orderId: orderResult.id,
+            isCustomerOrder: isCustomerOrder()
+          }
+        });
+
+        if (emailError) {
+          console.error('Email sending failed:', emailError);
+          // Don't fail the order if email fails
+        } else {
+          console.log('Order creation email sent successfully');
+        }
+      } catch (emailError) {
+        console.error('Email sending error:', emailError);
+        // Don't fail the order if email fails
+      }
+
       // Clear cart and redirect to order summary
       clearCart();
       
       toast({
         title: "Order Placed Successfully!",
-        description: `Your order #${orderResult.order_number} has been placed successfully.`,
+        description: `Your order #${orderResult.order_number} has been placed successfully. A confirmation email has been sent.`,
       });
 
       // Redirect to appropriate order summary page
