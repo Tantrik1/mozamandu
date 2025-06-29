@@ -115,7 +115,7 @@ export function ProductFilters({ onFiltersChange, categories, subcategories }: P
           <div>
             <Label htmlFor="category">Category</Label>
             <Select value={filters.category} onValueChange={(value) => {
-              handleFilterChange('category', value);
+              handleFilterChange('category', value === 'all' ? '' : value);
               if (value !== filters.category) {
                 handleFilterChange('subcategory', '');
               }
@@ -124,7 +124,7 @@ export function ProductFilters({ onFiltersChange, categories, subcategories }: P
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 {categories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                 ))}
@@ -133,12 +133,12 @@ export function ProductFilters({ onFiltersChange, categories, subcategories }: P
           </div>
           <div>
             <Label htmlFor="status">Status</Label>
-            <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
+            <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value === 'all' ? '' : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Status</SelectItem>
+                <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
               </SelectContent>
@@ -152,12 +152,12 @@ export function ProductFilters({ onFiltersChange, categories, subcategories }: P
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="subcategory">Subcategory</Label>
-                <Select value={filters.subcategory} onValueChange={(value) => handleFilterChange('subcategory', value)}>
+                <Select value={filters.subcategory} onValueChange={(value) => handleFilterChange('subcategory', value === 'all' ? '' : value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="All Subcategories" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Subcategories</SelectItem>
+                    <SelectItem value="all">All Subcategories</SelectItem>
                     {filteredSubcategories.map((sub) => (
                       <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
                     ))}
@@ -166,12 +166,12 @@ export function ProductFilters({ onFiltersChange, categories, subcategories }: P
               </div>
               <div>
                 <Label htmlFor="featured">Featured</Label>
-                <Select value={filters.featured} onValueChange={(value) => handleFilterChange('featured', value)}>
+                <Select value={filters.featured} onValueChange={(value) => handleFilterChange('featured', value === 'all' ? '' : value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="All Products" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Products</SelectItem>
+                    <SelectItem value="all">All Products</SelectItem>
                     <SelectItem value="true">Featured Only</SelectItem>
                     <SelectItem value="false">Non-Featured</SelectItem>
                   </SelectContent>
@@ -219,12 +219,12 @@ export function ProductFilters({ onFiltersChange, categories, subcategories }: P
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="hasVariants">Product Type</Label>
-                <Select value={filters.hasVariants} onValueChange={(value) => handleFilterChange('hasVariants', value)}>
+                <Select value={filters.hasVariants} onValueChange={(value) => handleFilterChange('hasVariants', value === 'all' ? '' : value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="All Types" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Types</SelectItem>
+                    <SelectItem value="all">All Types</SelectItem>
                     <SelectItem value="true">With Variants</SelectItem>
                     <SelectItem value="false">Simple Products</SelectItem>
                   </SelectContent>
