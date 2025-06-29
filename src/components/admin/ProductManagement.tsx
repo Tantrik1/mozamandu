@@ -124,7 +124,7 @@ export function ProductManagement() {
     }
     
     if (filters.status) {
-      query = query.eq('status', filters.status);
+      query = query.eq('status', filters.status as 'active' | 'inactive');
     }
     
     if (filters.featured === 'true') {
