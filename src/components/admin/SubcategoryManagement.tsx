@@ -292,7 +292,7 @@ export function SubcategoryManagement() {
     setSelectedImage(null);
     setImagePreview(null);
   };
-  return <div className="space-y-6 py-[10px] px-[10px]">
+  return <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Subcategory Management</h2>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
