@@ -81,8 +81,14 @@ export function CustomerAnalytics() {
     const customerTotalSpent = orders
       .filter(order => order.status !== 'cancelled')
       .reduce((acc, order) => {
-        const amount = parseFloat(String(order.total_amount)) || 0;
-        acc[order.user_id] = (acc[order.user_id] || 0) + amount;
+        const amount = typeof order.total_amount === 'string' ? 
+          parseFloat(order.total_amount) : 
+          typeof order.total_amount === 'number' ? 
+          order.total_amount : 0;
+        
+        if (!isNaN(amount)) {
+          acc[order.user_id] = (acc[order.user_id] || 0) + amount;
+        }
         return acc;
       }, {} as Record<string, number>);
 
@@ -104,7 +110,7 @@ export function CustomerAnalytics() {
       totalCustomers,
       newCustomers,
       returningCustomers,
-      avgCustomerLibetimeValue,
+      avgCustomerLifetimeValue,
       abandonedCartRate,
       customerGrowth,
       customerSegments
@@ -164,8 +170,8 @@ export function CustomerAnalytics() {
 
   return (
     <div className="space-y-6">
-      {/* Customer Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -182,9 +188,8 @@ export function CustomerAnalytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">New Customers</p>
-                <p className="text-2xl font-bold text-green-600">{analytics.newCustomers}</p>
-                <Badge variant="outline" className="text-xs mt-1">Last 30 days</Badge>
+                <p className="text-sm font-medium text-gray-600">New Customers (30d)</p>
+                <p className="text-2xl font-bold">{analytics.newCustomers}</p>
               </div>
               <UserPlus className="h-8 w-8 text-green-600" />
             </div>
@@ -195,13 +200,10 @@ export function CustomerAnalytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Returning</p>
-                <p className="text-2xl font-bold text-purple-600">{analytics.returningCustomers}</p>
-                <Badge variant="outline" className="text-xs mt-1">
-                  {analytics.totalCustomers > 0 ? ((analytics.returningCustomers / analytics.totalCustomers) * 100).toFixed(1) : 0}%
-                </Badge>
+                <p className="text-sm font-medium text-gray-600">Returning Customers</p>
+                <p className="text-2xl font-bold">{analytics.returningCustomers}</p>
               </div>
-              <Heart className="h-8 w-8 text-purple-600" />
+              <Heart className="h-8 w-8 text-pink-600" />
             </div>
           </CardContent>
         </Card>
@@ -210,39 +212,24 @@ export function CustomerAnalytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Avg CLTV</p>
-                <p className="text-2xl font-bold">Rs {analytics.avgCustomerLifetimeValue.toFixed(0)}</p>
-                <p className="text-xs text-gray-500">Customer Lifetime Value</p>
+                <p className="text-sm font-medium text-gray-600">Avg Lifetime Value</p>
+                <p className="text-2xl font-bold">Rs. {analytics.avgCustomerLifetimeValue.toFixed(0)}</p>
               </div>
-              <ShoppingBag className="h-8 w-8 text-yellow-600" />
+              <ShoppingBag className="h-8 w-8 text-purple-600" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Additional Metrics */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Abandoned Cart Rate</p>
-              <p className="text-2xl font-bold text-red-600">{analytics.abandonedCartRate.toFixed(1)}%</p>
-              <p className="text-xs text-gray-500">Customers without orders</p>
-            </div>
-            <ShoppingBag className="h-8 w-8 text-red-600" />
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Customer Growth */}
+        {/* Customer Growth Chart */}
         <Card>
           <CardHeader>
             <CardTitle>Customer Growth (Last 12 Months)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
+            <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={analytics.customerGrowth}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -252,9 +239,9 @@ export function CustomerAnalytics() {
                   <Line 
                     type="monotone" 
                     dataKey="customers" 
-                    stroke="#3b82f6" 
+                    stroke="#2563eb" 
                     strokeWidth={2}
-                    dot={{ fill: '#3b82f6' }}
+                    dot={{ fill: '#2563eb' }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -262,27 +249,72 @@ export function CustomerAnalytics() {
           </CardContent>
         </Card>
 
-        {/* Customer Segments */}
+        {/* Customer Segments Chart */}
         <Card>
           <CardHeader>
             <CardTitle>Customer Segments by Value</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
+            <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={analytics.customerSegments}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis 
                     dataKey="segment" 
+                    tick={{ fontSize: 12 }}
+                    interval={0}
                     angle={-45}
                     textAnchor="end"
                     height={100}
                   />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="count" fill="#8b5cf6" />
+                  <Bar dataKey="count" fill="#8884d8" />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Additional Metrics */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-600 mb-2">Abandoned Cart Rate</p>
+              <p className="text-3xl font-bold text-red-600">{analytics.abandonedCartRate.toFixed(1)}%</p>
+              <Badge variant="outline" className="mt-2">
+                {analytics.abandonedCartRate < 50 ? 'Good' : 'Needs Improvement'}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-600 mb-2">Customer Retention</p>
+              <p className="text-3xl font-bold text-green-600">
+                {analytics.totalCustomers > 0 ? ((analytics.returningCustomers / analytics.totalCustomers) * 100).toFixed(1) : 0}%
+              </p>
+              <Badge variant="outline" className="mt-2">
+                Returning Customers
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-600 mb-2">Growth Rate</p>
+              <p className="text-3xl font-bold text-blue-600">
+                {analytics.totalCustomers > 0 ? ((analytics.newCustomers / analytics.totalCustomers) * 100).toFixed(1) : 0}%
+              </p>
+              <Badge variant="outline" className="mt-2">
+                Last 30 Days
+              </Badge>
             </div>
           </CardContent>
         </Card>
