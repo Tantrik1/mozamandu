@@ -8,7 +8,6 @@ import { Footer } from '@/components/layout/Footer';
 export default function Index() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopBar />
       <CustomerHeader />
       <NoticePopup />
       <HeroSection />
