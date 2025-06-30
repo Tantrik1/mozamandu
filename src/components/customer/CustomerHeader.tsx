@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -382,16 +383,16 @@ export function CustomerHeader() {
                             />
                           </button>
                           
-                          {/* Subcategories */}
+                          {/* Subcategories with proper scrolling */}
                           <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                            isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                            isExpanded ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'
                           }`}>
-                            <div className="bg-gray-50 border-t border-gray-100">
+                            <div className="bg-gray-50 border-t border-gray-100 max-h-80 overflow-y-auto">
                               {category.subcategories?.map((subcategory) => (
                                 <Link
                                   key={subcategory.id}
                                   to={`/subcategories/${subcategory.id}`}
-                                  className="flex items-center space-x-3 p-4 hover:bg-white transition-colors duration-200"
+                                  className="flex items-center space-x-3 p-4 hover:bg-white transition-colors duration-200 border-b border-gray-100 last:border-b-0"
                                   onClick={closeMobileMenu}
                                 >
                                   <div className="flex-shrink-0">

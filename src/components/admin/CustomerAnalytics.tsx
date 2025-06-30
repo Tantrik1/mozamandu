@@ -11,7 +11,6 @@ interface CustomerAnalytics {
   newCustomers: number;
   returningCustomers: number;
   avgCustomerLifetimeValue: number;
-  abandonedCartRate: number;
   customerGrowth: Array<{ month: string; customers: number }>;
   customerSegments: Array<{ segment: string; count: number; value: number }>;
 }
@@ -22,7 +21,6 @@ export function CustomerAnalytics() {
     newCustomers: 0,
     returningCustomers: 0,
     avgCustomerLifetimeValue: 0,
-    abandonedCartRate: 0,
     customerGrowth: [],
     customerSegments: []
   });
@@ -59,7 +57,7 @@ export function CustomerAnalytics() {
   const calculateCustomerAnalytics = (profiles: any[], orders: any[]) => {
     const totalCustomers = profiles.length;
     
-    // Calculate new vs returning customers (last 30 days)
+    // Calculate new customers (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
@@ -69,7 +67,7 @@ export function CustomerAnalytics() {
 
     // Calculate returning customers (customers with more than 1 order)
     const customerOrderCounts = orders.reduce((acc, order) => {
-      if (order.status !== 'cancelled') {
+      if (order.status !== 'cancelled' && order.user_id) {
         acc[order.user_id] = (acc[order.user_id] || 0) + 1;
       }
       return acc;
@@ -81,24 +79,24 @@ export function CustomerAnalytics() {
     const customerTotalSpent = orders
       .filter(order => order.status !== 'cancelled')
       .reduce((acc, order) => {
-        const amount = typeof order.total_amount === 'string' ? 
-          parseFloat(order.total_amount) : 
-          typeof order.total_amount === 'number' ? 
-          order.total_amount : 0;
+        if (!order.user_id) return acc;
         
-        if (!isNaN(amount)) {
+        let amount = 0;
+        if (typeof order.total_amount === 'string') {
+          amount = parseFloat(order.total_amount);
+        } else if (typeof order.total_amount === 'number') {
+          amount = order.total_amount;
+        }
+        
+        if (!isNaN(amount) && amount > 0) {
           acc[order.user_id] = (acc[order.user_id] || 0) + amount;
         }
         return acc;
       }, {} as Record<string, number>);
 
-    const avgCustomerLifetimeValue = Object.keys(customerTotalSpent).length > 0 ?
-      Object.values(customerTotalSpent).reduce((sum, value) => sum + value, 0) / Object.keys(customerTotalSpent).length : 0;
-
-    // Calculate abandoned cart rate (simplified - customers with orders vs total customers)
-    const customersWithOrders = new Set(orders.map(order => order.user_id)).size;
-    const abandonedCartRate = totalCustomers > 0 ? 
-      ((totalCustomers - customersWithOrders) / totalCustomers) * 100 : 0;
+    const customerValues = Object.values(customerTotalSpent);
+    const avgCustomerLifetimeValue = customerValues.length > 0 ?
+      customerValues.reduce((sum, value) => sum + value, 0) / customerValues.length : 0;
 
     // Generate customer growth data (last 12 months)
     const customerGrowth = generateCustomerGrowthData(profiles);
@@ -111,7 +109,6 @@ export function CustomerAnalytics() {
       newCustomers,
       returningCustomers,
       avgCustomerLifetimeValue,
-      abandonedCartRate,
       customerGrowth,
       customerSegments
     });
@@ -278,19 +275,7 @@ export function CustomerAnalytics() {
       </div>
 
       {/* Additional Metrics */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center">
-              <p className="text-sm font-medium text-gray-600 mb-2">Abandoned Cart Rate</p>
-              <p className="text-3xl font-bold text-red-600">{analytics.abandonedCartRate.toFixed(1)}%</p>
-              <Badge variant="outline" className="mt-2">
-                {analytics.abandonedCartRate < 50 ? 'Good' : 'Needs Improvement'}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="text-center">

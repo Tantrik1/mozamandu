@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useLocation } from 'react-router-dom';
 
 interface TopBarText {
   id: string;
@@ -10,6 +11,7 @@ interface TopBarText {
 }
 
 export function TopBar() {
+  const location = useLocation();
   const [topBarText, setTopBarText] = useState<TopBarText | null>(null);
   const [isVisible, setIsVisible] = useState(true);
 
@@ -43,10 +45,13 @@ export function TopBar() {
     setIsVisible(false);
   };
 
-  if (!topBarText || !isVisible) return null;
+  // Don't show top bar on admin pages
+  const isAdminPage = location.pathname.startsWith('/admin');
+  
+  if (!topBarText || !isVisible || isAdminPage) return null;
 
   return (
-    <div className="bg-red-600 text-white text-center py-2 px-4 relative z-50">
+    <div className="bg-red-600 text-white text-center py-2 px-4 relative z-50" data-testid="top-bar">
       <div className="flex items-center justify-center">
         <p className="text-sm font-medium flex-1 text-center pr-8">
           {topBarText.text}

@@ -36,7 +36,6 @@ export function EnhancedPaymentScreenshotViewer({
   const [imageError, setImageError] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const handleImageLoad = () => {
     setImageLoading(false);
@@ -84,16 +83,6 @@ export function EnhancedPaymentScreenshotViewer({
   const resetViewControls = () => {
     setZoom(1);
     setRotation(0);
-  };
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
   };
 
   const openImageInNewTab = () => {
@@ -227,9 +216,6 @@ export function EnhancedPaymentScreenshotViewer({
                 <Button variant="ghost" size="sm" onClick={resetViewControls}>
                   Reset
                 </Button>
-                <Button variant="ghost" size="sm" onClick={toggleFullscreen}>
-                  {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                </Button>
                 <Button variant="ghost" size="sm" onClick={openImageInNewTab}>
                   <Eye className="h-4 w-4" />
                 </Button>
@@ -241,17 +227,17 @@ export function EnhancedPaymentScreenshotViewer({
           </DialogHeader>
           
           <div className="flex-1 overflow-auto bg-gray-50" style={{ height: 'calc(95vh - 200px)' }}>
-            <div className="flex justify-center items-center min-h-full p-4">
+            <div className="flex justify-center items-start min-h-full p-4">
               <div className="relative">
                 <img
                   src={imageUrl}
                   alt={`Payment screenshot for ${orderNumber}`}
-                  className="max-w-none h-auto object-contain transition-transform duration-200 cursor-move"
+                  className="h-auto object-contain transition-transform duration-200 cursor-move"
                   style={{
                     transform: `scale(${zoom}) rotate(${rotation}deg)`,
                     transformOrigin: 'center',
-                    minWidth: zoom < 1 ? 'auto' : undefined,
-                    maxWidth: zoom < 1 ? '100%' : 'none'
+                    maxHeight: zoom === 1 ? 'calc(95vh - 250px)' : 'none',
+                    width: 'auto'
                   }}
                   draggable={false}
                 />

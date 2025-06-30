@@ -101,9 +101,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Sending email to:', recipientEmail);
 
-    // Send email with proper from address for production
+    // Send email with proper from address
     const emailResponse = await resend.emails.send({
-      from: "Mozamandu <orders@mozamandu.com>", // Use your verified domain
+      from: "Mozamandu <info@mozamandu.com>",
       to: [recipientEmail],
       subject,
       html: emailHtml,
