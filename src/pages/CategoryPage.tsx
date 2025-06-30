@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {TopBar} from '@/components/customer/TopBar' ;
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Package } from 'lucide-react';
@@ -91,7 +92,9 @@ export default function CategoryPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <TopBar />
         <CustomerHeader />
+        
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
           <div className="text-center">Loading...</div>
         </div>
