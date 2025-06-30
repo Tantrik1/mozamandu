@@ -1,8 +1,9 @@
-
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
+import { useEffect } from 'react';
 
 export default function TermsConditions() {
+  useEffect(() => { window.scrollTo(0, 0); }, []);
   return (
     <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
@@ -14,6 +15,13 @@ export default function TermsConditions() {
             <p className="text-gray-600 mb-6">
               <strong>Effective Date:</strong> January 1, 2025
             </p>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Data Collection & Protection</h2>
+              <p className="text-gray-700 mb-4">
+                By using our services, you acknowledge and agree that we collect all customer data necessary for business operations, order fulfillment, and service improvement. All data is handled in compliance with the California Consumer Privacy Act (CCPA), Global Consumer Acts, and other applicable privacy laws. We do not misuse, sell, or share your data with unauthorized parties, and we employ advanced security measures to protect your information.
+              </p>
+            </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Acceptance of Terms</h2>
@@ -195,6 +203,13 @@ export default function TermsConditions() {
                   Address: Kathmandu, Nepal
                 </p>
               </div>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Compliance & Customer Rights</h2>
+              <p className="text-gray-700 mb-4">
+                We are committed to upholding your rights under CCPA, global consumer protection laws, and all relevant regulations. You may request access to, correction of, or deletion of your data at any time by contacting us at info@mozamandu.com.
+              </p>
             </section>
 
             <p className="text-gray-600 text-sm mt-8 p-4 bg-yellow-50 rounded-lg">
