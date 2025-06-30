@@ -2,164 +2,238 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { EnhancedPaymentScreenshotViewer } from '@/components/admin/EnhancedPaymentScreenshotViewer';
 
-interface CartItem {
+interface OrderItem {
   id: string;
-  productId: string;
-  productName: string;
-  colorVariantId?: string | null;
-  sizeVariantId?: string | null;
-  colorName?: string;
-  sizeName?: string;
+  product_name: string;
+  color_name?: string;
+  size_name?: string;
   quantity: number;
-  basePrice: number;
-  subcategoryId: string;
-  image_url?: string;
+  unit_price: number;
+  total_price: number;
 }
 
-interface PricingInfo {
-  finalPrice: number;
-  description: string;
-  mode: 'normal' | 'discount' | 'combo';
-  isCombo?: boolean;
-  breakdown?: string[];
-}
-
-interface PromoCode {
+interface OrderData {
   id: string;
-  code: string;
-  discount_percentage: number;
-  minimum_order_amount: number;
+  order_number: string;
+  customer_name: string;
+  customer_email: string;
+  contact_number: string;
+  whatsapp_number?: string;
+  delivery_address: string;
+  subtotal: number;
+  delivery_charge: number;
+  promocode_discount?: number;
+  total_amount: number;
+  paid_amount: number;
+  remaining_amount: number;
+  status: string;
+  payment_screenshot_url?: string;
+  created_at: string;
+  payment_method?: {
+    name: string;
+  };
+  delivery_location?: {
+    place_name: string;
+  };
 }
 
 interface OrderSummaryCardProps {
-  cartItems: CartItem[];
-  getItemPricing: (item: CartItem) => PricingInfo;
-  subtotal: number;
-  deliveryPrice: number;
-  appliedPromo: PromoCode | null;
-  promoDiscount: number;
-  finalTotal: number;
-  minimumPayment: number;
-  paymentType: 'full' | 'partial';
-  paidAmount: string;
-  submitting: boolean;
-  uploadingScreenshot: boolean;
-  onSubmitOrder: () => Promise<void>;
+  order: OrderData;
+  items: OrderItem[];
 }
 
-export function OrderSummaryCard({
-  cartItems,
-  getItemPricing,
-  subtotal,
-  deliveryPrice,
-  appliedPromo,
-  promoDiscount,
-  finalTotal,
-  minimumPayment,
-  paymentType,
-  paidAmount,
-  submitting,
-  uploadingScreenshot,
-  onSubmitOrder
-}: OrderSummaryCardProps) {
+export function OrderSummaryCard({ order, items }: OrderSummaryCardProps) {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending_payment':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'paid':
+        return 'bg-blue-100 text-blue-800';
+      case 'processing':
+        return 'bg-purple-100 text-purple-800';
+      case 'shipped':
+        return 'bg-indigo-100 text-indigo-800';
+      case 'delivered':
+        return 'bg-green-100 text-green-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const formatStatus = (status: string) => {
+    return status.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Order Summary</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Cart Items */}
-        <div className="space-y-3">
-          {cartItems.map((item) => {
-            const pricing = getItemPricing(item);
-            return (
-              <div key={item.id} className="flex justify-between items-start py-2 border-b border-gray-100">
+    <div className="space-y-6">
+      {/* Order Header */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-2xl font-bold">Order #{order.order_number}</CardTitle>
+              <p className="text-gray-600 mt-1">
+                Placed on {new Date(order.created_at).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </p>
+            </div>
+            <Badge className={`px-3 py-1 ${getStatusColor(order.status)}`}>
+              {formatStatus(order.status)}
+            </Badge>
+          </div>
+        </CardHeader>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Customer Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Customer Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Name</p>
+              <p className="font-medium">{order.customer_name}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500">Email</p>
+              <p className="font-medium">{order.customer_email}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500">Contact Number</p>
+              <p className="font-medium">{order.contact_number}</p>
+            </div>
+            {order.whatsapp_number && (
+              <div>
+                <p className="text-sm font-medium text-gray-500">WhatsApp Number</p>
+                <p className="font-medium">{order.whatsapp_number}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Delivery Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Delivery Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Delivery Address</p>
+              <p className="font-medium">{order.delivery_address}</p>
+            </div>
+            {order.delivery_location && (
+              <div>
+                <p className="text-sm font-medium text-gray-500">Delivery Location</p>
+                <p className="font-medium">{order.delivery_location.place_name}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-medium text-gray-500">Delivery Charge</p>
+              <p className="font-medium">Rs. {order.delivery_charge}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Order Items */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Order Items</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {items.map((item) => (
+              <div key={item.id} className="flex justify-between items-center py-3 border-b border-gray-100 last:border-b-0">
                 <div className="flex-1">
-                  <h4 className="font-medium text-sm">{item.productName}</h4>
-                  <div className="flex gap-2 text-xs text-gray-600 mt-1">
-                    {item.colorName && <span>Color: {item.colorName}</span>}
-                    {item.sizeName && <span>Size: {item.sizeName}</span>}
+                  <h4 className="font-medium">{item.product_name}</h4>
+                  <div className="flex gap-4 text-sm text-gray-600 mt-1">
+                    {item.color_name && <span>Color: {item.color_name}</span>}
+                    {item.size_name && <span>Size: {item.size_name}</span>}
                     <span>Qty: {item.quantity}</span>
                   </div>
-                  {pricing.mode !== 'normal' && (
-                    <Badge variant="secondary" className="text-xs mt-1">
-                      {pricing.description}
-                    </Badge>
-                  )}
                 </div>
                 <div className="text-right">
-                  <p className="font-medium text-sm">Rs. {(pricing.finalPrice * item.quantity).toFixed(2)}</p>
-                  <p className="text-xs text-gray-600">Rs. {pricing.finalPrice.toFixed(2)} each</p>
+                  <p className="font-medium">Rs. {item.total_price}</p>
+                  <p className="text-sm text-gray-600">Rs. {item.unit_price} each</p>
                 </div>
               </div>
-            );
-          })}
-        </div>
-
-        <Separator />
-
-        {/* Pricing Breakdown */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>Subtotal</span>
-            <span>Rs. {subtotal.toFixed(2)}</span>
+            ))}
           </div>
-          <div className="flex justify-between text-sm">
-            <span>Delivery Charge</span>
-            <span>Rs. {deliveryPrice.toFixed(2)}</span>
-          </div>
-          {appliedPromo && promoDiscount > 0 && (
-            <div className="flex justify-between text-sm text-green-600">
-              <span>Promo Discount ({appliedPromo.code})</span>
-              <span>-Rs. {promoDiscount.toFixed(2)}</span>
-            </div>
-          )}
-          <Separator />
-          <div className="flex justify-between font-bold">
-            <span>Total</span>
-            <span>Rs. {finalTotal.toFixed(2)}</span>
-          </div>
-        </div>
+        </CardContent>
+      </Card>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Payment Information */}
-        {paymentType === 'partial' && (
-          <div className="space-y-2 p-3 bg-blue-50 rounded-lg">
-            <div className="flex justify-between text-sm">
-              <span>Paying Now</span>
-              <span className="font-medium">Rs. {parseFloat(paidAmount || '0').toFixed(2)}</span>
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span>Rs. {order.subtotal}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span>Remaining Amount</span>
-              <span className="font-medium text-orange-600">
-                Rs. {(finalTotal - parseFloat(paidAmount || '0')).toFixed(2)}
-              </span>
+            <div className="flex justify-between">
+              <span>Delivery Charge</span>
+              <span>Rs. {order.delivery_charge}</span>
             </div>
-            <div className="text-xs text-gray-600">
-              Minimum payment: Rs. {minimumPayment.toFixed(2)} (20% of total)
+            {order.promocode_discount && order.promocode_discount > 0 && (
+              <div className="flex justify-between text-green-600">
+                <span>Promocode Discount</span>
+                <span>-Rs. {order.promocode_discount}</span>
+              </div>
+            )}
+            <Separator />
+            <div className="flex justify-between font-bold text-lg">
+              <span>Total Amount</span>
+              <span>Rs. {order.total_amount}</span>
             </div>
-          </div>
-        )}
+            <div className="flex justify-between text-green-600 font-medium">
+              <span>Paid Amount</span>
+              <span>Rs. {order.paid_amount}</span>
+            </div>
+            {order.remaining_amount > 0 && (
+              <div className="flex justify-between text-red-600 font-medium">
+                <span>Remaining Amount</span>
+                <span>Rs. {order.remaining_amount}</span>
+              </div>
+            )}
+            {order.payment_method && (
+              <div className="mt-3 pt-3 border-t">
+                <p className="text-sm font-medium text-gray-500">Payment Method</p>
+                <p className="font-medium">{order.payment_method.name}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Submit Button */}
-        <Button
-          onClick={onSubmitOrder}
-          disabled={submitting || uploadingScreenshot}
-          className="w-full bg-red-600 hover:bg-red-700 text-white"
-          size="lg"
-        >
-          {submitting || uploadingScreenshot ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {uploadingScreenshot ? 'Uploading Screenshot...' : 'Placing Order...'}
-            </>
-          ) : (
-            `Place Order - Rs. ${paymentType === 'full' ? finalTotal.toFixed(2) : parseFloat(paidAmount || '0').toFixed(2)}`
-          )}
-        </Button>
-      </CardContent>
-    </Card>
+        {/* Payment Screenshot */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Screenshot</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EnhancedPaymentScreenshotViewer
+              imageUrl={order.payment_screenshot_url}
+              orderNumber={order.order_number}
+              customerName={order.customer_name}
+              uploadedAt={order.created_at}
+            />
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }
