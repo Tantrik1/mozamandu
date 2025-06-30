@@ -15,6 +15,7 @@ import { PromoCodeSection } from './PromoCodeSection';
 import { PaymentMethodSection } from './PaymentMethodSection';
 import { OrderSummaryCard } from './OrderSummaryCard';
 import { reduceStockForOrder, restoreStockForOrder } from '@/utils/stockManagement';
+import { incrementPromoCodeUsage } from '@/utils/promoCodeUtils';
 
 interface FormErrors {
   [key: string]: string;
@@ -226,6 +227,18 @@ export function UniversalCheckout() {
           variant: "destructive",
         });
         return;
+      }
+
+      // Manually increment promo code usage if promo code was used
+      if (appliedPromo?.code) {
+        try {
+          console.log('Manually incrementing promo code usage for:', appliedPromo.code);
+          await incrementPromoCodeUsage(appliedPromo.code);
+          console.log('Promo code usage incremented successfully');
+        } catch (promoError) {
+          console.error('Failed to increment promo code usage:', promoError);
+          // Don't fail the order for this, just log it
+        }
       }
 
       // Prepare base order data
