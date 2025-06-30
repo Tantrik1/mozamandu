@@ -26,15 +26,15 @@ export function UniversalCheckout() {
   const { user, userProfile } = useAuth();
   const navigate = useNavigate();
   const { deliveryCharges, paymentMethods, loading } = useCheckoutData();
-  const { 
-    promoCode, 
-    setPromoCode, 
-    appliedPromo, 
-    isPromoApplied, 
-    applyPromoCode, 
-    removePromoCode 
+  const {
+    promoCode,
+    setPromoCode,
+    appliedPromo,
+    isPromoApplied,
+    applyPromoCode,
+    removePromoCode
   } = usePromoCode();
-  
+
   // Form state
   const [customerInfo, setCustomerInfo] = useState({
     name: '',
@@ -43,16 +43,16 @@ export function UniversalCheckout() {
     whatsapp: '',
     address: ''
   });
-  
+
   // Checkout data
   const [selectedDelivery, setSelectedDelivery] = useState('');
   const [selectedPayment, setSelectedPayment] = useState('');
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
-  
+
   // Payment type state
   const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
   const [paidAmount, setPaidAmount] = useState('');
-  
+
   // UI state
   const [submitting, setSubmitting] = useState(false);
   const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
@@ -64,7 +64,7 @@ export function UniversalCheckout() {
       navigate('/');
       return;
     }
-    
+
     // Auto-fill user info if logged in
     if (user && userProfile) {
       setCustomerInfo(prev => ({
@@ -82,11 +82,11 @@ export function UniversalCheckout() {
     if (!user) {
       return 'guest-payments';
     }
-    
+
     if (userProfile?.role === 'admin') {
       return 'admin-payments';
     }
-    
+
     return 'customer-payments';
   };
 
@@ -192,8 +192,8 @@ export function UniversalCheckout() {
       const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
       const subtotal = getTotalPrice();
       const totalWithDelivery = subtotal + deliveryPrice;
-      const promoDiscount = appliedPromo 
-        ? (totalWithDelivery * appliedPromo.discount_percentage) / 100 
+      const promoDiscount = appliedPromo
+        ? (totalWithDelivery * appliedPromo.discount_percentage) / 100
         : 0;
       const finalTotal = totalWithDelivery - promoDiscount;
       const actualPaidAmount = paymentType === 'full' ? finalTotal : parseFloat(paidAmount);
@@ -202,7 +202,7 @@ export function UniversalCheckout() {
       let paymentScreenshotUrl = null;
       if (paymentScreenshot) {
         paymentScreenshotUrl = await uploadPaymentScreenshot();
-        
+
         if (!paymentScreenshotUrl) {
           console.warn('Payment screenshot upload failed, but continuing with order');
         }
@@ -213,7 +213,7 @@ export function UniversalCheckout() {
       try {
         await reduceStockForOrder(cartItems);
         console.log('Stock reduced successfully');
-        
+
         // Show success message for stock reduction
         toast({
           title: "Stock Updated",
@@ -301,7 +301,7 @@ export function UniversalCheckout() {
 
         if (orderError) {
           console.error('Order creation error:', orderError);
-          
+
           // Better error handling for RLS issues
           if (orderError.code === '42501' || orderError.message.includes('row-level security')) {
             console.log('Retrying as explicit guest order...');
@@ -309,18 +309,18 @@ export function UniversalCheckout() {
               ...regularOrderData,
               user_id: null // Force null for guest orders
             };
-            
+
             const { data: guestOrder, error: guestOrderError } = await supabase
               .from('orders')
               .insert(guestOrderData)
               .select()
               .single();
-              
+
             if (guestOrderError) {
               console.error('Guest order creation also failed:', guestOrderError);
               throw new Error('Unable to create order. Please try again or contact support.');
             }
-            
+
             orderResult = guestOrder;
           } else {
             throw new Error(`Order creation failed: ${orderError.message}`);
@@ -353,7 +353,7 @@ export function UniversalCheckout() {
             .select('id')
             .eq('id', item.colorVariantId)
             .single();
-          
+
           if (colorVariant) {
             validColorVariantId = item.colorVariantId;
           } else {
@@ -367,7 +367,7 @@ export function UniversalCheckout() {
             .select('id')
             .eq('id', item.sizeVariantId)
             .single();
-          
+
           if (sizeVariant) {
             validSizeVariantId = item.sizeVariantId;
           } else {
@@ -411,7 +411,7 @@ export function UniversalCheckout() {
 
       if (itemsError) {
         console.error('Order items creation error:', itemsError);
-        
+
         // Try to cleanup the order if items creation fails
         const deleteTable = isCustomerOrder() ? 'customer_orders' : 'orders';
         await supabase.from(deleteTable).delete().eq('id', orderResult.id);
@@ -454,7 +454,7 @@ export function UniversalCheckout() {
 
       // Clear cart and redirect to order summary
       clearCart();
-      
+
       toast({
         title: "Order Placed Successfully!",
         description: `Your order #${orderResult.order_number} has been placed successfully. Stock has been updated and a confirmation email has been sent.`,
@@ -463,10 +463,10 @@ export function UniversalCheckout() {
       // Redirect to appropriate order summary page
       const summaryRoute = isCustomerOrder() ? 'customer-order-summary' : 'order-summary';
       navigate(`/${summaryRoute}/${orderResult.id}`);
-      
+
     } catch (error) {
       console.error('Error creating order:', error);
-      
+
       // Enhanced stock restoration with better error handling
       try {
         console.log('Restoring stock due to order creation failure...');
@@ -478,7 +478,7 @@ export function UniversalCheckout() {
         }));
         await restoreStockForOrder(stockItems);
         console.log('Stock restored successfully after order failure');
-        
+
         toast({
           title: "Stock Restored",
           description: "Product stock has been restored due to order creation failure.",
@@ -491,7 +491,7 @@ export function UniversalCheckout() {
           variant: "destructive",
         });
       }
-      
+
       toast({
         title: "Order Failed",
         description: error instanceof Error ? error.message : "There was an error placing your order. Please try again.",
@@ -507,8 +507,8 @@ export function UniversalCheckout() {
   const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
   const subtotal = getTotalPrice();
   const totalWithDelivery = subtotal + deliveryPrice;
-  const promoDiscount = appliedPromo 
-    ? (totalWithDelivery * appliedPromo.discount_percentage) / 100 
+  const promoDiscount = appliedPromo
+    ? (totalWithDelivery * appliedPromo.discount_percentage) / 100
     : 0;
   const finalTotal = totalWithDelivery - promoDiscount;
   const minimumPayment = finalTotal * 0.2; // 20% minimum
