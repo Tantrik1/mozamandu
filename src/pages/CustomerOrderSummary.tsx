@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +7,7 @@ import { ArrowLeft, Package, Phone, Mail, MapPin, Calendar, CreditCard } from 'l
 import { supabase } from '@/integrations/supabase/client';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
-import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
+import FullScreenImageModal from '@/components/admin/FullScreenImageModal';
 
 interface CustomerOrderDetails {
   id: string;
@@ -49,11 +48,12 @@ interface OrderItem {
 }
 
 export default function CustomerOrderSummary() {
-  const { orderId } = useParams();
+  const { orderId } = useParams<{ orderId: string }>();
   const [orderDetails, setOrderDetails] = useState<CustomerOrderDetails | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isScreenshotOpen, setIsScreenshotOpen] = useState(false);
 
   useEffect(() => {
     if (orderId) {
@@ -79,7 +79,7 @@ export default function CustomerOrderSummary() {
       if (orderError) {
         console.error('❌ Error fetching customer order:', orderError);
         setError('Order not found');
-        setIsLoading(false);
+        setLoading(false);
         return;
       }
 
@@ -103,7 +103,7 @@ export default function CustomerOrderSummary() {
       console.error('💥 Error fetching customer order details:', error);
       setError('Failed to load order details');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -122,7 +122,7 @@ export default function CustomerOrderSummary() {
     return status.replace('_', ' ').toUpperCase();
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <CustomerHeader />
@@ -161,7 +161,7 @@ export default function CustomerOrderSummary() {
   return (
     <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
-      
+
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-6">
           <Button asChild variant="outline" className="mb-4">
@@ -170,7 +170,7 @@ export default function CustomerOrderSummary() {
               Back to Dashboard
             </Link>
           </Button>
-          
+
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Order Details</h1>
@@ -233,11 +233,14 @@ export default function CustomerOrderSummary() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex justify-center">
-                    <PaymentScreenshotViewer
-                      imageUrl={orderDetails.payment_screenshot_url}
-                      orderNumber={orderDetails.order_number}
-                      customerName={orderDetails.customer_name}
-                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsScreenshotOpen(true)}
+                      className="flex items-center gap-2"
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      View Payment Screenshot
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -362,6 +365,14 @@ export default function CustomerOrderSummary() {
       </div>
 
       <Footer />
+
+      {/* Payment Screenshot Viewer */}
+      <FullScreenImageModal
+        isOpen={isScreenshotOpen}
+        onClose={() => setIsScreenshotOpen(false)}
+        imageUrl={orderDetails?.payment_screenshot_url || null}
+        orderId={orderDetails?.order_number}
+      />
     </div>
   );
 }

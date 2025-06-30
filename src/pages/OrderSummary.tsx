@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle, Package, Phone, Mail, Download, ArrowLeft, Printer, Gift, Tag } from 'lucide-react';
+import { CheckCircle, Package, Phone, Mail, Download, ArrowLeft, Printer, Gift, Tag, CreditCard } from 'lucide-react';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
-import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
+import FullScreenImageModal from '@/components/admin/FullScreenImageModal';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -47,14 +47,15 @@ interface OrderItem {
 
 export default function OrderSummary() {
   const { orderId } = useParams<{ orderId: string }>();
-  const navigate = useNavigate();
-  const { userProfile } = useAuth();
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Check if user came from admin panel
-  const isAdminView = userProfile?.role === 'admin';
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isScreenshotOpen, setIsScreenshotOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isAdminView = location.pathname.includes('/admin');
+  const { userProfile } = useAuth();
 
   useEffect(() => {
     if (!orderId) {
@@ -112,7 +113,7 @@ export default function OrderSummary() {
       });
       navigate('/');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -229,7 +230,7 @@ export default function OrderSummary() {
     }
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <CustomerHeader />
@@ -262,7 +263,7 @@ export default function OrderSummary() {
   return (
     <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
-      
+
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header Section */}
         <div className="flex items-center justify-between mb-8 no-print">
@@ -394,12 +395,14 @@ export default function OrderSummary() {
               <div>
                 <h3 className="font-semibold mb-3">Payment Screenshot</h3>
                 <div className="flex justify-center">
-                  <PaymentScreenshotViewer
-                    imageUrl={orderDetails.payment_screenshot_url}
-                    orderNumber={orderDetails.order_number}
-                    customerName={orderDetails.customer_name}
-                    uploadedAt={orderDetails.created_at}
-                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsScreenshotOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    View Payment Screenshot
+                  </Button>
                 </div>
               </div>
             )}
@@ -457,6 +460,14 @@ export default function OrderSummary() {
       </div>
 
       <Footer />
+
+      {/* Payment Screenshot Viewer */}
+      <FullScreenImageModal
+        isOpen={isScreenshotOpen}
+        onClose={() => setIsScreenshotOpen(false)}
+        imageUrl={orderDetails?.payment_screenshot_url || null}
+        orderId={orderDetails?.order_number}
+      />
     </div>
   );
 }
