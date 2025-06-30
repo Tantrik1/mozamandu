@@ -9,7 +9,7 @@ export default function TermsConditions() {
       <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">Terms and Conditions</h1>
-          
+
           <div className="prose max-w-none">
             <p className="text-gray-600 mb-6">
               <strong>Effective Date:</strong> January 1, 2025
@@ -57,7 +57,7 @@ export default function TermsConditions() {
               <p className="text-gray-700 mb-4">
                 All orders are subject to acceptance and availability. We reserve the right to refuse or cancel any order for any reason, including but not limited to product availability, errors in pricing, or fraud prevention.
               </p>
-              
+
               <h3 className="text-xl font-semibold text-gray-800 mb-3">Pricing</h3>
               <ul className="list-disc list-inside text-gray-700 mb-4 ml-4">
                 <li>All prices are subject to change without notice</li>
@@ -97,7 +97,7 @@ export default function TermsConditions() {
               <p className="text-gray-700 mb-4">
                 All content on this website, including but not limited to text, graphics, logos, images, and software, is the property of Mozamandu and is protected by copyright and other intellectual property laws.
               </p>
-              
+
               <h3 className="text-xl font-semibold text-gray-800 mb-3">User-Generated Content</h3>
               <p className="text-gray-700 mb-4">
                 By submitting content (reviews, comments, photos), you grant us a non-exclusive, royalty-free, perpetual license to use, modify, and display such content for business purposes.
@@ -191,7 +191,7 @@ export default function TermsConditions() {
                 <p className="text-gray-700">
                   <strong>Mozamandu</strong><br />
                   Email: info@mozamandu.com<br />
-                  Phone: +977 9761691727<br />
+                  Phone: +977 9761691276<br />
                   Address: Kathmandu, Nepal
                 </p>
               </div>

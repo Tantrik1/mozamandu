@@ -9,7 +9,7 @@ export default function ShippingPolicy() {
       <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">Shipping & Refunds Policy</h1>
-          
+
           <div className="prose max-w-none">
             <p className="text-gray-600 mb-6">
               <strong>Effective Date:</strong> January 1, 2025
@@ -17,7 +17,7 @@ export default function ShippingPolicy() {
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Shipping Information</h2>
-              
+
               <h3 className="text-xl font-semibold text-gray-800 mb-3">Delivery Hours</h3>
               <p className="text-gray-700 mb-4">
                 Our delivery hours are from <strong>12:00 PM to 6:00 PM</strong>, Monday through Sunday.
@@ -43,7 +43,7 @@ export default function ShippingPolicy() {
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Return Policy</h2>
-              
+
               <h3 className="text-xl font-semibold text-gray-800 mb-3">Return Window</h3>
               <p className="text-gray-700 mb-4">
                 You may return items within <strong>2 days</strong> of delivery on your own expense. No refunds will be provided.
@@ -68,7 +68,7 @@ export default function ShippingPolicy() {
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Refund Policy</h2>
-              
+
               <h3 className="text-xl font-semibold text-gray-800 mb-3">Refund Processing</h3>
               <ul className="list-disc list-inside text-gray-700 mb-4 ml-4">
                 <li>Refunds are processed within 3-5 business days after we receive the returned item</li>
@@ -116,7 +116,7 @@ export default function ShippingPolicy() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">How to Initiate a Return</h2>
               <ol className="list-decimal list-inside text-gray-700 mb-4 ml-4">
-                <li>Contact our customer service team at info@mozamandu.com or +977 9761691727</li>
+                <li>Contact our customer service team at info@mozamandu.com or +977 9761691276</li>
                 <li>Provide your order number and reason for return</li>
                 <li>We will provide you with return instructions and authorization</li>
                 <li>Package the item securely in original packaging</li>
