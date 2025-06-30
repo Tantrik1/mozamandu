@@ -177,6 +177,7 @@ export function CustomerHeader() {
     const megaMenuTopPosition = isTopBarVisible ? 'top-20' : 'top-16';
 
     return (
+      <Topbar />
       <div
         key={item.id}
         className="relative group"
