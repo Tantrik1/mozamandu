@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import {TopBar} from '@/components/customer/TopBar' ;
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -177,6 +178,7 @@ export function CustomerHeader() {
     const megaMenuTopPosition = isTopBarVisible ? 'top-20' : 'top-16';
 
     return (
+      <TopBar />
       <div
         key={item.id}
         className="relative group"
