@@ -54,8 +54,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Order fetched successfully:', order.order_number);
 
-    // Determine the order summary URL
-    const baseUrl = Deno.env.get('SUPABASE_URL')?.replace('/supabase', '') || 'https://your-domain.com';
+    // Determine the base URL for order summary
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const baseUrl = supabaseUrl.replace('/supabase', '').replace('https://', 'https://');
     const summaryPath = isCustomerOrder ? 'customer-order-summary' : 'order-summary';
     const orderSummaryUrl = `${baseUrl}/${summaryPath}/${orderId}`;
 
@@ -91,10 +92,19 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Invalid email type or missing parameters');
     }
 
-    // Send email
+    // Always send email to the customer email from the order
+    const recipientEmail = order.customer_email;
+    
+    if (!recipientEmail) {
+      throw new Error('No customer email found in order');
+    }
+
+    console.log('Sending email to:', recipientEmail);
+
+    // Send email with proper from address for production
     const emailResponse = await resend.emails.send({
-      from: "Mozamandu <orders@resend.dev>",
-      to: [order.customer_email],
+      from: "Mozamandu <orders@mozamandu.com>", // Use your verified domain
+      to: [recipientEmail],
       subject,
       html: emailHtml,
     });
@@ -104,7 +114,8 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(JSON.stringify({ 
       success: true, 
       emailId: emailResponse.data?.id,
-      message: 'Email sent successfully' 
+      message: 'Email sent successfully',
+      recipient: recipientEmail
     }), {
       status: 200,
       headers: {

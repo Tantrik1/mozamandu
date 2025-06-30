@@ -1,10 +1,9 @@
-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, Tag, Gift } from 'lucide-react';
-import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
+import { EnhancedPaymentScreenshotViewer } from '@/components/admin/EnhancedPaymentScreenshotViewer';
 
 interface CartItem {
   id: string;
@@ -223,13 +222,13 @@ export function OrderSummaryCard({
           </p>
         </div>
 
-        {/* Payment Screenshot Section */}
+        {/* Enhanced Payment Screenshot Section */}
         {paymentScreenshotUrl && orderNumber && customerName && (
           <div className="pt-4">
             <Separator className="mb-4" />
             <h4 className="font-semibold mb-3">Your Payment Screenshot</h4>
             <div className="flex justify-center">
-              <PaymentScreenshotViewer
+              <EnhancedPaymentScreenshotViewer
                 imageUrl={paymentScreenshotUrl}
                 orderNumber={orderNumber}
                 customerName={customerName}

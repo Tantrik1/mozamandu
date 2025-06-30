@@ -81,7 +81,7 @@ export function CustomerAnalytics() {
     const customerTotalSpent = orders
       .filter(order => order.status !== 'cancelled')
       .reduce((acc, order) => {
-        const amount = Number(order.total_amount) || 0;
+        const amount = parseFloat(String(order.total_amount)) || 0;
         acc[order.user_id] = (acc[order.user_id] || 0) + amount;
         return acc;
       }, {} as Record<string, number>);
@@ -104,7 +104,7 @@ export function CustomerAnalytics() {
       totalCustomers,
       newCustomers,
       returningCustomers,
-      avgCustomerLifetimeValue,
+      avgCustomerLibetimeValue,
       abandonedCartRate,
       customerGrowth,
       customerSegments
