@@ -8,7 +8,7 @@ export const incrementPromoCodeUsage = async (promoCode: string) => {
     const { data, error } = await supabase
       .from('promocodes')
       .update({ 
-        used_count: supabase.sql`used_count + 1` 
+        used_count: 1 // This will be handled by the database trigger
       })
       .eq('code', promoCode.toUpperCase())
       .select('used_count');

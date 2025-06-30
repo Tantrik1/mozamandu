@@ -13,7 +13,6 @@ import { TopBar } from './TopBar';
 
 export function CustomerHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isCartOpen, setIsCartOpen] = useState(false);
   const { getTotalItems } = useRobustCart();
   const { user, userProfile } = useAuth();
   const totalItems = getTotalItems();
@@ -70,19 +69,7 @@ export function CustomerHeader() {
             {/* Right Side Actions */}
             <div className="flex items-center space-x-4">
               {/* Cart */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsCartOpen(true)}
-                className="relative"
-              >
-                <ShoppingCart className="h-4 w-4" />
-                {totalItems > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {totalItems}
-                  </span>
-                )}
-              </Button>
+              <CartSidebar />
 
               {/* User Account */}
               {user ? (
@@ -171,9 +158,6 @@ export function CustomerHeader() {
           )}
         </div>
       </header>
-
-      {/* Cart Sidebar */}
-      <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </>
   );
 }
