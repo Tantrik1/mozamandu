@@ -26,7 +26,7 @@ export async function validateStockAvailability(items: StockUpdateItem[]): Promi
       // Get product info first
       const { data: product, error: productError } = await supabase
         .from('products')
-        .select('name, has_color_variants, has_size_variants')
+        .select('name, has_color_variants, has_size_variants, stock_quantity, status')
         .eq('id', item.productId)
         .single();
 
@@ -35,80 +35,73 @@ export async function validateStockAvailability(items: StockUpdateItem[]): Promi
         continue;
       }
 
+      if (product.status !== 'active') {
+        errors.push(`Product ${product.name} is no longer active`);
+        continue;
+      }
+
       productName = product.name;
 
-      // Check size variant stock first
-      if (item.sizeVariantId) {
-        const { data: sizeVariant, error } = await supabase
-          .from('size_variants')
-          .select('stock_quantity, size_name, color_variants(color_name)')
-          .eq('id', item.sizeVariantId)
-          .single();
-
-        if (error || !sizeVariant) {
-          // If size variant not found, check if we should fall back to color variant
-          if (item.colorVariantId) {
-            console.log(`Size variant ${item.sizeVariantId} not found, checking color variant...`);
-            const { data: colorVariant, error: colorError } = await supabase
-              .from('color_variants')
-              .select('stock_quantity, color_name')
-              .eq('id', item.colorVariantId)
-              .single();
-
-            if (colorError || !colorVariant) {
-              errors.push(`Neither size nor color variant found for product ${productName}`);
-              continue;
-            }
-
-            availableStock = colorVariant.stock_quantity || 0;
-            stockSource = `color variant (${colorVariant.color_name})`;
-          } else {
-            errors.push(`Size variant not found for product ${productName}`);
-            continue;
-          }
-        } else {
-          availableStock = sizeVariant.stock_quantity || 0;
-          stockSource = `size variant (${sizeVariant.size_name})`;
-        }
+      // Follow the correct stock hierarchy
+      
+      // Hierarchy 1: No color variants - use product stock
+      if (!product.has_color_variants) {
+        availableStock = product.stock_quantity || 0;
+        stockSource = 'product';
       }
-      // Check color variant stock
+      // Hierarchy 2: Has color variants
       else if (item.colorVariantId) {
-        const { data: colorVariant, error } = await supabase
+        const { data: colorVariant, error: colorError } = await supabase
           .from('color_variants')
-          .select('stock_quantity, color_name')
+          .select(`
+            color_name, 
+            stock_quantity,
+            size_variants(id, size_name, stock_quantity)
+          `)
           .eq('id', item.colorVariantId)
           .single();
 
-        if (error || !colorVariant) {
+        if (colorError || !colorVariant) {
           errors.push(`Color variant not found for product ${productName}`);
           continue;
         }
 
-        availableStock = colorVariant.stock_quantity || 0;
-        stockSource = `color variant (${colorVariant.color_name})`;
-      }
-      // Check product stock
-      else {
-        const { data: productStock, error } = await supabase
-          .from('products')
-          .select('stock_quantity')
-          .eq('id', item.productId)
-          .single();
+        const sizeVariants = colorVariant.size_variants || [];
 
-        if (error || !productStock) {
-          errors.push(`Product stock not found: ${productName}`);
+        // Hierarchy 2a: Color has size variants and size is specified
+        if (sizeVariants.length > 0 && item.sizeVariantId) {
+          const selectedSize = sizeVariants.find(size => size.id === item.sizeVariantId);
+          
+          if (!selectedSize) {
+            errors.push(`Size variant not found for product ${productName}`);
+            continue;
+          }
+
+          availableStock = selectedSize.stock_quantity || 0;
+          stockSource = `size variant (${selectedSize.size_name})`;
+        }
+        // Hierarchy 2b: Color has no size variants - use color stock
+        else if (sizeVariants.length === 0) {
+          availableStock = colorVariant.stock_quantity || 0;
+          stockSource = `color variant (${colorVariant.color_name})`;
+        }
+        // Invalid: Color has sizes but no size specified
+        else {
+          errors.push(`Size selection required for product ${productName}`);
           continue;
         }
-
-        availableStock = productStock.stock_quantity || 0;
-        stockSource = `product`;
+      }
+      // Invalid: Product has colors but no color specified
+      else {
+        errors.push(`Color selection required for product ${productName}`);
+        continue;
       }
 
       if (availableStock < item.quantity) {
         errors.push(`Insufficient stock for ${productName} (${stockSource}). Available: ${availableStock}, Requested: ${item.quantity}`);
       }
 
-      console.log(`Stock validation for ${productName}: Available ${availableStock}, Requested ${item.quantity}`);
+      console.log(`Stock validation for ${productName}: Available ${availableStock} from ${stockSource}, Requested ${item.quantity}`);
     } catch (error) {
       console.error('Error validating stock:', error);
       errors.push(`Failed to validate stock for product ${item.productId}`);
@@ -144,25 +137,65 @@ export async function updateProductStock(items: StockUpdateItem[], operation: 'r
       const multiplier = operation === 'reduce' ? -1 : 1;
       const stockChange = item.quantity * multiplier;
 
-      // Check what type of stock update we need
+      // Get product info to determine correct stock location
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('has_color_variants, has_size_variants')
+        .eq('id', item.productId)
+        .single();
+
+      if (productError || !product) {
+        throw new Error(`Product not found: ${item.productId}`);
+      }
+
       let stockUpdated = false;
 
-      // If size variant exists, try to update size variant stock
-      if (item.sizeVariantId) {
-        const { data: sizeVariant } = await supabase
-          .from('size_variants')
-          .select('id')
-          .eq('id', item.sizeVariantId)
+      // Follow the correct hierarchy for stock updates
+      
+      // Hierarchy 1: No color variants - update product stock
+      if (!product.has_color_variants) {
+        const { error: productError } = await supabase.rpc('update_product_stock', {
+          product_id: item.productId,
+          stock_change: stockChange
+        });
+
+        if (productError) {
+          throw new Error(`Failed to update product stock: ${productError.message}`);
+        }
+
+        completedUpdates.push({
+          type: 'product',
+          id: item.productId,
+          change: stockChange
+        });
+        stockUpdated = true;
+      }
+      // Hierarchy 2: Has color variants
+      else if (item.colorVariantId) {
+        // Check if this color has size variants
+        const { data: colorVariant, error: colorError } = await supabase
+          .from('color_variants')
+          .select(`
+            id,
+            size_variants(id)
+          `)
+          .eq('id', item.colorVariantId)
           .single();
 
-        if (sizeVariant) {
+        if (colorError || !colorVariant) {
+          throw new Error(`Color variant not found: ${item.colorVariantId}`);
+        }
+
+        const sizeVariants = colorVariant.size_variants || [];
+
+        // Hierarchy 2a: Color has size variants and size is specified
+        if (sizeVariants.length > 0 && item.sizeVariantId) {
           const { error: sizeError } = await supabase.rpc('update_size_variant_stock', {
             variant_id: item.sizeVariantId,
             stock_change: stockChange
           });
 
           if (sizeError) {
-            console.error('Error updating size variant stock:', sizeError);
             throw new Error(`Failed to update size variant stock: ${sizeError.message}`);
           }
 
@@ -173,24 +206,14 @@ export async function updateProductStock(items: StockUpdateItem[], operation: 'r
           });
           stockUpdated = true;
         }
-      }
-
-      // If size variant didn't exist or update failed, try color variant
-      if (!stockUpdated && item.colorVariantId) {
-        const { data: colorVariant } = await supabase
-          .from('color_variants')
-          .select('id')
-          .eq('id', item.colorVariantId)
-          .single();
-
-        if (colorVariant) {
+        // Hierarchy 2b: Color has no size variants - update color stock
+        else if (sizeVariants.length === 0) {
           const { error: colorError } = await supabase.rpc('update_color_variant_stock', {
             variant_id: item.colorVariantId,
             stock_change: stockChange
           });
 
           if (colorError) {
-            console.error('Error updating color variant stock:', colorError);
             throw new Error(`Failed to update color variant stock: ${colorError.message}`);
           }
 
@@ -201,25 +224,18 @@ export async function updateProductStock(items: StockUpdateItem[], operation: 'r
           });
           stockUpdated = true;
         }
+        // Invalid case
+        else {
+          throw new Error(`Invalid stock update configuration for product ${item.productId}`);
+        }
+      }
+      // Invalid case
+      else {
+        throw new Error(`Invalid stock update configuration for product ${item.productId} - color variant required`);
       }
 
-      // If no variants worked, update product stock directly
       if (!stockUpdated) {
-        const { error: productError } = await supabase.rpc('update_product_stock', {
-          product_id: item.productId,
-          stock_change: stockChange
-        });
-
-        if (productError) {
-          console.error('Error updating product stock:', productError);
-          throw new Error(`Failed to update product stock: ${productError.message}`);
-        }
-
-        completedUpdates.push({
-          type: 'product',
-          id: item.productId,
-          change: stockChange
-        });
+        throw new Error(`Failed to update stock for product ${item.productId}`);
       }
 
       console.log(`Successfully ${operation === 'reduce' ? 'reduced' : 'restored'} stock for product ${item.productId}`);

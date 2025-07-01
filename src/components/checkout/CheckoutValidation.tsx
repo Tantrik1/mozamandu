@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -16,6 +17,14 @@ export const useCheckoutValidation = () => {
       console.log('Validating stock for checkout items:', cartItems.length);
       
       for (const item of cartItems) {
+        console.log('Validating item:', {
+          productName: item.productName,
+          productId: item.productId,
+          colorVariantId: item.colorVariantId,
+          sizeVariantId: item.sizeVariantId,
+          quantity: item.quantity
+        });
+
         const result = await validateVariantStock(
           item.productId,
           item.colorVariantId,
