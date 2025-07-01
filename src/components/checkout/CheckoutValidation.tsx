@@ -15,36 +15,73 @@ export const useCheckoutValidation = () => {
     try {
       for (const item of cartItems) {
         let availableStock = 0;
+        let stockSource = '';
+        let stockFound = false;
 
+        // Check size variant stock first
         if (item.sizeVariantId) {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('size_variants')
-            .select('stock_quantity')
+            .select('stock_quantity, size_name')
             .eq('id', item.sizeVariantId)
             .single();
-          availableStock = data?.stock_quantity || 0;
-        } else if (item.colorVariantId) {
-          const { data } = await supabase
+
+          if (!error && data) {
+            availableStock = data.stock_quantity || 0;
+            stockSource = `size variant (${data.size_name})`;
+            stockFound = true;
+          } else {
+            console.log(`Size variant ${item.sizeVariantId} not found, checking color variant...`);
+          }
+        }
+
+        // If size variant not found, check color variant
+        if (!stockFound && item.colorVariantId) {
+          const { data, error } = await supabase
             .from('color_variants')
-            .select('stock_quantity')
+            .select('stock_quantity, color_name')
             .eq('id', item.colorVariantId)
             .single();
-          availableStock = data?.stock_quantity || 0;
-        } else {
-          const { data } = await supabase
+
+          if (!error && data) {
+            availableStock = data.stock_quantity || 0;
+            stockSource = `color variant (${data.color_name})`;
+            stockFound = true;
+          } else {
+            console.log(`Color variant ${item.colorVariantId} not found, checking product stock...`);
+          }
+        }
+
+        // If no variants found, check product stock
+        if (!stockFound) {
+          const { data, error } = await supabase
             .from('products')
-            .select('stock_quantity')
+            .select('stock_quantity, name')
             .eq('id', item.productId)
             .single();
-          availableStock = data?.stock_quantity || 0;
+
+          if (!error && data) {
+            availableStock = data.stock_quantity || 0;
+            stockSource = `product`;
+            stockFound = true;
+          }
+        }
+
+        if (!stockFound) {
+          return {
+            isValid: false,
+            error: `Unable to verify stock for ${item.productName}. Please try again or contact support.`
+          };
         }
 
         if (item.quantity > availableStock) {
           return {
             isValid: false,
-            error: `${item.productName} only has ${availableStock} units available, but you requested ${item.quantity}`
+            error: `${item.productName} only has ${availableStock} units available in ${stockSource}, but you requested ${item.quantity}`
           };
         }
+
+        console.log(`Stock validated for ${item.productName}: ${availableStock} available from ${stockSource}`);
       }
 
       return { isValid: true };
@@ -52,7 +89,7 @@ export const useCheckoutValidation = () => {
       console.error('Stock validation error:', error);
       return {
         isValid: false,
-        error: 'Failed to validate stock availability'
+        error: 'Failed to validate stock availability. Please try again.'
       };
     }
   };

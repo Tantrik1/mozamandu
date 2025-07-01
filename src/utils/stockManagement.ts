@@ -21,22 +21,55 @@ export async function validateStockAvailability(items: StockUpdateItem[]): Promi
     try {
       let availableStock = 0;
       let stockSource = '';
+      let productName = '';
+
+      // Get product info first
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('name, has_color_variants, has_size_variants')
+        .eq('id', item.productId)
+        .single();
+
+      if (productError || !product) {
+        errors.push(`Product not found: ${item.productId}`);
+        continue;
+      }
+
+      productName = product.name;
 
       // Check size variant stock first
       if (item.sizeVariantId) {
         const { data: sizeVariant, error } = await supabase
           .from('size_variants')
-          .select('stock_quantity, color_variants(color_name)')
+          .select('stock_quantity, size_name, color_variants(color_name)')
           .eq('id', item.sizeVariantId)
           .single();
 
         if (error || !sizeVariant) {
-          errors.push(`Size variant not found for product ${item.productId}`);
-          continue;
-        }
+          // If size variant not found, check if we should fall back to color variant
+          if (item.colorVariantId) {
+            console.log(`Size variant ${item.sizeVariantId} not found, checking color variant...`);
+            const { data: colorVariant, error: colorError } = await supabase
+              .from('color_variants')
+              .select('stock_quantity, color_name')
+              .eq('id', item.colorVariantId)
+              .single();
 
-        availableStock = sizeVariant.stock_quantity;
-        stockSource = `size variant`;
+            if (colorError || !colorVariant) {
+              errors.push(`Neither size nor color variant found for product ${productName}`);
+              continue;
+            }
+
+            availableStock = colorVariant.stock_quantity || 0;
+            stockSource = `color variant (${colorVariant.color_name})`;
+          } else {
+            errors.push(`Size variant not found for product ${productName}`);
+            continue;
+          }
+        } else {
+          availableStock = sizeVariant.stock_quantity || 0;
+          stockSource = `size variant (${sizeVariant.size_name})`;
+        }
       }
       // Check color variant stock
       else if (item.colorVariantId) {
@@ -47,35 +80,35 @@ export async function validateStockAvailability(items: StockUpdateItem[]): Promi
           .single();
 
         if (error || !colorVariant) {
-          errors.push(`Color variant not found for product ${item.productId}`);
+          errors.push(`Color variant not found for product ${productName}`);
           continue;
         }
 
-        availableStock = colorVariant.stock_quantity;
-        stockSource = `color variant`;
+        availableStock = colorVariant.stock_quantity || 0;
+        stockSource = `color variant (${colorVariant.color_name})`;
       }
       // Check product stock
       else {
-        const { data: product, error } = await supabase
+        const { data: productStock, error } = await supabase
           .from('products')
-          .select('stock_quantity, name')
+          .select('stock_quantity')
           .eq('id', item.productId)
           .single();
 
-        if (error || !product) {
-          errors.push(`Product not found: ${item.productId}`);
+        if (error || !productStock) {
+          errors.push(`Product stock not found: ${productName}`);
           continue;
         }
 
-        availableStock = product.stock_quantity || 0;
+        availableStock = productStock.stock_quantity || 0;
         stockSource = `product`;
       }
 
       if (availableStock < item.quantity) {
-        errors.push(`Insufficient stock for ${stockSource}. Available: ${availableStock}, Requested: ${item.quantity}`);
+        errors.push(`Insufficient stock for ${productName} (${stockSource}). Available: ${availableStock}, Requested: ${item.quantity}`);
       }
 
-      console.log(`Stock validation for ${item.productId}: Available ${availableStock}, Requested ${item.quantity}`);
+      console.log(`Stock validation for ${productName}: Available ${availableStock}, Requested ${item.quantity}`);
     } catch (error) {
       console.error('Error validating stock:', error);
       errors.push(`Failed to validate stock for product ${item.productId}`);
@@ -111,44 +144,67 @@ export async function updateProductStock(items: StockUpdateItem[], operation: 'r
       const multiplier = operation === 'reduce' ? -1 : 1;
       const stockChange = item.quantity * multiplier;
 
-      // If size variant exists, update size variant stock
+      // Check what type of stock update we need
+      let stockUpdated = false;
+
+      // If size variant exists, try to update size variant stock
       if (item.sizeVariantId) {
-        const { error: sizeError } = await supabase.rpc('update_size_variant_stock', {
-          variant_id: item.sizeVariantId,
-          stock_change: stockChange
-        });
+        const { data: sizeVariant } = await supabase
+          .from('size_variants')
+          .select('id')
+          .eq('id', item.sizeVariantId)
+          .single();
 
-        if (sizeError) {
-          console.error('Error updating size variant stock:', sizeError);
-          throw new Error(`Failed to update size variant stock: ${sizeError.message}`);
+        if (sizeVariant) {
+          const { error: sizeError } = await supabase.rpc('update_size_variant_stock', {
+            variant_id: item.sizeVariantId,
+            stock_change: stockChange
+          });
+
+          if (sizeError) {
+            console.error('Error updating size variant stock:', sizeError);
+            throw new Error(`Failed to update size variant stock: ${sizeError.message}`);
+          }
+
+          completedUpdates.push({
+            type: 'size',
+            id: item.sizeVariantId,
+            change: stockChange
+          });
+          stockUpdated = true;
         }
-
-        completedUpdates.push({
-          type: 'size',
-          id: item.sizeVariantId,
-          change: stockChange
-        });
       }
-      // If color variant exists (but no size variant), update color variant stock
-      else if (item.colorVariantId) {
-        const { error: colorError } = await supabase.rpc('update_color_variant_stock', {
-          variant_id: item.colorVariantId,
-          stock_change: stockChange
-        });
 
-        if (colorError) {
-          console.error('Error updating color variant stock:', colorError);
-          throw new Error(`Failed to update color variant stock: ${colorError.message}`);
+      // If size variant didn't exist or update failed, try color variant
+      if (!stockUpdated && item.colorVariantId) {
+        const { data: colorVariant } = await supabase
+          .from('color_variants')
+          .select('id')
+          .eq('id', item.colorVariantId)
+          .single();
+
+        if (colorVariant) {
+          const { error: colorError } = await supabase.rpc('update_color_variant_stock', {
+            variant_id: item.colorVariantId,
+            stock_change: stockChange
+          });
+
+          if (colorError) {
+            console.error('Error updating color variant stock:', colorError);
+            throw new Error(`Failed to update color variant stock: ${colorError.message}`);
+          }
+
+          completedUpdates.push({
+            type: 'color',
+            id: item.colorVariantId,
+            change: stockChange
+          });
+          stockUpdated = true;
         }
-
-        completedUpdates.push({
-          type: 'color',
-          id: item.colorVariantId,
-          change: stockChange
-        });
       }
-      // If no variants, update product stock directly
-      else {
+
+      // If no variants worked, update product stock directly
+      if (!stockUpdated) {
         const { error: productError } = await supabase.rpc('update_product_stock', {
           product_id: item.productId,
           stock_change: stockChange
@@ -218,11 +274,28 @@ export async function getProductStockInfo(productId: string, colorVariantId?: st
         .single();
 
       if (error || !data) {
+        // Fall back to color variant if size variant not found
+        if (colorVariantId) {
+          const { data: colorData, error: colorError } = await supabase
+            .from('color_variants')
+            .select('stock_quantity, color_name')
+            .eq('id', colorVariantId)
+            .single();
+
+          if (colorError || !colorData) {
+            throw new Error('Neither size nor color variant found');
+          }
+
+          return {
+            currentStock: colorData.stock_quantity || 0,
+            stockLocation: `Color: ${colorData.color_name} (size variant missing)`
+          };
+        }
         throw new Error('Size variant not found');
       }
 
       return {
-        currentStock: data.stock_quantity,
+        currentStock: data.stock_quantity || 0,
         stockLocation: `Size: ${data.size_name}`
       };
     } else if (colorVariantId) {
@@ -237,7 +310,7 @@ export async function getProductStockInfo(productId: string, colorVariantId?: st
       }
 
       return {
-        currentStock: data.stock_quantity,
+        currentStock: data.stock_quantity || 0,
         stockLocation: `Color: ${data.color_name}`
       };
     } else {

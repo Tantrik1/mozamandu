@@ -187,51 +187,66 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     try {
       console.log('Validating stock for:', { productId, colorVariantId, sizeVariantId, requestedQuantity });
       
+      let availableStock = 0;
+      let stockFound = false;
+
+      // Check size variant stock first
       if (sizeVariantId) {
-        const { data, error } = await supabase
+        const { data: sizeVariant, error } = await supabase
           .from('size_variants')
           .select('stock_quantity')
           .eq('id', sizeVariantId)
           .single();
 
-        if (error || !data) {
-          console.error('Error checking size variant stock:', error);
-          return false;
+        if (!error && sizeVariant) {
+          availableStock = sizeVariant.stock_quantity || 0;
+          stockFound = true;
+          console.log('Size variant stock found:', availableStock);
+        } else {
+          console.log('Size variant not found, checking color variant...');
         }
-
-        console.log('Size variant stock:', data.stock_quantity);
-        return data.stock_quantity >= requestedQuantity;
       }
       
-      if (colorVariantId) {
-        const { data, error } = await supabase
+      // If size variant not found, check color variant
+      if (!stockFound && colorVariantId) {
+        const { data: colorVariant, error } = await supabase
           .from('color_variants')
           .select('stock_quantity')
           .eq('id', colorVariantId)
           .single();
 
-        if (error || !data) {
-          console.error('Error checking color variant stock:', error);
-          return false;
+        if (!error && colorVariant) {
+          availableStock = colorVariant.stock_quantity || 0;
+          stockFound = true;
+          console.log('Color variant stock found:', availableStock);
+        } else {
+          console.log('Color variant not found, checking product stock...');
         }
-
-        console.log('Color variant stock:', data.stock_quantity);
-        return data.stock_quantity >= requestedQuantity;
       }
       
-      const { data, error } = await supabase
-        .from('products')
-        .select('stock_quantity')
-        .eq('id', productId)
-        .single();
+      // If no variants found, check product stock
+      if (!stockFound) {
+        const { data: product, error } = await supabase
+          .from('products')
+          .select('stock_quantity')
+          .eq('id', productId)
+          .single();
 
-      if (error || !data) {
-        console.error('Error checking product stock:', error);
+        if (!error && product) {
+          availableStock = product.stock_quantity || 0;
+          stockFound = true;
+          console.log('Product stock found:', availableStock);
+        }
+      }
+
+      if (!stockFound) {
+        console.error('No stock information found for product');
         return false;
       }
 
-      console.log('Product stock:', data.stock_quantity);
-      return data.stock_quantity >= requestedQuantity;
+      const isValid = availableStock >= requestedQuantity;
+      console.log(`Stock validation result: ${isValid} (available: ${availableStock}, requested: ${requestedQuantity})`);
+      return isValid;
     } catch (error) {
       console.error('Unexpected error validating stock:', error);
       return false;
