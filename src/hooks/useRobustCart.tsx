@@ -1,9 +1,10 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useCartPricing } from './useCartPricing';
 import { useComboManager } from './useComboManager';
+import { validateCartItems, showCartCleanupNotification } from '@/utils/cartValidation';
+import { validateVariantStock } from '@/utils/stockCalculation';
 
 interface CartItem {
   id: string;
@@ -80,6 +81,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
   const [discountTiers, setDiscountTiers] = useState<{ [key: string]: DiscountTier[] }>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cartValidated, setCartValidated] = useState(false);
 
   const { activeCombo } = useComboManager({ cartItems });
 
@@ -96,12 +98,47 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    saveCartToStorage();
-  }, [cartItems]);
+    if (cartItems.length > 0 && !cartValidated) {
+      validateAndCleanCart();
+    }
+  }, [cartItems, cartValidated]);
+
+  useEffect(() => {
+    if (cartValidated) {
+      saveCartToStorage();
+    }
+  }, [cartItems, cartValidated]);
 
   const setErrorWithTimeout = (message: string) => {
     setError(message);
     setTimeout(() => setError(null), 5000);
+  };
+
+  const validateAndCleanCart = async () => {
+    if (cartItems.length === 0) {
+      setCartValidated(true);
+      return;
+    }
+
+    console.log('Validating cart items...');
+    setLoading(true);
+
+    try {
+      const { validItems, removedItems, errors } = await validateCartItems(cartItems);
+      
+      if (removedItems.length > 0) {
+        console.log(`Removed ${removedItems.length} invalid items from cart`);
+        setCartItems(validItems);
+        showCartCleanupNotification(removedItems, errors);
+      }
+      
+      setCartValidated(true);
+    } catch (error) {
+      console.error('Error validating cart:', error);
+      setErrorWithTimeout('Error validating cart items');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchSubcategoriesData = async () => {
@@ -187,66 +224,14 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     try {
       console.log('Validating stock for:', { productId, colorVariantId, sizeVariantId, requestedQuantity });
       
-      let availableStock = 0;
-      let stockFound = false;
-
-      // Check size variant stock first
-      if (sizeVariantId) {
-        const { data: sizeVariant, error } = await supabase
-          .from('size_variants')
-          .select('stock_quantity')
-          .eq('id', sizeVariantId)
-          .single();
-
-        if (!error && sizeVariant) {
-          availableStock = sizeVariant.stock_quantity || 0;
-          stockFound = true;
-          console.log('Size variant stock found:', availableStock);
-        } else {
-          console.log('Size variant not found, checking color variant...');
-        }
-      }
+      const result = await validateVariantStock(productId, colorVariantId, sizeVariantId, requestedQuantity);
       
-      // If size variant not found, check color variant
-      if (!stockFound && colorVariantId) {
-        const { data: colorVariant, error } = await supabase
-          .from('color_variants')
-          .select('stock_quantity')
-          .eq('id', colorVariantId)
-          .single();
-
-        if (!error && colorVariant) {
-          availableStock = colorVariant.stock_quantity || 0;
-          stockFound = true;
-          console.log('Color variant stock found:', availableStock);
-        } else {
-          console.log('Color variant not found, checking product stock...');
-        }
-      }
-      
-      // If no variants found, check product stock
-      if (!stockFound) {
-        const { data: product, error } = await supabase
-          .from('products')
-          .select('stock_quantity')
-          .eq('id', productId)
-          .single();
-
-        if (!error && product) {
-          availableStock = product.stock_quantity || 0;
-          stockFound = true;
-          console.log('Product stock found:', availableStock);
-        }
+      if (!result.isValid && result.errorMessage) {
+        setErrorWithTimeout(result.errorMessage);
       }
 
-      if (!stockFound) {
-        console.error('No stock information found for product');
-        return false;
-      }
-
-      const isValid = availableStock >= requestedQuantity;
-      console.log(`Stock validation result: ${isValid} (available: ${availableStock}, requested: ${requestedQuantity})`);
-      return isValid;
+      console.log(`Stock validation result: ${result.isValid} (available: ${result.availableStock})`);
+      return result.isValid;
     } catch (error) {
       console.error('Unexpected error validating stock:', error);
       return false;
@@ -268,10 +253,9 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
       );
 
       if (!hasStock) {
-        setErrorWithTimeout('Insufficient stock for this item');
         toast({
-          title: "Out of Stock",
-          description: "Sorry, we don't have enough stock for this item",
+          title: "Stock Issue",
+          description: "Not enough stock available for this item",
           variant: "destructive",
         });
         return;
@@ -279,13 +263,23 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
 
       const { data: product, error: productError } = await supabase
         .from('products')
-        .select('name, image_url, subcategory_id, selling_price')
+        .select('name, image_url, subcategory_id, selling_price, status')
         .eq('id', params.productId)
         .single();
 
-      if (productError) {
+      if (productError || !product) {
         console.error('Error fetching product:', productError);
         throw new Error('Product not found');
+      }
+
+      if (product.status !== 'active') {
+        setErrorWithTimeout('Product is no longer available');
+        toast({
+          title: "Product Unavailable",
+          description: "This product is no longer available",
+          variant: "destructive",
+        });
+        return;
       }
 
       let basePrice = product.selling_price;
@@ -333,10 +327,9 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         );
 
         if (!hasStockForUpdate) {
-          setErrorWithTimeout('Not enough stock to add more of this item');
           toast({
             title: "Insufficient Stock",
-            description: `Only ${existingItem.quantity} items available`,
+            description: `Cannot add more of this item`,
             variant: "destructive",
           });
           return;
@@ -410,7 +403,6 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     );
 
     if (!hasStock) {
-      setErrorWithTimeout('Not enough stock for this quantity');
       toast({
         title: "Insufficient Stock",
         description: "Not enough items in stock for this quantity",

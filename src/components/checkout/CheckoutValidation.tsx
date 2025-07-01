@@ -1,7 +1,7 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { validateVariantStock } from '@/utils/stockCalculation';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -13,77 +13,31 @@ export const useCheckoutValidation = () => {
 
   const validateStock = async (cartItems: any[]): Promise<ValidationResult> => {
     try {
+      console.log('Validating stock for checkout items:', cartItems.length);
+      
       for (const item of cartItems) {
-        let availableStock = 0;
-        let stockSource = '';
-        let stockFound = false;
+        const result = await validateVariantStock(
+          item.productId,
+          item.colorVariantId,
+          item.sizeVariantId,
+          item.quantity
+        );
 
-        // Check size variant stock first
-        if (item.sizeVariantId) {
-          const { data, error } = await supabase
-            .from('size_variants')
-            .select('stock_quantity, size_name')
-            .eq('id', item.sizeVariantId)
-            .single();
-
-          if (!error && data) {
-            availableStock = data.stock_quantity || 0;
-            stockSource = `size variant (${data.size_name})`;
-            stockFound = true;
-          } else {
-            console.log(`Size variant ${item.sizeVariantId} not found, checking color variant...`);
-          }
-        }
-
-        // If size variant not found, check color variant
-        if (!stockFound && item.colorVariantId) {
-          const { data, error } = await supabase
-            .from('color_variants')
-            .select('stock_quantity, color_name')
-            .eq('id', item.colorVariantId)
-            .single();
-
-          if (!error && data) {
-            availableStock = data.stock_quantity || 0;
-            stockSource = `color variant (${data.color_name})`;
-            stockFound = true;
-          } else {
-            console.log(`Color variant ${item.colorVariantId} not found, checking product stock...`);
-          }
-        }
-
-        // If no variants found, check product stock
-        if (!stockFound) {
-          const { data, error } = await supabase
-            .from('products')
-            .select('stock_quantity, name')
-            .eq('id', item.productId)
-            .single();
-
-          if (!error && data) {
-            availableStock = data.stock_quantity || 0;
-            stockSource = `product`;
-            stockFound = true;
-          }
-        }
-
-        if (!stockFound) {
+        if (!result.isValid) {
+          const errorMessage = result.errorMessage || 
+            `${item.productName} has insufficient stock. Available: ${result.availableStock}, Requested: ${item.quantity}`;
+          
+          console.log('Stock validation failed for item:', item.productName, errorMessage);
           return {
             isValid: false,
-            error: `Unable to verify stock for ${item.productName}. Please try again or contact support.`
+            error: errorMessage
           };
         }
 
-        if (item.quantity > availableStock) {
-          return {
-            isValid: false,
-            error: `${item.productName} only has ${availableStock} units available in ${stockSource}, but you requested ${item.quantity}`
-          };
-        }
-
-        console.log(`Stock validated for ${item.productName}: ${availableStock} available from ${stockSource}`);
+        console.log(`Stock validated for ${item.productName}: ${result.availableStock} available`);
       }
 
+      console.log('All items passed stock validation');
       return { isValid: true };
     } catch (error) {
       console.error('Stock validation error:', error);
