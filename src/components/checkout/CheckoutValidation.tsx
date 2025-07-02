@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -14,10 +13,11 @@ export const useCheckoutValidation = () => {
 
   const validateStock = async (cartItems: any[]): Promise<ValidationResult> => {
     try {
+      console.log('=== CHECKOUT STOCK VALIDATION ===');
       console.log('Validating stock for checkout items:', cartItems.length);
       
       for (const item of cartItems) {
-        console.log('Validating item:', {
+        console.log('Validating checkout item:', {
           productName: item.productName,
           productId: item.productId,
           colorVariantId: item.colorVariantId,
@@ -36,20 +36,20 @@ export const useCheckoutValidation = () => {
           const errorMessage = result.errorMessage || 
             `${item.productName} has insufficient stock. Available: ${result.availableStock}, Requested: ${item.quantity}`;
           
-          console.log('Stock validation failed for item:', item.productName, errorMessage);
+          console.log('Checkout stock validation failed:', errorMessage);
           return {
             isValid: false,
             error: errorMessage
           };
         }
 
-        console.log(`Stock validated for ${item.productName}: ${result.availableStock} available`);
+        console.log(`Checkout stock OK for ${item.productName}: ${result.availableStock} available`);
       }
 
-      console.log('All items passed stock validation');
+      console.log('All checkout items passed stock validation');
       return { isValid: true };
     } catch (error) {
-      console.error('Stock validation error:', error);
+      console.error('Checkout stock validation error:', error);
       return {
         isValid: false,
         error: 'Failed to validate stock availability. Please try again.'

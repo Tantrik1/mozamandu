@@ -222,18 +222,22 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
 
   const validateStock = async (productId: string, colorVariantId: string | null = null, sizeVariantId: string | null = null, requestedQuantity: number): Promise<boolean> => {
     try {
-      console.log('Validating stock for:', { productId, colorVariantId, sizeVariantId, requestedQuantity });
+      console.log('=== CART STOCK VALIDATION ===');
+      console.log('Validating stock for cart addition:', { productId, colorVariantId, sizeVariantId, requestedQuantity });
       
       const result = await validateVariantStock(productId, colorVariantId, sizeVariantId, requestedQuantity);
       
       if (!result.isValid && result.errorMessage) {
         setErrorWithTimeout(result.errorMessage);
+        console.log(`Cart stock validation failed: ${result.errorMessage}`);
+      } else {
+        console.log(`Cart stock validation passed: ${result.availableStock} available`);
       }
 
-      console.log(`Stock validation result: ${result.isValid} (available: ${result.availableStock})`);
       return result.isValid;
     } catch (error) {
-      console.error('Unexpected error validating stock:', error);
+      console.error('Cart stock validation error:', error);
+      setErrorWithTimeout('Error checking stock availability');
       return false;
     }
   };
@@ -243,7 +247,8 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     setError(null);
     
     try {
-      console.log('Adding to cart:', params);
+      console.log('=== ADDING TO CART ===');
+      console.log('Add to cart params:', params);
       
       const hasStock = await validateStock(
         params.productId, 

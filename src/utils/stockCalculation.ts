@@ -17,7 +17,7 @@ export async function calculateProductStock(productId: string): Promise<StockCal
   try {
     console.log('Calculating stock for product:', productId);
     
-    // Get product details to understand variant structure
+    // Get product details
     const { data: product, error: productError } = await supabase
       .from('products')
       .select('has_color_variants, has_size_variants, stock_quantity, name, status')
@@ -34,23 +34,21 @@ export async function calculateProductStock(productId: string): Promise<StockCal
       return { totalStock: 0 };
     }
 
-    console.log('Product variant structure:', { 
+    console.log('Product details:', { 
       name: product.name,
       has_color_variants: product.has_color_variants, 
       has_size_variants: product.has_size_variants,
       stock_quantity: product.stock_quantity 
     });
 
-    // Case 1: Product has no variants - use product stock
+    // HIERARCHY 1: Product has no color variants - use product stock directly
     if (!product.has_color_variants) {
       const stock = product.stock_quantity || 0;
-      console.log(`Product has no variants, stock: ${stock}`);
+      console.log(`No color variants - using product stock: ${stock}`);
       return { totalStock: stock };
     }
 
-    // Case 2: Product has color variants - check each color
-    console.log('Product has color variants, checking each color...');
-    
+    // HIERARCHY 2: Product has color variants - check each color
     const { data: colorVariants, error: colorError } = await supabase
       .from('color_variants')
       .select(`
@@ -67,13 +65,18 @@ export async function calculateProductStock(productId: string): Promise<StockCal
       return { totalStock: 0 };
     }
 
+    if (!colorVariants || colorVariants.length === 0) {
+      console.log('No color variants found for product with has_color_variants=true');
+      return { totalStock: 0 };
+    }
+
     const colorBreakdown = [];
     let totalStock = 0;
 
-    for (const colorVariant of colorVariants || []) {
+    for (const colorVariant of colorVariants) {
       const sizeVariants = colorVariant.size_variants || [];
       
-      // Case 2a: This color has size variants - use size variant stocks
+      // HIERARCHY 2A: This color has size variants - sum size variant stocks
       if (sizeVariants.length > 0) {
         console.log(`Color ${colorVariant.color_name} has ${sizeVariants.length} size variants`);
         
@@ -91,9 +94,9 @@ export async function calculateProductStock(productId: string): Promise<StockCal
         });
 
         totalStock += colorStock;
-        console.log(`Color ${colorVariant.color_name}: ${colorStock} units from sizes`);
+        console.log(`Color ${colorVariant.color_name}: ${colorStock} units from ${sizeVariants.length} sizes`);
       }
-      // Case 2b: This color has no size variants - use color variant stock
+      // HIERARCHY 2B: This color has no size variants - use color variant stock
       else {
         console.log(`Color ${colorVariant.color_name} has no size variants`);
         
@@ -109,7 +112,7 @@ export async function calculateProductStock(productId: string): Promise<StockCal
       }
     }
 
-    console.log(`Total stock calculated: ${totalStock}`);
+    console.log(`Total calculated stock: ${totalStock}`);
     return { totalStock, colorBreakdown };
 
   } catch (error) {
@@ -120,11 +123,10 @@ export async function calculateProductStock(productId: string): Promise<StockCal
 
 export async function getProductStockSummary(productId: string): Promise<number> {
   const result = await calculateProductStock(productId);
-  console.log(`Stock summary for product ${productId}: ${result.totalStock}`);
   return result.totalStock;
 }
 
-// Robust variant stock validation following the correct hierarchy
+// Main stock validation function - follows correct hierarchy
 export async function validateVariantStock(
   productId: string,
   colorVariantId?: string | null,
@@ -132,9 +134,10 @@ export async function validateVariantStock(
   requestedQuantity: number = 1
 ): Promise<{ isValid: boolean; availableStock: number; errorMessage?: string }> {
   try {
-    console.log('Validating variant stock:', { productId, colorVariantId, sizeVariantId, requestedQuantity });
+    console.log('=== STOCK VALIDATION START ===');
+    console.log('Validating:', { productId, colorVariantId, sizeVariantId, requestedQuantity });
 
-    // Get product info first
+    // Step 1: Get product info
     const { data: product, error: productError } = await supabase
       .from('products')
       .select('name, status, has_color_variants, has_size_variants, stock_quantity')
@@ -142,6 +145,7 @@ export async function validateVariantStock(
       .single();
 
     if (productError || !product) {
+      console.log('Product not found:', productError);
       return {
         isValid: false,
         availableStock: 0,
@@ -150,6 +154,7 @@ export async function validateVariantStock(
     }
 
     if (product.status !== 'active') {
+      console.log('Product inactive');
       return {
         isValid: false,
         availableStock: 0,
@@ -157,17 +162,36 @@ export async function validateVariantStock(
       };
     }
 
+    console.log('Product found:', { 
+      name: product.name, 
+      has_color_variants: product.has_color_variants,
+      has_size_variants: product.has_size_variants,
+      stock_quantity: product.stock_quantity 
+    });
+
     let availableStock = 0;
     let stockSource = '';
 
-    // Hierarchy 1: If no color variants, use product stock
+    // STEP 2: Follow the hierarchy to determine stock source
+    
+    // CASE 1: Product has no color variants → use product stock
     if (!product.has_color_variants) {
       availableStock = product.stock_quantity || 0;
-      stockSource = 'product';
-      console.log(`Using product stock: ${availableStock}`);
+      stockSource = 'product level';
+      console.log(`Case 1 - No color variants: stock = ${availableStock}`);
     }
-    // Hierarchy 2: Has color variants - check the specific color
-    else if (colorVariantId) {
+    // CASE 2: Product has color variants → need to check specific color
+    else {
+      if (!colorVariantId) {
+        console.log('Case 2 - Color variant required but not provided');
+        return {
+          isValid: false,
+          availableStock: 0,
+          errorMessage: 'Please select a color'
+        };
+      }
+
+      // Get the specific color variant
       const { data: colorVariant, error: colorError } = await supabase
         .from('color_variants')
         .select(`
@@ -179,6 +203,7 @@ export async function validateVariantStock(
         .single();
 
       if (colorError || !colorVariant) {
+        console.log('Color variant not found:', colorError);
         return {
           isValid: false,
           availableStock: 0,
@@ -187,12 +212,23 @@ export async function validateVariantStock(
       }
 
       const sizeVariants = colorVariant.size_variants || [];
+      console.log(`Color variant found: ${colorVariant.color_name}, has ${sizeVariants.length} size variants`);
 
-      // Hierarchy 2a: If this color has size variants and a specific size is selected
-      if (sizeVariants.length > 0 && sizeVariantId) {
+      // CASE 2A: This color has size variants → check specific size
+      if (sizeVariants.length > 0) {
+        if (!sizeVariantId) {
+          console.log('Case 2A - Size variant required but not provided');
+          return {
+            isValid: false,
+            availableStock: 0,
+            errorMessage: 'Please select a size'
+          };
+        }
+
         const selectedSize = sizeVariants.find(size => size.id === sizeVariantId);
         
         if (!selectedSize) {
+          console.log('Size variant not found in color variants');
           return {
             isValid: false,
             availableStock: 0,
@@ -202,43 +238,30 @@ export async function validateVariantStock(
 
         availableStock = selectedSize.stock_quantity || 0;
         stockSource = `size variant (${selectedSize.size_name})`;
-        console.log(`Using size variant stock: ${availableStock} for ${selectedSize.size_name}`);
+        console.log(`Case 2A - Size variant: ${selectedSize.size_name} stock = ${availableStock}`);
       }
-      // Hierarchy 2b: If this color has no size variants, use color stock
-      else if (sizeVariants.length === 0) {
+      // CASE 2B: This color has no size variants → use color stock
+      else {
         availableStock = colorVariant.stock_quantity || 0;
         stockSource = `color variant (${colorVariant.color_name})`;
-        console.log(`Using color variant stock: ${availableStock} for ${colorVariant.color_name}`);
+        console.log(`Case 2B - Color variant: ${colorVariant.color_name} stock = ${availableStock}`);
       }
-      // Hierarchy 2c: Color has sizes but no size selected - invalid
-      else {
-        return {
-          isValid: false,
-          availableStock: 0,
-          errorMessage: 'Please select a size'
-        };
-      }
-    }
-    // Invalid case: Product has colors but no color selected
-    else {
-      return {
-        isValid: false,
-        availableStock: 0,
-        errorMessage: 'Please select a color'
-      };
     }
 
-    console.log(`Stock validation result: ${availableStock} available from ${stockSource}`);
+    const isValid = availableStock >= requestedQuantity;
+    console.log(`=== STOCK VALIDATION RESULT ===`);
+    console.log(`Stock source: ${stockSource}`);
+    console.log(`Available: ${availableStock}, Requested: ${requestedQuantity}, Valid: ${isValid}`);
 
     return {
-      isValid: availableStock >= requestedQuantity,
+      isValid,
       availableStock,
-      errorMessage: availableStock < requestedQuantity ? 
+      errorMessage: !isValid ? 
         `Only ${availableStock} items available` : undefined
     };
 
   } catch (error) {
-    console.error('Error validating variant stock:', error);
+    console.error('Error in validateVariantStock:', error);
     return {
       isValid: false,
       availableStock: 0,
