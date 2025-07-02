@@ -15,9 +15,10 @@ export interface StockCalculationResult {
 
 export async function calculateProductStock(productId: string): Promise<StockCalculationResult> {
   try {
-    console.log('Calculating stock for product:', productId);
+    console.log('=== CALCULATING PRODUCT STOCK ===');
+    console.log('Product ID:', productId);
     
-    // Get product details
+    // Get product details first
     const { data: product, error: productError } = await supabase
       .from('products')
       .select('has_color_variants, has_size_variants, stock_quantity, name, status')
@@ -48,14 +49,15 @@ export async function calculateProductStock(productId: string): Promise<StockCal
       return { totalStock: stock };
     }
 
-    // HIERARCHY 2: Product has color variants - check each color
+    // HIERARCHY 2: Product has color variants - get color variants
     const { data: colorVariants, error: colorError } = await supabase
       .from('color_variants')
       .select(`
         id, 
         color_name, 
         stock_quantity,
-        size_variants(size_name, stock_quantity)
+        has_sizes,
+        size_variants(id, size_name, stock_quantity)
       `)
       .eq('product_id', productId)
       .order('color_name');
@@ -77,7 +79,7 @@ export async function calculateProductStock(productId: string): Promise<StockCal
       const sizeVariants = colorVariant.size_variants || [];
       
       // HIERARCHY 2A: This color has size variants - sum size variant stocks
-      if (sizeVariants.length > 0) {
+      if (colorVariant.has_sizes && sizeVariants.length > 0) {
         console.log(`Color ${colorVariant.color_name} has ${sizeVariants.length} size variants`);
         
         const sizeBreakdown = sizeVariants.map(size => ({
@@ -197,6 +199,7 @@ export async function validateVariantStock(
         .select(`
           color_name, 
           stock_quantity,
+          has_sizes,
           size_variants(id, size_name, stock_quantity)
         `)
         .eq('id', colorVariantId)
@@ -212,10 +215,10 @@ export async function validateVariantStock(
       }
 
       const sizeVariants = colorVariant.size_variants || [];
-      console.log(`Color variant found: ${colorVariant.color_name}, has ${sizeVariants.length} size variants`);
+      console.log(`Color variant found: ${colorVariant.color_name}, has_sizes: ${colorVariant.has_sizes}, size variants count: ${sizeVariants.length}`);
 
       // CASE 2A: This color has size variants → check specific size
-      if (sizeVariants.length > 0) {
+      if (colorVariant.has_sizes && sizeVariants.length > 0) {
         if (!sizeVariantId) {
           console.log('Case 2A - Size variant required but not provided');
           return {

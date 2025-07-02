@@ -87,7 +87,7 @@ export async function updateProductStock(items: StockUpdateItem[], operation: 'r
         throw new Error(`Failed to update product stock: ${error.message}`);
       }
     }
-    // CASE 2: Has color variants → need to determine size vs color level
+    // CASE 2: Has color variants → determine if size or color level
     else {
       if (!item.colorVariantId) {
         throw new Error(`Color variant ID required for product ${item.productId}`);
@@ -96,10 +96,7 @@ export async function updateProductStock(items: StockUpdateItem[], operation: 'r
       // Check if this color has size variants
       const { data: colorVariant, error: colorError } = await supabase
         .from('color_variants')
-        .select(`
-          color_name,
-          size_variants(id)
-        `)
+        .select('color_name, has_sizes, size_variants(id)')
         .eq('id', item.colorVariantId)
         .single();
 
@@ -107,7 +104,8 @@ export async function updateProductStock(items: StockUpdateItem[], operation: 'r
         throw new Error(`Color variant not found: ${item.colorVariantId}`);
       }
 
-      const hasSizeVariants = colorVariant.size_variants && colorVariant.size_variants.length > 0;
+      const sizeVariants = colorVariant.size_variants || [];
+      const hasSizeVariants = colorVariant.has_sizes && sizeVariants.length > 0;
 
       // CASE 2A: Color has size variants → update size variant stock
       if (hasSizeVariants) {
