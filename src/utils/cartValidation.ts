@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { getVariantStockInfo } from './unifiedStockManager';
 
 interface CartItem {
   id: string;
@@ -31,7 +32,7 @@ export async function validateCartItems(cartItems: CartItem[]): Promise<Validati
 
   for (const item of cartItems) {
     try {
-      // Check if product exists
+      // Check if product exists and is active
       const { data: product, error: productError } = await supabase
         .from('products')
         .select('id, name, status, has_color_variants, has_size_variants')
@@ -52,45 +53,35 @@ export async function validateCartItems(cartItems: CartItem[]): Promise<Validati
         continue;
       }
 
-      // Validate color variant if specified
-      if (item.colorVariantId) {
-        const { data: colorVariant, error: colorError } = await supabase
-          .from('color_variants')
-          .select('id, color_name')
-          .eq('id', item.colorVariantId)
-          .eq('product_id', item.productId)
-          .single();
+      // Validate variants using unified stock system
+      const stockInfo = await getVariantStockInfo(
+        item.productId,
+        item.colorVariantId,
+        item.sizeVariantId
+      );
 
-        if (colorError || !colorVariant) {
-          console.log(`Color variant ${item.colorVariantId} not found, removing from cart`);
-          removedItems.push(item);
-          errors.push(`Color variant for "${item.productName}" no longer exists and was removed from cart`);
-          continue;
-        }
+      if (!stockInfo.isValid) {
+        console.log(`Stock validation failed for ${item.productId}: ${stockInfo.errorMessage}`);
+        removedItems.push(item);
+        errors.push(`"${item.productName}" has variant issues and was removed from cart`);
+        continue;
       }
 
-      // Validate size variant if specified
-      if (item.sizeVariantId) {
-        const { data: sizeVariant, error: sizeError } = await supabase
-          .from('size_variants')
-          .select('id, size_name, color_variant_id')
-          .eq('id', item.sizeVariantId)
-          .single();
-
-        if (sizeError || !sizeVariant) {
-          console.log(`Size variant ${item.sizeVariantId} not found, removing from cart`);
+      // Check if we have enough stock
+      if (stockInfo.stockAmount < item.quantity) {
+        console.log(`Insufficient stock for ${item.productId}: available ${stockInfo.stockAmount}, needed ${item.quantity}`);
+        
+        if (stockInfo.stockAmount > 0) {
+          // Adjust quantity to available stock
+          item.quantity = stockInfo.stockAmount;
+          validItems.push(item);
+          errors.push(`"${item.productName}" quantity reduced to ${stockInfo.stockAmount} (available stock)`);
+        } else {
+          // No stock available, remove item
           removedItems.push(item);
-          errors.push(`Size variant for "${item.productName}" no longer exists and was removed from cart`);
-          continue;
+          errors.push(`"${item.productName}" is out of stock and was removed from cart`);
         }
-
-        // Ensure size variant belongs to the correct color variant
-        if (item.colorVariantId && sizeVariant.color_variant_id !== item.colorVariantId) {
-          console.log(`Size variant ${item.sizeVariantId} doesn't belong to color variant ${item.colorVariantId}`);
-          removedItems.push(item);
-          errors.push(`Invalid variant combination for "${item.productName}" was removed from cart`);
-          continue;
-        }
+        continue;
       }
 
       // If we reach here, the item is valid
