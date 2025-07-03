@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,6 @@ import { useToast } from '@/hooks/use-toast';
 import { CreateProductForm } from './CreateProductForm';
 import { EditProductForm } from './EditProductForm';
 import { ProductDetailView } from './ProductDetailView';
-import { ProductFilters, ProductFilters as ProductFiltersType } from './ProductFilters';
 import { Pencil, Trash2, Plus, Package, Eye } from 'lucide-react';
 import { getProductStockSummary } from '@/utils/stockCalculation';
 
@@ -50,27 +49,24 @@ export function ProductManagement() {
   const [viewingProductId, setViewingProductId] = useState<string | null>(null);
   const [productStocks, setProductStocks] = useState<Record<string, number>>({});
   const [stockLoading, setStockLoading] = useState<Record<string, boolean>>({});
-  const [filters, setFilters] = useState<ProductFiltersType>({
-    search: '',
-    category: '',
-    subcategory: '',
-    status: '',
-    priceMin: '',
-    priceMax: '',
-    stockMin: '',
-    stockMax: '',
-    featured: '',
-    hasVariants: '',
-    sortBy: 'created_at',
-    sortOrder: 'desc'
-  });
   const { toast } = useToast();
+
+  // New filter state
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [subcategoryFilter, setSubcategoryFilter] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'selling_price'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Filtered subcategories
+  const filteredSubcategories = categoryFilter
+    ? subcategories.filter((sub) => sub.category_id === categoryFilter)
+    : subcategories;
 
   useEffect(() => {
     fetchProducts();
     fetchCategories();
     fetchSubcategories();
-  }, [filters]);
+  }, []);
 
   useEffect(() => {
     if (products.length > 0) {
@@ -78,13 +74,18 @@ export function ProductManagement() {
     }
   }, [products]);
 
+  // Refetch products when filters or sort change
+  useEffect(() => {
+    fetchProducts();
+  }, [categoryFilter, subcategoryFilter, sortBy, sortOrder]);
+
   const fetchCategories = async () => {
     const { data, error } = await supabase
       .from('categories')
       .select('id, name')
       .eq('status', 'on')
       .order('name');
-    
+
     if (!error && data) {
       setCategories(data);
     }
@@ -96,7 +97,7 @@ export function ProductManagement() {
       .select('id, name, category_id')
       .eq('status', 'on')
       .order('name');
-    
+
     if (!error && data) {
       setSubcategories(data);
     }
@@ -111,55 +112,15 @@ export function ProductManagement() {
         subcategories(name)
       `);
 
-    // Apply filters
-    if (filters.search) {
-      query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+    // Apply new filters
+    if (categoryFilter) {
+      query = query.eq('category_id', categoryFilter);
     }
-    
-    if (filters.category) {
-      query = query.eq('category_id', filters.category);
+    if (subcategoryFilter) {
+      query = query.eq('subcategory_id', subcategoryFilter);
     }
-    
-    if (filters.subcategory) {
-      query = query.eq('subcategory_id', filters.subcategory);
-    }
-    
-    if (filters.status) {
-      query = query.eq('status', filters.status as 'active' | 'inactive');
-    }
-    
-    if (filters.featured === 'true') {
-      query = query.eq('is_featured', true);
-    } else if (filters.featured === 'false') {
-      query = query.eq('is_featured', false);
-    }
-    
-    if (filters.hasVariants === 'true') {
-      query = query.or('has_color_variants.eq.true,color_has_size_variants.eq.true');
-    } else if (filters.hasVariants === 'false') {
-      query = query.eq('has_color_variants', false).eq('color_has_size_variants', false);
-    }
-    
-    if (filters.priceMin) {
-      query = query.gte('selling_price', parseFloat(filters.priceMin));
-    }
-    
-    if (filters.priceMax) {
-      query = query.lte('selling_price', parseFloat(filters.priceMax));
-    }
-    
-    if (filters.stockMin) {
-      query = query.gte('stock_quantity', parseInt(filters.stockMin));
-    }
-    
-    if (filters.stockMax) {
-      query = query.lte('stock_quantity', parseInt(filters.stockMax));
-    }
-
     // Apply sorting
-    const ascending = filters.sortOrder === 'asc';
-    query = query.order(filters.sortBy, { ascending });
-
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
     return query;
   };
 
@@ -170,13 +131,13 @@ export function ProductManagement() {
       const { data, error } = await query;
 
       if (error) throw error;
-      
+
       // Map the data to ensure proper typing
       const mappedProducts: Product[] = (data || []).map(product => ({
         ...product,
         color_has_size_variants: product.color_has_size_variants || false
       }));
-      
+
       setProducts(mappedProducts);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -194,20 +155,20 @@ export function ProductManagement() {
     console.log('Calculating stocks for', products.length, 'products');
     const stocks: Record<string, number> = {};
     const loadingStates: Record<string, boolean> = {};
-    
+
     // Set loading states
     products.forEach(product => {
       loadingStates[product.id] = true;
     });
     setStockLoading(loadingStates);
-    
+
     for (const product of products) {
       try {
         console.log(`Calculating stock for product: ${product.name} (${product.id})`);
         const stock = await getProductStockSummary(product.id);
         stocks[product.id] = stock;
         console.log(`Stock calculated for ${product.name}: ${stock}`);
-        
+
         // Update loading state for this product
         setStockLoading(prev => ({ ...prev, [product.id]: false }));
       } catch (error) {
@@ -216,7 +177,7 @@ export function ProductManagement() {
         setStockLoading(prev => ({ ...prev, [product.id]: false }));
       }
     }
-    
+
     console.log('Final stock calculations:', stocks);
     setProductStocks(stocks);
   };
@@ -239,12 +200,12 @@ export function ProductManagement() {
         .eq('id', productId);
 
       if (error) throw error;
-      
+
       toast({
         title: 'Success',
         description: 'Product deleted successfully',
       });
-      
+
       fetchProducts();
     } catch (error) {
       console.error('Error deleting product:', error);
@@ -337,11 +298,87 @@ export function ProductManagement() {
         </Button>
       </div>
 
-      <ProductFilters
-        onFiltersChange={setFilters}
-        categories={categories}
-        subcategories={subcategories}
-      />
+      {/* New Filter Bar */}
+      <div className="sticky top-0 z-10 mb-4">
+        <Card className="shadow border border-gray-200 bg-white/95 backdrop-blur p-4">
+          <div className="flex flex-col md:flex-row md:items-end gap-4">
+            <div className="flex-1 min-w-[180px]">
+              <label className="block text-sm font-medium mb-1" htmlFor="category-filter">Category</label>
+              <select
+                id="category-filter"
+                className="w-full border rounded px-3 py-2"
+                value={categoryFilter}
+                onChange={e => {
+                  setCategoryFilter(e.target.value);
+                  setSubcategoryFilter(''); // Reset subcategory when category changes
+                }}
+              >
+                <option value="">All Categories</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1 min-w-[180px]">
+              <label className="block text-sm font-medium mb-1" htmlFor="subcategory-filter">Subcategory</label>
+              <select
+                id="subcategory-filter"
+                className="w-full border rounded px-3 py-2"
+                value={subcategoryFilter}
+                onChange={e => setSubcategoryFilter(e.target.value)}
+                disabled={!categoryFilter && filteredSubcategories.length === 0}
+              >
+                <option value="">All Subcategories</option>
+                {filteredSubcategories.map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.name}</option>
+                ))}
+              </select>
+            </div>
+            {/* Sort By */}
+            <div className="flex-1 min-w-[180px]">
+              <label className="block text-sm font-medium mb-1" htmlFor="sort-by">Sort By</label>
+              <select
+                id="sort-by"
+                className="w-full border rounded px-3 py-2"
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as 'name' | 'selling_price')}
+              >
+                <option value="name">Name</option>
+                <option value="selling_price">Price</option>
+              </select>
+            </div>
+            {/* Sort Order */}
+            <div className="flex-1 min-w-[180px]">
+              <label className="block text-sm font-medium mb-1" htmlFor="sort-order">Order</label>
+              <select
+                id="sort-order"
+                className="w-full border rounded px-3 py-2"
+                value={sortOrder}
+                onChange={e => setSortOrder(e.target.value as 'asc' | 'desc')}
+              >
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setCategoryFilter('');
+                  setSubcategoryFilter('');
+                  setSortBy('name');
+                  setSortOrder('asc');
+                }}
+                disabled={!categoryFilter && !subcategoryFilter && sortBy === 'name' && sortOrder === 'asc'}
+              >
+                Reset
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
@@ -381,7 +418,7 @@ export function ProductManagement() {
                           <Badge variant="outline">Featured</Badge>
                         )}
                       </div>
-                      
+
                       <div className="text-sm text-gray-600 space-y-1">
                         <p>
                           <span className="font-medium">Category:</span> {product.categories?.name}
@@ -398,7 +435,7 @@ export function ProductManagement() {
                           )}
                         </p>
                         <p>
-                          <span className="font-medium">Stock:</span> 
+                          <span className="font-medium">Stock:</span>
                           <Badge variant="outline" className="ml-2">
                             {stockLoading[product.id] ? (
                               <span className="animate-pulse">Calculating...</span>
@@ -428,7 +465,7 @@ export function ProductManagement() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex space-x-2">
                     <Button
                       variant="outline"
