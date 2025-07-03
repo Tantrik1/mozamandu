@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -89,12 +88,12 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
 
   // Reset quantity when color changes or load existing cart quantity
   useEffect(() => {
-    const existingItem = cartItems.find(item => 
+    const existingItem = cartItems.find(item =>
       item.productId === product.id &&
       item.colorVariantId === selectedColor &&
       item.sizeVariantId === selectedSize
     );
-    
+
     setQuantity(existingItem ? existingItem.quantity : 1);
   }, [selectedColor, selectedSize, cartItems]);
 
@@ -169,7 +168,7 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
 
     if (product.color_has_size_variants && !selectedSize) {
       toast({
-        title: "Selection Required", 
+        title: "Selection Required",
         description: "Please select a size",
         variant: "destructive",
       });
@@ -214,8 +213,8 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
       {/* Image Section */}
       <div className="relative overflow-hidden bg-gray-50">
         {currentImage ? (
-          <img 
-            src={currentImage} 
+          <img
+            src={currentImage}
             alt={product.name}
             className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
           />
@@ -224,7 +223,7 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
             <span className="text-4xl">🧦</span>
           </div>
         )}
-        
+
         {/* Price Badge - Top Right */}
         <div className="absolute top-3 right-3 bg-red-600 text-white px-3 py-1 rounded-full shadow-lg">
           <span className="text-sm font-bold">Rs. {currentPricing.finalPrice.toFixed(2)}</span>
@@ -260,7 +259,7 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
           <span className="text-xs text-gray-600">Stock: {availableStock}</span>
         </div>
       </div>
-      
+
       <CardContent className="p-4 flex-1 flex flex-col space-y-3">
         {/* Product Info */}
         <div>
@@ -334,7 +333,7 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
         </div>
 
         {/* Add to Cart Button */}
-        <Button 
+        <Button
           onClick={handleAddToCart}
           disabled={loading || availableStock === 0}
           className="w-full bg-red-600 hover:bg-red-700 text-white h-10 mt-auto font-medium"

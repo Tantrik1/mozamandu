@@ -391,87 +391,28 @@ export function CustomerHeader() {
                           >
                             <span>{category.name}</span>
                             <ChevronDown
-                              className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''
-                                }`}
+                              className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                             />
                           </button>
 
                           {/* Subcategories with proper scrolling */}
-                          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'
-                            }`}>
-                            <div className="bg-gray-50 border-t border-gray-100 max-h-80 overflow-y-auto">
-                              {category.subcategories?.map((subcategory) => (
-                                <Link
-                                  key={subcategory.id}
-                                  to={`/subcategories/${subcategory.id}`}
-                                  className="flex items-center space-x-3 p-4 hover:bg-white transition-colors duration-200 border-b border-gray-100 last:border-b-0"
-                                  onClick={closeMobileMenu}
-                                >
-                                  <div className="flex-shrink-0">
-                                    {subcategory.image_url ? (
-                                      <img
-                                        src={subcategory.image_url}
-                                        alt={subcategory.name}
-                                        className="w-10 h-10 object-cover rounded-lg"
-                                      />
-                                    ) : (
-                                      <div className="w-10 h-10 bg-gradient-to-br from-red-100 to-red-200 rounded-lg flex items-center justify-center">
-                                        <Package className="w-5 h-5 text-red-500" />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex-1">
-                                    <h4 className="font-medium text-gray-800 text-sm">
-                                      {subcategory.name}
-                                    </h4>
-                                    <p className="text-xs text-gray-500">
-                                      View products
-                                    </p>
-                                  </div>
-                                </Link>
-                              ))}
-                            </div>
+                          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'}`}
+                          >
+                            {isExpanded && category.subcategories.map((subcategory) => (
+                              <Link
+                                key={subcategory.id}
+                                to={`/subcategories/${subcategory.id}`}
+                                className="block py-2 px-6 text-gray-700 hover:text-red-600 hover:bg-red-50 transition-all duration-200"
+                                onClick={closeMobileMenu}
+                              >
+                                {subcategory.name}
+                              </Link>
+                            ))}
                           </div>
                         </div>
                       );
                     })}
                   </div>
-
-                  {/* User Actions */}
-                  {user && (
-                    <div className="pt-6 border-t border-gray-100 space-y-4">
-                      <button
-                        onClick={() => {
-                          handleDashboardClick();
-                          closeMobileMenu();
-                        }}
-                        className="block w-full text-left text-gray-800 hover:text-red-600 font-medium py-3 px-4 rounded-lg hover:bg-red-50 transition-all duration-200"
-                      >
-                        {userProfile?.role === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleSignOut();
-                          closeMobileMenu();
-                        }}
-                        className="block w-full text-left text-gray-800 hover:text-red-600 font-medium py-3 px-4 rounded-lg hover:bg-red-50 transition-all duration-200"
-                      >
-                        Logout
-                      </button>
-                    </div>
-                  )}
-
-                  {!user && (
-                    <div className="pt-6 border-t border-gray-100">
-                      <Link
-                        to="/auth"
-                        onClick={closeMobileMenu}
-                        className="block w-full text-center bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-medium py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-                      >
-                        Login
-                      </Link>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

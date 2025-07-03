@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
@@ -8,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Footer } from '@/components/layout/Footer';
 import { calculateTotalProductStock } from '@/utils/unifiedStockManager';
+import { ProductCard } from '@/components/customer/ProductCard';
 
 interface Product {
   id: string;
@@ -20,6 +20,8 @@ interface Product {
   stock_quantity: number;
   has_color_variants: boolean;
   color_has_size_variants: boolean;
+  category_id: string;
+  subcategory_id: string;
 }
 
 export default function SubcategoryPage() {
@@ -83,7 +85,9 @@ export default function SubcategoryPage() {
             image_url: product.image_url,
             stock_quantity: totalStock,
             has_color_variants: product.has_color_variants,
-            color_has_size_variants: product.color_has_size_variants
+            color_has_size_variants: product.color_has_size_variants,
+            category_id: subcategory?.category_id || '',
+            subcategory_id: subcategoryId as string
           } as Product;
         })
       );
@@ -123,77 +127,41 @@ export default function SubcategoryPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
-      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {subcategory && (
-          <div className="mb-8">
-            <div className="flex items-center text-sm text-gray-500 mb-4">
-              <span>{subcategory.categories?.name}</span>
-              <span className="mx-2">›</span>
-              <span className="font-medium text-gray-900">{subcategory.name}</span>
+      <section className="py-8 sm:py-16 bg-white overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {subcategory && (
+            <div className="mb-8 text-center">
+              <div className="flex items-center justify-center text-sm text-gray-500 mb-4 gap-2">
+                <span>{subcategory.categories?.name}</span>
+                <span className="mx-2">›</span>
+                <span className="font-medium text-gray-900">{subcategory.name}</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 sm:mb-4">{subcategory.name}</h1>
+              <div className="w-20 h-1 bg-gradient-to-r from-red-500 to-red-600 rounded-full mx-auto mb-4"></div>
+              {subcategory.description && (
+                <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto mt-2">{subcategory.description}</p>
+              )}
             </div>
-            <h1 className="text-3xl font-bold text-gray-900">{subcategory.name}</h1>
-            {subcategory.description && (
-              <p className="text-gray-600 mt-2">{subcategory.description}</p>
-            )}
-          </div>
-        )}
+          )}
 
-        {products.length === 0 ? (
-          <div className="text-center py-12">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No products available</h3>
-            <p className="text-gray-500">Check back later for new products in this category!</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product) => (
-              <Card key={product.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="p-0">
-                  {product.image_url ? (
-                    <img 
-                      src={product.image_url} 
-                      alt={product.name}
-                      className="w-full h-48 object-cover rounded-t-lg"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        target.nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                  ) : null}
-                  <div className="w-full h-48 bg-gray-200 rounded-t-lg flex items-center justify-center">
-                    <span className="text-gray-400">No Image</span>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <CardTitle className="text-lg font-semibold">{product.name}</CardTitle>
-                    {product.is_featured && (
-                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                        Featured
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  {product.description && (
-                    <p className="text-sm text-gray-700 mb-3 line-clamp-2">
-                      {product.description}
-                    </p>
-                  )}
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-bold text-red-600">
-                      Rs. {getProductPrice(product)}
-                    </span>
-                    <span className={`text-sm font-medium ${product.stock_quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      Stock: {product.stock_quantity}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+          {products.length === 0 ? (
+            <div className="text-center py-12">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No products available</h3>
+              <p className="text-gray-500">Check back later for new products in this category!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {products.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  subcategoryPrice={subcategory?.selling_price || 0}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
       <Footer />
     </div>
   );
