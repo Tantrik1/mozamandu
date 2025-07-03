@@ -141,7 +141,7 @@ export async function calculateProductStock(productId: string): Promise<StockCal
       });
 
       if (!error && data !== null) {
-        return { totalStock: data };
+        return { totalStock: Number(data) };
       }
     } catch (breakdownError) {
       console.log('Breakdown table not available, using fallback method');
@@ -164,7 +164,7 @@ export async function getProductStockSummary(productId: string): Promise<number>
       });
 
       if (!error && data !== null) {
-        return data;
+        return Number(data);
       }
     } catch (rpcError) {
       console.log('RPC function not available, using fallback');
@@ -236,22 +236,6 @@ export async function validateVariantStock(
 // Helper function to get all available variants for a product
 export async function getAvailableVariants(productId: string) {
   try {
-    // Try breakdown table first
-    try {
-      const { data, error } = await supabase
-        .from('product_variants_breakdown')
-        .select('*')
-        .eq('product_id', productId)
-        .eq('is_active', true)
-        .gt('stock_quantity', 0);
-      
-      if (!error && data) {
-        return data;
-      }
-    } catch (breakdownError) {
-      console.log('Breakdown table not available');
-    }
-
     // Fallback to color variants
     const { data, error } = await supabase
       .from('color_variants')
