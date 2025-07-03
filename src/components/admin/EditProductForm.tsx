@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,7 +23,7 @@ const productSchema = z.object({
   subcategory_id: z.string().min(1, 'Subcategory is required'),
   is_featured: z.boolean().default(false),
   has_color_variants: z.boolean().default(false),
-  has_size_variants: z.boolean().default(false),
+  color_has_size_variants: z.boolean().default(false),
   stock_quantity: z.number().min(0, 'Stock quantity must be positive').optional(),
   status: z.enum(['active', 'inactive']).default('active'),
 });
@@ -86,7 +85,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       subcategory_id: '',
       is_featured: false,
       has_color_variants: false,
-      has_size_variants: false,
+      color_has_size_variants: false,
       stock_quantity: 0,
       status: 'active',
     },
@@ -94,7 +93,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   const watchedCategoryId = form.watch('category_id');
   const watchedHasColorVariants = form.watch('has_color_variants');
-  const watchedHasSizeVariants = form.watch('has_size_variants');
+  const watchedColorHasSizeVariants = form.watch('color_has_size_variants');
 
   useEffect(() => {
     const initializeData = async () => {
@@ -173,7 +172,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         subcategory_id: product.subcategory_id,
         is_featured: Boolean(product.is_featured),
         has_color_variants: Boolean(product.has_color_variants),
-        has_size_variants: Boolean(product.has_size_variants),
+        color_has_size_variants: Boolean(product.color_has_size_variants),
         stock_quantity: product.stock_quantity ? Number(product.stock_quantity) : 0,
         status: product.status,
       });
@@ -265,8 +264,8 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         subcategory_id: data.subcategory_id,
         is_featured: data.is_featured,
         has_color_variants: data.has_color_variants,
-        has_size_variants: data.has_size_variants,
-        stock_quantity: (!data.has_color_variants && !data.has_size_variants) ? data.stock_quantity || null : null,
+        color_has_size_variants: data.color_has_size_variants,
+        stock_quantity: (!data.has_color_variants && !data.color_has_size_variants) ? data.stock_quantity || null : null,
         status: data.status,
         image_url: currentImageUrl,
       };
@@ -282,7 +281,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
       // Save color variants if enabled
       if (data.has_color_variants && colorVariants.length > 0) {
-        await saveColorVariants(data.has_size_variants);
+        await saveColorVariants(data.color_has_size_variants);
       } else if (!data.has_color_variants) {
         // Delete existing variants if color variants are disabled
         await deleteExistingVariants();
@@ -334,7 +333,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     }
   };
 
-  const saveColorVariants = async (hasSizeVariants: boolean) => {
+  const saveColorVariants = async (colorHasSizeVariants: boolean) => {
     try {
       console.log('Saving color variants:', colorVariants);
       
@@ -350,9 +349,9 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             validVariants.map(cv => ({
               product_id: productId,
               color_name: cv.color_name,
-              stock_quantity: hasSizeVariants ? 0 : (cv.stock_quantity || 0),
+              stock_quantity: colorHasSizeVariants ? 0 : (cv.stock_quantity || 0),
               image_url: cv.image_url || null,
-              has_sizes: hasSizeVariants,
+              has_sizes: colorHasSizeVariants,
             }))
           )
           .select('id, color_name');
@@ -360,7 +359,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         if (colorError) throw colorError;
 
         // Insert size variants if applicable
-        if (hasSizeVariants && insertedColors) {
+        if (colorHasSizeVariants && insertedColors) {
           for (let i = 0; i < validVariants.length; i++) {
             const variant = validVariants[i];
             const insertedColor = insertedColors[i];
@@ -537,17 +536,17 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
                   <div className="flex items-center space-x-2">
                     <Switch
-                      id="has_size_variants"
-                      checked={form.watch('has_size_variants')}
+                      id="color_has_size_variants"
+                      checked={form.watch('color_has_size_variants')}
                       onCheckedChange={(checked) => {
-                        form.setValue('has_size_variants', checked);
+                        form.setValue('color_has_size_variants', checked);
                       }}
                     />
-                    <Label htmlFor="has_size_variants">Sizes</Label>
+                    <Label htmlFor="color_has_size_variants">Sizes</Label>
                   </div>
                 </div>
 
-                {!watchedHasColorVariants && !watchedHasSizeVariants && (
+                {!watchedHasColorVariants && !watchedColorHasSizeVariants && (
                   <div>
                     <Label htmlFor="stock_quantity">Stock Quantity *</Label>
                     <Input
@@ -630,11 +629,11 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
           </CardContent>
         </Card>
 
-        {(watchedHasColorVariants || watchedHasSizeVariants) && (
+        {(watchedHasColorVariants || watchedColorHasSizeVariants) && (
           <ProductVariantForm
             productId={productId}
             hasColorVariants={watchedHasColorVariants}
-            hasSizeVariants={watchedHasSizeVariants}
+            hasSizeVariants={watchedColorHasSizeVariants}
             onVariantsChange={setColorVariants}
           />
         )}
