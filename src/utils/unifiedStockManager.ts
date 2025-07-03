@@ -32,7 +32,7 @@ export async function getVariantStockInfo(
     console.log('Color Variant ID:', colorVariantId);
     console.log('Size Variant ID:', sizeVariantId);
 
-    const { data, error } = await supabase.rpc('get_variant_stock_info', {
+    const { data, error } = await supabase.rpc('get_variant_stock_info' as any, {
       p_product_id: productId,
       p_color_variant_id: colorVariantId || null,
       p_size_variant_id: sizeVariantId || null
@@ -48,7 +48,7 @@ export async function getVariantStockInfo(
       };
     }
 
-    if (!data || data.length === 0) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       return {
         stockSource: 'none',
         stockAmount: 0,
@@ -91,7 +91,7 @@ export async function updateVariantStockAtomic(
     console.log('Size Variant ID:', sizeVariantId);
     console.log('Stock Change:', stockChange);
 
-    const { data, error } = await supabase.rpc('update_variant_stock_atomic', {
+    const { data, error } = await supabase.rpc('update_variant_stock_atomic' as any, {
       p_product_id: productId,
       p_color_variant_id: colorVariantId,
       p_size_variant_id: sizeVariantId,
@@ -107,7 +107,7 @@ export async function updateVariantStockAtomic(
       };
     }
 
-    if (!data || data.length === 0) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       return {
         success: false,
         newStock: 0,
@@ -156,7 +156,7 @@ export async function validateCartStock(cartItems: any[]): Promise<CartValidatio
       productName: item.productName
     }));
 
-    const { data, error } = await supabase.rpc('validate_cart_stock', {
+    const { data, error } = await supabase.rpc('validate_cart_stock' as any, {
       p_items: itemsJson
     });
 
@@ -169,7 +169,7 @@ export async function validateCartStock(cartItems: any[]): Promise<CartValidatio
       };
     }
 
-    if (!data || data.length === 0) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       return {
         isValid: false,
         invalidItems: [],
