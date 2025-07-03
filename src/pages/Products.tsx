@@ -1,8 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { ProductCard } from '@/components/customer/ProductCard';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Footer } from '@/components/layout/Footer';
@@ -17,6 +16,10 @@ interface Product {
   is_featured: boolean;
   image_url: string;
   stock_quantity: number;
+  has_color_variants: boolean;
+  color_has_size_variants: boolean;
+  category_id: string;
+  subcategory_id: string;
   categories: { name: string };
   subcategories: { name: string; selling_price: number };
 }
@@ -80,10 +83,6 @@ export default function Products() {
     }
   };
 
-  const getProductPrice = (product: Product) => {
-    return product.selling_price || product.subcategories?.selling_price || 0;
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -116,54 +115,11 @@ export default function Products() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {products.map((product) => (
-              <Card key={product.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="p-0">
-                  {product.image_url ? (
-                    <img 
-                      src={product.image_url} 
-                      alt={product.name}
-                      className="w-full h-48 object-cover rounded-t-lg"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        target.nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                  ) : null}
-                  <div className="w-full h-48 bg-gray-200 rounded-t-lg flex items-center justify-center">
-                    <span className="text-gray-400">No Image</span>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <CardTitle className="text-lg font-semibold">{product.name}</CardTitle>
-                    {product.is_featured && (
-                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                        Featured
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  <p className="text-sm text-gray-600 mb-2">
-                    {product.categories?.name} → {product.subcategories?.name}
-                  </p>
-                  
-                  {product.description && (
-                    <p className="text-sm text-gray-700 mb-3 line-clamp-2">
-                      {product.description}
-                    </p>
-                  )}
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-bold text-red-600">
-                      Rs. {getProductPrice(product)}
-                    </span>
-                    <span className={`text-sm font-medium ${product.stock_quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      Stock: {product.stock_quantity}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+              <ProductCard
+                key={product.id}
+                product={product}
+                subcategoryPrice={product.subcategories?.selling_price || 0}
+              />
             ))}
           </div>
         )}
