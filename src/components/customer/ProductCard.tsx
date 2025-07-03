@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -89,12 +88,12 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
 
   // Reset quantity when color changes or load existing cart quantity
   useEffect(() => {
-    const existingItem = cartItems.find(item => 
+    const existingItem = cartItems.find(item =>
       item.productId === product.id &&
       item.colorVariantId === selectedColor &&
       item.sizeVariantId === selectedSize
     );
-    
+
     setQuantity(existingItem ? existingItem.quantity : 1);
   }, [selectedColor, selectedSize, cartItems]);
 
@@ -169,7 +168,7 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
 
     if (product.color_has_size_variants && !selectedSize) {
       toast({
-        title: "Selection Required", 
+        title: "Selection Required",
         description: "Please select a size",
         variant: "destructive",
       });
@@ -210,72 +209,58 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
   const availableStock = getAvailableStock();
 
   return (
-    <Card className="group hover:shadow-lg transition-all duration-300 cursor-pointer h-full flex flex-col overflow-hidden bg-white rounded-lg border border-gray-200">
+    <Card className="group hover:shadow-xl transition-all duration-300 cursor-pointer h-full flex flex-col overflow-hidden bg-white rounded-2xl border border-gray-200 shadow-md">
       {/* Image Section */}
-      <div className="relative overflow-hidden bg-gray-50">
+      <div className="relative overflow-hidden bg-gray-50 rounded-t-2xl">
         {currentImage ? (
-          <img 
-            src={currentImage} 
+          <img
+            src={currentImage}
             alt={product.name}
-            className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300 rounded-t-2xl"
           />
         ) : (
-          <div className="w-full h-48 bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+          <div className="w-full h-48 bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center rounded-t-2xl">
             <span className="text-4xl">🧦</span>
           </div>
         )}
-        
         {/* Price Badge - Top Right */}
-        <div className="absolute top-3 right-3 bg-red-600 text-white px-3 py-1 rounded-full shadow-lg">
-          <span className="text-sm font-bold">Rs. {currentPricing.finalPrice.toFixed(2)}</span>
+        <div className="absolute top-3 right-3 z-10">
+          <span className="bg-red-600 text-white px-4 py-1 rounded-full shadow-lg text-base font-bold border-2 border-white">
+            Rs. {currentPricing.finalPrice.toFixed(2)}
+          </span>
         </div>
-
-        {/* Featured Badge */}
-        {product.is_featured && (
-          <Badge className="absolute top-3 left-3 bg-yellow-500 text-black text-xs font-medium px-2 py-1">
-            <Star className="w-3 h-3 mr-1" />
-            Featured
-          </Badge>
-        )}
-
-        {/* Pricing Mode Badge */}
+        {/* Stock Info - Bottom Right */}
+        <div className="absolute bottom-3 right-3 z-10">
+          <span className="bg-white/90 text-gray-700 text-xs px-3 py-1 rounded-full border border-gray-200 shadow-sm font-medium">
+            Stock: {availableStock}
+          </span>
+        </div>
+        {/* Pricing Mode Badge - Bottom Left */}
         {currentPricing.mode !== 'normal' && (
-          <div className="absolute bottom-3 left-3">
+          <div className="absolute bottom-3 left-3 z-10">
             {currentPricing.mode === 'combo' && (
-              <Badge className="bg-green-500 text-white text-xs px-2 py-1">
-                Combo Price
-              </Badge>
+              <Badge className="bg-green-500 text-white text-xs px-2 py-1 rounded-full shadow">Combo Price</Badge>
             )}
             {currentPricing.mode === 'discount' && (
-              <Badge className="bg-blue-500 text-white text-xs px-2 py-1">
-                <Tag className="w-3 h-3 mr-1" />
-                MOQ Discount
+              <Badge className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full shadow flex items-center">
+                <Tag className="w-3 h-3 mr-1" /> MOQ Discount
               </Badge>
             )}
           </div>
         )}
-
-        {/* Stock Info */}
-        <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1">
-          <span className="text-xs text-gray-600">Stock: {availableStock}</span>
-        </div>
       </div>
-      
-      <CardContent className="p-4 flex-1 flex flex-col space-y-3">
+      <CardContent className="p-5 flex-1 flex flex-col space-y-4">
         {/* Product Info */}
         <div>
-          <h3 className="font-semibold text-lg text-gray-900 mb-1 line-clamp-1">
-            {product.name}
-          </h3>
-          <p className="text-sm text-gray-600 mb-2">Choose any color</p>
+          <h3 className="font-semibold text-lg text-gray-900 mb-1 line-clamp-1">{product.name}</h3>
+          <p className="text-sm text-gray-500 mb-2">Choose any color</p>
         </div>
-
         {/* Color Selection */}
         {product.has_color_variants && colorVariants.length > 0 && (
-          <div>
+          <div className="mb-2">
             <label className="text-sm font-medium text-gray-700 mb-1 block">Color:</label>
             <Select value={selectedColor} onValueChange={setSelectedColor}>
-              <SelectTrigger className="h-9 text-sm">
+              <SelectTrigger className="h-9 text-sm bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500">
                 <SelectValue placeholder="Select color" />
               </SelectTrigger>
               <SelectContent>
@@ -288,13 +273,12 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
             </Select>
           </div>
         )}
-
         {/* Size Selection */}
         {product.color_has_size_variants && sizeVariants.length > 0 && (
-          <div>
+          <div className="mb-2">
             <label className="text-sm font-medium text-gray-700 mb-1 block">Size:</label>
             <Select value={selectedSize} onValueChange={setSelectedSize}>
-              <SelectTrigger className="h-9 text-sm">
+              <SelectTrigger className="h-9 text-sm bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500">
                 <SelectValue placeholder="Select size" />
               </SelectTrigger>
               <SelectContent>
@@ -307,37 +291,37 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
             </Select>
           </div>
         )}
-
         {/* Quantity Selection */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
               disabled={quantity <= 1}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 border border-gray-300"
             >
               <Minus className="h-3 w-3" />
             </Button>
-            <span className="px-3 py-1 border rounded text-sm min-w-[2rem] text-center font-medium">{quantity}</span>
+            <span className="px-3 py-1 border border-gray-200 rounded text-base min-w-[2rem] text-center font-semibold bg-gray-50">
+              {quantity}
+            </span>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setQuantity(Math.min(availableStock, quantity + 1))}
               disabled={quantity >= availableStock}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 border border-gray-300"
             >
               <Plus className="h-3 w-3" />
             </Button>
           </div>
         </div>
-
         {/* Add to Cart Button */}
-        <Button 
+        <Button
           onClick={handleAddToCart}
           disabled={loading || availableStock === 0}
-          className="w-full bg-red-600 hover:bg-red-700 text-white h-10 mt-auto font-medium"
+          className="w-full bg-red-600 hover:bg-red-700 text-white h-11 mt-auto font-semibold text-base rounded-lg flex items-center justify-center gap-2 shadow-lg"
         >
           {loading ? (
             "Adding..."
@@ -345,7 +329,7 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
             "Out of Stock"
           ) : (
             <>
-              <ShoppingCart className="mr-2 h-4 w-4" />
+              <ShoppingCart className="h-5 w-5" />
               Add to Cart
             </>
           )}
