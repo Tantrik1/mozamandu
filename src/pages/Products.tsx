@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Footer } from '@/components/layout/Footer';
+import { calculateTotalProductStock } from '@/utils/unifiedStockManager';
 
 interface Product {
   id: string;
@@ -52,7 +53,19 @@ export default function Products() {
         setProducts([]);
       } else {
         console.log('✅ Products: Data loaded:', data?.length || 0);
-        setProducts(data || []);
+        
+        // Calculate accurate stock for each product using breakdown table
+        const productsWithStock = await Promise.all(
+          (data || []).map(async (product) => {
+            const totalStock = await calculateTotalProductStock(product.id);
+            return {
+              ...product,
+              stock_quantity: totalStock
+            };
+          })
+        );
+        
+        setProducts(productsWithStock);
       }
     } catch (error) {
       console.error('❌ Products: Unexpected error:', error);
@@ -145,11 +158,9 @@ export default function Products() {
                     <span className="text-xl font-bold text-red-600">
                       Rs. {getProductPrice(product)}
                     </span>
-                    {product.stock_quantity !== null && (
-                      <span className="text-sm text-gray-500">
-                        Stock: {product.stock_quantity}
-                      </span>
-                    )}
+                    <span className={`text-sm font-medium ${product.stock_quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      Stock: {product.stock_quantity}
+                    </span>
                   </div>
                 </CardContent>
               </Card>

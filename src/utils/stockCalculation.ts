@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { getVariantStockInfo, getProductVariantDetails, getStockBreakdown } from './unifiedStockManager';
+import { getVariantStockInfo, getStockBreakdown } from './unifiedStockManager';
 
 export interface StockCalculationResult {
   totalStock: number;
@@ -16,7 +16,7 @@ export interface StockCalculationResult {
 
 export async function calculateProductStock(productId: string): Promise<StockCalculationResult> {
   try {
-    console.log('=== CALCULATING PRODUCT STOCK ===');
+    console.log('=== CALCULATING PRODUCT STOCK FROM BREAKDOWN ===');
     console.log('Product ID:', productId);
     
     // Get product details first
@@ -43,27 +43,59 @@ export async function calculateProductStock(productId: string): Promise<StockCal
       stock_quantity: product.stock_quantity 
     });
 
-    // Use the improved stock breakdown function
-    const breakdown = await getStockBreakdown(productId);
-    
-    if (!product.has_color_variants) {
-      return { totalStock: breakdown.totalStock };
+    // Use the new breakdown table for accurate stock calculation
+    const { data: breakdownData, error: breakdownError } = await supabase
+      .from('product_variants_breakdown')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('is_active', true);
+
+    if (breakdownError) {
+      console.error('Error fetching breakdown data:', breakdownError);
+      return { totalStock: 0 };
     }
 
-    // Convert breakdown to the expected format
-    const colorBreakdown = breakdown.colorVariants.map(colorVariant => ({
-      colorName: colorVariant.colorName,
-      stock: colorVariant.colorStock,
-      sizeBreakdown: colorVariant.sizeVariants.length > 0 
-        ? colorVariant.sizeVariants.map(sizeVariant => ({
-            sizeName: sizeVariant.sizeName,
-            stock: sizeVariant.sizeStock
-          }))
-        : undefined
-    }));
+    if (!breakdownData || breakdownData.length === 0) {
+      console.log('No breakdown data found for product:', productId);
+      return { totalStock: product.stock_quantity || 0 };
+    }
+
+    // Calculate total stock from breakdown
+    const totalStock = breakdownData.reduce((sum, variant) => sum + variant.stock_quantity, 0);
+
+    if (!product.has_color_variants) {
+      return { totalStock };
+    }
+
+    // Group by color for breakdown
+    const colorMap = new Map();
+    
+    breakdownData.forEach(variant => {
+      if (variant.color_variant_id) {
+        if (!colorMap.has(variant.color_variant_id)) {
+          colorMap.set(variant.color_variant_id, {
+            colorName: variant.color_name,
+            stock: 0,
+            sizeBreakdown: []
+          });
+        }
+        
+        const colorVariant = colorMap.get(variant.color_variant_id);
+        colorVariant.stock += variant.stock_quantity;
+        
+        if (variant.size_variant_id) {
+          colorVariant.sizeBreakdown.push({
+            sizeName: variant.size_name,
+            stock: variant.stock_quantity
+          });
+        }
+      }
+    });
+
+    const colorBreakdown = Array.from(colorMap.values());
 
     return { 
-      totalStock: breakdown.totalStock, 
+      totalStock, 
       colorBreakdown 
     };
   } catch (error) {
@@ -74,20 +106,24 @@ export async function calculateProductStock(productId: string): Promise<StockCal
 
 export async function getProductStockSummary(productId: string): Promise<number> {
   try {
-    const { data: product } = await supabase
-      .from('products')
-      .select('stock_quantity')
-      .eq('id', productId)
-      .single();
+    // Use the breakdown table for accurate total
+    const { data, error } = await supabase.rpc('calculate_product_stock_from_breakdown', {
+      p_product_id: productId
+    });
 
-    return product?.stock_quantity || 0;
+    if (error) {
+      console.error('Error getting product stock summary:', error);
+      return 0;
+    }
+
+    return data || 0;
   } catch (error) {
     console.error('Error getting product stock summary:', error);
     return 0;
   }
 }
 
-// Main stock validation function using unified system
+// Main stock validation function using breakdown table
 export async function validateVariantStock(
   productId: string,
   colorVariantId?: string | null,
@@ -130,15 +166,22 @@ export async function validateVariantStock(
   }
 }
 
-// Helper function to get all available variants for a product
+// Helper function to get all available variants for a product using breakdown table
 export async function getAvailableVariants(productId: string) {
   try {
-    const variants = await getProductVariantDetails(productId);
+    const { data, error } = await supabase
+      .from('product_variants_breakdown')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('is_active', true)
+      .gt('stock_quantity', 0);
     
-    // Filter out variants with zero stock
-    return variants.filter(variant => 
-      variant.variant_stock_quantity > 0
-    );
+    if (error) {
+      console.error('Error getting available variants:', error);
+      return [];
+    }
+
+    return data || [];
   } catch (error) {
     console.error('Error getting available variants:', error);
     return [];

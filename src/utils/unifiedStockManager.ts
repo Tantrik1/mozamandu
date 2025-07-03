@@ -20,26 +20,30 @@ export interface CartValidationResult {
   errorMessages: string[];
 }
 
-// Unified function to get stock information using improved database RPC
+// Unified function to get stock information using the breakdown table
 export async function getVariantStockInfo(
   productId: string,
   colorVariantId?: string | null,
   sizeVariantId?: string | null
 ): Promise<StockInfo> {
   try {
-    console.log('=== GETTING VARIANT STOCK INFO ===');
+    console.log('=== GETTING VARIANT STOCK INFO FROM BREAKDOWN ===');
     console.log('Product ID:', productId);
     console.log('Color Variant ID:', colorVariantId);
     console.log('Size Variant ID:', sizeVariantId);
 
-    const { data, error } = await supabase.rpc('get_variant_stock_info' as any, {
-      p_product_id: productId,
-      p_color_variant_id: colorVariantId || null,
-      p_size_variant_id: sizeVariantId || null
-    });
+    // Query the breakdown table for exact match
+    const { data, error } = await supabase
+      .from('product_variants_breakdown')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('is_active', true)
+      .eq('color_variant_id', colorVariantId || null)
+      .eq('size_variant_id', sizeVariantId || null)
+      .maybeSingle();
 
     if (error) {
-      console.error('RPC error:', error);
+      console.error('Database error:', error);
       return {
         stockSource: 'none',
         stockAmount: 0,
@@ -48,23 +52,28 @@ export async function getVariantStockInfo(
       };
     }
 
-    if (!data || !Array.isArray(data) || data.length === 0) {
+    if (!data) {
       return {
         stockSource: 'none',
         stockAmount: 0,
         isValid: false,
-        errorMessage: 'No stock information found'
+        errorMessage: 'Variant combination not found'
       };
     }
 
-    const result = data[0];
-    console.log('Stock info result:', result);
+    const stockSource = data.size_variant_id ? 'size_variant' : 
+                       data.color_variant_id ? 'color_variant' : 'product';
+
+    console.log('Stock info result:', {
+      stockSource,
+      stockAmount: data.stock_quantity,
+      isValid: true
+    });
 
     return {
-      stockSource: result.stock_source,
-      stockAmount: result.stock_amount,
-      isValid: result.is_valid,
-      errorMessage: result.error_message
+      stockSource,
+      stockAmount: data.stock_quantity,
+      isValid: true
     };
   } catch (error) {
     console.error('Error getting variant stock info:', error);
@@ -77,7 +86,7 @@ export async function getVariantStockInfo(
   }
 }
 
-// Unified function to update stock atomically using improved database RPC
+// Unified function to update stock in the breakdown table
 export async function updateVariantStockAtomic(
   productId: string,
   colorVariantId: string | null,
@@ -85,43 +94,54 @@ export async function updateVariantStockAtomic(
   stockChange: number
 ): Promise<StockUpdateResult> {
   try {
-    console.log('=== UPDATING VARIANT STOCK ATOMICALLY ===');
+    console.log('=== UPDATING VARIANT STOCK IN BREAKDOWN TABLE ===');
     console.log('Product ID:', productId);
     console.log('Color Variant ID:', colorVariantId);
     console.log('Size Variant ID:', sizeVariantId);
     console.log('Stock Change:', stockChange);
 
-    const { data, error } = await supabase.rpc('update_variant_stock_atomic' as any, {
-      p_product_id: productId,
-      p_color_variant_id: colorVariantId,
-      p_size_variant_id: sizeVariantId,
-      p_stock_change: stockChange
-    });
+    // First get the current stock from breakdown table
+    const { data: currentData, error: fetchError } = await supabase
+      .from('product_variants_breakdown')
+      .select('stock_quantity')
+      .eq('product_id', productId)
+      .eq('color_variant_id', colorVariantId || null)
+      .eq('size_variant_id', sizeVariantId || null)
+      .eq('is_active', true)
+      .single();
 
-    if (error) {
-      console.error('RPC error:', error);
+    if (fetchError || !currentData) {
       return {
         success: false,
         newStock: 0,
-        errorMessage: 'Database error updating stock'
+        errorMessage: 'Variant not found in breakdown table'
       };
     }
 
-    if (!data || !Array.isArray(data) || data.length === 0) {
+    const newStock = Math.max(0, currentData.stock_quantity + stockChange);
+
+    // Update the breakdown table
+    const { error: updateError } = await supabase
+      .from('product_variants_breakdown')
+      .update({ stock_quantity: newStock, updated_at: new Date().toISOString() })
+      .eq('product_id', productId)
+      .eq('color_variant_id', colorVariantId || null)
+      .eq('size_variant_id', sizeVariantId || null);
+
+    if (updateError) {
+      console.error('Update error:', updateError);
       return {
         success: false,
-        newStock: 0,
-        errorMessage: 'No result from stock update'
+        newStock: currentData.stock_quantity,
+        errorMessage: 'Failed to update breakdown table'
       };
     }
 
-    const result = data[0];
-    console.log('Stock update result:', result);
+    console.log('Stock update result:', { success: true, newStock });
 
     return {
-      success: result.success,
-      newStock: result.new_stock,
-      errorMessage: result.error_message
+      success: true,
+      newStock,
     };
   } catch (error) {
     console.error('Error updating variant stock:', error);
@@ -133,10 +153,10 @@ export async function updateVariantStockAtomic(
   }
 }
 
-// Unified function to validate cart stock using database RPC
+// Unified function to validate cart stock using breakdown table
 export async function validateCartStock(cartItems: any[]): Promise<CartValidationResult> {
   try {
-    console.log('=== VALIDATING CART STOCK ===');
+    console.log('=== VALIDATING CART STOCK FROM BREAKDOWN ===');
     console.log('Cart items count:', cartItems.length);
 
     if (cartItems.length === 0) {
@@ -147,43 +167,30 @@ export async function validateCartStock(cartItems: any[]): Promise<CartValidatio
       };
     }
 
-    // Convert cart items to JSONB format expected by the function
-    const itemsJson = cartItems.map(item => ({
-      productId: item.productId,
-      colorVariantId: item.colorVariantId,
-      sizeVariantId: item.sizeVariantId,
-      quantity: item.quantity,
-      productName: item.productName
-    }));
+    const invalidItems: any[] = [];
+    const errorMessages: string[] = [];
 
-    const { data, error } = await supabase.rpc('validate_cart_stock' as any, {
-      p_items: itemsJson
-    });
+    for (const item of cartItems) {
+      const stockInfo = await getVariantStockInfo(
+        item.productId,
+        item.colorVariantId,
+        item.sizeVariantId
+      );
 
-    if (error) {
-      console.error('RPC error:', error);
-      return {
-        isValid: false,
-        invalidItems: [],
-        errorMessages: ['Database error validating cart stock']
-      };
+      if (!stockInfo.isValid || stockInfo.stockAmount < item.quantity) {
+        invalidItems.push(item);
+        errorMessages.push(
+          `${item.productName}: ${stockInfo.isValid ? 
+            `Only ${stockInfo.stockAmount} available, requested ${item.quantity}` : 
+            'Variant not available'}`
+        );
+      }
     }
-
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      return {
-        isValid: false,
-        invalidItems: [],
-        errorMessages: ['No result from cart validation']
-      };
-    }
-
-    const result = data[0];
-    console.log('Cart validation result:', result);
 
     return {
-      isValid: result.is_valid,
-      invalidItems: result.invalid_items || [],
-      errorMessages: result.error_messages || []
+      isValid: invalidItems.length === 0,
+      invalidItems,
+      errorMessages
     };
   } catch (error) {
     console.error('Error validating cart stock:', error);
@@ -195,13 +202,14 @@ export async function validateCartStock(cartItems: any[]): Promise<CartValidatio
   }
 }
 
-// Helper function to get detailed product variant information
+// Helper function to get detailed product variant information from breakdown table
 export async function getProductVariantDetails(productId: string) {
   try {
     const { data, error } = await supabase
-      .from('product_variants_summary')
+      .from('product_variants_breakdown')
       .select('*')
-      .eq('product_id', productId);
+      .eq('product_id', productId)
+      .eq('is_active', true);
 
     if (error) {
       console.error('Error fetching product variant details:', error);
@@ -215,27 +223,26 @@ export async function getProductVariantDetails(productId: string) {
   }
 }
 
-// Helper function to calculate total product stock (now uses automatic triggers)
+// Helper function to calculate total product stock from breakdown table
 export async function calculateTotalProductStock(productId: string): Promise<number> {
   try {
-    const { data: product } = await supabase
-      .from('products')
-      .select('stock_quantity')
-      .eq('id', productId)
-      .single();
+    const { data, error } = await supabase.rpc('calculate_product_stock_from_breakdown', {
+      p_product_id: productId
+    });
 
-    if (!product) return 0;
+    if (error) {
+      console.error('Error calculating total product stock:', error);
+      return 0;
+    }
 
-    // The database triggers automatically maintain the stock_quantity
-    // so we can directly return the product's stock_quantity
-    return product.stock_quantity || 0;
+    return data || 0;
   } catch (error) {
     console.error('Error calculating total product stock:', error);
     return 0;
   }
 }
 
-// Batch stock operations for order processing
+// Batch stock operations for order processing using breakdown table
 export async function processOrderStockChanges(
   orderItems: Array<{
     productId: string;
@@ -276,7 +283,7 @@ export async function processOrderStockChanges(
   };
 }
 
-// Helper function to get stock breakdown by variant
+// Helper function to get stock breakdown by variant from the breakdown table
 export async function getStockBreakdown(productId: string) {
   try {
     const variants = await getProductVariantDetails(productId);
@@ -293,26 +300,29 @@ export async function getStockBreakdown(productId: string) {
       }>
     };
 
+    // Calculate total stock
+    breakdown.totalStock = variants.reduce((sum, variant) => sum + variant.stock_quantity, 0);
+
+    // Group by color variants
     const colorMap = new Map();
 
     for (const variant of variants) {
-      breakdown.totalStock = variant.product_total_stock || 0;
-      
       if (variant.color_variant_id) {
         if (!colorMap.has(variant.color_variant_id)) {
           colorMap.set(variant.color_variant_id, {
             colorName: variant.color_name,
-            colorStock: variant.color_total_stock || 0,
+            colorStock: 0,
             sizeVariants: []
           });
         }
         
         const colorVariant = colorMap.get(variant.color_variant_id);
+        colorVariant.colorStock += variant.stock_quantity;
         
         if (variant.size_variant_id) {
           colorVariant.sizeVariants.push({
             sizeName: variant.size_name,
-            sizeStock: variant.variant_stock_quantity || 0
+            sizeStock: variant.stock_quantity
           });
         }
       }
