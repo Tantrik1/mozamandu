@@ -32,7 +32,6 @@ export async function getVariantStockInfo(
     console.log('Color Variant ID:', colorVariantId);
     console.log('Size Variant ID:', sizeVariantId);
 
-    // For now, use fallback method since breakdown table types aren't available
     // Get product details first
     const { data: product, error: productError } = await supabase
       .from('products')
@@ -319,20 +318,7 @@ export async function validateCartStock(cartItems: any[]): Promise<CartValidatio
 // Helper function to calculate total product stock
 export async function calculateTotalProductStock(productId: string): Promise<number> {
   try {
-    // Try using the RPC function first
-    try {
-      const { data, error } = await supabase.rpc('calculate_product_stock_from_breakdown', {
-        p_product_id: productId
-      });
-
-      if (!error && data !== null) {
-        return Number(data);
-      }
-    } catch (rpcError) {
-      console.log('RPC function not available, using manual calculation');
-    }
-
-    // Fallback to manual calculation
+    // Use manual calculation since RPC function doesn't exist
     const { data: product, error: productError } = await supabase
       .from('products')
       .select('has_color_variants, color_has_size_variants, stock_quantity')

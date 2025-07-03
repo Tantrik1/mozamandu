@@ -134,20 +134,7 @@ export async function calculateProductStock(productId: string): Promise<StockCal
     console.log('=== CALCULATING PRODUCT STOCK ===');
     console.log('Product ID:', productId);
     
-    // Try using the breakdown table first, fallback to old method if not available
-    try {
-      const { data, error } = await supabase.rpc('calculate_product_stock_from_breakdown', {
-        p_product_id: productId
-      });
-
-      if (!error && data !== null) {
-        return { totalStock: Number(data) };
-      }
-    } catch (breakdownError) {
-      console.log('Breakdown table not available, using fallback method');
-    }
-
-    // Fallback to calculating from individual tables
+    // Use fallback method directly since RPC function doesn't exist
     return await calculateProductStockFallback(productId);
   } catch (error) {
     console.error('Error in calculateProductStock:', error);
@@ -157,20 +144,7 @@ export async function calculateProductStock(productId: string): Promise<StockCal
 
 export async function getProductStockSummary(productId: string): Promise<number> {
   try {
-    // Try using the RPC function first
-    try {
-      const { data, error } = await supabase.rpc('calculate_product_stock_from_breakdown', {
-        p_product_id: productId
-      });
-
-      if (!error && data !== null) {
-        return Number(data);
-      }
-    } catch (rpcError) {
-      console.log('RPC function not available, using fallback');
-    }
-
-    // Fallback to manual calculation
+    // Use fallback method directly since RPC function doesn't exist
     const result = await calculateProductStockFallback(productId);
     return result.totalStock;
   } catch (error) {
