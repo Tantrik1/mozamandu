@@ -1,14 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { ProductCard } from '@/components/customer/ProductCard';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle } from 'lucide-react';
 import { Footer } from '@/components/layout/Footer';
+<<<<<<< HEAD
 import { calculateTotalProductStock } from '@/utils/unifiedStockManager';
 import { ProductCard } from '@/components/customer/ProductCard';
+=======
+>>>>>>> 9f249609f514ae49130200ac3399bfab1c96309c
 
+interface Subcategory {
+  id: string;
+  name: string;
+  description: string;
+  selling_price: number;
+  minimum_quantity: number;
+  image_url?: string;
+}
 interface Product {
   id: string;
   name: string;
@@ -17,113 +29,77 @@ interface Product {
   selling_price: number;
   is_featured: boolean;
   image_url: string;
-  stock_quantity: number;
   has_color_variants: boolean;
-  color_has_size_variants: boolean;
+  has_size_variants: boolean;
+  stock_quantity: number;
+  category_id: string;
+  subcategory_id: string;
 }
-
 export default function SubcategoryPage() {
-  const { subcategoryId } = useParams();
+  const {
+    subcategoryId
+  } = useParams<{
+    subcategoryId: string;
+  }>();
+  const [subcategory, setSubcategory] = useState<Subcategory | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [subcategory, setSubcategory] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     if (subcategoryId) {
       fetchSubcategoryData();
-      fetchProducts();
     }
   }, [subcategoryId]);
-
   const fetchSubcategoryData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('subcategories')
-        .select(`
-          *,
-          categories (name)
-        `)
-        .eq('id', subcategoryId)
-        .single();
+      // Fetch subcategory details
+      const {
+        data: subcategoryData,
+        error: subcategoryError
+      } = await supabase.from('subcategories').select('id, name, description, selling_price, minimum_quantity, image_url').eq('id', subcategoryId).eq('status', 'on').single();
+      if (subcategoryError) {
+        console.error('Error fetching subcategory:', subcategoryError);
+        toast({
+          title: "Error",
+          description: "Subcategory not found",
+          variant: "destructive"
+        });
+        return;
+      }
+      setSubcategory(subcategoryData);
 
-      if (error) throw error;
-      setSubcategory(data);
-    } catch (error) {
-      console.error('Error fetching subcategory:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch subcategory details.",
-        variant: "destructive",
+      // Fetch products in this subcategory
+      const {
+        data: productsData,
+        error: productsError
+      } = await supabase.from('products').select('*').eq('subcategory_id', subcategoryId).eq('status', 'active').order('created_at', {
+        ascending: false
       });
-    }
-  };
-
-  const fetchProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('subcategory_id', subcategoryId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Calculate accurate stock for each product using breakdown table
-      const productsWithStock = await Promise.all(
-        (data || []).map(async (product) => {
-          const totalStock = await calculateTotalProductStock(product.id);
-          return {
-            id: product.id,
-            name: product.name,
-            description: product.description,
-            cost_price: product.cost_price,
-            selling_price: product.selling_price,
-            is_featured: product.is_featured,
-            image_url: product.image_url,
-            stock_quantity: totalStock,
-            has_color_variants: product.has_color_variants,
-            color_has_size_variants: product.color_has_size_variants
-          } as Product;
-        })
-      );
-
-      setProducts(productsWithStock);
+      if (productsError) {
+        console.error('Error fetching products:', productsError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch products",
+          variant: "destructive"
+        });
+      } else {
+        setProducts(productsData || []);
+      }
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Error:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch products.",
-        variant: "destructive",
+        description: "Something went wrong",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
-
-  const getProductPrice = (product: Product) => {
-    return product.selling_price || subcategory?.selling_price || 0;
-  };
-
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <CustomerHeader />
-        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading products...</p>
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
+    return <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+<<<<<<< HEAD
         {subcategory && (
           <div className="mb-8">
             <div className="flex items-center text-sm text-gray-500 mb-4">
@@ -154,8 +130,56 @@ export default function SubcategoryPage() {
             ))}
           </div>
         )}
+=======
+        <div className="text-center">Loading...</div>
+>>>>>>> 9f249609f514ae49130200ac3399bfab1c96309c
       </div>
-      <Footer />
+    </div>;
+  }
+  if (!subcategory) {
+    return <div className="min-h-screen bg-gray-50">
+      <CustomerHeader />
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900">Subcategory not found</h1>
+        </div>
+      </div>
+    </div>;
+  }
+  return <div className="min-h-screen bg-gray-50">
+    <CustomerHeader />
+    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      {/* Subcategory Header */}
+      <div className="mb-6">
+        <div className="flex flex-wrap items-center gap-4 mb-4">
+          <h1 className="text-3xl font-bold text-gray-900">{subcategory.name}</h1>
+          <Badge variant="outline" className="text-red-600 border-red-600">
+            Base Price: Rs. {subcategory.selling_price}
+          </Badge>
+        </div>
+
+        {subcategory.description && <p className="text-gray-600 mb-4 text-lg">{subcategory.description}</p>}
+
+        {/* Minimum Quantity Notice */}
+        {subcategory.minimum_quantity > 1 && <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <h3 className="font-semibold text-blue-900">Minimum Order Requirement</h3>
+            <p className="text-blue-700 text-sm">
+              You need to add at least <span className="font-semibold">{subcategory.minimum_quantity} items</span> from this category to proceed to checkout.
+            </p>
+          </div>
+        </div>}
+      </div>
+
+      {/* Products Grid */}
+      {products.length === 0 ? <div className="text-center py-12">
+        <h3 className="text-lg font-medium text-gray-900 mb-2">No products available</h3>
+        <p className="text-gray-500">Products will appear here once they are added.</p>
+      </div> : <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-4">
+        {products.map(product => <ProductCard key={product.id} product={product} subcategoryPrice={subcategory.selling_price} />)}
+      </div>}
     </div>
-  );
+    <Footer />
+  </div>;
 }

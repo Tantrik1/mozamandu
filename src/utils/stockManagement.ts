@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { validateCartStock, processOrderStockChanges } from './unifiedStockManager';
+import { validateVariantStock } from './stockCalculation';
 
 interface StockUpdateItem {
   productId: string;
@@ -15,44 +15,132 @@ interface StockValidationResult {
 }
 
 export async function validateStockAvailability(items: StockUpdateItem[]): Promise<StockValidationResult> {
-  console.log('=== VALIDATING STOCK FOR MULTIPLE ITEMS ===');
-  console.log('Items to validate:', items.length);
+  const errors: string[] = [];
   
-  try {
-    const cartItems = items.map(item => ({
-      productId: item.productId,
-      colorVariantId: item.colorVariantId,
-      sizeVariantId: item.sizeVariantId,
-      quantity: item.quantity,
-      productName: `Product ${item.productId}` // We'll get actual name if needed
-    }));
-
-    const result = await validateCartStock(cartItems);
+  console.log('=== VALIDATING STOCK FOR MULTIPLE ITEMS ===');
+  
+  for (const item of items) {
+    console.log(`Validating item: ${item.productId}, qty: ${item.quantity}`);
     
-    return {
-      isValid: result.isValid,
-      errors: result.errorMessages
-    };
-  } catch (error) {
-    console.error('Error validating stock availability:', error);
-    return {
-      isValid: false,
-      errors: ['Error validating stock availability']
-    };
+    const result = await validateVariantStock(
+      item.productId,
+      item.colorVariantId,
+      item.sizeVariantId,
+      item.quantity
+    );
+
+    if (!result.isValid) {
+      const errorMsg = result.errorMessage || `Insufficient stock for product ${item.productId}`;
+      console.log(`Stock validation failed: ${errorMsg}`);
+      errors.push(errorMsg);
+    } else {
+      console.log(`Stock validation passed: ${result.availableStock} available`);
+    }
   }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
 }
 
 export async function updateProductStock(items: StockUpdateItem[], operation: 'reduce' | 'restore'): Promise<void> {
   console.log(`=== STOCK UPDATE OPERATION: ${operation.toUpperCase()} ===`);
-  console.log('Items to process:', items.length);
   
-  const result = await processOrderStockChanges(items, operation);
-  
-  if (!result.success) {
-    throw new Error(`Stock ${operation} failed: ${result.errors.join(', ')}`);
+  // Validate stock availability before reducing
+  if (operation === 'reduce') {
+    const validation = await validateStockAvailability(items);
+    if (!validation.isValid) {
+      throw new Error(`Stock validation failed: ${validation.errors.join(', ')}`);
+    }
   }
-  
-  console.log(`Stock ${operation} completed successfully`);
+
+  const multiplier = operation === 'reduce' ? -1 : 1;
+
+  for (const item of items) {
+    const stockChange = item.quantity * multiplier;
+    console.log(`Processing ${operation} for product ${item.productId}: ${stockChange} units`);
+
+    // Get product info to determine where to update stock
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .select('name, has_color_variants, has_size_variants')
+      .eq('id', item.productId)
+      .single();
+
+    if (productError || !product) {
+      throw new Error(`Product not found: ${item.productId}`);
+    }
+
+    // Follow the same hierarchy as stock validation
+    
+    // CASE 1: No color variants → update product stock
+    if (!product.has_color_variants) {
+      console.log(`Updating product stock for ${product.name}: ${stockChange}`);
+      
+      const { error } = await supabase.rpc('update_product_stock', {
+        product_id: item.productId,
+        stock_change: stockChange
+      });
+
+      if (error) {
+        throw new Error(`Failed to update product stock: ${error.message}`);
+      }
+    }
+    // CASE 2: Has color variants → determine if size or color level
+    else {
+      if (!item.colorVariantId) {
+        throw new Error(`Color variant ID required for product ${item.productId}`);
+      }
+
+      // Check if this color has size variants
+      const { data: colorVariant, error: colorError } = await supabase
+        .from('color_variants')
+        .select('color_name, has_sizes, size_variants(id)')
+        .eq('id', item.colorVariantId)
+        .single();
+
+      if (colorError || !colorVariant) {
+        throw new Error(`Color variant not found: ${item.colorVariantId}`);
+      }
+
+      const sizeVariants = colorVariant.size_variants || [];
+      const hasSizeVariants = colorVariant.has_sizes && sizeVariants.length > 0;
+
+      // CASE 2A: Color has size variants → update size variant stock
+      if (hasSizeVariants) {
+        if (!item.sizeVariantId) {
+          throw new Error(`Size variant ID required for product ${item.productId}`);
+        }
+
+        console.log(`Updating size variant stock: ${stockChange}`);
+        
+        const { error } = await supabase.rpc('update_size_variant_stock', {
+          variant_id: item.sizeVariantId,
+          stock_change: stockChange
+        });
+
+        if (error) {
+          throw new Error(`Failed to update size variant stock: ${error.message}`);
+        }
+      }
+      // CASE 2B: Color has no size variants → update color variant stock
+      else {
+        console.log(`Updating color variant stock for ${colorVariant.color_name}: ${stockChange}`);
+        
+        const { error } = await supabase.rpc('update_color_variant_stock', {
+          variant_id: item.colorVariantId,
+          stock_change: stockChange
+        });
+
+        if (error) {
+          throw new Error(`Failed to update color variant stock: ${error.message}`);
+        }
+      }
+    }
+
+    console.log(`Successfully ${operation}d stock for product ${item.productId}`);
+  }
 }
 
 export async function reduceStockForOrder(cartItems: any[]): Promise<void> {
