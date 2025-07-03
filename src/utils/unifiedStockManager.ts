@@ -20,7 +20,7 @@ export interface CartValidationResult {
   errorMessages: string[];
 }
 
-// Unified function to get stock information using database RPC
+// Unified function to get stock information using improved database RPC
 export async function getVariantStockInfo(
   productId: string,
   colorVariantId?: string | null,
@@ -77,7 +77,7 @@ export async function getVariantStockInfo(
   }
 }
 
-// Unified function to update stock atomically using database RPC
+// Unified function to update stock atomically using improved database RPC
 export async function updateVariantStockAtomic(
   productId: string,
   colorVariantId: string | null,
@@ -195,53 +195,40 @@ export async function validateCartStock(cartItems: any[]): Promise<CartValidatio
   }
 }
 
-// Helper function to calculate total product stock
-export async function calculateTotalProductStock(productId: string): Promise<number> {
-  const stockInfo = await getVariantStockInfo(productId);
-  if (!stockInfo.isValid) {
-    return 0;
-  }
+// Helper function to get detailed product variant information
+export async function getProductVariantDetails(productId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('product_variants_summary')
+      .select('*')
+      .eq('product_id', productId);
 
-  // For products with variants, we need to sum all variant stocks
+    if (error) {
+      console.error('Error fetching product variant details:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error in getProductVariantDetails:', error);
+    return [];
+  }
+}
+
+// Helper function to calculate total product stock (now uses automatic triggers)
+export async function calculateTotalProductStock(productId: string): Promise<number> {
   try {
     const { data: product } = await supabase
       .from('products')
-      .select('has_color_variants, has_size_variants, stock_quantity')
+      .select('stock_quantity')
       .eq('id', productId)
       .single();
 
     if (!product) return 0;
 
-    if (!product.has_color_variants) {
-      return product.stock_quantity || 0;
-    }
-
-    // Get all color variants for this product
-    const { data: colorVariants } = await supabase
-      .from('color_variants')
-      .select(`
-        stock_quantity,
-        has_sizes,
-        size_variants(stock_quantity)
-      `)
-      .eq('product_id', productId);
-
-    if (!colorVariants) return 0;
-
-    let totalStock = 0;
-    
-    for (const colorVariant of colorVariants) {
-      if (colorVariant.has_sizes && colorVariant.size_variants) {
-        // Sum size variant stocks
-        totalStock += colorVariant.size_variants.reduce((sum: number, size: any) => 
-          sum + (size.stock_quantity || 0), 0);
-      } else {
-        // Use color variant stock
-        totalStock += colorVariant.stock_quantity || 0;
-      }
-    }
-
-    return totalStock;
+    // The database triggers automatically maintain the stock_quantity
+    // so we can directly return the product's stock_quantity
+    return product.stock_quantity || 0;
   } catch (error) {
     console.error('Error calculating total product stock:', error);
     return 0;
@@ -287,4 +274,58 @@ export async function processOrderStockChanges(
     success: errors.length === 0,
     errors
   };
+}
+
+// Helper function to get stock breakdown by variant
+export async function getStockBreakdown(productId: string) {
+  try {
+    const variants = await getProductVariantDetails(productId);
+    
+    const breakdown = {
+      totalStock: 0,
+      colorVariants: [] as Array<{
+        colorName: string;
+        colorStock: number;
+        sizeVariants: Array<{
+          sizeName: string;
+          sizeStock: number;
+        }>;
+      }>
+    };
+
+    const colorMap = new Map();
+
+    for (const variant of variants) {
+      breakdown.totalStock = variant.product_total_stock || 0;
+      
+      if (variant.color_variant_id) {
+        if (!colorMap.has(variant.color_variant_id)) {
+          colorMap.set(variant.color_variant_id, {
+            colorName: variant.color_name,
+            colorStock: variant.color_total_stock || 0,
+            sizeVariants: []
+          });
+        }
+        
+        const colorVariant = colorMap.get(variant.color_variant_id);
+        
+        if (variant.size_variant_id) {
+          colorVariant.sizeVariants.push({
+            sizeName: variant.size_name,
+            sizeStock: variant.variant_stock_quantity || 0
+          });
+        }
+      }
+    }
+
+    breakdown.colorVariants = Array.from(colorMap.values());
+    
+    return breakdown;
+  } catch (error) {
+    console.error('Error getting stock breakdown:', error);
+    return {
+      totalStock: 0,
+      colorVariants: []
+    };
+  }
 }
