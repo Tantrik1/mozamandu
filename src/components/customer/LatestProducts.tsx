@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +17,7 @@ export function LatestProducts() {
   const fetchLatestProducts = async () => {
     try {
       console.log('🔄 LatestProducts: Starting data fetch');
+      
       const { data, error } = await supabase
         .from('products')
         .select(`
@@ -39,6 +41,7 @@ export function LatestProducts() {
         setLatestProducts([]);
       } else {
         console.log('✅ LatestProducts: Data loaded:', data?.length || 0);
+        
         // Calculate accurate stock for each product using breakdown table
         const productsWithStock = await Promise.all(
           (data || []).map(async (product) => {
@@ -58,6 +61,7 @@ export function LatestProducts() {
             };
           })
         );
+        
         setLatestProducts(productsWithStock);
       }
     } catch (error) {
@@ -112,8 +116,8 @@ export function LatestProducts() {
         {latestProducts.map((product) => (
           <Card key={product.id} className="hover:shadow-lg transition-shadow">
             {product.image_url ? (
-              <img
-                src={product.image_url}
+              <img 
+                src={product.image_url} 
                 alt={product.name}
                 className="w-full aspect-square object-cover rounded-t-lg"
                 onError={(e) => {
@@ -135,13 +139,13 @@ export function LatestProducts() {
                   </Badge>
                 )}
               </div>
-
+              
               {product.description && (
                 <p className="text-sm text-gray-600 mb-3 line-clamp-2">
                   {product.description}
                 </p>
               )}
-
+              
               <div className="flex items-center justify-between">
                 <span className="text-xl font-bold text-red-600">
                   Rs. {getProductPrice(product)}
