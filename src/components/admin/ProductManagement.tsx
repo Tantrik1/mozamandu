@@ -22,7 +22,7 @@ interface Product {
   image_url: string | null;
   is_featured: boolean;
   has_color_variants: boolean;
-  has_size_variants: boolean;
+  color_has_size_variants: boolean;
   stock_quantity: number | null;
   status: 'active' | 'inactive';
   categories: { name: string } | null;
@@ -135,9 +135,9 @@ export function ProductManagement() {
     }
     
     if (filters.hasVariants === 'true') {
-      query = query.or('has_color_variants.eq.true,has_size_variants.eq.true');
+      query = query.or('has_color_variants.eq.true,color_has_size_variants.eq.true');
     } else if (filters.hasVariants === 'false') {
-      query = query.eq('has_color_variants', false).eq('has_size_variants', false);
+      query = query.eq('has_color_variants', false).eq('color_has_size_variants', false);
     }
     
     if (filters.priceMin) {
@@ -170,7 +170,14 @@ export function ProductManagement() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setProducts(data || []);
+      
+      // Map the data to ensure proper typing
+      const mappedProducts: Product[] = (data || []).map(product => ({
+        ...product,
+        color_has_size_variants: product.color_has_size_variants || false
+      }));
+      
+      setProducts(mappedProducts);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast({
@@ -399,18 +406,18 @@ export function ProductManagement() {
                               productStocks[product.id] !== undefined ? productStocks[product.id] : 'Unknown'
                             )}
                           </Badge>
-                          {(product.has_color_variants || product.has_size_variants) && (
+                          {(product.has_color_variants || product.color_has_size_variants) && (
                             <span className="text-xs text-gray-500 ml-2">
                               (Calculated from variants)
                             </span>
                           )}
                         </p>
-                        {(product.has_color_variants || product.has_size_variants) && (
+                        {(product.has_color_variants || product.color_has_size_variants) && (
                           <div className="flex items-center space-x-1">
                             {product.has_color_variants && (
                               <Badge variant="outline" className="text-xs">Color Variants</Badge>
                             )}
-                            {product.has_size_variants && (
+                            {product.color_has_size_variants && (
                               <Badge variant="outline" className="text-xs">Size Variants</Badge>
                             )}
                           </div>

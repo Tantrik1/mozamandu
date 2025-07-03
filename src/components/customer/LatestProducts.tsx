@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,38 +6,28 @@ import { toast } from '@/hooks/use-toast';
 import { calculateTotalProductStock } from '@/utils/unifiedStockManager';
 
 export function LatestProducts() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [latestProducts, setLatestProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
+    fetchLatestProducts();
+  }, []);
 
   const fetchLatestProducts = async () => {
     try {
       console.log('🔄 LatestProducts: Starting data fetch');
-      
       const { data, error } = await supabase
         .from('products')
         .select(`
           *,
           subcategories!inner (
             name,
-            selling_price,
-            image_url,
-            description,
-            cost_price,
-            is_featured,
-            has_color_variants,
-            has_size_variants,
-            status,
-            stock_quantity,
-            category_id,
-            subcategory_id,
-            subcategory:subcategories!inner(id, name)
-          `)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(8);
+            selling_price
+          )
+        `)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(8);
 
       if (error) {
         console.error('❌ LatestProducts: Fetch error:', error);
@@ -50,7 +39,6 @@ export function LatestProducts() {
         setLatestProducts([]);
       } else {
         console.log('✅ LatestProducts: Data loaded:', data?.length || 0);
-        
         // Calculate accurate stock for each product using breakdown table
         const productsWithStock = await Promise.all(
           (data || []).map(async (product) => {
@@ -70,7 +58,6 @@ export function LatestProducts() {
             };
           })
         );
-        
         setLatestProducts(productsWithStock);
       }
     } catch (error) {
@@ -109,7 +96,7 @@ export function LatestProducts() {
     );
   }
 
-  if (products.length === 0) {
+  if (latestProducts.length === 0) {
     return (
       <div className="w-full">
         <h2 className="text-2xl font-bold mb-6">Latest Products</h2>
@@ -125,8 +112,8 @@ export function LatestProducts() {
         {latestProducts.map((product) => (
           <Card key={product.id} className="hover:shadow-lg transition-shadow">
             {product.image_url ? (
-              <img 
-                src={product.image_url} 
+              <img
+                src={product.image_url}
                 alt={product.name}
                 className="w-full aspect-square object-cover rounded-t-lg"
                 onError={(e) => {
@@ -148,13 +135,13 @@ export function LatestProducts() {
                   </Badge>
                 )}
               </div>
-              
+
               {product.description && (
                 <p className="text-sm text-gray-600 mb-3 line-clamp-2">
                   {product.description}
                 </p>
               )}
-              
+
               <div className="flex items-center justify-between">
                 <span className="text-xl font-bold text-red-600">
                   Rs. {getProductPrice(product)}
