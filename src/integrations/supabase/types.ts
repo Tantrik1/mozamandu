@@ -845,11 +845,11 @@ export type Database = {
       products: {
         Row: {
           category_id: string
+          color_has_size_variants: boolean | null
           cost_price: number
           created_at: string | null
           description: string | null
           has_color_variants: boolean | null
-          has_size_variants: boolean | null
           id: string
           image_url: string | null
           is_featured: boolean | null
@@ -862,11 +862,11 @@ export type Database = {
         }
         Insert: {
           category_id: string
+          color_has_size_variants?: boolean | null
           cost_price: number
           created_at?: string | null
           description?: string | null
           has_color_variants?: boolean | null
-          has_size_variants?: boolean | null
           id?: string
           image_url?: string | null
           is_featured?: boolean | null
@@ -879,11 +879,11 @@ export type Database = {
         }
         Update: {
           category_id?: string
+          color_has_size_variants?: boolean | null
           cost_price?: number
           created_at?: string | null
           description?: string | null
           has_color_variants?: boolean | null
-          has_size_variants?: boolean | null
           id?: string
           image_url?: string | null
           is_featured?: boolean | null

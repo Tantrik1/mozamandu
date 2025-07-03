@@ -19,7 +19,7 @@ interface Product {
   image_url: string | null;
   is_featured: boolean;
   has_color_variants: boolean;
-  has_size_variants: boolean;
+  color_has_size_variants: boolean;
   stock_quantity: number | null;
   status: 'active' | 'inactive';
   categories: { name: string } | null;
@@ -59,9 +59,9 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
         .single();
 
       if (productError) throw productError;
-      setProduct(productData);
+      setProduct(productData as Product);
 
-      // Calculate detailed stock information
+      // Calculate detailed stock information using the new breakdown system
       const stockResult = await calculateProductStock(productId);
       setStockDetails(stockResult);
       
@@ -266,7 +266,7 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
           )}
 
           {/* Variant Information */}
-          {(product.has_color_variants || product.has_size_variants) && (
+          {(product.has_color_variants || product.color_has_size_variants) && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -282,7 +282,7 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
                       <span>Color Variants Enabled</span>
                     </Badge>
                   )}
-                  {product.has_size_variants && (
+                  {product.color_has_size_variants && (
                     <Badge variant="outline" className="flex items-center space-x-1">
                       <Ruler className="h-3 w-3" />
                       <span>Size Variants Enabled</span>
@@ -290,11 +290,11 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
                   )}
                 </div>
                 <p className="text-sm text-gray-600">
-                  {product.has_color_variants && product.has_size_variants 
+                  {product.has_color_variants && product.color_has_size_variants 
                     ? "This product supports both color and size variations."
                     : product.has_color_variants
                     ? "This product supports color variations only."
-                    : product.has_size_variants
+                    : product.color_has_size_variants
                     ? "This product supports size variations only."
                     : "This product has no variants."
                   }

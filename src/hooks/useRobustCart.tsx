@@ -4,7 +4,7 @@ import { toast } from '@/hooks/use-toast';
 import { useCartPricing } from './useCartPricing';
 import { useComboManager } from './useComboManager';
 import { validateCartItems, showCartCleanupNotification } from '@/utils/cartValidation';
-import { validateVariantStock } from '@/utils/stockCalculation';
+import { getVariantStockInfo } from '@/utils/unifiedStockManager';
 
 interface CartItem {
   id: string;
@@ -225,16 +225,22 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
       console.log('=== CART STOCK VALIDATION ===');
       console.log('Validating stock for cart addition:', { productId, colorVariantId, sizeVariantId, requestedQuantity });
       
-      const result = await validateVariantStock(productId, colorVariantId, sizeVariantId, requestedQuantity);
+      const stockInfo = await getVariantStockInfo(productId, colorVariantId, sizeVariantId);
       
-      if (!result.isValid && result.errorMessage) {
-        setErrorWithTimeout(result.errorMessage);
-        console.log(`Cart stock validation failed: ${result.errorMessage}`);
-      } else {
-        console.log(`Cart stock validation passed: ${result.availableStock} available`);
+      if (!stockInfo.isValid) {
+        setErrorWithTimeout(stockInfo.errorMessage || 'Stock validation failed');
+        console.log(`Cart stock validation failed: ${stockInfo.errorMessage}`);
+        return false;
       }
 
-      return result.isValid;
+      if (stockInfo.stockAmount < requestedQuantity) {
+        setErrorWithTimeout(`Only ${stockInfo.stockAmount} items available`);
+        console.log(`Cart stock validation failed: insufficient stock`);
+        return false;
+      }
+
+      console.log(`Cart stock validation passed: ${stockInfo.stockAmount} available`);
+      return true;
     } catch (error) {
       console.error('Cart stock validation error:', error);
       setErrorWithTimeout('Error checking stock availability');

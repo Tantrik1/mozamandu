@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { validateVariantStock } from '@/utils/stockCalculation';
+import { validateCartStock } from '@/utils/unifiedStockManager';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -17,34 +17,18 @@ export const useCheckoutValidation = () => {
       console.log('=== CHECKOUT STOCK VALIDATION ===');
       console.log('Validating stock for checkout items:', cartItems.length);
       
-      for (const item of cartItems) {
-        console.log('Validating checkout item:', {
-          productName: item.productName,
-          productId: item.productId,
-          colorVariantId: item.colorVariantId,
-          sizeVariantId: item.sizeVariantId,
-          quantity: item.quantity
-        });
+      const result = await validateCartStock(cartItems);
 
-        const result = await validateVariantStock(
-          item.productId,
-          item.colorVariantId,
-          item.sizeVariantId,
-          item.quantity
-        );
-
-        if (!result.isValid) {
-          const errorMessage = result.errorMessage || 
-            `${item.productName} has insufficient stock. Available: ${result.availableStock}, Requested: ${item.quantity}`;
-          
-          console.log('Checkout stock validation failed:', errorMessage);
-          return {
-            isValid: false,
-            error: errorMessage
-          };
-        }
-
-        console.log(`Checkout stock OK for ${item.productName}: ${result.availableStock} available`);
+      if (!result.isValid) {
+        const errorMessage = result.errorMessages.length > 0 
+          ? result.errorMessages[0] 
+          : 'Some items have insufficient stock';
+        
+        console.log('Checkout stock validation failed:', errorMessage);
+        return {
+          isValid: false,
+          error: errorMessage
+        };
       }
 
       console.log('All checkout items passed stock validation');
