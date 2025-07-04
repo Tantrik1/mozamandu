@@ -9,6 +9,8 @@ import { EditProductForm } from './EditProductForm';
 import { ProductDetailView } from './ProductDetailView';
 import { Pencil, Trash2, Plus, Package, Eye } from 'lucide-react';
 import { getProductStockSummary } from '@/utils/stockCalculation';
+import { ProductEditBlockedModal } from './ProductEditBlockedModal';
+import { validateProductEditability, ProductEditValidationResult } from '@/utils/productEditValidation';
 
 interface Product {
   id: string;
@@ -49,6 +51,15 @@ export function ProductManagement() {
   const [viewingProductId, setViewingProductId] = useState<string | null>(null);
   const [productStocks, setProductStocks] = useState<Record<string, number>>({});
   const [stockLoading, setStockLoading] = useState<Record<string, boolean>>({});
+  const [editBlockedModal, setEditBlockedModal] = useState<{
+    isOpen: boolean;
+    reason: string;
+    pendingOrdersCount?: number;
+  }>({
+    isOpen: false,
+    reason: '',
+    pendingOrdersCount: 0
+  });
   const { toast } = useToast();
 
   // New filter state
@@ -186,7 +197,19 @@ export function ProductManagement() {
     setViewingProductId(productId);
   };
 
-  const handleEdit = (productId: string) => {
+  const handleEdit = async (productId: string) => {
+    // Validate if product can be edited
+    const validation = await validateProductEditability(productId);
+    
+    if (!validation.canEdit) {
+      setEditBlockedModal({
+        isOpen: true,
+        reason: validation.reason || 'Product cannot be edited at this time.',
+        pendingOrdersCount: validation.pendingOrdersCount
+      });
+      return;
+    }
+
     setEditingProductId(productId);
   };
 
@@ -235,8 +258,20 @@ export function ProductManagement() {
     setEditingProductId(null);
   };
 
-  const handleDetailViewEdit = () => {
+  const handleDetailViewEdit = async () => {
     if (viewingProductId) {
+      // Validate if product can be edited
+      const validation = await validateProductEditability(viewingProductId);
+      
+      if (!validation.canEdit) {
+        setEditBlockedModal({
+          isOpen: true,
+          reason: validation.reason || 'Product cannot be edited at this time.',
+          pendingOrdersCount: validation.pendingOrdersCount
+        });
+        return;
+      }
+
       setEditingProductId(viewingProductId);
       setViewingProductId(null);
     }
@@ -249,6 +284,14 @@ export function ProductManagement() {
 
   const handleDetailViewBack = () => {
     setViewingProductId(null);
+  };
+
+  const closeEditBlockedModal = () => {
+    setEditBlockedModal({
+      isOpen: false,
+      reason: '',
+      pendingOrdersCount: 0
+    });
   };
 
   if (loading) {
@@ -495,6 +538,14 @@ export function ProductManagement() {
           ))
         )}
       </div>
+
+      {/* Product Edit Blocked Modal */}
+      <ProductEditBlockedModal
+        isOpen={editBlockedModal.isOpen}
+        onClose={closeEditBlockedModal}
+        reason={editBlockedModal.reason}
+        pendingOrdersCount={editBlockedModal.pendingOrdersCount}
+      />
     </div>
   );
 }

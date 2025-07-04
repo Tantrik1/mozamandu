@@ -13,6 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { ProductVariantForm } from './ProductVariantForm';
+import { ProductEditBlockedModal } from './ProductEditBlockedModal';
+import { validateVariantEditability } from '@/utils/productEditValidation';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -72,6 +74,15 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+  const [editBlockedModal, setEditBlockedModal] = useState<{
+    isOpen: boolean;
+    reason: string;
+    pendingOrdersCount?: number;
+  }>({
+    isOpen: false,
+    reason: '',
+    pendingOrdersCount: 0
+  });
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -390,263 +401,363 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     }
   };
 
+  const handleDeleteColorVariant = async (variantId: string) => {
+    // Validate if this variant can be deleted
+    const validation = await validateVariantEditability(productId, variantId);
+    
+    if (!validation.canEdit) {
+      setEditBlockedModal({
+        isOpen: true,
+        reason: validation.reason || 'This variant cannot be deleted at this time.',
+        pendingOrdersCount: validation.pendingOrdersCount
+      });
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this color variant? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('color_variants')
+        .delete()
+        .eq('id', variantId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Color variant deleted successfully',
+      });
+
+      fetchProductData();
+    } catch (error) {
+      console.error('Error deleting color variant:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete color variant',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteSizeVariant = async (sizeVariantId: string, colorVariantId: string) => {
+    // Validate if this size variant can be deleted
+    const validation = await validateVariantEditability(productId, colorVariantId, sizeVariantId);
+    
+    if (!validation.canEdit) {
+      setEditBlockedModal({
+        isOpen: true,
+        reason: validation.reason || 'This size variant cannot be deleted at this time.',
+        pendingOrdersCount: validation.pendingOrdersCount
+      });
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this size variant? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('size_variants')
+        .delete()
+        .eq('id', sizeVariantId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Size variant deleted successfully',
+      });
+
+      fetchProductData();
+    } catch (error) {
+      console.error('Error deleting size variant:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete size variant',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const closeEditBlockedModal = () => {
+    setEditBlockedModal({
+      isOpen: false,
+      reason: '',
+      pendingOrdersCount: 0
+    });
+  };
+
   if (dataLoading) {
     return <div className="flex justify-center p-8">Loading product data...</div>;
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onCancel}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <h2 className="text-2xl font-bold">Edit Product</h2>
+    <>
+      <div className="p-6 max-w-5xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <Button variant="outline" onClick={onCancel}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <h2 className="text-2xl font-bold">Edit Product</h2>
+          </div>
         </div>
-      </div>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Product Name *</Label>
-                  <Input
-                    id="name"
-                    {...form.register('name')}
-                    placeholder="Enter product name"
-                  />
-                  {form.formState.errors.name && (
-                    <p className="text-red-500 text-sm mt-1">{form.formState.errors.name.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    {...form.register('description')}
-                    placeholder="Enter product description"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Product Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-4">
                   <div>
-                    <Label htmlFor="cost_price">Cost Price (Rs) *</Label>
+                    <Label htmlFor="name">Product Name *</Label>
                     <Input
-                      id="cost_price"
-                      type="number"
-                      step="0.01"
-                      {...form.register('cost_price', { valueAsNumber: true })}
-                      placeholder="0.00"
+                      id="name"
+                      {...form.register('name')}
+                      placeholder="Enter product name"
                     />
-                    {form.formState.errors.cost_price && (
-                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.cost_price.message}</p>
+                    {form.formState.errors.name && (
+                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.name.message}</p>
                     )}
                   </div>
 
                   <div>
-                    <Label htmlFor="selling_price">Selling Price (Rs)</Label>
-                    <Input
-                      id="selling_price"
-                      type="number"
-                      step="0.01"
-                      {...form.register('selling_price', { valueAsNumber: true })}
-                      placeholder="0.00"
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      {...form.register('description')}
+                      placeholder="Enter product description"
+                      rows={3}
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="category">Category *</Label>
-                    <Select
-                      value={form.watch('category_id')}
-                      onValueChange={(value) => form.setValue('category_id', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {form.formState.errors.category_id && (
-                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.category_id.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="subcategory">Subcategory *</Label>
-                    <Select
-                      value={form.watch('subcategory_id')}
-                      onValueChange={(value) => form.setValue('subcategory_id', value)}
-                      disabled={!watchedCategoryId}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select subcategory" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filteredSubcategories.map((subcategory) => (
-                          <SelectItem key={subcategory.id} value={subcategory.id}>
-                            {subcategory.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {form.formState.errors.subcategory_id && (
-                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.subcategory_id.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="is_featured"
-                      checked={form.watch('is_featured')}
-                      onCheckedChange={(checked) => form.setValue('is_featured', checked)}
-                    />
-                    <Label htmlFor="is_featured">Featured</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="has_color_variants"
-                      checked={form.watch('has_color_variants')}
-                      onCheckedChange={(checked) => {
-                        form.setValue('has_color_variants', checked);
-                        if (!checked) {
-                          setColorVariants([]);
-                        }
-                      }}
-                    />
-                    <Label htmlFor="has_color_variants">Colors</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="color_has_size_variants"
-                      checked={form.watch('color_has_size_variants')}
-                      onCheckedChange={(checked) => {
-                        form.setValue('color_has_size_variants', checked);
-                      }}
-                    />
-                    <Label htmlFor="color_has_size_variants">Sizes</Label>
-                  </div>
-                </div>
-
-                {!watchedHasColorVariants && !watchedColorHasSizeVariants && (
-                  <div>
-                    <Label htmlFor="stock_quantity">Stock Quantity *</Label>
-                    <Input
-                      id="stock_quantity"
-                      type="number"
-                      {...form.register('stock_quantity', { valueAsNumber: true })}
-                      placeholder="0"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={form.watch('status')}
-                    onValueChange={(value: 'active' | 'inactive') => form.setValue('status', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <Label>Product Image</Label>
-                <div className="mt-2 space-y-4">
-                  <div>
-                    <input
-                      id="image-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      disabled={uploadingImage}
-                    />
-                    <label
-                      htmlFor="image-upload"
-                      className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      {uploadingImage ? 'Uploading...' : 'Upload Image'}
-                    </label>
-                  </div>
-
-                  {imagePreview && (
-                    <div className="relative">
-                      <img
-                        src={imagePreview}
-                        alt="Product preview"
-                        className="w-full max-w-sm h-48 object-cover rounded-lg border"
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="cost_price">Cost Price (Rs) *</Label>
+                      <Input
+                        id="cost_price"
+                        type="number"
+                        step="0.01"
+                        {...form.register('cost_price', { valueAsNumber: true })}
+                        placeholder="0.00"
                       />
-                      <div className="absolute top-2 right-2 space-x-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => window.open(imagePreview, '_blank')}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="destructive"
-                          onClick={removeImage}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      {form.formState.errors.cost_price && (
+                        <p className="text-red-500 text-sm mt-1">{form.formState.errors.cost_price.message}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="selling_price">Selling Price (Rs)</Label>
+                      <Input
+                        id="selling_price"
+                        type="number"
+                        step="0.01"
+                        {...form.register('selling_price', { valueAsNumber: true })}
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="category">Category *</Label>
+                      <Select
+                        value={form.watch('category_id')}
+                        onValueChange={(value) => form.setValue('category_id', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {form.formState.errors.category_id && (
+                        <p className="text-red-500 text-sm mt-1">{form.formState.errors.category_id.message}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="subcategory">Subcategory *</Label>
+                      <Select
+                        value={form.watch('subcategory_id')}
+                        onValueChange={(value) => form.setValue('subcategory_id', value)}
+                        disabled={!watchedCategoryId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select subcategory" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredSubcategories.map((subcategory) => (
+                            <SelectItem key={subcategory.id} value={subcategory.id}>
+                              {subcategory.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {form.formState.errors.subcategory_id && (
+                        <p className="text-red-500 text-sm mt-1">{form.formState.errors.subcategory_id.message}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="is_featured"
+                        checked={form.watch('is_featured')}
+                        onCheckedChange={(checked) => form.setValue('is_featured', checked)}
+                      />
+                      <Label htmlFor="is_featured">Featured</Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="has_color_variants"
+                        checked={form.watch('has_color_variants')}
+                        onCheckedChange={(checked) => {
+                          form.setValue('has_color_variants', checked);
+                          if (!checked) {
+                            setColorVariants([]);
+                          }
+                        }}
+                      />
+                      <Label htmlFor="has_color_variants">Colors</Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="color_has_size_variants"
+                        checked={form.watch('color_has_size_variants')}
+                        onCheckedChange={(checked) => {
+                          form.setValue('color_has_size_variants', checked);
+                        }}
+                      />
+                      <Label htmlFor="color_has_size_variants">Sizes</Label>
+                    </div>
+                  </div>
+
+                  {!watchedHasColorVariants && !watchedColorHasSizeVariants && (
+                    <div>
+                      <Label htmlFor="stock_quantity">Stock Quantity *</Label>
+                      <Input
+                        id="stock_quantity"
+                        type="number"
+                        {...form.register('stock_quantity', { valueAsNumber: true })}
+                        placeholder="0"
+                      />
                     </div>
                   )}
+
+                  <div>
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={form.watch('status')}
+                      onValueChange={(value: 'active' | 'inactive') => form.setValue('status', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Product Image</Label>
+                  <div className="mt-2 space-y-4">
+                    <div>
+                      <input
+                        id="image-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        disabled={uploadingImage}
+                      />
+                      <label
+                        htmlFor="image-upload"
+                        className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                      </label>
+                    </div>
+
+                    {imagePreview && (
+                      <div className="relative">
+                        <img
+                          src={imagePreview}
+                          alt="Product preview"
+                          className="w-full max-w-sm h-48 object-cover rounded-lg border"
+                        />
+                        <div className="absolute top-2 right-2 space-x-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => window.open(imagePreview, '_blank')}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            onClick={removeImage}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {(watchedHasColorVariants || watchedColorHasSizeVariants) && (
-          <ProductVariantForm
-            productId={productId}
-            hasColorVariants={watchedHasColorVariants}
-            hasSizeVariants={watchedColorHasSizeVariants}
-            onVariantsChange={setColorVariants}
-          />
-        )}
+          {(watchedHasColorVariants || watchedColorHasSizeVariants) && (
+            <ProductVariantForm
+              productId={productId}
+              hasColorVariants={watchedHasColorVariants}
+              hasSizeVariants={watchedColorHasSizeVariants}
+              onVariantsChange={setColorVariants}
+            />
+          )}
 
-        <div className="flex justify-end space-x-4">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Updating...' : 'Update Product'}
-          </Button>
-        </div>
-      </form>
-    </div>
+          <div className="flex justify-end space-x-4">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Updating...' : 'Update Product'}
+            </Button>
+          </div>
+        </form>
+
+        {/* Product Edit Blocked Modal */}
+        <ProductEditBlockedModal
+          isOpen={editBlockedModal.isOpen}
+          onClose={closeEditBlockedModal}
+          reason={editBlockedModal.reason}
+          pendingOrdersCount={editBlockedModal.pendingOrdersCount}
+        />
+      </div>
+    </>
   );
 }
