@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useRobustCart } from '@/hooks/useRobustCart';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Product {
   id: string;
@@ -228,11 +229,11 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
   return (
     <div className={`relative rounded-2xl overflow-hidden ${glass} ${animateCard} flex flex-col h-full group`}>
       {/* Product Image */}
-      <div className="relative aspect-square w-full flex items-center justify-center bg-gradient-to-br from-white via-red-50 to-red-100">
+      <div className="relative aspect-square w-full flex items-center justify-center overflow-hidden bg-white">
         <img
           src={currentImage}
           alt={product.name}
-          className="object-contain w-5/6 h-5/6 transition-transform duration-500 group-hover:scale-105 group-hover:rotate-1 drop-shadow-xl"
+          className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105 group-hover:rotate-1"
           style={{ transition: 'all 0.4s cubic-bezier(.4,2,.6,1)' }}
         />
         {selectedInventory && availableStock === 0 && (
@@ -264,21 +265,19 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
         </div>
         {/* MOQ Info for Discount */}
         {/* MOQ Info for Discount */}
-        {/* Color Swatches */}
+        {/* Color Dropdown */}
         {colorOptions.length > 0 && (
-          <div className="flex items-center justify-center gap-2 mb-1">
-            {colorOptions.map(color => (
-              <button
-                key={color}
-                type="button"
-                aria-label={color}
-                className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-400 ${selectedColor === color ? 'ring-2 ring-red-500 border-red-500 scale-110' : 'border-gray-300'} ${colorSwatchPalette[color] || colorSwatchPalette.Default}`}
-                onClick={() => setSelectedColor(color)}
-                style={{ boxShadow: selectedColor === color ? '0 0 0 2px #fff' : undefined }}
-              >
-                {selectedColor === color && <span className="block w-3 h-3 bg-white rounded-full" />}
-              </button>
-            ))}
+          <div className="mb-1 w-full flex justify-center">
+            <Select value={selectedColor} onValueChange={setSelectedColor}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Select color" />
+              </SelectTrigger>
+              <SelectContent>
+                {colorOptions.map(color => (
+                  <SelectItem key={color} value={color}>{color}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
         {/* Size Pills */}

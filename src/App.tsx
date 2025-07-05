@@ -1,9 +1,8 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { RobustCartProvider } from "@/hooks/useRobustCart";
 import { RouteGuard } from "@/components/RouteGuard";
@@ -24,10 +23,19 @@ import TermsConditions from "./pages/TermsConditions";
 import NotFound from "./pages/NotFound";
 import Home from "./pages/Home";
 import FAQ from "./pages/FAQ";
-import About from "./pages/About";  
+import About from "./pages/About";
 import Contact from "./pages/Contact";
+import { useEffect } from 'react';
 
 const queryClient = new QueryClient();
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+  }, [pathname]);
+  return null;
+}
 
 function App() {
   return (
@@ -38,28 +46,29 @@ function App() {
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <ScrollToTop />
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/auth" element={<Auth />} />
-                <Route 
-                  path="/admin/*" 
+                <Route
+                  path="/admin/*"
                   element={
                     <RouteGuard requireAuth requireAdmin>
                       <Admin />
                     </RouteGuard>
-                  } 
+                  }
                 />
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/categories/:categoryId" element={<CategoryPage />} />
                 <Route path="/subcategories/:subcategoryId" element={<SubcategoryPage />} />
                 <Route path="/products" element={<Products />} />
-                <Route 
-                  path="/dashboard" 
+                <Route
+                  path="/dashboard"
                   element={
                     <RouteGuard requireAuth>
                       <CustomerDashboard />
                     </RouteGuard>
-                  } 
+                  }
                 />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/order-summary/:orderId" element={<OrderSummary />} />
