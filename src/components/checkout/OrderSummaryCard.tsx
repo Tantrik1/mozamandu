@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -32,6 +31,8 @@ interface PromoCode {
   code: string;
   discount_percentage: number;
   minimum_order_amount: number;
+  valid_from?: string;
+  valid_until?: string;
 }
 
 interface OrderSummaryCardProps {

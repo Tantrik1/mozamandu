@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -16,14 +15,14 @@ export const useCheckoutValidation = () => {
     try {
       console.log('=== CHECKOUT STOCK VALIDATION ===');
       console.log('Validating stock for checkout items:', cartItems.length);
-      
+
       const result = await validateCartStock(cartItems);
 
       if (!result.isValid) {
-        const errorMessage = result.errorMessages.length > 0 
-          ? result.errorMessages[0] 
+        const errorMessage = result.errorMessages.length > 0
+          ? result.errorMessages[0]
           : 'Some items have insufficient stock';
-        
+
         console.log('Checkout stock validation failed:', errorMessage);
         return {
           isValid: false,
@@ -65,7 +64,8 @@ export const useCheckoutValidation = () => {
       }
 
       if (validUntil && now > validUntil) {
-        return { isValid: false, error: 'Promo code has expired' };
+        const expiredDate = validUntil.toLocaleDateString();
+        return { isValid: false, error: `Promo code expired on ${expiredDate}` };
       }
 
       // Check minimum order amount

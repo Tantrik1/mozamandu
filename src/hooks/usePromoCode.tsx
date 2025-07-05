@@ -7,6 +7,8 @@ interface PromoCode {
   code: string;
   discount_percentage: number;
   minimum_order_amount: number;
+  valid_from?: string;
+  valid_until?: string;
 }
 
 export function usePromoCode() {
@@ -28,6 +30,30 @@ export function usePromoCode() {
       toast({
         title: "Invalid Promo Code",
         description: "Promo code not found or expired",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if promo code is still valid based on dates
+    const now = new Date();
+    const validFrom = promo.valid_from ? new Date(promo.valid_from) : null;
+    const validUntil = promo.valid_until ? new Date(promo.valid_until) : null;
+
+    if (validFrom && now < validFrom) {
+      toast({
+        title: "Promo Code Not Yet Active",
+        description: `This promo code will be active from ${validFrom.toLocaleDateString()}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (validUntil && now > validUntil) {
+      const expiredDate = validUntil.toLocaleDateString();
+      toast({
+        title: "Promo Code Expired",
+        description: `This promo code expired on ${expiredDate}`,
         variant: "destructive",
       });
       return;
