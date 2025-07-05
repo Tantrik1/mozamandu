@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash2, Plus, Save, RefreshCw } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Trash2, Plus, Save, RefreshCw, Edit } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -29,6 +30,13 @@ interface InventoryVariantFormProps {
   onInventoryChange: (summary: InventorySummary) => void;
 }
 
+interface NewVariantForm {
+  colorName: string;
+  sizeName: string;
+  sizeCode: string;
+  stockQuantity: number;
+}
+
 export function InventoryVariantForm({
   productId,
   productName,
@@ -47,6 +55,14 @@ export function InventoryVariantForm({
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [newVariant, setNewVariant] = useState<NewVariantForm>({
+    colorName: '',
+    sizeName: '',
+    sizeCode: '',
+    stockQuantity: 0
+  });
 
   useEffect(() => {
     if (productId) {
@@ -155,6 +171,81 @@ export function InventoryVariantForm({
     }
   };
 
+  const handleAddVariant = async () => {
+    if (!productId) return;
+
+    try {
+      const item = {
+        product_id: productId,
+        product_name: productName,
+        color_name: hasColorVariants ? newVariant.colorName : null,
+        size_name: hasSizeVariants ? newVariant.sizeName : null,
+        size_code: hasSizeVariants ? newVariant.sizeCode : null,
+        stock_quantity: newVariant.stockQuantity,
+        cost_price: costPrice,
+        selling_price: sellingPrice,
+        color_variant_id: null,
+        size_variant_id: null
+      };
+
+      await createInventoryItem(item);
+      setNewVariant({
+        colorName: '',
+        sizeName: '',
+        sizeCode: '',
+        stockQuantity: 0
+      });
+      setIsAddDialogOpen(false);
+      await loadInventory();
+      
+      toast({
+        title: 'Success',
+        description: 'Variant added successfully',
+      });
+    } catch (error) {
+      console.error('Error adding variant:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add variant',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleEditItem = async (item: InventoryItem) => {
+    try {
+      const { error } = await supabase
+        .from('product_inventory')
+        .update({
+          color_name: item.color_name,
+          size_name: item.size_name,
+          size_code: item.size_code,
+          stock_quantity: item.stock_quantity,
+          cost_price: item.cost_price,
+          selling_price: item.selling_price,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', item.id);
+
+      if (error) throw error;
+
+      setEditingItem(null);
+      await loadInventory();
+      
+      toast({
+        title: 'Success',
+        description: 'Variant updated successfully',
+      });
+    } catch (error) {
+      console.error('Error updating variant:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update variant',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (isLoading) {
     return <div className="text-center py-8">Loading inventory...</div>;
   }
@@ -173,14 +264,83 @@ export function InventoryVariantForm({
                 <Badge variant="secondary">Variants: {summary.variant_count}</Badge>
               </div>
             </div>
-            <Button 
-              onClick={handleSync} 
-              disabled={isSyncing}
-              variant="outline"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-              {isSyncing ? 'Syncing...' : 'Sync Inventory'}
-            </Button>
+            <div className="flex gap-2">
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Variant
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add New Variant</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    {hasColorVariants && (
+                      <div>
+                        <Label htmlFor="colorName">Color Name *</Label>
+                        <Input
+                          id="colorName"
+                          value={newVariant.colorName}
+                          onChange={(e) => setNewVariant(prev => ({ ...prev, colorName: e.target.value }))}
+                          placeholder="Enter color name"
+                        />
+                      </div>
+                    )}
+                    {hasSizeVariants && (
+                      <>
+                        <div>
+                          <Label htmlFor="sizeName">Size Name *</Label>
+                          <Input
+                            id="sizeName"
+                            value={newVariant.sizeName}
+                            onChange={(e) => setNewVariant(prev => ({ ...prev, sizeName: e.target.value }))}
+                            placeholder="Enter size name"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="sizeCode">Size Code</Label>
+                          <Input
+                            id="sizeCode"
+                            value={newVariant.sizeCode}
+                            onChange={(e) => setNewVariant(prev => ({ ...prev, sizeCode: e.target.value }))}
+                            placeholder="Enter size code"
+                          />
+                        </div>
+                      </>
+                    )}
+                    <div>
+                      <Label htmlFor="stockQuantity">Stock Quantity *</Label>
+                      <Input
+                        id="stockQuantity"
+                        type="number"
+                        min="0"
+                        value={newVariant.stockQuantity}
+                        onChange={(e) => setNewVariant(prev => ({ ...prev, stockQuantity: parseInt(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleAddVariant}>
+                        Add Variant
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Button 
+                onClick={handleSync} 
+                disabled={isSyncing}
+                variant="outline"
+                size="sm"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                {isSyncing ? 'Syncing...' : 'Sync Inventory'}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -203,19 +363,53 @@ export function InventoryVariantForm({
                   <TableRow key={item.id}>
                     <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                     <TableCell>{item.product_name}</TableCell>
-                    {hasColorVariants && <TableCell>{item.color_name || '-'}</TableCell>}
-                    {hasSizeVariants && <TableCell>{item.size_name || '-'}</TableCell>}
+                    {hasColorVariants && (
+                      <TableCell>
+                        {editingItem?.id === item.id ? (
+                          <Input
+                            value={editingItem.color_name || ''}
+                            onChange={(e) => setEditingItem({...editingItem, color_name: e.target.value})}
+                            className="w-24"
+                          />
+                        ) : (
+                          item.color_name || '-'
+                        )}
+                      </TableCell>
+                    )}
+                    {hasSizeVariants && (
+                      <TableCell>
+                        {editingItem?.id === item.id ? (
+                          <Input
+                            value={editingItem.size_name || ''}
+                            onChange={(e) => setEditingItem({...editingItem, size_name: e.target.value})}
+                            className="w-20"
+                          />
+                        ) : (
+                          item.size_name || '-'
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={item.stock_quantity}
-                        onChange={(e) => {
-                          const newStock = parseInt(e.target.value) || 0;
-                          handleStockUpdate(item.id, newStock);
-                        }}
-                        className="w-20"
-                      />
+                      {editingItem?.id === item.id ? (
+                        <Input
+                          type="number"
+                          min="0"
+                          value={editingItem.stock_quantity}
+                          onChange={(e) => setEditingItem({...editingItem, stock_quantity: parseInt(e.target.value) || 0})}
+                          className="w-20"
+                        />
+                      ) : (
+                        <Input
+                          type="number"
+                          min="0"
+                          value={item.stock_quantity}
+                          onChange={(e) => {
+                            const newStock = parseInt(e.target.value) || 0;
+                            handleStockUpdate(item.id, newStock);
+                          }}
+                          className="w-20"
+                        />
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-green-600">
@@ -228,14 +422,47 @@ export function InventoryVariantForm({
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        {editingItem?.id === item.id ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditItem(editingItem)}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <Save className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingItem(null)}
+                              className="text-gray-600 hover:text-gray-700"
+                            >
+                              ✕
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingItem(item)}
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteItem(item.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
