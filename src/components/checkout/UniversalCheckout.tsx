@@ -350,7 +350,8 @@ export function UniversalCheckout() {
             mode: pricing.mode,
             breakdown: pricing.breakdown || [],
             isCombo: pricing.isCombo || false,
-            basePrice: item.basePrice
+            basePrice: item.basePrice,
+            product_inventory_id: item.productInventoryId || null
           }
         };
 

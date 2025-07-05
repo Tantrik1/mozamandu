@@ -38,6 +38,7 @@ interface CustomerOrderDetails {
 
 interface OrderItem {
   id: string;
+  product_id: string;
   product_name: string;
   color_name?: string;
   size_name?: string;
@@ -45,11 +46,15 @@ interface OrderItem {
   unit_price: number;
   total_price: number;
   pricing_mode: string;
-  product_inventory_id: string;
   pricing_details?: {
     breakdown?: string[];
     description?: string;
     basePrice?: number;
+  };
+  product?: {
+    name: string;
+    category?: { name: string };
+    subcategory?: { name: string };
   };
 }
 
@@ -60,28 +65,12 @@ export default function CustomerOrderSummary() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isScreenshotOpen, setIsScreenshotOpen] = useState(false);
-  const [inventoryMap, setInventoryMap] = useState({});
 
   useEffect(() => {
     if (orderId) {
       fetchOrderDetails();
     }
   }, [orderId]);
-
-  useEffect(() => {
-    async function fetchInventory() {
-      const ids = orderItems.map(item => item.product_inventory_id).filter(Boolean);
-      if (ids.length === 0) return;
-      const { data } = await supabase
-        .from('product_inventory')
-        .select('id, sku, available_stock, is_active')
-        .in('id', ids);
-      const map = {};
-      (data || []).forEach(inv => { map[inv.id] = inv; });
-      setInventoryMap(map);
-    }
-    fetchInventory();
-  }, [orderItems]);
 
   const fetchOrderDetails = async () => {
     try {
@@ -105,25 +94,85 @@ export default function CustomerOrderSummary() {
         return;
       }
 
-      // Fetch order items
-      const { data: itemsData, error: itemsError } = await supabase
+      // Step 1: Fetch all customer order item details for the order
+      const { data: itemDetails, error: detailsError } = await supabase
         .from('customer_order_item_details')
         .select('*')
-        .eq('order_id', orderId)
-        .order('created_at');
-
-      if (itemsError) {
-        console.error('❌ Error fetching order items:', itemsError);
+        .eq('order_id', orderId);
+      if (detailsError) {
+        console.error('❌ Error fetching order item details:', detailsError);
       }
-
-      console.log('✅ Customer order data fetched:', orderData);
-      console.log('✅ Order items fetched:', itemsData);
-
+      // Step 2: Extract unique product_inventory_ids from pricing_details
+      const inventoryIds = Array.from(new Set(
+        (itemDetails || [])
+          .map(item => {
+            let details = item.pricing_details;
+            if (typeof details === 'string') {
+              try {
+                details = JSON.parse(details);
+              } catch {
+                details = {};
+              }
+            }
+            if (typeof details === 'object' && details !== null && !Array.isArray(details)) {
+              const rawId = (details as any).product_inventory_id;
+              return typeof rawId === 'string' ? rawId : undefined;
+            }
+            return undefined;
+          })
+          .filter((id): id is string => typeof id === 'string' && !!id)
+      ));
+      // Step 3: Fetch all product inventory with product/category/subcategory info
+      let inventoryMap: Record<string, any> = {};
+      if (inventoryIds.length > 0) {
+        const { data: inventory, error: inventoryError } = await supabase
+          .from('product_inventory')
+          .select(`
+            id,
+            product:products(
+              name,
+              category:categories(name),
+              subcategory:subcategories(name)
+            )
+          `)
+          .in('id', inventoryIds);
+        if (!inventoryError && inventory) {
+          inventoryMap = Object.fromEntries(inventory.map(inv => [inv.id, inv]));
+        }
+      }
+      // Step 4: Merge product info into each order item detail
+      let mergedItems = (itemDetails || []).map(item => {
+        let details = item.pricing_details;
+        if (typeof details === 'string') {
+          try {
+            details = JSON.parse(details);
+          } catch {
+            details = {};
+          }
+        }
+        if (typeof details !== 'object' || details === null || Array.isArray(details)) details = {};
+        let inventoryId: string | undefined = undefined;
+        if (typeof details === 'object' && details !== null && !Array.isArray(details)) {
+          const rawId = (details as any).product_inventory_id;
+          inventoryId = typeof rawId === 'string' ? rawId : undefined;
+        }
+        const inventoryData = inventoryId ? inventoryMap[inventoryId] : undefined;
+        return {
+          id: item.id,
+          product_id: inventoryId || '',
+          product_name: inventoryData?.product?.name || '',
+          color_name: item.color_name ?? '',
+          size_name: item.size_name ?? '',
+          quantity: item.quantity ?? 0,
+          unit_price: item.unit_price ?? 0,
+          total_price: item.total_price ?? 0,
+          pricing_mode: item.pricing_mode ?? '',
+          pricing_details: details,
+          product: inventoryData?.product || undefined
+        } as OrderItem;
+      });
+      setOrderItems(mergedItems);
       setOrderDetails(orderData);
-      setOrderItems((itemsData || []).map((item: any) => ({
-        ...item,
-        product_inventory_id: item.product_inventory_id || '',
-      })));
     } catch (error) {
       console.error('💥 Error fetching customer order details:', error);
       setError('Failed to load order details');
@@ -220,55 +269,74 @@ export default function CustomerOrderSummary() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {orderItems.map((item) => (
-                    <div key={item.id} className="flex flex-col md:flex-row md:justify-between md:items-center p-2 bg-white rounded border mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          {item.pricing_mode === 'combo' && (
-                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                              Combo
-                            </Badge>
+                  {orderItems.map((item) => {
+                    const basePrice = item.pricing_details?.basePrice ?? item.unit_price;
+                    const saved = basePrice > item.unit_price;
+                    return (
+                      <div key={item.id} className="flex flex-col md:flex-row md:justify-between md:items-center p-4 bg-white rounded border mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            {item.pricing_mode === 'combo' && (
+                              <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                                Combo
+                              </Badge>
+                            )}
+                            {item.pricing_mode === 'discount' && (
+                              <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+                                MOQ
+                              </Badge>
+                            )}
+                            <span className="text-sm">Qty: {item.quantity}</span>
+                          </div>
+                          {item.product_name && <h4 className="font-medium">{item.product_name}</h4>}
+                          {/* Category and Subcategory */}
+                          {item.product && (
+                            <p className="text-sm text-gray-600 mb-1">
+                              {item.product.category?.name} → {item.product.subcategory?.name}
+                            </p>
                           )}
-                          {item.pricing_mode === 'discount' && (
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
-                              MOQ
-                            </Badge>
+                          {item.color_name && (
+                            <p className="text-sm text-gray-600">Color: {item.color_name}</p>
                           )}
-                          <span className="text-sm">Qty: {item.quantity}</span>
+                          {item.size_name && (
+                            <p className="text-sm text-gray-600">Size: {item.size_name}</p>
+                          )}
+                          {/* --- Advanced Pricing Breakdown --- */}
+                          {item.pricing_details && (
+                            <div className="mt-2 space-y-1">
+                              {item.pricing_details.description && (
+                                <p className="text-xs text-gray-700 font-semibold mb-1">{item.pricing_details.description}</p>
+                              )}
+                              {Array.isArray(item.pricing_details.breakdown) && item.pricing_details.breakdown.length > 0 && (
+                                <ul className="text-xs text-gray-600 list-disc list-inside mb-1">
+                                  {item.pricing_details.breakdown.map((line: string, idx: number) => (
+                                    <li key={idx}>{line}</li>
+                                  ))}
+                                </ul>
+                              )}
+                              {typeof item.pricing_details.basePrice === 'number' && (
+                                <p className="text-xs text-gray-500 mt-1">Base Price: Rs. {item.pricing_details.basePrice.toFixed(2)}</p>
+                              )}
+                              {saved && (
+                                <p className="text-xs text-green-600 mt-1">
+                                  Saved: Rs. {(basePrice - item.unit_price).toFixed(2)} each
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
                         </div>
-                        {item.product_name && <h4 className="font-medium">{item.product_name}</h4>}
-                        {item.color_name && (
-                          <p className="text-sm text-gray-600">Color: {item.color_name}</p>
-                        )}
-                        {item.size_name && (
-                          <p className="text-sm text-gray-600">Size: {item.size_name}</p>
-                        )}
-                        {/* Pricing breakdown details */}
-                        {item.pricing_details && item.pricing_details.description && (
-                          <p className="text-xs text-gray-700 font-semibold mb-1">{item.pricing_details.description}</p>
-                        )}
-                        {item.pricing_details && item.pricing_details.breakdown && item.pricing_details.breakdown.length > 0 && (
-                          <ul className="text-xs text-gray-600 list-disc list-inside mb-1">
-                            {item.pricing_details.breakdown.map((line: string, idx: number) => (
-                              <li key={idx}>{line}</li>
-                            ))}
-                          </ul>
-                        )}
-                        {typeof item.pricing_details?.basePrice === 'number' && (
-                          <p className="text-xs text-gray-500 mt-1">Base Price: Rs. {item.pricing_details.basePrice.toFixed(2)}</p>
-                        )}
-                        <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
+                        <div className="text-right mt-2 md:mt-0">
+                          <p className="font-medium">Rs. {item.total_price.toFixed(2)}</p>
+                          {saved && (
+                            <p className="text-xs text-green-600">
+                              Total Saved: Rs. {((basePrice - item.unit_price) * item.quantity).toFixed(2)}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right mt-2 md:mt-0">
-                        <p className="font-medium">Rs. {item.total_price.toFixed(2)}</p>
-                        {item.unit_price < (item.pricing_details?.basePrice || item.unit_price) && (
-                          <p className="text-xs text-green-600">
-                            Saved: Rs. {((item.pricing_details?.basePrice || item.unit_price) - item.unit_price).toFixed(2)} each
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
