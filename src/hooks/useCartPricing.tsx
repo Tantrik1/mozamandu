@@ -1,4 +1,3 @@
-
 import { useMemo } from 'react';
 import { usePricing } from './usePricing';
 
@@ -6,8 +5,7 @@ interface CartItem {
   id: string;
   productId: string;
   productName: string;
-  colorVariantId?: string | null;
-  sizeVariantId?: string | null;
+  productInventoryId?: string | null;
   colorName?: string;
   sizeName?: string;
   quantity: number;
@@ -61,13 +59,13 @@ export function useCartPricing({ cartItems, activeCombo, discountTiers }: UseCar
   const getItemPricing = useMemo(() => {
     return (item: CartItem): PricingInfo => {
       const subcategoryTotalQty = subcategoryQuantities[item.subcategoryId] || 0;
-      
+
       // Priority 1: Check if combo is active and applies to this subcategory
       if (activeCombo) {
         const comboSubcategory = activeCombo.combo_subcategories.find(
           cs => cs.subcategory_id === item.subcategoryId
         );
-        
+
         if (comboSubcategory && subcategoryTotalQty >= comboSubcategory.min_units) {
           return {
             finalPrice: comboSubcategory.price,

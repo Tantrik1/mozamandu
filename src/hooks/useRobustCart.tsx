@@ -10,27 +10,28 @@ interface CartItem {
   id: string;
   productId: string;
   productName: string;
-  colorVariantId?: string | null;
-  sizeVariantId?: string | null;
+  productInventoryId?: string | null;
   colorName?: string;
   sizeName?: string;
   quantity: number;
   basePrice: number;
   subcategoryId: string;
   image_url?: string;
+  // Legacy support for old cart items
+  colorVariantId?: string | null;
+  sizeVariantId?: string | null;
 }
 
 interface AddToCartParams {
   productId: string;
-  colorVariantId?: string | null;
-  sizeVariantId?: string | null;
+  productInventoryId?: string | null;
   quantity: number;
 }
 
 interface SubcategoryData {
   id: string;
   name: string;
-  selling_price: number;  
+  selling_price: number;
   minimum_quantity: number;
 }
 
@@ -69,6 +70,7 @@ interface CartContextType {
   getTotalItems: () => number;
   getItemPricing: (item: CartItem) => PricingInfo;
   activeCombo: ComboData | null;
+  discountTiers: { [key: string]: DiscountTier[] };
   loading: boolean;
   error: string | null;
 }
@@ -125,13 +127,13 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
 
     try {
       const { validItems, removedItems, errors } = await validateCartItems(cartItems);
-      
+
       if (removedItems.length > 0) {
         console.log(`Removed ${removedItems.length} invalid items from cart`);
         setCartItems(validItems);
         showCartCleanupNotification(removedItems, errors);
       }
-      
+
       setCartValidated(true);
     } catch (error) {
       console.error('Error validating cart:', error);
@@ -159,7 +161,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         acc[sub.id] = sub;
         return acc;
       }, {} as { [key: string]: SubcategoryData }) || {};
-      
+
       console.log('Loaded subcategories:', Object.keys(subcategoriesMap).length);
       setSubcategoriesData(subcategoriesMap);
     } catch (error) {
@@ -189,7 +191,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         acc[tier.subcategory_id].push(tier);
         return acc;
       }, {} as { [key: string]: DiscountTier[] }) || {};
-      
+
       console.log('Loaded discount tiers for subcategories:', Object.keys(tiersMap).length);
       setDiscountTiers(tiersMap);
     } catch (error) {
@@ -220,13 +222,13 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const validateStock = async (productId: string, colorVariantId: string | null = null, sizeVariantId: string | null = null, requestedQuantity: number): Promise<boolean> => {
+  const validateStock = async (productId: string, productInventoryId: string | null = null, requestedQuantity: number): Promise<boolean> => {
     try {
       console.log('=== CART STOCK VALIDATION ===');
-      console.log('Validating stock for cart addition:', { productId, colorVariantId, sizeVariantId, requestedQuantity });
-      
-      const stockInfo = await getVariantStockInfo(productId, colorVariantId, sizeVariantId);
-      
+      console.log('Validating stock for cart addition:', { productId, productInventoryId, requestedQuantity });
+
+      const stockInfo = await getVariantStockInfo(productId, productInventoryId);
+
       if (!stockInfo.isValid) {
         setErrorWithTimeout(stockInfo.errorMessage || 'Stock validation failed');
         console.log(`Cart stock validation failed: ${stockInfo.errorMessage}`);
@@ -251,15 +253,14 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
   const addToCart = async (params: AddToCartParams) => {
     setLoading(true);
     setError(null);
-    
+
     try {
       console.log('=== ADDING TO CART ===');
       console.log('Add to cart params:', params);
-      
+
       const hasStock = await validateStock(
-        params.productId, 
-        params.colorVariantId, 
-        params.sizeVariantId, 
+        params.productId,
+        params.productInventoryId,
         params.quantity
       );
 
@@ -302,38 +303,32 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
       let colorName = '';
       let sizeName = '';
 
-      if (params.colorVariantId) {
-        const { data: colorVariant } = await supabase
-          .from('color_variants')
-          .select('color_name')
-          .eq('id', params.colorVariantId)
+      // If we have a product inventory ID, get the variant details
+      if (params.productInventoryId) {
+        const { data: inventoryItem } = await supabase
+          .from('product_inventory')
+          .select('color_name, size_name')
+          .eq('id', params.productInventoryId)
           .single();
-        colorName = colorVariant?.color_name || '';
+
+        if (inventoryItem) {
+          colorName = inventoryItem.color_name || '';
+          sizeName = inventoryItem.size_name || '';
+        }
       }
 
-      if (params.sizeVariantId) {
-        const { data: sizeVariant } = await supabase
-          .from('size_variants')
-          .select('size_name')
-          .eq('id', params.sizeVariantId)
-          .single();
-        sizeName = sizeVariant?.size_name || '';
-      }
-
-      const existingItemIndex = cartItems.findIndex(item => 
+      const existingItemIndex = cartItems.findIndex(item =>
         item.productId === params.productId &&
-        item.colorVariantId === params.colorVariantId &&
-        item.sizeVariantId === params.sizeVariantId
+        item.productInventoryId === params.productInventoryId
       );
 
       if (existingItemIndex >= 0) {
         const existingItem = cartItems[existingItemIndex];
         const newQuantity = existingItem.quantity + params.quantity;
-        
+
         const hasStockForUpdate = await validateStock(
-          params.productId, 
-          params.colorVariantId, 
-          params.sizeVariantId, 
+          params.productId,
+          params.productInventoryId,
           newQuantity
         );
 
@@ -349,15 +344,14 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         const updatedItems = [...cartItems];
         updatedItems[existingItemIndex].quantity = newQuantity;
         setCartItems(updatedItems);
-        
+
         console.log('Updated existing cart item quantity:', newQuantity);
       } else {
         const newItem: CartItem = {
-          id: `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}`,
+          id: `${params.productId}-${params.productInventoryId || 'no-inventory'}`,
           productId: params.productId,
           productName: product.name,
-          colorVariantId: params.colorVariantId,
-          sizeVariantId: params.sizeVariantId,
+          productInventoryId: params.productInventoryId,
           colorName,
           sizeName,
           quantity: params.quantity,
@@ -390,7 +384,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
   const removeFromCart = (itemId: string) => {
     console.log('Removing item from cart:', itemId);
     setCartItems(prev => prev.filter(item => item.id !== itemId));
-    
+
     toast({
       title: "Removed from Cart",
       description: "Item has been removed from your cart",
@@ -408,8 +402,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
 
     const hasStock = await validateStock(
       item.productId,
-      item.colorVariantId,
-      item.sizeVariantId,
+      item.productInventoryId,
       quantity
     );
 
@@ -423,7 +416,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     }
 
     console.log('Updating cart item quantity:', itemId, 'to', quantity);
-    setCartItems(prev => prev.map(item => 
+    setCartItems(prev => prev.map(item =>
       item.id === itemId ? { ...item, quantity } : item
     ));
   };
@@ -455,6 +448,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     getTotalItems,
     getItemPricing,
     activeCombo,
+    discountTiers,
     loading,
     error
   };

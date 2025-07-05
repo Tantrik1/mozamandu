@@ -24,7 +24,8 @@ import {
   ShoppingCart,
   UserCheck,
   LogOut,
-  HelpCircle
+  HelpCircle,
+  Warehouse
 } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
@@ -49,6 +50,11 @@ const menuItems = [
     title: "Products",
     url: "/admin/products",
     icon: Package,
+  },
+  {
+    title: "Inventory",
+    url: "/admin/inventory",
+    icon: Warehouse,
   },
   {
     title: "Orders",

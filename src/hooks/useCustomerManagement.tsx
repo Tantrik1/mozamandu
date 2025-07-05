@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -30,9 +29,9 @@ export function useCustomerManagement() {
 
   const fetchCustomers = async () => {
     setLoading(true);
-    
+
     console.log('Fetching customers...');
-    
+
     try {
       // Fetch all profiles (both admin and customer roles)
       const { data: profiles, error: profilesError } = await supabase
@@ -69,18 +68,25 @@ export function useCustomerManagement() {
         customerProfiles.map(async (profile) => {
           try {
             console.log(`Fetching orders for customer ${profile.id}...`);
-            
-            const { data: orders, error: ordersError } = await supabase
-              .from('orders')
-              .select('total_amount')
-              .eq('user_id', profile.id);
 
-            if (ordersError) {
-              console.error('Orders fetch error for customer', profile.id, ':', ordersError);
-            }
+            // Check both orders and customer_orders tables
+            const [ordersResponse, customerOrdersResponse] = await Promise.all([
+              supabase
+                .from('orders')
+                .select('total_amount')
+                .eq('user_id', profile.id),
+              supabase
+                .from('customer_orders')
+                .select('total_amount')
+                .eq('user_id', profile.id)
+            ]);
 
-            const totalOrders = orders?.length || 0;
-            const totalSpent = orders?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
+            const orders = ordersResponse.data || [];
+            const customerOrders = customerOrdersResponse.data || [];
+
+            const totalOrders = orders.length + customerOrders.length;
+            const totalSpent = orders.reduce((sum, order) => sum + Number(order.total_amount), 0) +
+              customerOrders.reduce((sum, order) => sum + Number(order.total_amount), 0);
 
             console.log(`Customer ${profile.email}: ${totalOrders} orders, Rs. ${totalSpent} spent`);
 
@@ -114,7 +120,7 @@ export function useCustomerManagement() {
 
       console.log('Final customers with stats:', customersWithStats);
       setCustomers(customersWithStats);
-      
+
     } catch (error) {
       console.error('Error in fetchCustomers:', error);
       toast({
@@ -129,18 +135,34 @@ export function useCustomerManagement() {
 
   const fetchCustomerOrders = async (customerId: string) => {
     console.log('Fetching orders for customer:', customerId);
-    
-    const { data, error } = await supabase
-      .from('orders')
-      .select('id, order_number, total_amount, status, created_at')
-      .eq('user_id', customerId)
-      .order('created_at', { ascending: false });
 
-    if (error) {
+    try {
+      // Fetch from both orders and customer_orders tables
+      const [ordersResponse, customerOrdersResponse] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('id, order_number, total_amount, status, created_at')
+          .eq('user_id', customerId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('customer_orders')
+          .select('id, order_number, total_amount, status, created_at')
+          .eq('user_id', customerId)
+          .order('created_at', { ascending: false })
+      ]);
+
+      const orders = ordersResponse.data || [];
+      const customerOrders = customerOrdersResponse.data || [];
+
+      // Combine and sort all orders by creation date
+      const allOrders = [...orders, ...customerOrders].sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      console.log('Customer orders:', allOrders);
+      setCustomerOrders(allOrders);
+    } catch (error) {
       console.error('Customer orders fetch error:', error);
-    } else {
-      console.log('Customer orders:', data);
-      setCustomerOrders(data || []);
     }
   };
 

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { getVariantStockInfo, validateCartStock } from './unifiedStockManager';
@@ -7,14 +6,16 @@ interface CartItem {
   id: string;
   productId: string;
   productName: string;
-  colorVariantId?: string | null;
-  sizeVariantId?: string | null;
+  productInventoryId?: string | null;
   colorName?: string;
   sizeName?: string;
   quantity: number;
   basePrice: number;
   subcategoryId: string;
   image_url?: string;
+  // Legacy support for old cart items
+  colorVariantId?: string | null;
+  sizeVariantId?: string | null;
 }
 
 interface ValidationResult {
@@ -32,7 +33,7 @@ export async function validateCartItems(cartItems: CartItem[]): Promise<Validati
 
   // Use the unified cart validation function
   const cartValidationResult = await validateCartStock(cartItems);
-  
+
   if (cartValidationResult.isValid) {
     // All items are valid
     return {
@@ -66,24 +67,23 @@ export async function validateCartItems(cartItems: CartItem[]): Promise<Validati
         continue;
       }
 
-      // Validate variants using unified stock system
+      // Validate inventory using unified stock system
       const stockInfo = await getVariantStockInfo(
         item.productId,
-        item.colorVariantId,
-        item.sizeVariantId
+        item.productInventoryId
       );
 
       if (!stockInfo.isValid) {
         console.log(`Stock validation failed for ${item.productId}: ${stockInfo.errorMessage}`);
         removedItems.push(item);
-        errors.push(`"${item.productName}" has variant issues and was removed from cart`);
+        errors.push(`"${item.productName}" has inventory issues and was removed from cart`);
         continue;
       }
 
       // Check if we have enough stock
       if (stockInfo.stockAmount < item.quantity) {
         console.log(`Insufficient stock for ${item.productId}: available ${stockInfo.stockAmount}, needed ${item.quantity}`);
-        
+
         if (stockInfo.stockAmount > 0) {
           // Adjust quantity to available stock
           item.quantity = stockInfo.stockAmount;
@@ -131,8 +131,7 @@ export async function validateSingleCartItem(item: CartItem): Promise<{
   try {
     const stockInfo = await getVariantStockInfo(
       item.productId,
-      item.colorVariantId,
-      item.sizeVariantId
+      item.productInventoryId
     );
 
     if (!stockInfo.isValid) {
@@ -146,7 +145,7 @@ export async function validateSingleCartItem(item: CartItem): Promise<{
       return {
         isValid: stockInfo.stockAmount > 0,
         adjustedQuantity: stockInfo.stockAmount,
-        errorMessage: stockInfo.stockAmount > 0 
+        errorMessage: stockInfo.stockAmount > 0
           ? `Only ${stockInfo.stockAmount} items available`
           : 'Item is out of stock'
       };

@@ -1,4 +1,3 @@
-
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -19,14 +18,14 @@ interface SubcategoryRequirement {
 }
 
 export function CartSidebar() {
-  const { 
-    cartItems, 
-    updateQuantity, 
-    removeFromCart, 
-    getTotalPrice, 
-    getTotalItems, 
+  const {
+    cartItems,
+    updateQuantity,
+    removeFromCart,
+    getTotalPrice,
+    getTotalItems,
     getItemPricing,
-    activeCombo 
+    activeCombo
   } = useRobustCart();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -40,7 +39,7 @@ export function CartSidebar() {
 
   const checkSubcategoryRequirements = async () => {
     const subcategoryTotals: { [key: string]: number } = {};
-    
+
     // Calculate totals per subcategory
     for (const item of cartItems) {
       subcategoryTotals[item.subcategoryId] = (subcategoryTotals[item.subcategoryId] || 0) + item.quantity;
@@ -71,6 +70,12 @@ export function CartSidebar() {
   const canCheckout = subcategoryRequirements.every(req => req.fulfilled);
   const totalPrice = getTotalPrice();
 
+  // Calculate normal total (no discounts or combos)
+  const normalTotal = cartItems.reduce((sum, item) => sum + (item.basePrice * item.quantity), 0);
+  const savings = Math.max(0, normalTotal - totalPrice);
+  // Check if any item is in discount mode (but not combo)
+  const hasDiscount = cartItems.some(item => getItemPricing(item).mode === 'discount');
+
   const handleCheckout = () => {
     if (!canCheckout) {
       toast({
@@ -91,8 +96,8 @@ export function CartSidebar() {
         <Button variant="ghost" size="sm" className="relative">
           <ShoppingCart className="h-5 w-5" />
           {getTotalItems() > 0 && (
-            <Badge 
-              variant="destructive" 
+            <Badge
+              variant="destructive"
               className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center text-xs"
             >
               {getTotalItems()}
@@ -100,7 +105,7 @@ export function CartSidebar() {
           )}
         </Button>
       </SheetTrigger>
-      
+
       <SheetContent className="w-full sm:max-w-lg flex flex-col h-full">
         <SheetHeader className="flex-shrink-0">
           <SheetTitle className="flex items-center gap-2">
@@ -146,18 +151,18 @@ export function CartSidebar() {
                     return (
                       <div key={item.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
                         {item.image_url && (
-                          <img 
-                            src={item.image_url} 
+                          <img
+                            src={item.image_url}
                             alt={item.productName}
                             className="w-12 h-12 object-cover rounded-md flex-shrink-0"
                           />
                         )}
-                        
+
                         <div className="flex-1 min-w-0">
                           <h3 className="text-sm font-medium text-gray-900 truncate">
                             {item.productName}
                           </h3>
-                          
+
                           {/* Variant Info */}
                           <div className="flex flex-wrap gap-2 mt-1">
                             {item.colorName && (
@@ -192,11 +197,11 @@ export function CartSidebar() {
                                 </Badge>
                               )}
                             </div>
-                            
+
                             <p className="text-xs text-gray-600">
                               {pricing.description}
                             </p>
-                            
+
                             {/* Show breakdown for discount pricing */}
                             {pricing.breakdown && pricing.breakdown.length > 1 && (
                               <div className="text-xs text-gray-500 mt-1 bg-blue-50 p-2 rounded">
@@ -230,7 +235,7 @@ export function CartSidebar() {
                                 <Plus className="h-3 w-3" />
                               </Button>
                             </div>
-                            
+
                             <Button
                               variant="ghost"
                               size="sm"
@@ -282,19 +287,27 @@ export function CartSidebar() {
                   <span>Total</span>
                   <span>Rs.{totalPrice.toFixed(2)}</span>
                 </div>
-                {activeCombo && (
+                {activeCombo && savings > 0 && (
                   <div className="bg-green-50 border border-green-200 rounded p-2 mt-2">
                     <p className="text-sm text-green-800 font-medium flex items-center gap-1">
                       <Gift className="w-4 h-4" />
-                      Combo pricing active! You're saving money.
+                      Combo pricing active! You have saved Rs.{savings.toFixed(2)}!
+                    </p>
+                  </div>
+                )}
+                {!activeCombo && hasDiscount && savings > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded p-2 mt-2">
+                    <p className="text-sm text-blue-800 font-medium flex items-center gap-1">
+                      <Tag className="w-4 h-4" />
+                      MOQ discount active! You have saved Rs.{savings.toFixed(2)}!
                     </p>
                   </div>
                 )}
               </div>
 
               {/* Checkout Button */}
-              <Button 
-                className="w-full bg-red-600 hover:bg-red-700" 
+              <Button
+                className="w-full bg-red-600 hover:bg-red-700"
                 disabled={!canCheckout}
                 onClick={handleCheckout}
               >

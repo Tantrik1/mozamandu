@@ -14,8 +14,6 @@ import { DeliveryLocationSelector } from './DeliveryLocationSelector';
 import { PromoCodeSection } from './PromoCodeSection';
 import { PaymentMethodSection } from './PaymentMethodSection';
 import { OrderSummaryCard } from './OrderSummaryCard';
-import { reduceStockForOrder, restoreStockForOrder } from '@/utils/stockManagement';
-import { incrementPromoCodeUsage } from '@/utils/promoCodeUtils';
 
 interface FormErrors {
   [key: string]: string;
@@ -208,39 +206,6 @@ export function UniversalCheckout() {
         }
       }
 
-      // Enhanced stock reduction with better error handling
-      console.log('Validating and reducing stock for order items...');
-      try {
-        await reduceStockForOrder(cartItems);
-        console.log('Stock reduced successfully');
-
-        // Show success message for stock reduction
-        toast({
-          title: "Stock Updated",
-          description: "Product stock has been successfully reserved for your order.",
-        });
-      } catch (stockError) {
-        console.error('Stock reduction failed:', stockError);
-        toast({
-          title: "Stock Error",
-          description: stockError instanceof Error ? stockError.message : "There was an error updating stock. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Manually increment promo code usage if promo code was used
-      if (appliedPromo?.code) {
-        try {
-          console.log('Manually incrementing promo code usage for:', appliedPromo.code);
-          await incrementPromoCodeUsage(appliedPromo.code);
-          console.log('Promo code usage incremented successfully');
-        } catch (promoError) {
-          console.error('Failed to increment promo code usage:', promoError);
-          // Don't fail the order for this, just log it
-        }
-      }
-
       // Prepare base order data
       const baseOrderData = {
         customer_name: customerInfo.name,
@@ -343,60 +308,50 @@ export function UniversalCheckout() {
       const orderItemDetailsTable = isCustomerOrder() ? 'customer_order_item_details' : 'order_item_details';
 
       for (const item of cartItems) {
-        // Validate that the variant IDs exist if they're provided
-        let validColorVariantId = null;
-        let validSizeVariantId = null;
-
-        if (item.colorVariantId) {
-          const { data: colorVariant } = await supabase
-            .from('color_variants')
-            .select('id')
-            .eq('id', item.colorVariantId)
+        // Get inventory details for the item
+        let inventoryItem = null;
+        if (item.productInventoryId) {
+          const { data: inventory } = await supabase
+            .from('product_inventory')
+            .select('id, color_name, size_name')
+            .eq('id', item.productInventoryId)
             .single();
 
-          if (colorVariant) {
-            validColorVariantId = item.colorVariantId;
+          if (inventory) {
+            inventoryItem = inventory;
           } else {
-            console.warn(`Color variant ${item.colorVariantId} not found, setting to null`);
+            console.warn(`Inventory item ${item.productInventoryId} not found`);
           }
         }
 
-        if (item.sizeVariantId) {
-          const { data: sizeVariant } = await supabase
-            .from('size_variants')
-            .select('id')
-            .eq('id', item.sizeVariantId)
-            .single();
-
-          if (sizeVariant) {
-            validSizeVariantId = item.sizeVariantId;
-          } else {
-            console.warn(`Size variant ${item.sizeVariantId} not found, setting to null`);
-          }
-        }
-
-        // Create order item with validated variant IDs
+        // Create order item with inventory information (only product_inventory_id)
         const orderItem = {
           order_id: orderResult.id,
           product_id: item.productId,
-          color_variant_id: validColorVariantId,
-          size_variant_id: validSizeVariantId,
+          product_inventory_id: item.productInventoryId || null,
           quantity: item.quantity
         };
 
         orderItems.push(orderItem);
 
-        // Create order item details
+        // Create order item details (for display)
         const pricing = getItemPricing(item);
         const orderItemDetail = {
           order_id: orderResult.id,
           product_name: item.productName,
-          color_name: item.colorName || '',
-          size_name: item.sizeName || '',
+          color_name: inventoryItem?.color_name || '',
+          size_name: inventoryItem?.size_name || '',
           quantity: item.quantity,
           unit_price: pricing.finalPrice,
           total_price: pricing.finalPrice * item.quantity,
-          pricing_mode: pricing.mode
+          pricing_mode: pricing.mode,
+          pricing_details: {
+            description: pricing.description,
+            mode: pricing.mode,
+            breakdown: pricing.breakdown || [],
+            isCombo: pricing.isCombo || false,
+            basePrice: item.basePrice
+          }
         };
 
         orderItemDetails.push(orderItemDetail);
@@ -466,31 +421,6 @@ export function UniversalCheckout() {
 
     } catch (error) {
       console.error('Error creating order:', error);
-
-      // Enhanced stock restoration with better error handling
-      try {
-        console.log('Restoring stock due to order creation failure...');
-        const stockItems = cartItems.map(item => ({
-          productId: item.productId,
-          colorVariantId: item.colorVariantId,
-          sizeVariantId: item.sizeVariantId,
-          quantity: item.quantity
-        }));
-        await restoreStockForOrder(stockItems);
-        console.log('Stock restored successfully after order failure');
-
-        toast({
-          title: "Stock Restored",
-          description: "Product stock has been restored due to order creation failure.",
-        });
-      } catch (restoreError) {
-        console.error('Failed to restore stock:', restoreError);
-        toast({
-          title: "Critical Error",
-          description: "Order failed and stock could not be restored. Please contact support immediately.",
-          variant: "destructive",
-        });
-      }
 
       toast({
         title: "Order Failed",

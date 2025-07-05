@@ -1,10 +1,10 @@
-
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate, Routes, Route } from 'react-router-dom';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { CategoryManagement } from '@/components/admin/CategoryManagement';
 import { SubcategoryManagement } from '@/components/admin/SubcategoryManagement';
 import { ProductManagement } from '@/components/admin/ProductManagement';
+import { InventoryManagement } from '@/components/admin/InventoryManagement';
 import { EnhancedOrderManagement } from '@/components/admin/EnhancedOrderManagement';
 import { CustomerManagement } from '@/components/admin/CustomerManagement';
 import { ComboManagement } from '@/components/admin/ComboManagement';
@@ -37,7 +37,7 @@ function AdminDashboard() {
           <p className="text-gray-600">Comprehensive business analytics and insights</p>
         </div>
       </div>
-      
+
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -48,14 +48,14 @@ function AdminDashboard() {
 
         <TabsContent value="overview" className="space-y-6">
           <DashboardStats />
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <OrdersChart />
             <div className="grid grid-cols-1 gap-6">
               <TopProducts />
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <TopCustomers />
             <RecentNotifications />
@@ -115,6 +115,7 @@ export default function EnhancedAdmin() {
             <Route path="categories" element={<CategoryManagement />} />
             <Route path="subcategories" element={<SubcategoryManagement />} />
             <Route path="products" element={<ProductManagement />} />
+            <Route path="inventory" element={<InventoryManagement />} />
             <Route path="orders" element={<EnhancedOrderManagement />} />
             <Route path="customers" element={<CustomerManagement />} />
             <Route path="combos" element={<ComboManagement />} />

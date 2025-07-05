@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface StockInfo {
@@ -20,22 +19,20 @@ export interface CartValidationResult {
   errorMessages: string[];
 }
 
-// Unified function to get stock information using the breakdown table (fallback to manual calculation)
+// Unified function to get stock information using the product_inventory table
 export async function getVariantStockInfo(
   productId: string,
-  colorVariantId?: string | null,
-  sizeVariantId?: string | null
+  productInventoryId?: string | null
 ): Promise<StockInfo> {
   try {
     console.log('=== GETTING VARIANT STOCK INFO ===');
     console.log('Product ID:', productId);
-    console.log('Color Variant ID:', colorVariantId);
-    console.log('Size Variant ID:', sizeVariantId);
+    console.log('Product Inventory ID:', productInventoryId);
 
     // Get product details first
     const { data: product, error: productError } = await supabase
       .from('products')
-      .select('has_color_variants, color_has_size_variants, stock_quantity, name, status')
+      .select('has_color_variants, color_has_size_variants, name, status')
       .eq('id', productId)
       .single();
 
@@ -58,71 +55,55 @@ export async function getVariantStockInfo(
       };
     }
 
-    // If no variants requested and product has no variants
-    if (!colorVariantId && !sizeVariantId && !product.has_color_variants) {
+    // If no inventory ID provided, get the base product inventory (no variants)
+    if (!productInventoryId) {
+      const { data: baseInventory, error: baseInventoryError } = await supabase
+        .from('product_inventory')
+        .select('stock_quantity, available_stock, is_active')
+        .eq('product_id', productId)
+        .is('color_variant_id', null)
+        .is('size_variant_id', null)
+        .eq('is_active', true)
+        .single();
+
+      if (baseInventoryError || !baseInventory) {
+        return {
+          stockSource: 'none',
+          stockAmount: 0,
+          isValid: false,
+          errorMessage: 'Product inventory not found'
+        };
+      }
+
       return {
-        stockSource: 'product',
-        stockAmount: product.stock_quantity || 0,
+        stockSource: 'product_inventory',
+        stockAmount: baseInventory.available_stock || baseInventory.stock_quantity || 0,
         isValid: true
       };
     }
 
-    // If color variant requested
-    if (colorVariantId && !sizeVariantId) {
-      const { data: colorVariant, error: colorError } = await supabase
-        .from('color_variants')
-        .select('stock_quantity, has_sizes')
-        .eq('id', colorVariantId)
-        .eq('product_id', productId)
-        .single();
+    // Get specific inventory item
+    const { data: inventoryItem, error: inventoryError } = await supabase
+      .from('product_inventory')
+      .select('stock_quantity, available_stock, is_active, color_name, size_name')
+      .eq('id', productInventoryId)
+      .eq('product_id', productId)
+      .eq('is_active', true)
+      .single();
 
-      if (colorError || !colorVariant) {
-        return {
-          stockSource: 'none',
-          stockAmount: 0,
-          isValid: false,
-          errorMessage: 'Color variant not found'
-        };
-      }
-
-      if (!colorVariant.has_sizes) {
-        return {
-          stockSource: 'color_variant',
-          stockAmount: colorVariant.stock_quantity || 0,
-          isValid: true
-        };
-      }
-    }
-
-    // If size variant requested
-    if (sizeVariantId) {
-      const { data: sizeVariant, error: sizeError } = await supabase
-        .from('size_variants')
-        .select('stock_quantity')
-        .eq('id', sizeVariantId)
-        .single();
-
-      if (sizeError || !sizeVariant) {
-        return {
-          stockSource: 'none',
-          stockAmount: 0,
-          isValid: false,
-          errorMessage: 'Size variant not found'
-        };
-      }
-
+    if (inventoryError || !inventoryItem) {
       return {
-        stockSource: 'size_variant',
-        stockAmount: sizeVariant.stock_quantity || 0,
-        isValid: true
+        stockSource: 'none',
+        stockAmount: 0,
+        isValid: false,
+        errorMessage: 'Inventory item not found'
       };
     }
 
     return {
-      stockSource: 'none',
-      stockAmount: 0,
-      isValid: false,
-      errorMessage: 'Invalid variant combination'
+      stockSource: 'product_inventory',
+      stockAmount: inventoryItem.available_stock || inventoryItem.stock_quantity || 0,
+      isValid: true
     };
   } catch (error) {
     console.error('Error getting variant stock info:', error);
@@ -135,127 +116,104 @@ export async function getVariantStockInfo(
   }
 }
 
-// Unified function to update stock (fallback to manual updates)
+// Unified function to update stock using the product_inventory table
 export async function updateVariantStockAtomic(
   productId: string,
-  colorVariantId: string | null,
-  sizeVariantId: string | null,
+  productInventoryId: string | null,
   stockChange: number
 ): Promise<StockUpdateResult> {
   try {
     console.log('=== UPDATING VARIANT STOCK ===');
     console.log('Product ID:', productId);
-    console.log('Color Variant ID:', colorVariantId);
-    console.log('Size Variant ID:', sizeVariantId);
+    console.log('Product Inventory ID:', productInventoryId);
     console.log('Stock Change:', stockChange);
 
-    // Determine which table to update based on variant IDs
-    if (sizeVariantId) {
-      // Update size variant
+    // If no inventory ID provided, update the base product inventory
+    if (!productInventoryId) {
       const { data: current, error: fetchError } = await supabase
-        .from('size_variants')
-        .select('stock_quantity')
-        .eq('id', sizeVariantId)
+        .from('product_inventory')
+        .select('stock_quantity, available_stock')
+        .eq('product_id', productId)
+        .is('color_variant_id', null)
+        .is('size_variant_id', null)
+        .eq('is_active', true)
         .single();
 
       if (fetchError || !current) {
         return {
           success: false,
           newStock: 0,
-          errorMessage: 'Size variant not found'
+          errorMessage: 'Base product inventory not found'
         };
       }
 
       const newStock = Math.max(0, current.stock_quantity + stockChange);
+      const newAvailableStock = Math.max(0, current.available_stock + stockChange);
 
       const { error: updateError } = await supabase
-        .from('size_variants')
-        .update({ stock_quantity: newStock })
-        .eq('id', sizeVariantId);
+        .from('product_inventory')
+        .update({
+          stock_quantity: newStock,
+          available_stock: newAvailableStock
+        })
+        .eq('product_id', productId)
+        .is('color_variant_id', null)
+        .is('size_variant_id', null);
 
       if (updateError) {
         return {
           success: false,
           newStock: current.stock_quantity,
-          errorMessage: 'Failed to update size variant stock'
+          errorMessage: 'Failed to update base product inventory stock'
         };
       }
 
       return {
         success: true,
-        newStock
-      };
-    } else if (colorVariantId) {
-      // Update color variant
-      const { data: current, error: fetchError } = await supabase
-        .from('color_variants')
-        .select('stock_quantity')
-        .eq('id', colorVariantId)
-        .single();
-
-      if (fetchError || !current) {
-        return {
-          success: false,
-          newStock: 0,
-          errorMessage: 'Color variant not found'
-        };
-      }
-
-      const newStock = Math.max(0, current.stock_quantity + stockChange);
-
-      const { error: updateError } = await supabase
-        .from('color_variants')
-        .update({ stock_quantity: newStock })
-        .eq('id', colorVariantId);
-
-      if (updateError) {
-        return {
-          success: false,
-          newStock: current.stock_quantity,
-          errorMessage: 'Failed to update color variant stock'
-        };
-      }
-
-      return {
-        success: true,
-        newStock
-      };
-    } else {
-      // Update product stock
-      const { data: current, error: fetchError } = await supabase
-        .from('products')
-        .select('stock_quantity')
-        .eq('id', productId)
-        .single();
-
-      if (fetchError || !current) {
-        return {
-          success: false,
-          newStock: 0,
-          errorMessage: 'Product not found'
-        };
-      }
-
-      const newStock = Math.max(0, (current.stock_quantity || 0) + stockChange);
-
-      const { error: updateError } = await supabase
-        .from('products')
-        .update({ stock_quantity: newStock })
-        .eq('id', productId);
-
-      if (updateError) {
-        return {
-          success: false,
-          newStock: current.stock_quantity || 0,
-          errorMessage: 'Failed to update product stock'
-        };
-      }
-
-      return {
-        success: true,
-        newStock
+        newStock: newAvailableStock
       };
     }
+
+    // Update specific inventory item
+    const { data: current, error: fetchError } = await supabase
+      .from('product_inventory')
+      .select('stock_quantity, available_stock')
+      .eq('id', productInventoryId)
+      .eq('product_id', productId)
+      .eq('is_active', true)
+      .single();
+
+    if (fetchError || !current) {
+      return {
+        success: false,
+        newStock: 0,
+        errorMessage: 'Inventory item not found'
+      };
+    }
+
+    const newStock = Math.max(0, current.stock_quantity + stockChange);
+    const newAvailableStock = Math.max(0, current.available_stock + stockChange);
+
+    const { error: updateError } = await supabase
+      .from('product_inventory')
+      .update({
+        stock_quantity: newStock,
+        available_stock: newAvailableStock
+      })
+      .eq('id', productInventoryId);
+
+    if (updateError) {
+      return {
+        success: false,
+        newStock: current.stock_quantity,
+        errorMessage: 'Failed to update inventory stock'
+      };
+    }
+
+    return {
+      success: true,
+      newStock: newAvailableStock
+    };
   } catch (error) {
     console.error('Error updating variant stock:', error);
     return {
@@ -266,100 +224,54 @@ export async function updateVariantStockAtomic(
   }
 }
 
-// Unified function to validate cart stock
+// Function to validate cart stock using the new inventory system
 export async function validateCartStock(cartItems: any[]): Promise<CartValidationResult> {
-  try {
-    console.log('=== VALIDATING CART STOCK ===');
-    console.log('Cart items count:', cartItems.length);
+  const invalidItems: any[] = [];
+  const errorMessages: string[] = [];
 
-    if (cartItems.length === 0) {
-      return {
-        isValid: true,
-        invalidItems: [],
-        errorMessages: []
-      };
-    }
+  for (const item of cartItems) {
+    try {
+      const stockInfo = await getVariantStockInfo(item.productId, item.productInventoryId);
 
-    const invalidItems: any[] = [];
-    const errorMessages: string[] = [];
-
-    for (const item of cartItems) {
-      const stockInfo = await getVariantStockInfo(
-        item.productId,
-        item.colorVariantId,
-        item.sizeVariantId
-      );
-
-      if (!stockInfo.isValid || stockInfo.stockAmount < item.quantity) {
+      if (!stockInfo.isValid) {
         invalidItems.push(item);
-        errorMessages.push(
-          `${item.productName}: ${stockInfo.isValid ? 
-            `Only ${stockInfo.stockAmount} available, requested ${item.quantity}` : 
-            'Variant not available'}`
-        );
+        errorMessages.push(`Item "${item.productName}": ${stockInfo.errorMessage}`);
+        continue;
       }
-    }
 
-    return {
-      isValid: invalidItems.length === 0,
-      invalidItems,
-      errorMessages
-    };
-  } catch (error) {
-    console.error('Error validating cart stock:', error);
-    return {
-      isValid: false,
-      invalidItems: [],
-      errorMessages: ['Error validating cart stock']
-    };
+      if (stockInfo.stockAmount < item.quantity) {
+        invalidItems.push(item);
+        errorMessages.push(`Item "${item.productName}": Only ${stockInfo.stockAmount} available, requested ${item.quantity}`);
+      }
+    } catch (error) {
+      console.error('Error validating cart item stock:', error);
+      invalidItems.push(item);
+      errorMessages.push(`Item "${item.productName}": Error checking stock availability`);
+    }
   }
+
+  return {
+    isValid: invalidItems.length === 0,
+    invalidItems,
+    errorMessages
+  };
 }
 
-// Helper function to calculate total product stock
+// Function to calculate total product stock using the new inventory system
 export async function calculateTotalProductStock(productId: string): Promise<number> {
   try {
-    // Use manual calculation since RPC function doesn't exist
-    const { data: product, error: productError } = await supabase
-      .from('products')
-      .select('has_color_variants, color_has_size_variants, stock_quantity')
-      .eq('id', productId)
-      .single();
+    const { data: inventoryItems, error } = await supabase
+      .from('product_inventory')
+      .select('available_stock')
+      .eq('product_id', productId)
+      .eq('is_active', true);
 
-    if (productError || !product) {
+    if (error) {
+      console.error('Error calculating total product stock:', error);
       return 0;
     }
 
-    if (!product.has_color_variants) {
-      return product.stock_quantity || 0;
-    }
-
-    // Calculate from variants
-    const { data: colorVariants, error: colorError } = await supabase
-      .from('color_variants')
-      .select('id, stock_quantity, has_sizes')
-      .eq('product_id', productId);
-
-    if (colorError || !colorVariants) {
-      return 0;
-    }
-
-    let totalStock = 0;
-
-    for (const colorVariant of colorVariants) {
-      if (!colorVariant.has_sizes) {
-        totalStock += colorVariant.stock_quantity || 0;
-      } else {
-        const { data: sizeVariants, error: sizeError } = await supabase
-          .from('size_variants')
-          .select('stock_quantity')
-          .eq('color_variant_id', colorVariant.id);
-
-        if (!sizeError && sizeVariants) {
-          totalStock += sizeVariants.reduce((sum, size) => sum + (size.stock_quantity || 0), 0);
-        }
-      }
-    }
-
+    const totalStock = inventoryItems?.reduce((sum, item) => sum + (item.available_stock || 0), 0) || 0;
     return totalStock;
   } catch (error) {
     console.error('Error calculating total product stock:', error);
@@ -367,38 +279,32 @@ export async function calculateTotalProductStock(productId: string): Promise<num
   }
 }
 
-// Batch stock operations for order processing
+// Function to process order stock changes using the new inventory system
 export async function processOrderStockChanges(
   orderItems: Array<{
     productId: string;
-    colorVariantId?: string | null;
-    sizeVariantId?: string | null;
+    productInventoryId?: string | null;
     quantity: number;
   }>,
   operation: 'reduce' | 'restore'
 ): Promise<{ success: boolean; errors: string[] }> {
-  console.log(`=== PROCESSING ORDER STOCK CHANGES: ${operation.toUpperCase()} ===`);
-  console.log('Order items:', orderItems.length);
-
   const errors: string[] = [];
-  const multiplier = operation === 'reduce' ? -1 : 1;
+  const stockChange = operation === 'reduce' ? -1 : 1;
 
   for (const item of orderItems) {
-    const stockChange = item.quantity * multiplier;
-    
-    const result = await updateVariantStockAtomic(
-      item.productId,
-      item.colorVariantId || null,
-      item.sizeVariantId || null,
-      stockChange
-    );
+    try {
+      const result = await updateVariantStockAtomic(
+        item.productId,
+        item.productInventoryId,
+        stockChange * item.quantity
+      );
 
-    if (!result.success) {
-      const errorMsg = result.errorMessage || `Failed to ${operation} stock for product ${item.productId}`;
-      console.error(errorMsg);
-      errors.push(errorMsg);
-    } else {
-      console.log(`Successfully ${operation}d stock for product ${item.productId}: ${stockChange} units`);
+      if (!result.success) {
+        errors.push(`Failed to ${operation} stock for product ${item.productId}: ${result.errorMessage}`);
+      }
+    } catch (error) {
+      console.error(`Error ${operation}ing stock for item:`, error);
+      errors.push(`Error ${operation}ing stock for product ${item.productId}`);
     }
   }
 
@@ -408,177 +314,130 @@ export async function processOrderStockChanges(
   };
 }
 
-// Helper function to get stock breakdown by variant
+// Function to get stock breakdown using the new inventory system
 export async function getStockBreakdown(productId: string) {
   try {
-    const { data: product, error: productError } = await supabase
-      .from('products')
-      .select('has_color_variants, color_has_size_variants, stock_quantity')
-      .eq('id', productId)
-      .single();
+    const { data: inventoryItems, error } = await supabase
+      .from('product_inventory')
+      .select(`
+        id,
+        color_name,
+        size_name,
+        stock_quantity,
+        available_stock,
+        reserved_stock,
+        is_active,
+        color_variant_id,
+        size_variant_id
+      `)
+      .eq('product_id', productId)
+      .eq('is_active', true)
+      .order('color_name')
+      .order('size_name');
 
-    if (productError || !product) {
-      return {
-        totalStock: 0,
-        colorVariants: []
-      };
+    if (error) {
+      console.error('Error getting stock breakdown:', error);
+      return [];
     }
 
-    if (!product.has_color_variants) {
-      return {
-        totalStock: product.stock_quantity || 0,
-        colorVariants: []
-      };
-    }
-
-    const { data: colorVariants, error: colorError } = await supabase
-      .from('color_variants')
-      .select('id, color_name, stock_quantity, has_sizes')
-      .eq('product_id', productId);
-
-    if (colorError || !colorVariants) {
-      return {
-        totalStock: 0,
-        colorVariants: []
-      };
-    }
-
-    const breakdown = {
-      totalStock: 0,
-      colorVariants: [] as Array<{
-        colorName: string;
-        colorStock: number;
-        sizeVariants: Array<{
-          sizeName: string;
-          sizeStock: number;
-        }>;
-      }>
-    };
-
-    for (const colorVariant of colorVariants) {
-      const colorData = {
-        colorName: colorVariant.color_name,
-        colorStock: 0,
-        sizeVariants: [] as Array<{
-          sizeName: string;
-          sizeStock: number;
-        }>
-      };
-
-      if (!colorVariant.has_sizes) {
-        colorData.colorStock = colorVariant.stock_quantity || 0;
-        breakdown.totalStock += colorData.colorStock;
-      } else {
-        const { data: sizeVariants, error: sizeError } = await supabase
-          .from('size_variants')
-          .select('size_name, stock_quantity')
-          .eq('color_variant_id', colorVariant.id);
-
-        if (!sizeError && sizeVariants) {
-          for (const sizeVariant of sizeVariants) {
-            const sizeStock = sizeVariant.stock_quantity || 0;
-            colorData.sizeVariants.push({
-              sizeName: sizeVariant.size_name,
-              sizeStock
-            });
-            colorData.colorStock += sizeStock;
-            breakdown.totalStock += sizeStock;
-          }
-        }
-      }
-
-      breakdown.colorVariants.push(colorData);
-    }
-
-    return breakdown;
+    return inventoryItems || [];
   } catch (error) {
     console.error('Error getting stock breakdown:', error);
-    return {
-      totalStock: 0,
-      colorVariants: []
-    };
+    return [];
   }
 }
 
-// Helper function to get detailed product variant information
+// Function to get product variant details using the new inventory system
 export async function getProductVariantDetails(productId: string) {
   try {
     const { data: product, error: productError } = await supabase
       .from('products')
-      .select('has_color_variants, color_has_size_variants, stock_quantity, name')
+      .select('has_color_variants, color_has_size_variants')
       .eq('id', productId)
       .single();
 
     if (productError || !product) {
-      return [];
+      return { hasVariants: false, variants: [] };
     }
-
-    const variants = [];
 
     if (!product.has_color_variants) {
-      variants.push({
-        product_id: productId,
-        product_name: product.name,
-        color_variant_id: null,
-        color_name: null,
-        size_variant_id: null,
-        size_name: null,
-        size_code: null,
-        stock_quantity: product.stock_quantity || 0,
-        variant_sku: `${product.name.toUpperCase().replace(/\s+/g, '_')}_DEFAULT`,
-        is_active: true
-      });
-    } else {
-      const { data: colorVariants, error: colorError } = await supabase
-        .from('color_variants')
-        .select('id, color_name, stock_quantity, has_sizes')
-        .eq('product_id', productId);
-
-      if (!colorError && colorVariants) {
-        for (const colorVariant of colorVariants) {
-          if (!colorVariant.has_sizes) {
-            variants.push({
-              product_id: productId,
-              product_name: product.name,
-              color_variant_id: colorVariant.id,
-              color_name: colorVariant.color_name,
-              size_variant_id: null,
-              size_name: null,
-              size_code: null,
-              stock_quantity: colorVariant.stock_quantity || 0,
-              variant_sku: `${product.name.toUpperCase().replace(/\s+/g, '_')}_${colorVariant.color_name.toUpperCase().replace(/\s+/g, '_')}`,
-              is_active: true
-            });
-          } else {
-            const { data: sizeVariants, error: sizeError } = await supabase
-              .from('size_variants')
-              .select('id, size_name, size_code, stock_quantity')
-              .eq('color_variant_id', colorVariant.id);
-
-            if (!sizeError && sizeVariants) {
-              for (const sizeVariant of sizeVariants) {
-                variants.push({
-                  product_id: productId,
-                  product_name: product.name,
-                  color_variant_id: colorVariant.id,
-                  color_name: colorVariant.color_name,
-                  size_variant_id: sizeVariant.id,
-                  size_name: sizeVariant.size_name,
-                  size_code: sizeVariant.size_code,
-                  stock_quantity: sizeVariant.stock_quantity || 0,
-                  variant_sku: `${product.name.toUpperCase().replace(/\s+/g, '_')}_${colorVariant.color_name.toUpperCase().replace(/\s+/g, '_')}_${sizeVariant.size_name.toUpperCase().replace(/\s+/g, '_')}`,
-                  is_active: true
-                });
-              }
-            }
-          }
-        }
-      }
+      return { hasVariants: false, variants: [] };
     }
 
-    return variants;
+    // Get color variants with their inventory
+    const { data: colorVariants, error: colorError } = await supabase
+      .from('color_variants')
+      .select(`
+        id,
+        color_name,
+        has_sizes,
+        image_url,
+        size_variants (
+          id,
+          size_name,
+          size_code
+        )
+      `)
+      .eq('product_id', productId)
+      .order('color_name');
+
+    if (colorError) {
+      console.error('Error getting color variants:', colorError);
+      return { hasVariants: false, variants: [] };
+    }
+
+    // Get inventory for each variant
+    const variantsWithInventory = await Promise.all(
+      (colorVariants || []).map(async (colorVariant) => {
+        if (colorVariant.has_sizes && colorVariant.size_variants) {
+          // Get inventory for each size variant
+          const sizeVariantsWithInventory = await Promise.all(
+            colorVariant.size_variants.map(async (sizeVariant) => {
+              const { data: inventory } = await supabase
+                .from('product_inventory')
+                .select('id, stock_quantity, available_stock')
+                .eq('product_id', productId)
+                .eq('color_variant_id', colorVariant.id)
+                .eq('size_variant_id', sizeVariant.id)
+                .eq('is_active', true)
+                .single();
+
+              return {
+                ...sizeVariant,
+                inventory: inventory || null
+              };
+            })
+          );
+
+          return {
+            ...colorVariant,
+            size_variants: sizeVariantsWithInventory
+          };
+        } else {
+          // Get inventory for color variant without sizes
+          const { data: inventory } = await supabase
+            .from('product_inventory')
+            .select('id, stock_quantity, available_stock')
+            .eq('product_id', productId)
+            .eq('color_variant_id', colorVariant.id)
+            .is('size_variant_id', null)
+            .eq('is_active', true)
+            .single();
+
+          return {
+            ...colorVariant,
+            inventory: inventory || null
+          };
+        }
+      })
+    );
+
+    return {
+      hasVariants: true,
+      variants: variantsWithInventory
+    };
   } catch (error) {
-    console.error('Error in getProductVariantDetails:', error);
-    return [];
+    console.error('Error getting product variant details:', error);
+    return { hasVariants: false, variants: [] };
   }
 }

@@ -67,11 +67,23 @@ export function ProductManagement() {
   const [subcategoryFilter, setSubcategoryFilter] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'selling_price'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Filtered subcategories
   const filteredSubcategories = categoryFilter
     ? subcategories.filter((sub) => sub.category_id === categoryFilter)
     : subcategories;
+
+  // Filtered products with search
+  const displayedProducts = products.filter(product => {
+    const matchesSearch =
+      !searchTerm ||
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesCategory = !categoryFilter || product.category_id === categoryFilter;
+    const matchesSubcategory = !subcategoryFilter || product.subcategory_id === subcategoryFilter;
+    return matchesSearch && matchesCategory && matchesSubcategory;
+  });
 
   useEffect(() => {
     fetchProducts();
@@ -200,7 +212,7 @@ export function ProductManagement() {
   const handleEdit = async (productId: string) => {
     // Validate if product can be edited
     const validation = await validateProductEditability(productId);
-    
+
     if (!validation.canEdit) {
       setEditBlockedModal({
         isOpen: true,
@@ -262,7 +274,7 @@ export function ProductManagement() {
     if (viewingProductId) {
       // Validate if product can be edited
       const validation = await validateProductEditability(viewingProductId);
-      
+
       if (!validation.canEdit) {
         setEditBlockedModal({
           isOpen: true,
@@ -345,6 +357,18 @@ export function ProductManagement() {
       <div className="sticky top-0 z-10 mb-4">
         <Card className="shadow border border-gray-200 bg-white/95 backdrop-blur p-4">
           <div className="flex flex-col md:flex-row md:items-end gap-4">
+            {/* Search Bar */}
+            <div className="flex-1 min-w-[220px]">
+              <label className="block text-sm font-medium mb-1" htmlFor="product-search">Search</label>
+              <input
+                id="product-search"
+                type="text"
+                className="w-full border rounded px-3 py-2"
+                placeholder="Search by name or description..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
             <div className="flex-1 min-w-[180px]">
               <label className="block text-sm font-medium mb-1" htmlFor="category-filter">Category</label>
               <select
@@ -425,18 +449,18 @@ export function ProductManagement() {
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
-          Showing {products.length} product{products.length !== 1 ? 's' : ''}
+          Showing {displayedProducts.length} product{displayedProducts.length !== 1 ? 's' : ''}
         </p>
       </div>
 
       <div className="grid gap-4">
-        {products.length === 0 ? (
+        {displayedProducts.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
             <p>No products found matching your filters</p>
           </div>
         ) : (
-          products.map((product) => (
+          displayedProducts.map((product) => (
             <Card key={product.id}>
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">

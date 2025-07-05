@@ -43,6 +43,7 @@ interface OrderItem {
   total_price: number;
   pricing_mode: string;
   pricing_details: any;
+  product_inventory_id: string;
 }
 
 export default function OrderSummary() {
@@ -56,6 +57,7 @@ export default function OrderSummary() {
   const location = useLocation();
   const isAdminView = location.pathname.includes('/admin');
   const { userProfile } = useAuth();
+  const [inventoryMap, setInventoryMap] = useState({});
 
   useEffect(() => {
     if (!orderId) {
@@ -64,6 +66,21 @@ export default function OrderSummary() {
     }
     fetchOrderDetails();
   }, [orderId, navigate]);
+
+  useEffect(() => {
+    async function fetchInventory() {
+      const ids = orderItems.map(item => item.product_inventory_id).filter(Boolean);
+      if (ids.length === 0) return;
+      const { data } = await supabase
+        .from('product_inventory')
+        .select('id, sku, available_stock, is_active')
+        .in('id', ids);
+      const map = {};
+      (data || []).forEach(inv => { map[inv.id] = inv; });
+      setInventoryMap(map);
+    }
+    fetchInventory();
+  }, [orderItems]);
 
   const fetchOrderDetails = async () => {
     if (!orderId) return;
@@ -166,6 +183,13 @@ export default function OrderSummary() {
                 <p className="text-sm text-gray-600">Size: <span className="font-medium">{firstItem.size_name}</span></p>
               )}
             </div>
+            <p className="text-xs text-gray-500">SKU: {inventoryMap[firstItem.product_inventory_id]?.sku || 'N/A'}</p>
+            {typeof inventoryMap[firstItem.product_inventory_id]?.available_stock === 'number' && (
+              <p className="text-xs text-gray-500">Stock: {inventoryMap[firstItem.product_inventory_id]?.available_stock}</p>
+            )}
+            {inventoryMap[firstItem.product_inventory_id] && !inventoryMap[firstItem.product_inventory_id].is_active && (
+              <p className="text-xs text-red-600 font-bold">This variant is inactive</p>
+            )}
           </div>
           <div className="text-right">
             <p className="font-bold text-xl">Rs. {totalPrice.toFixed(2)}</p>
@@ -180,9 +204,9 @@ export default function OrderSummary() {
         {/* Detailed Item Breakdown */}
         <div className="space-y-2">
           {items.map((item, index) => (
-            <div key={index} className="flex justify-between items-center p-2 bg-white rounded border">
+            <div key={index} className="flex flex-col md:flex-row md:justify-between md:items-center p-2 bg-white rounded border mb-2">
               <div className="flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mb-1">
                   {item.pricing_mode === 'combo' && (
                     <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
                       <Gift className="w-2 h-2 mr-1" />
@@ -197,13 +221,27 @@ export default function OrderSummary() {
                   )}
                   <span className="text-sm">Qty: {item.quantity}</span>
                 </div>
+                {/* Pricing breakdown details */}
+                {item.pricing_details && item.pricing_details.description && (
+                  <p className="text-xs text-gray-700 font-semibold mb-1">{item.pricing_details.description}</p>
+                )}
+                {item.pricing_details && item.pricing_details.breakdown && item.pricing_details.breakdown.length > 0 && (
+                  <ul className="text-xs text-gray-600 list-disc list-inside mb-1">
+                    {item.pricing_details.breakdown.map((line: string, idx: number) => (
+                      <li key={idx}>{line}</li>
+                    ))}
+                  </ul>
+                )}
+                {typeof item.pricing_details?.basePrice === 'number' && (
+                  <p className="text-xs text-gray-500 mt-1">Base Price: Rs. {item.pricing_details.basePrice.toFixed(2)}</p>
+                )}
                 <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
               </div>
-              <div className="text-right">
+              <div className="text-right mt-2 md:mt-0">
                 <p className="font-medium">Rs. {item.total_price.toFixed(2)}</p>
-                {item.unit_price < (item.pricing_details?.base_price || item.unit_price) && (
+                {item.unit_price < (item.pricing_details?.basePrice || item.unit_price) && (
                   <p className="text-xs text-green-600">
-                    Saved: Rs. {((item.pricing_details?.base_price || item.unit_price) - item.unit_price).toFixed(2)} each
+                    Saved: Rs. {((item.pricing_details?.basePrice || item.unit_price) - item.unit_price).toFixed(2)} each
                   </p>
                 )}
               </div>

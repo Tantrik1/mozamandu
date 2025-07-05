@@ -7,7 +7,6 @@ import { Eye, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { restoreStockForOrder } from '@/utils/stockManagement';
 
 interface Order {
   id: string;
@@ -31,11 +30,11 @@ interface AdminOrdersTableProps {
   onUpdateStatus: (orderId: string, newStatus: string) => Promise<void>;
 }
 
-export function AdminOrdersTable({ 
-  orders, 
-  filteredOrders, 
-  updating, 
-  onUpdateStatus 
+export function AdminOrdersTable({
+  orders,
+  filteredOrders,
+  updating,
+  onUpdateStatus
 }: AdminOrdersTableProps) {
   const navigate = useNavigate();
 
@@ -70,56 +69,10 @@ export function AdminOrdersTable({
     if (!order) return;
 
     const oldStatus = order.status;
-    
-    // Enhanced stock restoration when cancelling orders
-    if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
-      try {
-        console.log('Restoring stock for cancelled order...');
-        
-        // Fetch order items to restore stock
-        const { data: orderItems, error: itemsError } = await supabase
-          .from('order_items')
-          .select('product_id, color_variant_id, size_variant_id, quantity')
-          .eq('order_id', orderId);
 
-        if (itemsError) {
-          console.error('Error fetching order items:', itemsError);
-          toast({
-            title: "Error",
-            description: "Could not fetch order items for stock restoration",
-            variant: "destructive",
-          });
-        } else if (orderItems && orderItems.length > 0) {
-          const stockItems = orderItems.map(item => ({
-            productId: item.product_id,
-            colorVariantId: item.color_variant_id,
-            sizeVariantId: item.size_variant_id,
-            quantity: item.quantity
-          }));
-
-          await restoreStockForOrder(stockItems);
-          console.log('Stock restored successfully');
-          
-          toast({
-            title: "Stock Restored",
-            description: `Stock has been restored for ${orderItems.length} item(s) from the cancelled order.`,
-          });
-        } else {
-          console.log('No order items found to restore stock for');
-        }
-      } catch (stockError) {
-        console.error('Error restoring stock:', stockError);
-        toast({
-          title: "Stock Restoration Error",
-          description: stockError instanceof Error ? stockError.message : "Order was cancelled but stock could not be restored. Please check manually.",
-          variant: "destructive",
-        });
-      }
-    }
-    
     // Call the parent update function
     await onUpdateStatus(orderId, newStatus);
-    
+
     // Send status update email
     try {
       console.log('Sending status update email...');

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { getVariantStockInfo, getStockBreakdown } from './unifiedStockManager';
 
@@ -14,16 +13,16 @@ export interface StockCalculationResult {
   }>;
 }
 
-// Fallback function to calculate stock from existing tables if breakdown table is not available
-export async function calculateProductStockFallback(productId: string): Promise<StockCalculationResult> {
+// Function to calculate stock using the new inventory system
+export async function calculateProductStockNew(productId: string): Promise<StockCalculationResult> {
   try {
-    console.log('=== CALCULATING PRODUCT STOCK (FALLBACK) ===');
+    console.log('=== CALCULATING PRODUCT STOCK (NEW INVENTORY SYSTEM) ===');
     console.log('Product ID:', productId);
-    
+
     // Get product details first
     const { data: product, error: productError } = await supabase
       .from('products')
-      .select('has_color_variants, color_has_size_variants, stock_quantity, name, status')
+      .select('has_color_variants, color_has_size_variants, name, status')
       .eq('id', productId)
       .single();
 
@@ -37,15 +36,149 @@ export async function calculateProductStockFallback(productId: string): Promise<
       return { totalStock: 0 };
     }
 
-    console.log('Product details:', { 
+    console.log('Product details:', {
       name: product.name,
-      has_color_variants: product.has_color_variants, 
-      color_has_size_variants: product.color_has_size_variants,
-      stock_quantity: product.stock_quantity 
+      has_color_variants: product.has_color_variants,
+      color_has_size_variants: product.color_has_size_variants
+    });
+
+    // Get all inventory items for this product
+    const { data: inventoryItems, error: inventoryError } = await supabase
+      .from('product_inventory')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('is_active', true)
+      .order('color_name', { ascending: true })
+      .order('size_name', { ascending: true });
+
+    if (inventoryError) {
+      console.error('Error fetching inventory items:', inventoryError);
+      return { totalStock: 0 };
+    }
+
+    if (!inventoryItems || inventoryItems.length === 0) {
+      console.log('No inventory items found for product');
+      return { totalStock: 0 };
+    }
+
+    let totalStock = 0;
+    const colorBreakdown: Array<{
+      colorName: string;
+      stock: number;
+      sizeBreakdown?: Array<{
+        sizeName: string;
+        stock: number;
+      }>;
+    }> = [];
+
+    // Group inventory items by color
+    const colorGroups: { [key: string]: any[] } = {};
+
+    for (const item of inventoryItems) {
+      const colorKey = item.color_name || 'default';
+      if (!colorGroups[colorKey]) {
+        colorGroups[colorKey] = [];
+      }
+      colorGroups[colorKey].push(item);
+    }
+
+    // Process each color group
+    for (const [colorName, items] of Object.entries(colorGroups)) {
+      if (product.has_color_variants && product.color_has_size_variants) {
+        // Product has color and size variants
+        const sizeBreakdown: Array<{
+          sizeName: string;
+          stock: number;
+        }> = [];
+
+        let colorStock = 0;
+
+        for (const item of items) {
+          const itemStock = item.available_stock || item.stock_quantity || 0;
+          colorStock += itemStock;
+          totalStock += itemStock;
+
+          if (item.size_name) {
+            sizeBreakdown.push({
+              sizeName: item.size_name,
+              stock: itemStock
+            });
+          }
+        }
+
+        colorBreakdown.push({
+          colorName: colorName === 'default' ? 'No Color' : colorName,
+          stock: colorStock,
+          sizeBreakdown: sizeBreakdown.length > 0 ? sizeBreakdown : undefined
+        });
+      } else if (product.has_color_variants) {
+        // Product has only color variants
+        const colorStock = items.reduce((sum, item) => sum + (item.available_stock || item.stock_quantity || 0), 0);
+        totalStock += colorStock;
+
+        colorBreakdown.push({
+          colorName: colorName === 'default' ? 'No Color' : colorName,
+          stock: colorStock
+        });
+      } else {
+        // Product has no variants
+        const itemStock = items[0]?.available_stock || items[0]?.stock_quantity || 0;
+        totalStock += itemStock;
+      }
+    }
+
+    return {
+      totalStock,
+      colorBreakdown: colorBreakdown.length > 0 ? colorBreakdown : undefined
+    };
+  } catch (error) {
+    console.error('Error in calculateProductStockNew:', error);
+    return { totalStock: 0 };
+  }
+}
+
+// Fallback function to calculate stock from existing tables if breakdown table is not available
+export async function calculateProductStockFallback(productId: string): Promise<StockCalculationResult> {
+  try {
+    console.log('=== CALCULATING PRODUCT STOCK (FALLBACK) ===');
+    console.log('Product ID:', productId);
+
+    // Get product details first
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .select('has_color_variants, color_has_size_variants, name, status')
+      .eq('id', productId)
+      .single();
+
+    if (productError || !product) {
+      console.error('Product not found:', productId, productError);
+      return { totalStock: 0 };
+    }
+
+    if (product.status !== 'active') {
+      console.log('Product is inactive:', product.name);
+      return { totalStock: 0 };
+    }
+
+    console.log('Product details:', {
+      name: product.name,
+      has_color_variants: product.has_color_variants,
+      color_has_size_variants: product.color_has_size_variants
     });
 
     if (!product.has_color_variants) {
-      return { totalStock: product.stock_quantity || 0 };
+      // Try to get stock from inventory first
+      const { data: inventoryItem } = await supabase
+        .from('product_inventory')
+        .select('available_stock, stock_quantity')
+        .eq('product_id', productId)
+        .is('color_variant_id', null)
+        .is('size_variant_id', null)
+        .eq('is_active', true)
+        .single();
+
+      const stock = inventoryItem?.available_stock || inventoryItem?.stock_quantity || 0;
+      return { totalStock: stock };
     }
 
     // Get color variants
@@ -56,11 +189,11 @@ export async function calculateProductStockFallback(productId: string): Promise<
 
     if (colorError) {
       console.error('Error fetching color variants:', colorError);
-      return { totalStock: product.stock_quantity || 0 };
+      return { totalStock: 0 };
     }
 
     if (!colorVariants || colorVariants.length === 0) {
-      return { totalStock: product.stock_quantity || 0 };
+      return { totalStock: 0 };
     }
 
     let totalStock = 0;
@@ -75,14 +208,24 @@ export async function calculateProductStockFallback(productId: string): Promise<
 
     for (const colorVariant of colorVariants) {
       if (!colorVariant.has_sizes) {
-        // Color variant without sizes
-        totalStock += colorVariant.stock_quantity || 0;
+        // Color variant without sizes - check inventory
+        const { data: inventoryItem } = await supabase
+          .from('product_inventory')
+          .select('available_stock, stock_quantity')
+          .eq('product_id', productId)
+          .eq('color_variant_id', colorVariant.id)
+          .is('size_variant_id', null)
+          .eq('is_active', true)
+          .single();
+
+        const colorStock = inventoryItem?.available_stock || inventoryItem?.stock_quantity || 0;
+        totalStock += colorStock;
         colorBreakdown.push({
           colorName: colorVariant.color_name,
-          stock: colorVariant.stock_quantity || 0
+          stock: colorStock
         });
       } else {
-        // Color variant with sizes
+        // Color variant with sizes - check inventory for each size
         const { data: sizeVariants, error: sizeError } = await supabase
           .from('size_variants')
           .select('*')
@@ -101,7 +244,17 @@ export async function calculateProductStockFallback(productId: string): Promise<
         let colorStock = 0;
         if (sizeVariants) {
           for (const sizeVariant of sizeVariants) {
-            const sizeStock = sizeVariant.stock_quantity || 0;
+            // Check inventory for this size variant
+            const { data: inventoryItem } = await supabase
+              .from('product_inventory')
+              .select('available_stock, stock_quantity')
+              .eq('product_id', productId)
+              .eq('color_variant_id', colorVariant.id)
+              .eq('size_variant_id', sizeVariant.id)
+              .eq('is_active', true)
+              .single();
+
+            const sizeStock = inventoryItem?.available_stock || inventoryItem?.stock_quantity || 0;
             colorStock += sizeStock;
             totalStock += sizeStock;
             sizeBreakdown.push({
@@ -119,9 +272,9 @@ export async function calculateProductStockFallback(productId: string): Promise<
       }
     }
 
-    return { 
-      totalStock, 
-      colorBreakdown 
+    return {
+      totalStock,
+      colorBreakdown
     };
   } catch (error) {
     console.error('Error in calculateProductStockFallback:', error);
@@ -133,9 +286,14 @@ export async function calculateProductStock(productId: string): Promise<StockCal
   try {
     console.log('=== CALCULATING PRODUCT STOCK ===');
     console.log('Product ID:', productId);
-    
-    // Use fallback method directly since RPC function doesn't exist
-    return await calculateProductStockFallback(productId);
+
+    // Try new inventory system first
+    try {
+      return await calculateProductStockNew(productId);
+    } catch (newSystemError) {
+      console.log('New inventory system failed, using fallback:', newSystemError);
+      return await calculateProductStockFallback(productId);
+    }
   } catch (error) {
     console.error('Error in calculateProductStock:', error);
     return { totalStock: 0 };
@@ -144,8 +302,7 @@ export async function calculateProductStock(productId: string): Promise<StockCal
 
 export async function getProductStockSummary(productId: string): Promise<number> {
   try {
-    // Use fallback method directly since RPC function doesn't exist
-    const result = await calculateProductStockFallback(productId);
+    const result = await calculateProductStock(productId);
     return result.totalStock;
   } catch (error) {
     console.error('Error getting product stock summary:', error);
@@ -156,46 +313,35 @@ export async function getProductStockSummary(productId: string): Promise<number>
 // Main stock validation function
 export async function validateVariantStock(
   productId: string,
-  colorVariantId?: string | null,
-  sizeVariantId?: string | null,
+  productInventoryId?: string | null,
   requestedQuantity: number = 1
 ): Promise<{ isValid: boolean; availableStock: number; errorMessage?: string }> {
   try {
     console.log('=== STOCK VALIDATION START ===');
-    console.log('Validating:', { productId, colorVariantId, sizeVariantId, requestedQuantity });
+    console.log('Validating:', { productId, productInventoryId, requestedQuantity });
 
-    // Try using unified stock manager if available
-    try {
-      const stockInfo = await getVariantStockInfo(productId, colorVariantId, sizeVariantId);
-      
-      if (stockInfo.isValid) {
-        const isValid = stockInfo.stockAmount >= requestedQuantity;
-        
-        console.log(`=== STOCK VALIDATION RESULT ===`);
-        console.log(`Stock source: ${stockInfo.stockSource}`);
-        console.log(`Available: ${stockInfo.stockAmount}, Requested: ${requestedQuantity}, Valid: ${isValid}`);
+    // Use unified stock manager
+    const stockInfo = await getVariantStockInfo(productId, productInventoryId);
 
-        return {
-          isValid,
-          availableStock: stockInfo.stockAmount,
-          errorMessage: !isValid ? 
-            `Only ${stockInfo.stockAmount} items available` : undefined
-        };
-      }
-    } catch (unifiedError) {
-      console.log('Unified stock manager not available, using fallback');
+    if (stockInfo.isValid) {
+      const isValid = stockInfo.stockAmount >= requestedQuantity;
+
+      console.log(`=== STOCK VALIDATION RESULT ===`);
+      console.log(`Stock source: ${stockInfo.stockSource}`);
+      console.log(`Available: ${stockInfo.stockAmount}, Requested: ${requestedQuantity}, Valid: ${isValid}`);
+
+      return {
+        isValid,
+        availableStock: stockInfo.stockAmount,
+        errorMessage: !isValid ?
+          `Only ${stockInfo.stockAmount} items available` : undefined
+      };
     }
 
-    // Fallback validation
-    const stockResult = await calculateProductStockFallback(productId);
-    const availableStock = stockResult.totalStock;
-    const isValid = availableStock >= requestedQuantity;
-
     return {
-      isValid,
-      availableStock,
-      errorMessage: !isValid ? 
-        `Only ${availableStock} items available` : undefined
+      isValid: false,
+      availableStock: 0,
+      errorMessage: stockInfo.errorMessage || 'Stock validation failed'
     };
   } catch (error) {
     console.error('Error in validateVariantStock:', error);
@@ -210,13 +356,16 @@ export async function validateVariantStock(
 // Helper function to get all available variants for a product
 export async function getAvailableVariants(productId: string) {
   try {
-    // Fallback to color variants
+    // Get inventory items with stock
     const { data, error } = await supabase
-      .from('color_variants')
+      .from('product_inventory')
       .select('*')
       .eq('product_id', productId)
-      .gt('stock_quantity', 0);
-    
+      .eq('is_active', true)
+      .gt('available_stock', 0)
+      .order('color_name')
+      .order('size_name');
+
     if (error) {
       console.error('Error getting available variants:', error);
       return [];
@@ -232,57 +381,69 @@ export async function getAvailableVariants(productId: string) {
 // Helper function to check if a specific variant combination exists
 export async function checkVariantExists(
   productId: string,
+  productInventoryId?: string | null
+): Promise<boolean> {
+  try {
+    if (!productInventoryId) {
+      // Check if base product inventory exists
+      const { data, error } = await supabase
+        .from('product_inventory')
+        .select('id')
+        .eq('product_id', productId)
+        .is('color_variant_id', null)
+        .is('size_variant_id', null)
+        .eq('is_active', true)
+        .single();
+
+      return !error && !!data;
+    }
+
+    // Check specific inventory item
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('id')
+      .eq('id', productInventoryId)
+      .eq('product_id', productId)
+      .eq('is_active', true)
+      .single();
+
+    return !error && !!data;
+  } catch (error) {
+    console.error('Error checking variant existence:', error);
+    return false;
+  }
+}
+
+// Legacy function for backward compatibility
+export async function checkVariantExistsLegacy(
+  productId: string,
   colorVariantId?: string | null,
   sizeVariantId?: string | null
 ): Promise<boolean> {
   try {
-    // Try using unified stock manager
-    try {
-      const stockInfo = await getVariantStockInfo(productId, colorVariantId, sizeVariantId);
-      return stockInfo.isValid;
-    } catch (unifiedError) {
-      console.log('Unified stock manager not available');
-    }
+    // Check if any inventory item matches the variant criteria
+    let query = supabase
+      .from('product_inventory')
+      .select('id')
+      .eq('product_id', productId)
+      .eq('is_active', true);
 
-    // Fallback check
-    if (!colorVariantId && !sizeVariantId) {
-      // Check if product exists
-      const { data, error } = await supabase
-        .from('products')
-        .select('id')
-        .eq('id', productId)
-        .eq('status', 'active')
-        .single();
-      
-      return !error && !!data;
-    }
-
-    if (colorVariantId && !sizeVariantId) {
-      // Check color variant
-      const { data, error } = await supabase
-        .from('color_variants')
-        .select('id')
-        .eq('id', colorVariantId)
-        .eq('product_id', productId)
-        .single();
-      
-      return !error && !!data;
+    if (colorVariantId) {
+      query = query.eq('color_variant_id', colorVariantId);
+    } else {
+      query = query.is('color_variant_id', null);
     }
 
     if (sizeVariantId) {
-      // Check size variant
-      const { data, error } = await supabase
-        .from('size_variants')
-        .select('id')
-        .eq('id', sizeVariantId)
-        .single();
-      
-      return !error && !!data;
+      query = query.eq('size_variant_id', sizeVariantId);
+    } else {
+      query = query.is('size_variant_id', null);
     }
 
-    return false;
+    const { data, error } = await query.single();
+    return !error && !!data;
   } catch (error) {
-    console.error('Error checking variant existence:', error);
+    console.error('Error checking legacy variant existence:', error);
     return false;
   }
 }

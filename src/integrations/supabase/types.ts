@@ -44,7 +44,6 @@ export type Database = {
           id: string
           image_url: string | null
           product_id: string
-          stock_quantity: number | null
         }
         Insert: {
           color_name: string
@@ -53,7 +52,6 @@ export type Database = {
           id?: string
           image_url?: string | null
           product_id: string
-          stock_quantity?: number | null
         }
         Update: {
           color_name?: string
@@ -62,7 +60,6 @@ export type Database = {
           id?: string
           image_url?: string | null
           product_id?: string
-          stock_quantity?: number | null
         }
         Relationships: [
           {
@@ -202,40 +199,30 @@ export type Database = {
       }
       customer_order_items: {
         Row: {
-          color_variant_id: string | null
           created_at: string | null
           id: string
           order_id: string
           product_id: string
+          product_inventory_id: string | null
           quantity: number
-          size_variant_id: string | null
         }
         Insert: {
-          color_variant_id?: string | null
           created_at?: string | null
           id?: string
           order_id: string
           product_id: string
+          product_inventory_id?: string | null
           quantity: number
-          size_variant_id?: string | null
         }
         Update: {
-          color_variant_id?: string | null
           created_at?: string | null
           id?: string
           order_id?: string
           product_id?: string
+          product_inventory_id?: string | null
           quantity?: number
-          size_variant_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "customer_order_items_color_variant_id_fkey"
-            columns: ["color_variant_id"]
-            isOneToOne: false
-            referencedRelation: "color_variants"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "customer_order_items_order_id_fkey"
             columns: ["order_id"]
@@ -251,10 +238,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "customer_order_items_size_variant_id_fkey"
-            columns: ["size_variant_id"]
+            foreignKeyName: "customer_order_items_product_inventory_id_fkey"
+            columns: ["product_inventory_id"]
             isOneToOne: false
-            referencedRelation: "size_variants"
+            referencedRelation: "product_inventory"
             referencedColumns: ["id"]
           },
         ]
@@ -600,40 +587,30 @@ export type Database = {
       }
       order_items: {
         Row: {
-          color_variant_id: string | null
           created_at: string | null
           id: string
           order_id: string
           product_id: string
+          product_inventory_id: string | null
           quantity: number
-          size_variant_id: string | null
         }
         Insert: {
-          color_variant_id?: string | null
           created_at?: string | null
           id?: string
           order_id: string
           product_id: string
+          product_inventory_id?: string | null
           quantity: number
-          size_variant_id?: string | null
         }
         Update: {
-          color_variant_id?: string | null
           created_at?: string | null
           id?: string
           order_id?: string
           product_id?: string
+          product_inventory_id?: string | null
           quantity?: number
-          size_variant_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "order_items_color_variant_id_fkey"
-            columns: ["color_variant_id"]
-            isOneToOne: false
-            referencedRelation: "color_variants"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "order_items_order_id_fkey"
             columns: ["order_id"]
@@ -649,10 +626,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "order_items_size_variant_id_fkey"
-            columns: ["size_variant_id"]
+            foreignKeyName: "order_items_product_inventory_id_fkey"
+            columns: ["product_inventory_id"]
             isOneToOne: false
-            referencedRelation: "size_variants"
+            referencedRelation: "product_inventory"
             referencedColumns: ["id"]
           },
         ]
@@ -938,7 +915,6 @@ export type Database = {
           name: string
           selling_price: number | null
           status: Database["public"]["Enums"]["product_status"] | null
-          stock_quantity: number | null
           subcategory_id: string
           updated_at: string | null
         }
@@ -955,7 +931,6 @@ export type Database = {
           name: string
           selling_price?: number | null
           status?: Database["public"]["Enums"]["product_status"] | null
-          stock_quantity?: number | null
           subcategory_id: string
           updated_at?: string | null
         }
@@ -972,7 +947,6 @@ export type Database = {
           name?: string
           selling_price?: number | null
           status?: Database["public"]["Enums"]["product_status"] | null
-          stock_quantity?: number | null
           subcategory_id?: string
           updated_at?: string | null
         }
@@ -1075,7 +1049,6 @@ export type Database = {
           id: string
           size_code: string | null
           size_name: string
-          stock_quantity: number
         }
         Insert: {
           color_variant_id: string
@@ -1083,7 +1056,6 @@ export type Database = {
           id?: string
           size_code?: string | null
           size_name: string
-          stock_quantity?: number
         }
         Update: {
           color_variant_id?: string
@@ -1091,7 +1063,6 @@ export type Database = {
           id?: string
           size_code?: string | null
           size_name?: string
-          stock_quantity?: number
         }
         Relationships: [
           {
@@ -1247,11 +1218,11 @@ export type Database = {
     Enums: {
       category_status: "on" | "off"
       order_status:
-        | "pending_payment"
-        | "payment_confirmed"
-        | "on_delivery"
-        | "delivered"
-        | "cancelled"
+      | "pending_payment"
+      | "payment_confirmed"
+      | "on_delivery"
+      | "delivered"
+      | "cancelled"
       product_status: "active" | "inactive"
       user_role: "admin" | "customer"
     }
@@ -1265,106 +1236,108 @@ type DefaultSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+  | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+  ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+    Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+    Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-    ? R
-    : never
+  ? R
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
+    DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+      Row: infer R
+    }
+  ? R
+  : never
+  : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
+    Insert: infer I
+  }
+  ? I
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Insert: infer I
+  }
+  ? I
+  : never
+  : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+    Update: infer U
+  }
+  ? U
+  : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
       Update: infer U
     }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
+  ? U
+  : never
+  : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["Enums"]
+  | { schema: keyof Database },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+  ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+  : never = never,
 > = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["CompositeTypes"]
+  | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+  ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+  : never = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
   ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
 
 export const Constants = {
   public: {

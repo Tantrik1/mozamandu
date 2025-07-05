@@ -45,6 +45,12 @@ interface OrderItem {
   unit_price: number;
   total_price: number;
   pricing_mode: string;
+  product_inventory_id: string;
+  pricing_details?: {
+    breakdown?: string[];
+    description?: string;
+    basePrice?: number;
+  };
 }
 
 export default function CustomerOrderSummary() {
@@ -54,12 +60,28 @@ export default function CustomerOrderSummary() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isScreenshotOpen, setIsScreenshotOpen] = useState(false);
+  const [inventoryMap, setInventoryMap] = useState({});
 
   useEffect(() => {
     if (orderId) {
       fetchOrderDetails();
     }
   }, [orderId]);
+
+  useEffect(() => {
+    async function fetchInventory() {
+      const ids = orderItems.map(item => item.product_inventory_id).filter(Boolean);
+      if (ids.length === 0) return;
+      const { data } = await supabase
+        .from('product_inventory')
+        .select('id, sku, available_stock, is_active')
+        .in('id', ids);
+      const map = {};
+      (data || []).forEach(inv => { map[inv.id] = inv; });
+      setInventoryMap(map);
+    }
+    fetchInventory();
+  }, [orderItems]);
 
   const fetchOrderDetails = async () => {
     try {
@@ -98,7 +120,10 @@ export default function CustomerOrderSummary() {
       console.log('✅ Order items fetched:', itemsData);
 
       setOrderDetails(orderData);
-      setOrderItems(itemsData || []);
+      setOrderItems((itemsData || []).map((item: any) => ({
+        ...item,
+        product_inventory_id: item.product_inventory_id || '',
+      })));
     } catch (error) {
       console.error('💥 Error fetching customer order details:', error);
       setError('Failed to load order details');
@@ -196,25 +221,51 @@ export default function CustomerOrderSummary() {
               <CardContent>
                 <div className="space-y-4">
                   {orderItems.map((item) => (
-                    <div key={item.id} className="flex justify-between items-start py-4 border-b last:border-b-0">
+                    <div key={item.id} className="flex flex-col md:flex-row md:justify-between md:items-center p-2 bg-white rounded border mb-2">
                       <div className="flex-1">
-                        <h4 className="font-medium">{item.product_name}</h4>
+                        <div className="flex items-center gap-2 mb-1">
+                          {item.pricing_mode === 'combo' && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                              Combo
+                            </Badge>
+                          )}
+                          {item.pricing_mode === 'discount' && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+                              MOQ
+                            </Badge>
+                          )}
+                          <span className="text-sm">Qty: {item.quantity}</span>
+                        </div>
+                        {item.product_name && <h4 className="font-medium">{item.product_name}</h4>}
                         {item.color_name && (
                           <p className="text-sm text-gray-600">Color: {item.color_name}</p>
                         )}
                         {item.size_name && (
                           <p className="text-sm text-gray-600">Size: {item.size_name}</p>
                         )}
-                        <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
-                        {item.pricing_mode !== 'normal' && (
-                          <Badge variant="secondary" className="mt-1">
-                            {item.pricing_mode === 'combo' ? 'Combo Price' : 'Discount Applied'}
-                          </Badge>
+                        {/* Pricing breakdown details */}
+                        {item.pricing_details && item.pricing_details.description && (
+                          <p className="text-xs text-gray-700 font-semibold mb-1">{item.pricing_details.description}</p>
                         )}
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">Rs. {item.total_price.toFixed(2)}</p>
+                        {item.pricing_details && item.pricing_details.breakdown && item.pricing_details.breakdown.length > 0 && (
+                          <ul className="text-xs text-gray-600 list-disc list-inside mb-1">
+                            {item.pricing_details.breakdown.map((line: string, idx: number) => (
+                              <li key={idx}>{line}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {typeof item.pricing_details?.basePrice === 'number' && (
+                          <p className="text-xs text-gray-500 mt-1">Base Price: Rs. {item.pricing_details.basePrice.toFixed(2)}</p>
+                        )}
                         <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
+                      </div>
+                      <div className="text-right mt-2 md:mt-0">
+                        <p className="font-medium">Rs. {item.total_price.toFixed(2)}</p>
+                        {item.unit_price < (item.pricing_details?.basePrice || item.unit_price) && (
+                          <p className="text-xs text-green-600">
+                            Saved: Rs. {((item.pricing_details?.basePrice || item.unit_price) - item.unit_price).toFixed(2)} each
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}

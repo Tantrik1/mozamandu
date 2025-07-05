@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,16 +16,17 @@ interface SignUpFormProps {
 export function SignUpForm({ onSuccess }: SignUpFormProps) {
   const { signUp } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
-  
+
   const [signUpData, setSignUpData] = useState({
     fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
   });
-  
+
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Check if password meets all criteria
@@ -168,14 +168,24 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
 
         <div>
           <Label htmlFor="signup-confirm">Confirm Password</Label>
-          <Input
-            id="signup-confirm"
-            type="password"
-            value={signUpData.confirmPassword}
-            onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
-            placeholder="Confirm your password"
-            disabled={isLoading}
-          />
+          <div className="relative">
+            <Input
+              id="signup-confirm"
+              type={showConfirmPassword ? "text" : "password"}
+              value={signUpData.confirmPassword}
+              onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
+              placeholder="Confirm your password"
+              className="pr-10"
+              disabled={isLoading}
+            />
+            <button
+              type="button"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           {errors.confirmPassword && <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>}
         </div>
 
@@ -199,14 +209,24 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
         </div>
         {errors.terms && <p className="text-sm text-red-600">{errors.terms}</p>}
 
-        <Button 
-          type="submit" 
-          className="w-full bg-red-600 hover:bg-red-700" 
+        <Button
+          type="submit"
+          className="w-full bg-red-600 hover:bg-red-700"
           disabled={isLoading}
         >
           {isLoading ? 'Creating Account...' : 'Create Account'}
         </Button>
       </form>
+      <style jsx>{`
+        input:focus {
+          outline: none;
+          box-shadow: 0 0 0 2px #ef4444, 0 2px 8px 0 #fca5a5;
+          transition: box-shadow 0.2s;
+        }
+        .bg-gradient-futuristic {
+          background: linear-gradient(135deg, #fff 0%, #ffe5e5 100%);
+        }
+      `}</style>
     </TooltipProvider>
   );
 }

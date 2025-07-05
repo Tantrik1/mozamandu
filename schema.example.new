@@ -1,0 +1,342 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.categories (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  description text,
+  status USER-DEFINED NOT NULL DEFAULT 'on'::category_status,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT categories_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.color_variants (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  product_id uuid NOT NULL,
+  color_name text NOT NULL,
+  image_url text,
+  created_at timestamp with time zone DEFAULT now(),
+  has_sizes boolean DEFAULT false,
+  CONSTRAINT color_variants_pkey PRIMARY KEY (id),
+  CONSTRAINT color_variants_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
+  CONSTRAINT fk_color_variants_product_id FOREIGN KEY (product_id) REFERENCES public.products(id)
+);
+CREATE TABLE public.combo_subcategories (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  combo_id uuid NOT NULL,
+  subcategory_id uuid NOT NULL,
+  min_units integer NOT NULL CHECK (min_units > 0),
+  price numeric NOT NULL CHECK (price >= 0::numeric),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT combo_subcategories_pkey PRIMARY KEY (id),
+  CONSTRAINT combo_subcategories_subcategory_id_fkey FOREIGN KEY (subcategory_id) REFERENCES public.subcategories(id),
+  CONSTRAINT combo_subcategories_combo_id_fkey FOREIGN KEY (combo_id) REFERENCES public.combos(id)
+);
+CREATE TABLE public.combos (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  description text,
+  status text NOT NULL DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'inactive'::text])),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT combos_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.customer_order_item_details (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL,
+  product_name text NOT NULL,
+  color_name text,
+  size_name text,
+  quantity integer NOT NULL,
+  unit_price numeric NOT NULL,
+  total_price numeric NOT NULL,
+  pricing_mode text NOT NULL DEFAULT 'normal'::text,
+  pricing_details jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT customer_order_item_details_pkey PRIMARY KEY (id),
+  CONSTRAINT customer_order_item_details_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.customer_orders(id)
+);
+CREATE TABLE public.customer_order_items (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL,
+  product_id uuid NOT NULL,
+  quantity integer NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  product_inventory_id uuid,
+  CONSTRAINT customer_order_items_pkey PRIMARY KEY (id),
+  CONSTRAINT customer_order_items_product_inventory_id_fkey FOREIGN KEY (product_inventory_id) REFERENCES public.product_inventory(id),
+  CONSTRAINT customer_order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.customer_orders(id),
+  CONSTRAINT customer_order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
+);
+CREATE TABLE public.customer_orders (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  order_number text NOT NULL DEFAULT ((('ORD-'::text || to_char(now(), 'YYYYMMDD'::text)) || '-'::text) || lpad((floor((random() * (10000)::double precision)))::text, 4, '0'::text)),
+  customer_name text NOT NULL,
+  customer_email text NOT NULL,
+  contact_number text NOT NULL,
+  whatsapp_number text,
+  delivery_address text NOT NULL,
+  subtotal numeric NOT NULL DEFAULT 0,
+  delivery_charge numeric NOT NULL DEFAULT 0,
+  promocode_discount numeric DEFAULT 0,
+  total_amount numeric NOT NULL DEFAULT 0,
+  paid_amount numeric NOT NULL DEFAULT 0,
+  remaining_amount numeric NOT NULL DEFAULT 0,
+  payment_percentage integer NOT NULL DEFAULT 100,
+  status USER-DEFINED NOT NULL DEFAULT 'pending_payment'::order_status,
+  payment_method_id uuid,
+  payment_screenshot_url text,
+  promocode_used text,
+  combo_applied boolean DEFAULT false,
+  pricing_breakdown jsonb,
+  delivery_location_id uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT customer_orders_pkey PRIMARY KEY (id),
+  CONSTRAINT customer_orders_payment_method_id_fkey FOREIGN KEY (payment_method_id) REFERENCES public.payment_methods(id),
+  CONSTRAINT customer_orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT customer_orders_delivery_location_id_fkey FOREIGN KEY (delivery_location_id) REFERENCES public.delivery_charges(id)
+);
+CREATE TABLE public.delivery_charges (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  place_name text NOT NULL,
+  delivery_price numeric NOT NULL CHECK (delivery_price >= 0::numeric),
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT delivery_charges_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.discount_tiers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  subcategory_id uuid NOT NULL,
+  min_quantity integer NOT NULL,
+  max_quantity integer,
+  discount_amount numeric NOT NULL DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT discount_tiers_pkey PRIMARY KEY (id),
+  CONSTRAINT discount_tiers_subcategory_id_fkey FOREIGN KEY (subcategory_id) REFERENCES public.subcategories(id)
+);
+CREATE TABLE public.email_verification_codes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  email text NOT NULL,
+  code text NOT NULL,
+  expires_at timestamp with time zone NOT NULL,
+  verified boolean DEFAULT false,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  user_data jsonb,
+  CONSTRAINT email_verification_codes_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.faqs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  question text NOT NULL,
+  answer text NOT NULL,
+  is_active boolean NOT NULL DEFAULT true,
+  display_order integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT faqs_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.navbar_items (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  item_type text NOT NULL CHECK (item_type = ANY (ARRAY['home'::text, 'category'::text, 'faq'::text])),
+  category_id uuid,
+  is_visible boolean NOT NULL DEFAULT true,
+  display_order integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT navbar_items_pkey PRIMARY KEY (id),
+  CONSTRAINT navbar_items_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id)
+);
+CREATE TABLE public.notices (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text,
+  image_url text,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT notices_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.order_item_details (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL,
+  product_name text NOT NULL,
+  color_name text,
+  size_name text,
+  quantity integer NOT NULL,
+  unit_price numeric NOT NULL,
+  total_price numeric NOT NULL,
+  pricing_mode text NOT NULL DEFAULT 'normal'::text,
+  pricing_details jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT order_item_details_pkey PRIMARY KEY (id),
+  CONSTRAINT order_item_details_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id)
+);
+CREATE TABLE public.order_items (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL,
+  product_id uuid NOT NULL,
+  quantity integer NOT NULL CHECK (quantity > 0),
+  created_at timestamp with time zone DEFAULT now(),
+  product_inventory_id uuid,
+  CONSTRAINT order_items_pkey PRIMARY KEY (id),
+  CONSTRAINT order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
+  CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT order_items_product_inventory_id_fkey FOREIGN KEY (product_inventory_id) REFERENCES public.product_inventory(id)
+);
+CREATE TABLE public.orders (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_number text NOT NULL DEFAULT ((('ORD-'::text || to_char(now(), 'YYYYMMDD'::text)) || '-'::text) || lpad((floor((random() * (10000)::double precision)))::text, 4, '0'::text)) UNIQUE,
+  user_id uuid,
+  customer_name text NOT NULL,
+  customer_email text NOT NULL,
+  contact_number text NOT NULL,
+  whatsapp_number text,
+  delivery_address text NOT NULL,
+  delivery_location_id uuid,
+  subtotal numeric NOT NULL DEFAULT 0,
+  delivery_charge numeric NOT NULL DEFAULT 0,
+  promocode_discount numeric DEFAULT 0,
+  total_amount numeric NOT NULL DEFAULT 0,
+  status USER-DEFINED NOT NULL DEFAULT 'pending_payment'::order_status,
+  payment_method_id uuid,
+  payment_screenshot_url text,
+  promocode_used text,
+  combo_applied boolean DEFAULT false,
+  pricing_breakdown jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  paid_amount numeric NOT NULL DEFAULT 0,
+  remaining_amount numeric NOT NULL DEFAULT 0,
+  payment_percentage integer NOT NULL DEFAULT 100,
+  CONSTRAINT orders_pkey PRIMARY KEY (id),
+  CONSTRAINT orders_payment_method_id_fkey FOREIGN KEY (payment_method_id) REFERENCES public.payment_methods(id),
+  CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT orders_delivery_location_id_fkey FOREIGN KEY (delivery_location_id) REFERENCES public.delivery_charges(id)
+);
+CREATE TABLE public.payment_methods (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  qr_code_url text NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT payment_methods_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.product_images (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  product_id uuid NOT NULL,
+  color_variant_id uuid,
+  image_url text NOT NULL,
+  is_primary boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  image_type text DEFAULT 'main'::text CHECK (image_type = ANY (ARRAY['main'::text, 'variant'::text, 'gallery'::text])),
+  storage_path text,
+  CONSTRAINT product_images_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_product_images_product_id FOREIGN KEY (product_id) REFERENCES public.products(id),
+  CONSTRAINT product_images_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
+  CONSTRAINT product_images_color_variant_id_fkey FOREIGN KEY (color_variant_id) REFERENCES public.color_variants(id),
+  CONSTRAINT fk_product_images_color_variant_id FOREIGN KEY (color_variant_id) REFERENCES public.color_variants(id)
+);
+CREATE TABLE public.product_inventory (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  product_id uuid NOT NULL,
+  sku text NOT NULL UNIQUE,
+  color_variant_id uuid,
+  size_variant_id uuid,
+  product_name text NOT NULL,
+  color_name text,
+  size_name text,
+  size_code text,
+  stock_quantity integer NOT NULL DEFAULT 0,
+  reserved_stock integer NOT NULL DEFAULT 0,
+  available_stock integer DEFAULT (stock_quantity - reserved_stock),
+  cost_price numeric,
+  selling_price numeric,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT product_inventory_pkey PRIMARY KEY (id),
+  CONSTRAINT product_inventory_size_variant_id_fkey FOREIGN KEY (size_variant_id) REFERENCES public.size_variants(id),
+  CONSTRAINT product_inventory_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
+  CONSTRAINT product_inventory_color_variant_id_fkey FOREIGN KEY (color_variant_id) REFERENCES public.color_variants(id)
+);
+CREATE TABLE public.products (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  category_id uuid NOT NULL,
+  subcategory_id uuid NOT NULL,
+  description text,
+  cost_price numeric NOT NULL,
+  selling_price numeric,
+  is_featured boolean DEFAULT false,
+  has_color_variants boolean DEFAULT false,
+  color_has_size_variants boolean DEFAULT false,
+  status USER-DEFINED DEFAULT 'active'::product_status,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  image_url text,
+  CONSTRAINT products_pkey PRIMARY KEY (id),
+  CONSTRAINT products_subcategory_id_fkey FOREIGN KEY (subcategory_id) REFERENCES public.subcategories(id),
+  CONSTRAINT products_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id)
+);
+CREATE TABLE public.profiles (
+  id uuid NOT NULL,
+  email text NOT NULL,
+  full_name text,
+  role USER-DEFINED NOT NULL DEFAULT 'customer'::user_role,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  contact_number text,
+  whatsapp_number text,
+  CONSTRAINT profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.promocodes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  code text NOT NULL UNIQUE,
+  description text,
+  discount_percentage numeric NOT NULL CHECK (discount_percentage > 0::numeric AND discount_percentage <= 100::numeric),
+  minimum_order_amount numeric DEFAULT 0,
+  used_count integer DEFAULT 0,
+  is_active boolean DEFAULT true,
+  valid_from timestamp with time zone DEFAULT now(),
+  valid_until timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT promocodes_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.size_variants (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  color_variant_id uuid NOT NULL,
+  size_name text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  size_code text,
+  CONSTRAINT size_variants_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_size_variants_color_variant_id FOREIGN KEY (color_variant_id) REFERENCES public.color_variants(id),
+  CONSTRAINT size_variants_color_variant_id_fkey FOREIGN KEY (color_variant_id) REFERENCES public.color_variants(id)
+);
+CREATE TABLE public.subcategories (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  category_id uuid NOT NULL,
+  name text NOT NULL,
+  description text,
+  selling_price numeric NOT NULL,
+  status USER-DEFINED NOT NULL DEFAULT 'on'::category_status,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  minimum_quantity integer NOT NULL DEFAULT 1,
+  image_url text,
+  CONSTRAINT subcategories_pkey PRIMARY KEY (id),
+  CONSTRAINT subcategories_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id)
+);
+CREATE TABLE public.top_bar_text (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  text text NOT NULL,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT top_bar_text_pkey PRIMARY KEY (id)
+);

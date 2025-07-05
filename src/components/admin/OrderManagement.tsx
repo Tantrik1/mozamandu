@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Eye, Search, Filter, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Order {
   id: string;
@@ -62,10 +62,10 @@ export function OrderManagement() {
     } else {
       setLoading(true);
     }
-    
+
     try {
       console.log('Fetching orders for admin dashboard...');
-      
+
       // Fetch all orders including guest orders (user_id can be null)
       const { data, error } = await supabase
         .from('orders')
@@ -136,9 +136,9 @@ export function OrderManagement() {
     try {
       const { error } = await supabase
         .from('orders')
-        .update({ 
-          status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled', 
-          updated_at: new Date().toISOString() 
+        .update({
+          status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled',
+          updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
 
@@ -183,8 +183,8 @@ export function OrderManagement() {
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.customer_email.toLowerCase().includes(searchQuery.toLowerCase());
+      order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.customer_email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -243,7 +243,21 @@ export function OrderManagement() {
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Status Tabs */}
+      <div className="mb-4">
+        <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
+          <TabsList className="grid grid-cols-6 w-full">
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="pending_payment">Pending</TabsTrigger>
+            <TabsTrigger value="payment_confirmed">Payment Confirmed</TabsTrigger>
+            <TabsTrigger value="on_delivery">On Delivery</TabsTrigger>
+            <TabsTrigger value="delivered">Delivered</TabsTrigger>
+            <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* Search Filter */}
       <Card>
         <CardContent className="p-4">
           <div className="flex gap-4 items-center">
@@ -257,22 +271,6 @@ export function OrderManagement() {
                   className="pl-10"
                 />
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                  <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
-                  <SelectItem value="on_delivery">On Delivery</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
         </CardContent>
@@ -375,7 +373,7 @@ export function OrderManagement() {
                                   <p><strong>Name:</strong> {selectedOrder.customer_name}</p>
                                   <p><strong>Email:</strong> {selectedOrder.customer_email}</p>
                                   <p><strong>Contact:</strong> {selectedOrder.contact_number}</p>
-                                  <p><strong>Customer Type:</strong> 
+                                  <p><strong>Customer Type:</strong>
                                     <Badge className="ml-2" variant={selectedOrder.user_id ? "default" : "secondary"}>
                                       {getCustomerType(selectedOrder)}
                                     </Badge>
@@ -383,7 +381,7 @@ export function OrderManagement() {
                                 </div>
                                 <div>
                                   <p><strong>Order Date:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
-                                  <p><strong>Status:</strong> 
+                                  <p><strong>Status:</strong>
                                     <Badge className={`ml-2 ${getStatusColor(selectedOrder.status)}`}>
                                       {selectedOrder.status.replace('_', ' ')}
                                     </Badge>
@@ -467,7 +465,7 @@ export function OrderManagement() {
                                     )}
                                   </div>
                                 </div>
-                                
+
                                 {selectedOrder.payment_screenshot_url && (
                                   <div>
                                     <h4 className="font-medium mb-2">Payment Screenshot:</h4>
@@ -489,7 +487,7 @@ export function OrderManagement() {
               ))}
             </TableBody>
           </Table>
-          
+
           {filteredOrders.length === 0 && (
             <div className="text-center py-8">
               <p className="text-gray-500">No orders found</p>

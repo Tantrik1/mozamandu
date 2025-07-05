@@ -64,6 +64,8 @@ export function LatestProducts() {
               has_color_variants: product.has_color_variants,
               color_has_size_variants: product.color_has_size_variants,
               stock_quantity: totalStock,
+              category_id: product.category_id,
+              subcategory_id: product.subcategory_id,
               subcategory: product.subcategories
             };
           })

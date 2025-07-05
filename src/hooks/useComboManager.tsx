@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -7,8 +6,7 @@ interface CartItem {
   id: string;
   productId: string;
   productName: string;
-  colorVariantId?: string | null;
-  sizeVariantId?: string | null;
+  productInventoryId?: string | null;
   colorName?: string;
   sizeName?: string;
   quantity: number;
@@ -87,14 +85,14 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
           .from('subcategories')
           .select('id, name')
           .in('id', subcategoryIds);
-        
+
         if (subcategoryNames) {
           const nameMap = subcategoryNames.reduce((acc, sub) => {
             acc[sub.id] = sub.name;
             return acc;
           }, {} as { [key: string]: string });
-          
-          console.log('📝 Cart subcategories with names:', 
+
+          console.log('📝 Cart subcategories with names:',
             Object.entries(subcategoryCounts).map(([id, count]) => ({
               id,
               name: nameMap[id] || 'Unknown',
@@ -105,21 +103,21 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
       }
 
       let newActiveCombo: ComboData | null = null;
-      
+
       // Check each combo for eligibility
       for (const combo of combos || []) {
         console.log(`🎯 Checking combo: ${combo.name}`);
         console.log(`📋 Combo requirements:`, combo.combo_subcategories);
-        
+
         let isEligible = true;
         const missingRequirements: string[] = [];
-        
+
         for (const comboSubcategory of combo.combo_subcategories) {
           const requiredUnits = comboSubcategory.min_units;
           const availableUnits = subcategoryCounts[comboSubcategory.subcategory_id] || 0;
-          
+
           console.log(`📏 Subcategory ${comboSubcategory.subcategory_id}: needs ${requiredUnits}, has ${availableUnits}`);
-          
+
           if (availableUnits < requiredUnits) {
             isEligible = false;
             missingRequirements.push(`Subcategory ${comboSubcategory.subcategory_id}: needs ${requiredUnits}, has ${availableUnits}`);
