@@ -641,7 +641,7 @@ export async function createInventoryForProduct(
 /**
  * Generate a unique SKU for a product
  */
-async function generateProductSKU(
+export async function generateProductSKU(
   productName: string,
   colorName?: string,
   sizeName?: string

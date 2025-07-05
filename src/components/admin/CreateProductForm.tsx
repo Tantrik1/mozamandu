@@ -13,7 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { CreateProductVariantForm } from './CreateProductVariantForm';
-import { createInventoryForProduct } from '@/utils/inventoryManager';
+import { createInventoryForProduct, createInventoryItem, generateProductSKU } from '@/utils/inventoryManager';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -66,6 +67,9 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const { toast } = useToast();
+  const [skuModalOpen, setSkuModalOpen] = useState(false);
+  const [skuRows, setSkuRows] = useState<any[]>([]); // [{sku, color, size, stock, ...}]
+  const [pendingFormData, setPendingFormData] = useState<any>(null);
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -215,69 +219,25 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   };
 
   const onSubmit = async (data: z.infer<typeof productSchema>) => {
-    setLoading(true);
     try {
-      console.log('Creating product with data:', data);
+      setLoading(true);
 
-      // Upload image if exists
-      const imageUrl = await uploadImageAndGetUrl();
+      // Generate all breakdowns/variations that will be created
+      const breakdowns = await getAllBreakdowns(data, colorVariants, data.has_color_variants, data.has_size_variants);
+      const skuRows = await Promise.all(breakdowns.map(async (b) => ({
+        ...b,
+        sku: await generateProductSKU(data.name, b.color_name, b.size_name),
+        stock_quantity: 0
+      })));
 
-      // Create product
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .insert({
-          name: data.name,
-          description: data.description,
-          cost_price: data.cost_price,
-          selling_price: data.selling_price,
-          category_id: data.category_id,
-          subcategory_id: data.subcategory_id,
-          is_featured: data.is_featured,
-          has_color_variants: data.has_color_variants,
-          color_has_size_variants: data.has_size_variants,
-          status: data.status,
-          image_url: imageUrl,
-        })
-        .select()
-        .single();
-
-      if (productError) throw productError;
-
-      console.log('Product created:', product);
-
-      // Save color variants if any
-      if (data.has_color_variants && colorVariants.length > 0) {
-        await saveColorVariants(product.id, data.has_size_variants);
-      }
-
-      // Automatically create inventory items
-      try {
-        await createInventoryForProduct(
-          product.id,
-          data.name,
-          data.cost_price,
-          data.selling_price
-        );
-
-        toast({
-          title: 'Success',
-          description: 'Product created successfully! Inventory items have been automatically created.',
-        });
-      } catch (inventoryError) {
-        console.error('Error creating inventory items:', inventoryError);
-        toast({
-          title: 'Warning',
-          description: 'Product created but there was an issue creating inventory items. Please check the inventory management page.',
-          variant: 'destructive',
-        });
-      }
-
-      onSave();
+      setSkuRows(skuRows);
+      setPendingFormData(data);
+      setSkuModalOpen(true);
     } catch (error) {
-      console.error('Error creating product:', error);
+      console.error('Error preparing SKU modal:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create product',
+        description: 'Failed to prepare product creation',
         variant: 'destructive',
       });
     } finally {
@@ -320,6 +280,117 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     } catch (error) {
       console.error('Error saving variants:', error);
       throw error;
+    }
+  };
+
+  // Helper to get all breakdowns/variations for the product
+  async function getAllBreakdowns(data: any, colorVariants: any[], hasColor: boolean, hasSize: boolean) {
+    if (!hasColor) {
+      return [{ product_name: data.name }];
+    }
+    const result = [];
+    for (const color of colorVariants) {
+      if (!hasSize || !color.size_variants.length) {
+        result.push({ product_name: data.name, color_name: color.color_name });
+      } else {
+        for (const size of color.size_variants) {
+          result.push({
+            product_name: data.name,
+            color_name: color.color_name,
+            size_name: size.size_name,
+            size_code: size.size_code
+          });
+        }
+      }
+    }
+    return result;
+  }
+
+  // Modal save handler - now creates product AND inventory
+  const handleSkuModalSave = async () => {
+    if (!pendingFormData) return;
+
+    // Validate unique, non-empty SKUs
+    const seen = new Set();
+    for (const row of skuRows) {
+      if (!row.sku || seen.has(row.sku)) {
+        toast({ title: 'Error', description: 'SKUs must be unique and non-empty', variant: 'destructive' });
+        return;
+      }
+      seen.add(row.sku);
+    }
+
+    try {
+      setLoading(true);
+
+      // Upload image if exists
+      const imageUrl = await uploadImageAndGetUrl();
+
+      // Fetch subcategory price if needed
+      let fallbackSellingPrice = null;
+      if (!pendingFormData.selling_price) {
+        const { data: subcat, error: subcatError } = await supabase
+          .from('subcategories')
+          .select('selling_price')
+          .eq('id', pendingFormData.subcategory_id)
+          .single();
+        if (!subcatError && subcat && subcat.selling_price) {
+          fallbackSellingPrice = subcat.selling_price;
+        }
+      }
+
+      // Create product
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .insert({
+          name: pendingFormData.name,
+          description: pendingFormData.description,
+          cost_price: pendingFormData.cost_price,
+          selling_price: pendingFormData.selling_price || fallbackSellingPrice || null,
+          category_id: pendingFormData.category_id,
+          subcategory_id: pendingFormData.subcategory_id,
+          is_featured: pendingFormData.is_featured,
+          has_color_variants: pendingFormData.has_color_variants,
+          color_has_size_variants: pendingFormData.has_size_variants,
+          status: pendingFormData.status,
+          image_url: imageUrl,
+        })
+        .select()
+        .single();
+
+      if (productError) throw productError;
+
+      // Save color variants if any
+      if (pendingFormData.has_color_variants && colorVariants.length > 0) {
+        await saveColorVariants(product.id, pendingFormData.has_size_variants);
+      }
+
+      // Create inventory items with the user's SKUs and stock
+      for (const row of skuRows) {
+        await createInventoryItem({
+          product_id: product.id,
+          sku: row.sku,
+          product_name: row.product_name,
+          color_name: row.color_name,
+          size_name: row.size_name,
+          size_code: row.size_code,
+          stock_quantity: row.stock_quantity,
+          cost_price: pendingFormData.cost_price,
+          selling_price: pendingFormData.selling_price || fallbackSellingPrice || null,
+          is_active: true
+        });
+      }
+
+      toast({ title: 'Success', description: 'Product and inventory created successfully!' });
+      setSkuModalOpen(false);
+      setSkuRows([]);
+      setPendingFormData(null);
+      onSave();
+    } catch (err) {
+      console.error('Error creating product:', err);
+      toast({ title: 'Error', description: 'Failed to create product and inventory', variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -567,6 +638,36 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
           </Button>
         </div>
       </form>
+
+      <Dialog open={skuModalOpen} onOpenChange={setSkuModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Review & Edit SKUs and Stock</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {skuRows.map((row, idx) => (
+              <div key={idx} className="flex gap-2 items-center">
+                <Input value={row.sku} onChange={e => {
+                  const newRows = [...skuRows];
+                  newRows[idx].sku = e.target.value;
+                  setSkuRows(newRows);
+                }} className="w-40" />
+                <span>{row.product_name}</span>
+                {row.color_name && <span>Color: {row.color_name}</span>}
+                {row.size_name && <span>Size: {row.size_name}</span>}
+                <Input type="number" min={0} value={row.stock_quantity} onChange={e => {
+                  const newRows = [...skuRows];
+                  newRows[idx].stock_quantity = Number(e.target.value);
+                  setSkuRows(newRows);
+                }} className="w-24" placeholder="Stock" />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSkuModalSave}>Save Inventory</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

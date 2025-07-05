@@ -15,6 +15,8 @@ import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { EditProductVariantForm } from './EditProductVariantForm';
 import { ProductEditBlockedModal } from './ProductEditBlockedModal';
 import { validateProductEditability } from '@/utils/productEditValidation';
+import { getProductInventory, updateInventoryItem, createInventoryItem, InventoryItem } from '@/utils/inventoryManager';
+import { Table, TableHead, TableRow, TableCell, TableBody } from '@/components/ui/table';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -80,6 +82,8 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     pendingOrdersCount: 0
   });
   const { toast } = useToast();
+  const [inventoryRows, setInventoryRows] = useState<InventoryItem[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -105,6 +109,12 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     fetchProduct();
     fetchCategories();
     fetchSubcategories();
+    if (productId) {
+      setInventoryLoading(true);
+      getProductInventory(productId)
+        .then(setInventoryRows)
+        .finally(() => setInventoryLoading(false));
+    }
   }, [productId]);
 
   useEffect(() => {
@@ -355,19 +365,33 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     }
   };
 
+  // Handler for stock/sku edits
+  const handleInventoryChange = (idx: number, field: string, value: any) => {
+    setInventoryRows(rows => {
+      const newRows = [...rows];
+      newRows[idx] = { ...newRows[idx], [field]: value };
+      return newRows;
+    });
+  };
+
+  // Handler to add a new row (for new variation)
+  const handleAddInventoryRow = () => {
+    setInventoryRows(rows => [
+      ...rows,
+      { id: '', product_id: productId, sku: '', product_name: form.getValues('name'), color_name: '', size_name: '', size_code: '', stock_quantity: 0, reserved_stock: 0, available_stock: 0, is_active: true, created_at: '', updated_at: '' }
+    ]);
+  };
+
+  // Enhanced onSubmit to handle inventory updates
   const onSubmit = async (data: z.infer<typeof productSchema>) => {
     try {
       setSaving(true);
-
-      // Check if product can be edited
-      const editabilityCheck = await validateProductEditability(productId);
-      if (!editabilityCheck.canEdit) {
-        setEditBlockedModal({
-          isOpen: true,
-          reason: editabilityCheck.reason || 'Unknown reason',
-          pendingOrdersCount: editabilityCheck.pendingOrdersCount
-        });
-        return;
+      // Check for reserved stock if name/variation changes
+      for (const row of inventoryRows) {
+        if (row.reserved_stock > 0 && (row.product_name !== data.name || row.color_name !== row.color_name || row.size_name !== row.size_name)) {
+          toast({ title: 'Edit Blocked', description: 'Cannot change product/variation with reserved stock.', variant: 'destructive' });
+          return;
+        }
       }
 
       console.log('Updating product with data:', data);
@@ -408,9 +432,18 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         await removeAllVariants();
       }
 
+      // Save inventory changes
+      for (const row of inventoryRows) {
+        if (row.id) {
+          await updateInventoryItem(row.id, row);
+        } else {
+          await createInventoryItem(row);
+        }
+      }
+
       toast({
         title: 'Success',
-        description: 'Product updated successfully!',
+        description: 'Product and inventory updated!',
       });
 
       onSave();
@@ -418,7 +451,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       console.error('Error updating product:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update product',
+        description: 'Failed to update product/inventory',
         variant: 'destructive',
       });
     } finally {
@@ -772,6 +805,32 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             )}
           </CardContent>
         </Card>
+
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>SKU</TableCell>
+              <TableCell>Color</TableCell>
+              <TableCell>Size</TableCell>
+              <TableCell>Stock</TableCell>
+              <TableCell>Reserved</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {inventoryRows.map((row, idx) => (
+              <TableRow key={row.id || idx}>
+                <TableCell><Input value={row.sku} onChange={e => handleInventoryChange(idx, 'sku', e.target.value)} /></TableCell>
+                <TableCell>{row.color_name || '-'}</TableCell>
+                <TableCell>{row.size_name || '-'}</TableCell>
+                <TableCell><Input type="number" value={row.stock_quantity} onChange={e => handleInventoryChange(idx, 'stock_quantity', Number(e.target.value))} /></TableCell>
+                <TableCell>{row.reserved_stock}</TableCell>
+                <TableCell>{row.id ? null : <Button onClick={() => setInventoryRows(rows => rows.filter((_, i) => i !== idx))}>Remove</Button>}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <Button onClick={handleAddInventoryRow}>Add Variation</Button>
 
         <div className="flex justify-end space-x-4">
           <Button type="button" variant="outline" onClick={onCancel}>
