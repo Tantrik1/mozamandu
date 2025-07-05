@@ -434,10 +434,11 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
       // Save inventory changes
       for (const row of inventoryRows) {
+        const { available_stock, ...updatableFields } = row;
         if (row.id) {
-          await updateInventoryItem(row.id, row);
+          await updateInventoryItem(row.id, updatableFields);
         } else {
-          await createInventoryItem(row);
+          await createInventoryItem(updatableFields);
         }
       }
 
