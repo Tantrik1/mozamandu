@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Save, X } from 'lucide-react';
 import { ProductEditBlockedModal } from './ProductEditBlockedModal';
 import { validateProductEditability } from '@/utils/productEditValidation';
-import { ProductVariantForm } from './ProductVariantForm';
+import { InventoryVariantForm } from './InventoryVariantForm';
+import { InventorySummary } from '@/utils/inventoryManager';
 
 interface Product {
   id: string;
@@ -69,7 +69,12 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [variants, setVariants] = useState<ColorVariant[]>([]);
+  const [inventorySummary, setInventorySummary] = useState<InventorySummary>({
+    total_stock: 0,
+    available_stock: 0,
+    reserved_stock: 0,
+    variant_count: 0
+  });
   const [editBlockedModal, setEditBlockedModal] = useState<{
     isOpen: boolean;
     reason: string;
@@ -185,120 +190,8 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     }
   };
 
-  const handleVariantsChange = (newVariants: ColorVariant[]) => {
-    setVariants(newVariants);
-  };
-
-  const saveVariants = async (productId: string, variants: ColorVariant[]) => {
-    console.log('Saving variants for product:', productId, variants);
-
-    try {
-      // Delete existing variants that are not in the new list
-      const existingVariantIds = variants.filter(v => v.id).map(v => v.id);
-      if (existingVariantIds.length > 0) {
-        await supabase
-          .from('color_variants')
-          .delete()
-          .eq('product_id', productId)
-          .not('id', 'in', `(${existingVariantIds.join(',')})`);
-      } else {
-        // Delete all existing variants if no IDs provided
-        await supabase
-          .from('color_variants')
-          .delete()
-          .eq('product_id', productId);
-      }
-
-      // Process each variant
-      for (const variant of variants) {
-        let colorVariantId = variant.id;
-
-        if (colorVariantId) {
-          // Update existing color variant
-          const { error: updateError } = await supabase
-            .from('color_variants')
-            .update({
-              color_name: variant.color_name,
-              image_url: variant.image_url,
-              has_sizes: variant.has_sizes,
-              stock_quantity: variant.has_sizes ? 0 : (variant.stock_quantity || 0)
-            })
-            .eq('id', colorVariantId);
-
-          if (updateError) throw updateError;
-        } else {
-          // Create new color variant
-          const { data: newColorVariant, error: insertError } = await supabase
-            .from('color_variants')
-            .insert({
-              product_id: productId,
-              color_name: variant.color_name,
-              image_url: variant.image_url,
-              has_sizes: variant.has_sizes,
-              stock_quantity: variant.has_sizes ? 0 : (variant.stock_quantity || 0)
-            })
-            .select()
-            .single();
-
-          if (insertError) throw insertError;
-          colorVariantId = newColorVariant.id;
-        }
-
-        // Handle size variants if they exist
-        if (variant.has_sizes && variant.size_variants && colorVariantId) {
-          // Delete existing size variants not in the new list
-          const existingSizeIds = variant.size_variants.filter(s => s.id).map(s => s.id);
-          if (existingSizeIds.length > 0) {
-            await supabase
-              .from('size_variants')
-              .delete()
-              .eq('color_variant_id', colorVariantId)
-              .not('id', 'in', `(${existingSizeIds.join(',')})`);
-          } else {
-            await supabase
-              .from('size_variants')
-              .delete()
-              .eq('color_variant_id', colorVariantId);
-          }
-
-          // Process each size variant
-          for (const sizeVariant of variant.size_variants) {
-            if (sizeVariant.id) {
-              // Update existing size variant
-              await supabase
-                .from('size_variants')
-                .update({
-                  size_name: sizeVariant.size_name,
-                  size_code: sizeVariant.size_code,
-                  stock_quantity: sizeVariant.stock_quantity
-                })
-                .eq('id', sizeVariant.id);
-            } else {
-              // Create new size variant
-              await supabase
-                .from('size_variants')
-                .insert({
-                  color_variant_id: colorVariantId,
-                  size_name: sizeVariant.size_name,
-                  size_code: sizeVariant.size_code,
-                  stock_quantity: sizeVariant.stock_quantity
-                });
-            }
-          }
-        } else if (colorVariantId) {
-          // Remove all size variants if has_sizes is false
-          await supabase
-            .from('size_variants')
-            .delete()
-            .eq('color_variant_id', colorVariantId);
-        }
-      }
-
-      console.log('Variants saved successfully');
-    } catch (error) {
-      console.error('Error saving variants:', error);
-      throw error;
-    }
+  const handleInventoryChange = (summary: InventorySummary) => {
+    setInventorySummary(summary);
   };
 
   const handleSave = async () => {
@@ -328,7 +221,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         is_featured: formData.is_featured,
         has_color_variants: formData.has_color_variants,
         color_has_size_variants: formData.color_has_size_variants,
-        stock_quantity: formData.stock_quantity ? parseInt(formData.stock_quantity) : null,
+        stock_quantity: formData.has_color_variants ? null : (formData.stock_quantity ? parseInt(formData.stock_quantity) : null),
         status: formData.status,
         updated_at: new Date().toISOString()
       };
@@ -340,14 +233,9 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
       if (error) throw error;
 
-      // Save variants if product has color variants
-      if (formData.has_color_variants && variants.length > 0) {
-        await saveVariants(productId, variants);
-      }
-
       toast({
         title: 'Success',
-        description: 'Product updated successfully',
+        description: 'Product updated successfully. Inventory will be synced automatically.',
       });
 
       onSave();
@@ -515,7 +403,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
               )}
             </div>
 
-            {/* Stock Quantity */}
+            {/* Stock Quantity - Only for simple products */}
             {!formData.has_color_variants && (
               <div>
                 <Label htmlFor="stock_quantity">Stock Quantity</Label>
@@ -525,6 +413,9 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                   value={formData.stock_quantity}
                   onChange={(e) => handleInputChange('stock_quantity', e.target.value)}
                 />
+                <p className="text-sm text-gray-500 mt-1">
+                  For products with variants, stock is managed in the inventory section below.
+                </p>
               </div>
             )}
 
@@ -571,15 +462,16 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
           </CardContent>
         </Card>
 
-        {/* Product Variants */}
-        {formData.has_color_variants && (
-          <ProductVariantForm
-            productId={productId}
-            hasColorVariants={formData.has_color_variants}
-            hasSizeVariants={formData.color_has_size_variants}
-            onVariantsChange={handleVariantsChange}
-          />
-        )}
+        {/* New Inventory Management Section */}
+        <InventoryVariantForm
+          productId={productId}
+          productName={formData.name}
+          hasColorVariants={formData.has_color_variants}
+          hasSizeVariants={formData.color_has_size_variants}
+          costPrice={parseFloat(formData.cost_price) || 0}
+          sellingPrice={formData.selling_price ? parseFloat(formData.selling_price) : null}
+          onInventoryChange={handleInventoryChange}
+        />
       </div>
 
       {/* Product Edit Blocked Modal */}

@@ -8,31 +8,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface Product {
+interface InventoryItem {
   id: string;
-  name: string;
-  stock_quantity: number;
-  categories: { name: string } | null;
-  subcategories: { name: string } | null;
-}
-
-interface ColorVariant {
-  id: string;
-  color_name: string;
-  stock_quantity: number;
+  sku: string;
   product_name: string;
-  category_name: string;
-  subcategory_name: string;
-}
-
-interface SizeVariant {
-  id: string;
-  size_name: string;
+  color_name: string | null;
+  size_name: string | null;
+  available_stock: number;
   stock_quantity: number;
-  color_name: string;
-  product_name: string;
-  category_name: string;
-  subcategory_name: string;
+  reserved_stock: number;
 }
 
 const serve_handler = async (req: Request): Promise<Response> => {
@@ -42,7 +26,7 @@ const serve_handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log('Starting low stock alert check...');
+    console.log('Starting low stock alert check with new inventory system...');
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -57,121 +41,48 @@ const serve_handler = async (req: Request): Promise<Response> => {
     const resend = new Resend(resendApiKey);
 
     const lowStockItems: Array<{
-      type: 'product' | 'color_variant' | 'size_variant';
+      type: 'inventory_item';
+      sku: string;
       name: string;
-      stock: number;
-      category?: string;
-      subcategory?: string;
-      variant?: string;
+      variant: string;
+      available_stock: number;
+      stock_quantity: number;
+      reserved_stock: number;
     }> = [];
 
-    // Check products without variants
-    console.log('Checking products without variants...');
-    const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select(`
-        id,
-        name,
-        stock_quantity,
-        has_color_variants,
-        categories(name),
-        subcategories(name)
-      `)
-      .eq('status', 'active')
-      .eq('has_color_variants', false)
-      .lt('stock_quantity', 10);
+    // Check inventory items with low available stock
+    console.log('Checking inventory items with low stock...');
+    const { data: inventoryItems, error: inventoryError } = await supabase
+      .from('product_inventory')
+      .select('*')
+      .eq('is_active', true)
+      .lt('available_stock', 10);
 
-    if (productsError) {
-      console.error('Error fetching products:', productsError);
-    } else if (products) {
-      console.log(`Found ${products.length} products with low stock`);
-      products.forEach((product: any) => {
-        if (product.stock_quantity < 10) {
-          lowStockItems.push({
-            type: 'product',
-            name: product.name,
-            stock: product.stock_quantity || 0,
-            category: product.categories?.name,
-            subcategory: product.subcategories?.name
-          });
+    if (inventoryError) {
+      console.error('Error fetching inventory items:', inventoryError);
+    } else if (inventoryItems) {
+      console.log(`Found ${inventoryItems.length} inventory items with low stock`);
+      inventoryItems.forEach((item: any) => {
+        let variant = '';
+        if (item.color_name && item.size_name) {
+          variant = `${item.color_name} - ${item.size_name}`;
+        } else if (item.color_name) {
+          variant = `Color: ${item.color_name}`;
+        } else if (item.size_name) {
+          variant = `Size: ${item.size_name}`;
+        } else {
+          variant = 'Default';
         }
-      });
-    }
 
-    // Check color variants without sizes
-    console.log('Checking color variants without sizes...');
-    const { data: colorVariants, error: colorVariantsError } = await supabase
-      .from('color_variants')
-      .select(`
-        id,
-        color_name,
-        stock_quantity,
-        has_sizes,
-        products!inner(
-          name,
-          status,
-          categories(name),
-          subcategories(name)
-        )
-      `)
-      .eq('products.status', 'active')
-      .eq('has_sizes', false)
-      .lt('stock_quantity', 10);
-
-    if (colorVariantsError) {
-      console.error('Error fetching color variants:', colorVariantsError);
-    } else if (colorVariants) {
-      console.log(`Found ${colorVariants.length} color variants with low stock`);
-      colorVariants.forEach((variant: any) => {
-        if (variant.stock_quantity < 10) {
-          lowStockItems.push({
-            type: 'color_variant',
-            name: variant.products.name,
-            stock: variant.stock_quantity || 0,
-            category: variant.products.categories?.name,
-            subcategory: variant.products.subcategories?.name,
-            variant: `Color: ${variant.color_name}`
-          });
-        }
-      });
-    }
-
-    // Check size variants
-    console.log('Checking size variants...');
-    const { data: sizeVariants, error: sizeVariantsError } = await supabase
-      .from('size_variants')
-      .select(`
-        id,
-        size_name,
-        stock_quantity,
-        color_variants!inner(
-          color_name,
-          products!inner(
-            name,
-            status,
-            categories(name),
-            subcategories(name)
-          )
-        )
-      `)
-      .eq('color_variants.products.status', 'active')
-      .lt('stock_quantity', 10);
-
-    if (sizeVariantsError) {
-      console.error('Error fetching size variants:', sizeVariantsError);
-    } else if (sizeVariants) {
-      console.log(`Found ${sizeVariants.length} size variants with low stock`);
-      sizeVariants.forEach((variant: any) => {
-        if (variant.stock_quantity < 10) {
-          lowStockItems.push({
-            type: 'size_variant',
-            name: variant.color_variants.products.name,
-            stock: variant.stock_quantity || 0,
-            category: variant.color_variants.products.categories?.name,
-            subcategory: variant.color_variants.products.subcategories?.name,
-            variant: `${variant.color_variants.color_name} - ${variant.size_name}`
-          });
-        }
+        lowStockItems.push({
+          type: 'inventory_item',
+          sku: item.sku,
+          name: item.product_name,
+          variant: variant,
+          available_stock: item.available_stock || 0,
+          stock_quantity: item.stock_quantity || 0,
+          reserved_stock: item.reserved_stock || 0
+        });
       });
     }
 
@@ -184,7 +95,7 @@ const serve_handler = async (req: Request): Promise<Response> => {
       const emailResponse = await resend.emails.send({
         from: 'Mozamandu Store <noreply@mozamandu.com>',
         to: ['info@mozamandu.com'],
-        subject: `🚨 LOW STOCK ALERT - ${lowStockItems.length} items need attention`,
+        subject: `🚨 INVENTORY ALERT - ${lowStockItems.length} items need attention`,
         html: emailContent,
       });
 
@@ -193,7 +104,7 @@ const serve_handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: `Low stock alert sent for ${lowStockItems.length} items`,
+          message: `Low stock alert sent for ${lowStockItems.length} inventory items`,
           items: lowStockItems,
           emailResponse
         }),
@@ -210,7 +121,7 @@ const serve_handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'No low stock items found',
+          message: 'No low stock items found in inventory',
           items: []
         }),
         {
@@ -242,12 +153,13 @@ const serve_handler = async (req: Request): Promise<Response> => {
 };
 
 function generateEmailContent(lowStockItems: Array<{
-  type: 'product' | 'color_variant' | 'size_variant';
+  type: 'inventory_item';
+  sku: string;
   name: string;
-  stock: number;
-  category?: string;
-  subcategory?: string;
-  variant?: string;
+  variant: string;
+  available_stock: number;
+  stock_quantity: number;
+  reserved_stock: number;
 }>): string {
   const currentDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -259,19 +171,24 @@ function generateEmailContent(lowStockItems: Array<{
   let itemsHtml = '';
   
   lowStockItems.forEach((item, index) => {
-    const stockColor = item.stock === 0 ? '#dc2626' : item.stock < 5 ? '#ea580c' : '#d97706';
-    const stockStatus = item.stock === 0 ? 'OUT OF STOCK' : `${item.stock} remaining`;
+    const stockColor = item.available_stock === 0 ? '#dc2626' : item.available_stock < 5 ? '#ea580c' : '#d97706';
+    const stockStatus = item.available_stock === 0 ? 'OUT OF STOCK' : `${item.available_stock} available`;
     
     itemsHtml += `
       <tr style="border-bottom: 1px solid #e5e7eb;">
         <td style="padding: 12px; text-align: left;">${index + 1}</td>
         <td style="padding: 12px; text-align: left;">
           <div style="font-weight: 600; color: #111827;">${item.name}</div>
-          ${item.variant ? `<div style="font-size: 14px; color: #6b7280;">${item.variant}</div>` : ''}
+          <div style="font-size: 12px; font-family: monospace; color: #6b7280;">${item.sku}</div>
+          <div style="font-size: 14px; color: #6b7280;">${item.variant}</div>
         </td>
-        <td style="padding: 12px; text-align: left;">
-          <div>${item.category || 'N/A'}</div>
-          <div style="font-size: 14px; color: #6b7280;">${item.subcategory || ''}</div>
+        <td style="padding: 12px; text-align: center;">
+          <div style="font-weight: 600;">${item.stock_quantity}</div>
+          <div style="font-size: 12px; color: #6b7280;">Total</div>
+        </td>
+        <td style="padding: 12px; text-align: center;">
+          <div style="font-weight: 600; color: #ea580c;">${item.reserved_stock}</div>
+          <div style="font-size: 12px; color: #6b7280;">Reserved</div>
         </td>
         <td style="padding: 12px; text-align: center;">
           <span style="
@@ -295,7 +212,7 @@ function generateEmailContent(lowStockItems: Array<{
     <head>
       <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
         .header { background: linear-gradient(135deg, #dc2626, #ea580c); color: white; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
         .alert-icon { font-size: 48px; margin-bottom: 10px; }
         .table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
@@ -306,25 +223,27 @@ function generateEmailContent(lowStockItems: Array<{
     <body>
       <div class="container">
         <div class="header">
-          <div class="alert-icon">🚨</div>
-          <h1 style="margin: 0; font-size: 24px;">LOW STOCK ALERT</h1>
-          <p style="margin: 10px 0 0 0; opacity: 0.9;">Immediate attention required for inventory management</p>
+          <div class="alert-icon">📦</div>
+          <h1 style="margin: 0; font-size: 24px;">INVENTORY ALERT</h1>
+          <p style="margin: 10px 0 0 0; opacity: 0.9;">Low stock detected in inventory system</p>
         </div>
         
         <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-          <h2 style="color: #dc2626; margin-top: 0;">⚠️ Stock Level Warning</h2>
+          <h2 style="color: #dc2626; margin-top: 0;">⚠️ Inventory Low Stock Warning</h2>
           <p>Dear Admin,</p>
-          <p>This is an automated alert to inform you that <strong>${lowStockItems.length}</strong> product(s) in your inventory have stock levels below the threshold of 10 units.</p>
+          <p>This is an automated alert from the new inventory management system. <strong>${lowStockItems.length}</strong> inventory item(s) have available stock below the threshold of 10 units.</p>
           <p><strong>Date:</strong> ${currentDate}</p>
+          <p><em>Note: Available stock = Total stock - Reserved stock</em></p>
         </div>
 
         <table class="table">
           <thead>
             <tr>
               <th style="width: 60px;">#</th>
-              <th>Product Name</th>
-              <th>Category</th>
-              <th style="width: 120px; text-align: center;">Stock Status</th>
+              <th>Product & SKU</th>
+              <th style="width: 100px; text-align: center;">Total Stock</th>
+              <th style="width: 100px; text-align: center;">Reserved</th>
+              <th style="width: 120px; text-align: center;">Available</th>
             </tr>
           </thead>
           <tbody>
@@ -335,15 +254,16 @@ function generateEmailContent(lowStockItems: Array<{
         <div class="footer">
           <h3 style="color: #dc2626; margin-top: 0;">Recommended Actions:</h3>
           <ul style="text-align: left; display: inline-block; margin: 0;">
-            <li>Review and reorder items marked as "OUT OF STOCK" immediately</li>
-            <li>Consider restocking items with less than 5 units remaining</li>
+            <li>Review items marked as "OUT OF STOCK" immediately</li>
+            <li>Consider restocking items with less than 5 available units</li>
+            <li>Check reserved stock for pending orders</li>
             <li>Update product visibility if items are temporarily unavailable</li>
-            <li>Check for any pending orders that might affect these items</li>
+            <li>Use the new inventory management system for precise tracking</li>
           </ul>
           
           <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
             <p style="margin: 0; color: #6b7280; font-size: 14px;">
-              This is an automated message from Mozamandu Inventory Management System.<br>
+              This alert is generated by the enhanced Mozamandu Inventory Management System.<br>
               Generated on ${new Date().toLocaleString()}
             </p>
           </div>

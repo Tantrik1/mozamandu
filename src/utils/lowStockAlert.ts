@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export async function checkLowStockAndAlert(): Promise<{ success: boolean; message: string }> {
   try {
-    console.log('Triggering low stock alert check...');
+    console.log('Triggering low stock alert check with new inventory system...');
     
     const { data, error } = await supabase.functions.invoke('low-stock-alert', {
       body: {}
@@ -20,7 +20,7 @@ export async function checkLowStockAndAlert(): Promise<{ success: boolean; messa
     console.log('Low stock alert response:', data);
     return {
       success: true,
-      message: data.message || 'Low stock check completed'
+      message: data.message || 'Low stock check completed with new inventory system'
     };
   } catch (error) {
     console.error('Error triggering low stock alert:', error);

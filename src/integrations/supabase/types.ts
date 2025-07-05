@@ -842,6 +842,88 @@ export type Database = {
           },
         ]
       }
+      product_inventory: {
+        Row: {
+          available_stock: number | null
+          color_name: string | null
+          color_variant_id: string | null
+          cost_price: number | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          product_id: string
+          product_name: string
+          reserved_stock: number
+          selling_price: number | null
+          size_code: string | null
+          size_name: string | null
+          size_variant_id: string | null
+          sku: string
+          stock_quantity: number
+          updated_at: string | null
+        }
+        Insert: {
+          available_stock?: number | null
+          color_name?: string | null
+          color_variant_id?: string | null
+          cost_price?: number | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          product_id: string
+          product_name: string
+          reserved_stock?: number
+          selling_price?: number | null
+          size_code?: string | null
+          size_name?: string | null
+          size_variant_id?: string | null
+          sku: string
+          stock_quantity?: number
+          updated_at?: string | null
+        }
+        Update: {
+          available_stock?: number | null
+          color_name?: string | null
+          color_variant_id?: string | null
+          cost_price?: number | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          product_id?: string
+          product_name?: string
+          reserved_stock?: number
+          selling_price?: number | null
+          size_code?: string | null
+          size_name?: string | null
+          size_variant_id?: string | null
+          sku?: string
+          stock_quantity?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_inventory_color_variant_id_fkey"
+            columns: ["color_variant_id"]
+            isOneToOne: false
+            referencedRelation: "color_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_inventory_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_inventory_size_variant_id_fkey"
+            columns: ["size_variant_id"]
+            isOneToOne: false
+            referencedRelation: "size_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category_id: string
@@ -1112,17 +1194,46 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_product_sku: {
+        Args: {
+          p_product_name: string
+          p_color_name?: string
+          p_size_name?: string
+        }
+        Returns: string
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_product_inventory_summary: {
+        Args: { product_uuid: string }
+        Returns: {
+          total_stock: number
+          available_stock: number
+          reserved_stock: number
+          variant_count: number
+        }[]
       }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      migrate_to_product_inventory: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       update_color_variant_stock: {
         Args: { variant_id: string; stock_change: number }
         Returns: undefined
+      }
+      update_inventory_stock: {
+        Args: {
+          inventory_id: string
+          stock_change: number
+          operation_type?: string
+        }
+        Returns: boolean
       }
       update_product_stock: {
         Args: { product_id: string; stock_change: number }
