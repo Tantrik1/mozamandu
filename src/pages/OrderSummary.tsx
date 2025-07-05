@@ -120,7 +120,10 @@ export default function OrderSummary() {
       }
 
       setOrderDetails(order);
-      setOrderItems(items || []);
+      setOrderItems(items?.map(item => ({
+        ...item,
+        product_inventory_id: item.id // Map the id to product_inventory_id
+      })) || []);
     } catch (error) {
       console.error('Unexpected error fetching order:', error);
       toast({

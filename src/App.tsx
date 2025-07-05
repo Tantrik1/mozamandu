@@ -73,6 +73,14 @@ function App() {
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/order-summary/:orderId" element={<OrderSummary />} />
                 <Route path="/customer-order-summary/:orderId" element={<CustomerOrderSummary />} />
+                <Route
+                  path="/admin/order-summary/:orderId"
+                  element={
+                    <RouteGuard requireAuth requireAdmin>
+                      <OrderSummary />
+                    </RouteGuard>
+                  }
+                />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/shipping" element={<ShippingPolicy />} />
                 <Route path="/terms" element={<TermsConditions />} />
