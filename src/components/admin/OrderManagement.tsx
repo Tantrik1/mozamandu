@@ -11,6 +11,8 @@ import { Eye, Search, Filter, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { handleOrderStatusUpdate } from '@/utils/inventoryManager';
+import { AdminPasswordDialog } from '@/components/admin/AdminPasswordDialog';
 
 interface Order {
   id: string;
@@ -54,6 +56,8 @@ export function OrderManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [pendingStatusUpdate, setPendingStatusUpdate] = useState<{ order: Order; newStatus: string } | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -213,9 +217,26 @@ export function OrderManagement() {
   };
 
   const updateOrderStatus = async (order: Order, newStatus: string) => {
-    try {
-      const tableName = order.source_table === 'customer_orders' ? 'customer_orders' : 'orders';
+    // Check if this is a cancellation and requires password confirmation
+    if (newStatus === 'cancelled' && order.status !== 'cancelled') {
+      setPendingStatusUpdate({ order, newStatus });
+      setPasswordDialogOpen(true);
+      return;
+    }
 
+    await performStatusUpdate(order, newStatus);
+  };
+
+  const performStatusUpdate = async (order: Order, newStatus: string) => {
+    try {
+      const oldStatus = order.status;
+      const tableName = order.source_table === 'customer_orders' ? 'customer_orders' : 'orders';
+      const isCustomerOrder = order.source_table === 'customer_orders';
+
+      console.log(`Updating order status: ${oldStatus} -> ${newStatus} for ${order.order_number}`);
+      console.log(`Order type: ${order.order_type}, Source table: ${order.source_table}`);
+
+      // Update order status in database
       const { error } = await supabase
         .from(tableName)
         .update({
@@ -231,13 +252,34 @@ export function OrderManagement() {
           description: "Failed to update order status",
           variant: "destructive",
         });
-      } else {
-        toast({
-          title: "Success",
-          description: "Order status updated successfully",
-        });
-        fetchOrders(true);
+        return;
       }
+
+      // Handle stock changes based on status change
+      console.log(`Processing stock changes for order status: ${oldStatus} -> ${newStatus}`);
+      const stockUpdated = await handleOrderStatusUpdate(
+        order.id,
+        oldStatus,
+        newStatus,
+        isCustomerOrder
+      );
+
+      if (!stockUpdated) {
+        console.error('Failed to update stock for order status change');
+        toast({
+          title: "Warning",
+          description: "Order status updated but stock processing failed",
+          variant: "destructive",
+        });
+      } else {
+        console.log('Stock updated successfully for order status change');
+      }
+
+      toast({
+        title: "Success",
+        description: "Order status updated successfully",
+      });
+      fetchOrders(true);
     } catch (error) {
       console.error('Unexpected error updating order status:', error);
       toast({
@@ -245,6 +287,13 @@ export function OrderManagement() {
         description: "Failed to update order status",
         variant: "destructive",
       });
+    }
+  };
+
+  const handlePasswordConfirm = () => {
+    if (pendingStatusUpdate) {
+      performStatusUpdate(pendingStatusUpdate.order, pendingStatusUpdate.newStatus);
+      setPendingStatusUpdate(null);
     }
   };
 
@@ -463,6 +512,19 @@ export function OrderManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Admin Password Dialog */}
+      <AdminPasswordDialog
+        isOpen={passwordDialogOpen}
+        onClose={() => {
+          setPasswordDialogOpen(false);
+          setPendingStatusUpdate(null);
+        }}
+        onConfirm={handlePasswordConfirm}
+        title="Confirm Order Cancellation"
+        message="This action cannot be undone. Order status cannot be changed after cancellation. Please enter your admin password to confirm."
+        actionType="cancel_order"
+      />
     </div>
   );
 }

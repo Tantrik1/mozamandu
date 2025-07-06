@@ -14,6 +14,7 @@ import { DeliveryLocationSelector } from './DeliveryLocationSelector';
 import { PromoCodeSection } from './PromoCodeSection';
 import { PaymentMethodSection } from './PaymentMethodSection';
 import { OrderSummaryCard } from './OrderSummaryCard';
+import { validateCheckoutStock, processCheckoutStock } from '@/utils/inventoryManager';
 
 interface FormErrors {
   [key: string]: string;
@@ -185,6 +186,21 @@ export function UniversalCheckout() {
       console.log('User authenticated:', !!user);
       console.log('User ID:', user?.id);
       console.log('Is customer order:', isCustomerOrder());
+
+      // Validate stock before proceeding with order
+      console.log('Validating stock for checkout...');
+      const stockValidation = await validateCheckoutStock(cartItems);
+
+      if (!stockValidation.isValid) {
+        toast({
+          title: "Stock Error",
+          description: stockValidation.errors[0] || "Some items have insufficient stock",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Stock validation passed, proceeding with order creation...');
 
       const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
       const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
@@ -386,6 +402,28 @@ export function UniversalCheckout() {
 
       console.log('Order items created successfully');
 
+      // Process stock changes for the order
+      console.log('Processing stock changes for order...');
+      const orderItemsForStock = cartItems.map(item => ({
+        productId: item.productId,
+        productInventoryId: item.productInventoryId || null,
+        quantity: item.quantity
+      }));
+
+      const stockProcessed = await processCheckoutStock(orderItemsForStock, orderResult.id);
+
+      if (!stockProcessed) {
+        console.error('Failed to process stock changes for order');
+        // Don't fail the order, but log the error
+        toast({
+          title: "Warning",
+          description: "Order created but stock processing failed. Please contact support.",
+          variant: "destructive",
+        });
+      } else {
+        console.log('Stock changes processed successfully');
+      }
+
       // Send order creation email
       try {
         console.log('Sending order creation email...');
@@ -409,7 +447,7 @@ export function UniversalCheckout() {
       }
 
       // Clear cart and redirect to order summary
-      clearCart();
+      await clearCart();
 
       toast({
         title: "Order Placed Successfully!",

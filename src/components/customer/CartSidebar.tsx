@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { useCartStockMonitoring } from '@/hooks/useStockMonitoring';
 
 interface SubcategoryRequirement {
   subcategoryId: string;
@@ -30,6 +31,9 @@ export function CartSidebar() {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [subcategoryRequirements, setSubcategoryRequirements] = useState<SubcategoryRequirement[]>([]);
+
+  // Monitor stock for cart items
+  const { cartStockStatus, hasStockIssues, invalidItems } = useCartStockMonitoring(cartItems);
 
   useEffect(() => {
     if (cartItems.length > 0) {
@@ -81,6 +85,15 @@ export function CartSidebar() {
       toast({
         title: "Minimum requirements not met",
         description: "Please add more items to meet minimum quantity requirements",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (hasStockIssues) {
+      toast({
+        title: "Stock Issues Detected",
+        description: "Some items in your cart have stock issues. Please review and update your cart.",
         variant: "destructive",
       });
       return;
@@ -142,11 +155,31 @@ export function CartSidebar() {
                   </div>
                 )}
 
+                {/* Stock Issues Alert */}
+                {hasStockIssues && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                      <span className="font-medium text-red-800">Stock Issues Detected</span>
+                    </div>
+                    <div className="text-sm text-red-700 space-y-1">
+                      {invalidItems.map((invalidItem, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <span>•</span>
+                          <span>{invalidItem.errorMessage}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Cart Items */}
                 <div className="space-y-3">
                   {cartItems.map((item) => {
                     const pricing = getItemPricing(item);
                     const itemTotal = pricing.finalPrice * item.quantity;
+                    const itemKey = `${item.productId}-${item.productInventoryId || 'no-inventory'}`;
+                    const stockStatus = cartStockStatus[itemKey];
 
                     return (
                       <div key={item.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
@@ -159,9 +192,17 @@ export function CartSidebar() {
                         )}
 
                         <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
                           <h3 className="text-sm font-medium text-gray-900 truncate">
                             {item.productName}
                           </h3>
+                            {stockStatus && !stockStatus.isValid && (
+                              <Badge variant="destructive" className="text-xs">
+                                <AlertTriangle className="w-2 h-2 mr-1" />
+                                Stock Issue
+                              </Badge>
+                            )}
+                          </div>
 
                           {/* Variant Info */}
                           <div className="flex flex-wrap gap-2 mt-1">

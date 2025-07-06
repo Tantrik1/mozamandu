@@ -94,9 +94,9 @@ CREATE TABLE public.customer_orders (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT customer_orders_pkey PRIMARY KEY (id),
-  CONSTRAINT customer_orders_payment_method_id_fkey FOREIGN KEY (payment_method_id) REFERENCES public.payment_methods(id),
   CONSTRAINT customer_orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-  CONSTRAINT customer_orders_delivery_location_id_fkey FOREIGN KEY (delivery_location_id) REFERENCES public.delivery_charges(id)
+  CONSTRAINT customer_orders_delivery_location_id_fkey FOREIGN KEY (delivery_location_id) REFERENCES public.delivery_charges(id),
+  CONSTRAINT customer_orders_payment_method_id_fkey FOREIGN KEY (payment_method_id) REFERENCES public.payment_methods(id)
 );
 CREATE TABLE public.delivery_charges (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -137,6 +137,38 @@ CREATE TABLE public.faqs (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT faqs_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.inventory_audit_log (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  product_inventory_id uuid,
+  product_id uuid,
+  color_variant_id uuid,
+  size_variant_id uuid,
+  category_id uuid,
+  subcategory_id uuid,
+  action_type character varying NOT NULL,
+  old_stock_quantity integer,
+  new_stock_quantity integer,
+  old_reserved_stock integer,
+  new_reserved_stock integer,
+  old_available_stock integer,
+  new_available_stock integer,
+  change_amount integer,
+  reason text,
+  user_id uuid,
+  order_id uuid,
+  cart_id text,
+  created_at timestamp with time zone DEFAULT now(),
+  ip_address inet,
+  user_agent text,
+  CONSTRAINT inventory_audit_log_pkey PRIMARY KEY (id),
+  CONSTRAINT inventory_audit_log_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id),
+  CONSTRAINT inventory_audit_log_subcategory_id_fkey FOREIGN KEY (subcategory_id) REFERENCES public.subcategories(id),
+  CONSTRAINT inventory_audit_log_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT inventory_audit_log_product_inventory_id_fkey FOREIGN KEY (product_inventory_id) REFERENCES public.product_inventory(id),
+  CONSTRAINT inventory_audit_log_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
+  CONSTRAINT inventory_audit_log_color_variant_id_fkey FOREIGN KEY (color_variant_id) REFERENCES public.color_variants(id),
+  CONSTRAINT inventory_audit_log_size_variant_id_fkey FOREIGN KEY (size_variant_id) REFERENCES public.size_variants(id)
 );
 CREATE TABLE public.navbar_items (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -183,8 +215,8 @@ CREATE TABLE public.order_items (
   product_inventory_id uuid,
   CONSTRAINT order_items_pkey PRIMARY KEY (id),
   CONSTRAINT order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
-  CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
-  CONSTRAINT order_items_product_inventory_id_fkey FOREIGN KEY (product_inventory_id) REFERENCES public.product_inventory(id)
+  CONSTRAINT order_items_product_inventory_id_fkey FOREIGN KEY (product_inventory_id) REFERENCES public.product_inventory(id),
+  CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id)
 );
 CREATE TABLE public.orders (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -213,8 +245,8 @@ CREATE TABLE public.orders (
   payment_percentage integer NOT NULL DEFAULT 100,
   CONSTRAINT orders_pkey PRIMARY KEY (id),
   CONSTRAINT orders_payment_method_id_fkey FOREIGN KEY (payment_method_id) REFERENCES public.payment_methods(id),
-  CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-  CONSTRAINT orders_delivery_location_id_fkey FOREIGN KEY (delivery_location_id) REFERENCES public.delivery_charges(id)
+  CONSTRAINT orders_delivery_location_id_fkey FOREIGN KEY (delivery_location_id) REFERENCES public.delivery_charges(id),
+  CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.payment_methods (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -235,9 +267,9 @@ CREATE TABLE public.product_images (
   image_type text DEFAULT 'main'::text CHECK (image_type = ANY (ARRAY['main'::text, 'variant'::text, 'gallery'::text])),
   storage_path text,
   CONSTRAINT product_images_pkey PRIMARY KEY (id),
-  CONSTRAINT fk_product_images_product_id FOREIGN KEY (product_id) REFERENCES public.products(id),
   CONSTRAINT product_images_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
   CONSTRAINT product_images_color_variant_id_fkey FOREIGN KEY (color_variant_id) REFERENCES public.color_variants(id),
+  CONSTRAINT fk_product_images_product_id FOREIGN KEY (product_id) REFERENCES public.products(id),
   CONSTRAINT fk_product_images_color_variant_id FOREIGN KEY (color_variant_id) REFERENCES public.color_variants(id)
 );
 CREATE TABLE public.product_inventory (
@@ -258,10 +290,17 @@ CREATE TABLE public.product_inventory (
   is_active boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  category_id uuid,
+  subcategory_id uuid,
+  low_stock_threshold integer DEFAULT 10,
+  category_name text,
+  subcategory_name text,
   CONSTRAINT product_inventory_pkey PRIMARY KEY (id),
+  CONSTRAINT product_inventory_color_variant_id_fkey FOREIGN KEY (color_variant_id) REFERENCES public.color_variants(id),
+  CONSTRAINT product_inventory_subcategory_id_fkey FOREIGN KEY (subcategory_id) REFERENCES public.subcategories(id),
+  CONSTRAINT product_inventory_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id),
   CONSTRAINT product_inventory_size_variant_id_fkey FOREIGN KEY (size_variant_id) REFERENCES public.size_variants(id),
-  CONSTRAINT product_inventory_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
-  CONSTRAINT product_inventory_color_variant_id_fkey FOREIGN KEY (color_variant_id) REFERENCES public.color_variants(id)
+  CONSTRAINT product_inventory_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
 );
 CREATE TABLE public.products (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -279,8 +318,8 @@ CREATE TABLE public.products (
   updated_at timestamp with time zone DEFAULT now(),
   image_url text,
   CONSTRAINT products_pkey PRIMARY KEY (id),
-  CONSTRAINT products_subcategory_id_fkey FOREIGN KEY (subcategory_id) REFERENCES public.subcategories(id),
-  CONSTRAINT products_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id)
+  CONSTRAINT products_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id),
+  CONSTRAINT products_subcategory_id_fkey FOREIGN KEY (subcategory_id) REFERENCES public.subcategories(id)
 );
 CREATE TABLE public.profiles (
   id uuid NOT NULL,

@@ -3,8 +3,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useCartPricing } from './useCartPricing';
 import { useComboManager } from './useComboManager';
-import { validateCartItems, showCartCleanupNotification } from '@/utils/cartValidation';
-import { getVariantStockInfo } from '@/utils/unifiedStockManager';
+import { validateCartItems, showCartCleanupNotification } from '@/utils/stockManagement';
+import { getVariantStockInfo } from '@/utils/stockManagement';
+import {
+  reserveStockForCartItem,
+  releaseStockForCartItem,
+  updateCartItemStock,
+  validateStock
+} from '@/utils/stockManagement';
 
 interface CartItem {
   id: string;
@@ -222,26 +228,20 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const validateStock = async (productId: string, productInventoryId: string | null = null, requestedQuantity: number): Promise<boolean> => {
+  const validateStockForCart = async (productId: string, productInventoryId: string | null = null, requestedQuantity: number): Promise<boolean> => {
     try {
       console.log('=== CART STOCK VALIDATION ===');
       console.log('Validating stock for cart addition:', { productId, productInventoryId, requestedQuantity });
 
-      const stockInfo = await getVariantStockInfo(productId, productInventoryId);
+      const stockValidation = await validateStock(productId, productInventoryId, requestedQuantity);
 
-      if (!stockInfo.isValid) {
-        setErrorWithTimeout(stockInfo.errorMessage || 'Stock validation failed');
-        console.log(`Cart stock validation failed: ${stockInfo.errorMessage}`);
+      if (!stockValidation.isValid) {
+        setErrorWithTimeout(stockValidation.errorMessage || 'Stock validation failed');
+        console.log(`Cart stock validation failed: ${stockValidation.errorMessage}`);
         return false;
       }
 
-      if (stockInfo.stockAmount < requestedQuantity) {
-        setErrorWithTimeout(`Only ${stockInfo.stockAmount} items available`);
-        console.log(`Cart stock validation failed: insufficient stock`);
-        return false;
-      }
-
-      console.log(`Cart stock validation passed: ${stockInfo.stockAmount} available`);
+      console.log(`Cart stock validation passed: ${stockValidation.availableStock} available`);
       return true;
     } catch (error) {
       console.error('Cart stock validation error:', error);
@@ -258,7 +258,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
       console.log('=== ADDING TO CART ===');
       console.log('Add to cart params:', params);
 
-      const hasStock = await validateStock(
+      const hasStock = await validateStockForCart(
         params.productId,
         params.productInventoryId,
         params.quantity
@@ -326,7 +326,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         const existingItem = cartItems[existingItemIndex];
         const newQuantity = existingItem.quantity + params.quantity;
 
-        const hasStockForUpdate = await validateStock(
+        const hasStockForUpdate = await validateStockForCart(
           params.productId,
           params.productInventoryId,
           newQuantity
@@ -336,6 +336,23 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
           toast({
             title: "Insufficient Stock",
             description: `Cannot add more of this item`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Reserve additional stock for the increased quantity
+        const additionalQuantity = params.quantity;
+        const stockReserved = await reserveStockForCartItem(
+          params.productId,
+          params.productInventoryId,
+          additionalQuantity
+        );
+
+        if (!stockReserved) {
+          toast({
+            title: "Stock Error",
+            description: "Failed to reserve stock for additional quantity",
             variant: "destructive",
           });
           return;
@@ -360,6 +377,22 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
           image_url: product.image_url
         };
 
+        // Reserve stock for the new item
+        const stockReserved = await reserveStockForCartItem(
+          params.productId,
+          params.productInventoryId,
+          params.quantity
+        );
+
+        if (!stockReserved) {
+          toast({
+            title: "Stock Error",
+            description: "Failed to reserve stock for this item",
+            variant: "destructive",
+          });
+          return;
+        }
+
         setCartItems(prev => [...prev, newItem]);
         console.log('Added new cart item:', newItem);
       }
@@ -381,8 +414,19 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const removeFromCart = (itemId: string) => {
+  const removeFromCart = async (itemId: string) => {
     console.log('Removing item from cart:', itemId);
+
+    const item = cartItems.find(i => i.id === itemId);
+    if (item) {
+      // Release reserved stock
+      await releaseStockForCartItem(
+        item.productId,
+        item.productInventoryId,
+        item.quantity
+      );
+    }
+
     setCartItems(prev => prev.filter(item => item.id !== itemId));
 
     toast({
@@ -393,14 +437,14 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
 
   const updateQuantity = async (itemId: string, quantity: number) => {
     if (quantity <= 0) {
-      removeFromCart(itemId);
+      await removeFromCart(itemId);
       return;
     }
 
     const item = cartItems.find(i => i.id === itemId);
     if (!item) return;
 
-    const hasStock = await validateStock(
+    const hasStock = await validateStockForCart(
       item.productId,
       item.productInventoryId,
       quantity
@@ -415,14 +459,41 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Update stock reservation
+    const stockUpdated = await updateCartItemStock(
+      item.productId,
+      item.productInventoryId,
+      item.quantity,
+      quantity
+    );
+
+    if (!stockUpdated) {
+      toast({
+        title: "Stock Error",
+        description: "Failed to update stock reservation",
+        variant: "destructive",
+      });
+      return;
+    }
+
     console.log('Updating cart item quantity:', itemId, 'to', quantity);
     setCartItems(prev => prev.map(item =>
       item.id === itemId ? { ...item, quantity } : item
     ));
   };
 
-  const clearCart = () => {
+  const clearCart = async () => {
     console.log('Clearing cart');
+
+    // Release all reserved stock
+    for (const item of cartItems) {
+      await releaseStockForCartItem(
+        item.productId,
+        item.productInventoryId,
+        item.quantity
+      );
+    }
+
     setCartItems([]);
     toast({
       title: "Cart Cleared",

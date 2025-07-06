@@ -5,6 +5,7 @@ import { ShoppingCart, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getRealTimeStock } from '@/utils/inventoryManager';
 
 interface Product {
   id: string;
@@ -112,15 +113,23 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
   }, [selectedColor, inventoryRows, product.image_url]);
 
   const fetchInventoryRows = async () => {
-    const { data, error } = await (await import('@/integrations/supabase/client')).supabase
-      .from('product_inventory')
-      .select('*')
-      .eq('product_id', product.id)
-      .eq('is_active', true);
-    if (error) {
+    try {
+      const { data, error } = await (await import('@/integrations/supabase/client')).supabase
+        .from('product_inventory')
+        .select('*')
+        .eq('product_id', product.id)
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Error fetching inventory rows:', error);
+        setInventoryRows([]);
+      } else {
+        setInventoryRows(data || []);
+        console.log(`Fetched ${data?.length || 0} inventory rows for product ${product.id}`);
+      }
+    } catch (error) {
+      console.error('Error in fetchInventoryRows:', error);
       setInventoryRows([]);
-    } else {
-      setInventoryRows(data || []);
     }
   };
 

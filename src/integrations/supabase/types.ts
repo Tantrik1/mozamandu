@@ -467,6 +467,131 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_audit_log: {
+        Row: {
+          action_type: string
+          cart_id: string | null
+          category_id: string | null
+          change_amount: number | null
+          color_variant_id: string | null
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          new_available_stock: number | null
+          new_reserved_stock: number | null
+          new_stock_quantity: number | null
+          old_available_stock: number | null
+          old_reserved_stock: number | null
+          old_stock_quantity: number | null
+          order_id: string | null
+          product_id: string | null
+          product_inventory_id: string | null
+          reason: string | null
+          size_variant_id: string | null
+          subcategory_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          cart_id?: string | null
+          category_id?: string | null
+          change_amount?: number | null
+          color_variant_id?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          new_available_stock?: number | null
+          new_reserved_stock?: number | null
+          new_stock_quantity?: number | null
+          old_available_stock?: number | null
+          old_reserved_stock?: number | null
+          old_stock_quantity?: number | null
+          order_id?: string | null
+          product_id?: string | null
+          product_inventory_id?: string | null
+          reason?: string | null
+          size_variant_id?: string | null
+          subcategory_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          cart_id?: string | null
+          category_id?: string | null
+          change_amount?: number | null
+          color_variant_id?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          new_available_stock?: number | null
+          new_reserved_stock?: number | null
+          new_stock_quantity?: number | null
+          old_available_stock?: number | null
+          old_reserved_stock?: number | null
+          old_stock_quantity?: number | null
+          order_id?: string | null
+          product_id?: string | null
+          product_inventory_id?: string | null
+          reason?: string | null
+          size_variant_id?: string | null
+          subcategory_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_audit_log_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audit_log_color_variant_id_fkey"
+            columns: ["color_variant_id"]
+            isOneToOne: false
+            referencedRelation: "color_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audit_log_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audit_log_product_inventory_id_fkey"
+            columns: ["product_inventory_id"]
+            isOneToOne: false
+            referencedRelation: "product_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audit_log_size_variant_id_fkey"
+            columns: ["size_variant_id"]
+            isOneToOne: false
+            referencedRelation: "size_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audit_log_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audit_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       navbar_items: {
         Row: {
           category_id: string | null
@@ -822,12 +947,15 @@ export type Database = {
       product_inventory: {
         Row: {
           available_stock: number | null
+          category_id: string | null
+          category_name: string | null
           color_name: string | null
           color_variant_id: string | null
           cost_price: number | null
           created_at: string | null
           id: string
           is_active: boolean | null
+          low_stock_threshold: number | null
           product_id: string
           product_name: string
           reserved_stock: number
@@ -837,16 +965,21 @@ export type Database = {
           size_variant_id: string | null
           sku: string
           stock_quantity: number
+          subcategory_id: string | null
+          subcategory_name: string | null
           updated_at: string | null
         }
         Insert: {
           available_stock?: number | null
+          category_id?: string | null
+          category_name?: string | null
           color_name?: string | null
           color_variant_id?: string | null
           cost_price?: number | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          low_stock_threshold?: number | null
           product_id: string
           product_name: string
           reserved_stock?: number
@@ -856,16 +989,21 @@ export type Database = {
           size_variant_id?: string | null
           sku: string
           stock_quantity?: number
+          subcategory_id?: string | null
+          subcategory_name?: string | null
           updated_at?: string | null
         }
         Update: {
           available_stock?: number | null
+          category_id?: string | null
+          category_name?: string | null
           color_name?: string | null
           color_variant_id?: string | null
           cost_price?: number | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          low_stock_threshold?: number | null
           product_id?: string
           product_name?: string
           reserved_stock?: number
@@ -875,6 +1013,8 @@ export type Database = {
           size_variant_id?: string | null
           sku?: string
           stock_quantity?: number
+          subcategory_id?: string | null
+          subcategory_name?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1213,6 +1353,17 @@ export type Database = {
       update_size_variant_stock: {
         Args: { variant_id: string; stock_change: number }
         Returns: undefined
+      }
+      safe_update_stock: {
+        Args: {
+          p_product_id: string
+          p_stock_change: number
+          p_color_variant_id?: string | null
+          p_size_variant_id?: string | null
+          p_reservation_change?: number | null
+          p_reason?: string | null
+        }
+        Returns: boolean
       }
     }
     Enums: {
