@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -779,4 +780,93 @@ export function OrderManagement() {
                             )}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            initialFocus
+                            mode="range"
+                            defaultMonth={dateRange?.from}
+                            selected={dateRange}
+                            onSelect={setDateRange}
+                            numberOfMonths={2}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="text-center py-8">Loading orders...</div>
+          ) : (
+            <div className="mt-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order ID</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(isCustomerOrderView ? filteredCustomerOrders : filteredOrders).map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-mono text-xs">{order.id}</TableCell>
+                      <TableCell>
+                        {isCustomerOrderView ? 
+                          (order as CustomerOrder).user_id : 
+                          (order as Order).customer_name
+                        }
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getStatusIcon(order.status)}
+                          <span className="capitalize">{order.status.replace('_', ' ')}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>${order.total_amount.toFixed(2)}</TableCell>
+                      <TableCell>{format(new Date(order.created_at), 'MMM dd, yyyy')}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleConfirmOrder(order.id, isCustomerOrderView)}
+                            disabled={order.status !== 'pending_payment'}
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleShipOrder(order.id, isCustomerOrderView)}
+                            disabled={order.status !== 'confirmed'}
+                          >
+                            <Truck className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleCancelOrder(order.id, isCustomerOrderView)}
+                            disabled={['delivered', 'cancelled', 'refunded'].includes(order.status)}
+                          >
+                            <Ban className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
