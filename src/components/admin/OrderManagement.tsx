@@ -41,7 +41,8 @@ interface Order {
   contact_number: string;
   delivery_address: string;
   total_amount: number;
-  payment_method: string;
+  payment_method?: string;
+  payment_method_id?: string;
   status: string;
   created_at: string;
   order_items?: OrderItem[];
@@ -98,7 +99,7 @@ export function OrderManagement() {
       // Add default payment_method for orders that don't have it
       const ordersWithPaymentMethod = (data || []).map(order => ({
         ...order,
-        payment_method: order.payment_method || 'Unknown'
+        payment_method: order.payment_method || order.payment_method_id || 'Unknown'
       }));
       
       setOrders(ordersWithPaymentMethod);

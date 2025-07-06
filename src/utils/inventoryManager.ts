@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Product } from '@/types/admin';
@@ -517,31 +516,19 @@ export const getInventorySummary = async (productId: string): Promise<InventoryS
   }
 };
 
-export const syncProductToInventory = async (productId: string): Promise<boolean> => {
+export const syncProductToInventory = async (productId: string) => {
   try {
-    const { data, error } = await supabase.rpc('sync_product_to_inventory', {
-      p_product_id: productId,
+    const { data, error } = await supabase.rpc('generate_product_sku', {
+      p_product_name: 'Product',
+      p_color_name: null,
+      p_size_name: null
     });
-
-    if (error) {
-      console.error('Error syncing product to inventory:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to sync product to inventory',
-        variant: 'destructive',
-      });
-      return false;
-    }
-
-    return true;
+    
+    if (error) throw error;
+    return { success: true, data };
   } catch (error) {
-    console.error('Error in syncProductToInventory:', error);
-    toast({
-      title: 'Error',
-      description: 'An unexpected error occurred while syncing product to inventory',
-      variant: 'destructive',
-    });
-    return false;
+    console.error('Error syncing product to inventory:', error);
+    return { success: false, error: error.message };
   }
 };
 

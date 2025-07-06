@@ -1,19 +1,23 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { validateCartStock } from '@/utils/inventoryManager';
 
 interface CartItem {
+  id: string;
   productId: string;
   productInventoryId?: string;
   quantity: number;
   productName: string;
   price: number;
+  basePrice: number;
   imageUrl?: string;
+  image_url?: string;
   colorName?: string;
   sizeName?: string;
   sku?: string;
+  subcategoryId: string;
 }
 
 interface StockValidationResult {
@@ -29,10 +33,56 @@ interface StockValidationResult {
   }>;
 }
 
+interface ComboData {
+  id: string;
+  name: string;
+  description?: string;
+  combo_subcategories: Array<{
+    subcategory_id: string;
+    min_units: number;
+    price: number;
+  }>;
+}
+
+interface DiscountTier {
+  min_quantity: number;
+  discount_amount: number;
+}
+
+interface CartContextType {
+  cartItems: CartItem[];
+  loading: boolean;
+  validationErrors: string[];
+  addToCart: (item: Omit<CartItem, 'quantity'> & { quantity?: number }) => void;
+  removeFromCart: (itemId: string) => void;
+  updateQuantity: (itemId: string, newQuantity: number) => void;
+  clearCart: () => void;
+  validateStock: () => Promise<StockValidationResult>;
+  getTotalPrice: () => number;
+  getTotalItems: () => number;
+  isInCart: (productId: string, productInventoryId?: string) => boolean;
+  getCartItem: (productId: string, productInventoryId?: string) => CartItem | undefined;
+  getItemPricing: (item: CartItem) => any;
+  activeCombo: ComboData | null;
+  discountTiers: { [subcategoryId: string]: DiscountTier[] };
+}
+
+const CartContext = createContext<CartContextType | undefined>(undefined);
+
 export function useRobustCart() {
+  const context = useContext(CartContext);
+  if (context === undefined) {
+    throw new Error('useRobustCart must be used within a RobustCartProvider');
+  }
+  return context;
+}
+
+export function RobustCartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [activeCombo, setActiveCombo] = useState<ComboData | null>(null);
+  const [discountTiers, setDiscountTiers] = useState<{ [subcategoryId: string]: DiscountTier[] }>({});
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -53,6 +103,15 @@ export function useRobustCart() {
   }, [cartItems]);
 
   const addToCart = useCallback((item: Omit<CartItem, 'quantity'> & { quantity?: number }) => {
+    const newItem: CartItem = {
+      id: `${item.productId}-${item.productInventoryId || 'no-inventory'}-${Date.now()}`,
+      ...item,
+      quantity: item.quantity || 1,
+      basePrice: item.price,
+      image_url: item.imageUrl,
+      subcategoryId: item.subcategoryId || '',
+    };
+
     setCartItems(prevItems => {
       const existingItemIndex = prevItems.findIndex(
         cartItem =>
@@ -70,7 +129,7 @@ export function useRobustCart() {
         return updatedItems;
       } else {
         // Add new item
-        return [...prevItems, { ...item, quantity: item.quantity || 1 }];
+        return [...prevItems, newItem];
       }
     });
 
@@ -80,13 +139,8 @@ export function useRobustCart() {
     });
   }, []);
 
-  const removeFromCart = useCallback((productId: string, productInventoryId?: string) => {
-    setCartItems(prevItems =>
-      prevItems.filter(
-        item =>
-          !(item.productId === productId && item.productInventoryId === productInventoryId)
-      )
-    );
+  const removeFromCart = useCallback((itemId: string) => {
+    setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
 
     toast({
       title: 'Removed from cart',
@@ -94,15 +148,15 @@ export function useRobustCart() {
     });
   }, []);
 
-  const updateQuantity = useCallback((productId: string, productInventoryId: string | undefined, newQuantity: number) => {
+  const updateQuantity = useCallback((itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
-      removeFromCart(productId, productInventoryId);
+      removeFromCart(itemId);
       return;
     }
 
     setCartItems(prevItems =>
       prevItems.map(item =>
-        item.productId === productId && item.productInventoryId === productInventoryId
+        item.id === itemId
           ? { ...item, quantity: newQuantity }
           : item
       )
@@ -187,6 +241,17 @@ export function useRobustCart() {
     );
   }, [cartItems]);
 
+  const getItemPricing = useCallback((item: CartItem) => {
+    return {
+      finalPrice: item.price,
+      originalPrice: item.basePrice,
+      description: `Rs. ${item.price.toFixed(2)} each`,
+      mode: 'normal' as const,
+      savings: 0,
+      breakdown: []
+    };
+  }, []);
+
   // Real-time stock monitoring for cart items
   useEffect(() => {
     if (cartItems.length === 0) return;
@@ -216,7 +281,7 @@ export function useRobustCart() {
     return () => clearInterval(checkStockPeriodically);
   }, [cartItems]);
 
-  return {
+  const contextValue: CartContextType = {
     cartItems,
     loading,
     validationErrors,
@@ -229,5 +294,14 @@ export function useRobustCart() {
     getTotalItems,
     isInCart,
     getCartItem,
+    getItemPricing,
+    activeCombo,
+    discountTiers,
   };
+
+  return (
+    <CartContext.Provider value={contextValue}>
+      {children}
+    </CartContext.Provider>
+  );
 }

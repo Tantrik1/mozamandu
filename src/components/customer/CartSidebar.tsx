@@ -1,3 +1,4 @@
+
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { useCartStockMonitoring } from '@/hooks/useStockMonitoring';
+import { useCartStockMonitoring } from '@/hooks/useCartStockMonitoring';
 
 interface SubcategoryRequirement {
   subcategoryId: string;
@@ -46,7 +47,9 @@ export function CartSidebar() {
 
     // Calculate totals per subcategory
     for (const item of cartItems) {
-      subcategoryTotals[item.subcategoryId] = (subcategoryTotals[item.subcategoryId] || 0) + item.quantity;
+      if (item.subcategoryId) {
+        subcategoryTotals[item.subcategoryId] = (subcategoryTotals[item.subcategoryId] || 0) + item.quantity;
+      }
     }
 
     // Get subcategory requirements
@@ -75,7 +78,7 @@ export function CartSidebar() {
   const totalPrice = getTotalPrice();
 
   // Calculate normal total (no discounts or combos)
-  const normalTotal = cartItems.reduce((sum, item) => sum + (item.basePrice * item.quantity), 0);
+  const normalTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const savings = Math.max(0, normalTotal - totalPrice);
   // Check if any item is in discount mode (but not combo)
   const hasDiscount = cartItems.some(item => getItemPricing(item).mode === 'discount');
@@ -183,9 +186,9 @@ export function CartSidebar() {
 
                     return (
                       <div key={item.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                        {item.image_url && (
+                        {item.imageUrl && (
                           <img
-                            src={item.image_url}
+                            src={item.imageUrl}
                             alt={item.productName}
                             className="w-12 h-12 object-cover rounded-md flex-shrink-0"
                           />

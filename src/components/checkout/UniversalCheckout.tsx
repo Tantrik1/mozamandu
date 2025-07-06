@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +31,7 @@ export function UniversalCheckout() {
 
   const { validateStock, validatePromoCode, validatePaymentAmount } = useCheckoutValidation();
 
-  const subtotal = cartItems.reduce((acc, item) => acc + (item.basePrice * item.quantity), 0);
+  const subtotal = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const totalAmount = subtotal + deliveryCharge - promoDiscount;
 
   useEffect(() => {
@@ -201,9 +202,9 @@ export function UniversalCheckout() {
                   <div className="space-y-4">
                     {cartItems.map((item) => (
                       <div key={item.id} className="flex items-center space-x-4 p-4 border rounded-lg">
-                        {item.image_url && (
+                        {item.imageUrl && (
                           <img
-                            src={item.image_url}
+                            src={item.imageUrl}
                             alt={item.productName}
                             className="w-16 h-16 object-cover rounded"
                           />
@@ -216,7 +217,7 @@ export function UniversalCheckout() {
                           {item.sizeName && (
                             <p className="text-sm text-gray-500">Size: {item.sizeName}</p>
                           )}
-                          <p className="text-lg font-semibold">Rs. {item.basePrice}</p>
+                          <p className="text-lg font-semibold">Rs. {item.price}</p>
                         </div>
                         <div className="flex items-center space-x-2">
                           <Button
