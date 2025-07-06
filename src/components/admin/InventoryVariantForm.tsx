@@ -9,16 +9,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Trash2, Plus, Save, RefreshCw, Edit } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { 
   getProductInventory, 
   getInventorySummary, 
   syncProductToInventory,
   createInventoryItem,
   deleteInventoryItem,
+  addStock,
   InventoryItem,
   InventorySummary 
 } from '@/utils/inventoryManager';
+import { useRealTimeInventory } from '@/hooks/useRealTimeInventory';
+import { RealTimeStockIndicator } from '@/components/inventory/RealTimeStockIndicator';
+import { InventoryManagementPanel } from '@/components/inventory/InventoryManagementPanel';
 
 interface InventoryVariantFormProps {
   productId?: string;
@@ -57,6 +60,7 @@ export function InventoryVariantForm({
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [stockUpdates, setStockUpdates] = useState<{ [key: string]: number }>({});
   const [newVariant, setNewVariant] = useState<NewVariantForm>({
     colorName: '',
     sizeName: '',
@@ -64,11 +68,17 @@ export function InventoryVariantForm({
     stockQuantity: 0
   });
 
+  // Real-time inventory monitoring
+  const { lastUpdate } = useRealTimeInventory({
+    productId,
+    enableRealTime: true
+  });
+
   useEffect(() => {
     if (productId) {
       loadInventory();
     }
-  }, [productId]);
+  }, [productId, lastUpdate]);
 
   const loadInventory = async () => {
     if (!productId) return;
@@ -118,30 +128,22 @@ export function InventoryVariantForm({
     }
   };
 
-  const handleStockUpdate = async (inventoryId: string, newStock: number) => {
+  const handleStockUpdate = async (inventoryId: string, stockToAdd: number) => {
+    if (stockToAdd <= 0) return;
+
     try {
-      const item = inventory.find(i => i.id === inventoryId);
-      if (!item) return;
-
-      const stockChange = newStock - item.stock_quantity;
+      const success = await addStock(inventoryId, stockToAdd, 'Manual stock addition');
       
-      // Update in database
-      const { error } = await supabase
-        .from('product_inventory')
-        .update({ stock_quantity: newStock })
-        .eq('id', inventoryId);
-
-      if (error) throw error;
-
-      // Update local state
-      setInventory(prev => prev.map(item => 
-        item.id === inventoryId 
-          ? { ...item, stock_quantity: newStock, available_stock: newStock - item.reserved_stock }
-          : item
-      ));
-
-      // Refresh summary
-      await loadInventory();
+      if (success) {
+        toast({
+          title: 'Success',
+          description: `Added ${stockToAdd} units to inventory`,
+        });
+        setStockUpdates(prev => ({ ...prev, [inventoryId]: 0 }));
+        await loadInventory();
+      } else {
+        throw new Error('Failed to add stock');
+      }
     } catch (error) {
       console.error('Error updating stock:', error);
       toast({
@@ -212,51 +214,20 @@ export function InventoryVariantForm({
     }
   };
 
-  const handleEditItem = async (item: InventoryItem) => {
-    try {
-      const { error } = await supabase
-        .from('product_inventory')
-        .update({
-          color_name: item.color_name,
-          size_name: item.size_name,
-          size_code: item.size_code,
-          stock_quantity: item.stock_quantity,
-          cost_price: item.cost_price,
-          selling_price: item.selling_price,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', item.id);
-
-      if (error) throw error;
-
-      setEditingItem(null);
-      await loadInventory();
-      
-      toast({
-        title: 'Success',
-        description: 'Variant updated successfully',
-      });
-    } catch (error) {
-      console.error('Error updating variant:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update variant',
-        variant: 'destructive',
-      });
-    }
-  };
-
   if (isLoading) {
     return <div className="text-center py-8">Loading inventory...</div>;
   }
 
   return (
     <div className="space-y-6">
+      {/* Inventory Management Panel */}
+      <InventoryManagementPanel productId={productId} />
+
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Inventory Management</CardTitle>
+              <CardTitle>Product Inventory Variants</CardTitle>
               <div className="flex gap-4 mt-2">
                 <Badge variant="outline">Total: {summary.total_stock}</Badge>
                 <Badge variant="outline" className="text-green-600">Available: {summary.available_stock}</Badge>
@@ -311,7 +282,7 @@ export function InventoryVariantForm({
                       </>
                     )}
                     <div>
-                      <Label htmlFor="stockQuantity">Stock Quantity *</Label>
+                      <Label htmlFor="stockQuantity">Initial Stock Quantity *</Label>
                       <Input
                         id="stockQuantity"
                         type="number"
@@ -352,9 +323,8 @@ export function InventoryVariantForm({
                   <TableHead>Product</TableHead>
                   {hasColorVariants && <TableHead>Color</TableHead>}
                   {hasSizeVariants && <TableHead>Size</TableHead>}
-                  <TableHead>Stock</TableHead>
-                  <TableHead>Available</TableHead>
-                  <TableHead>Reserved</TableHead>
+                  <TableHead>Stock Status</TableHead>
+                  <TableHead>Add Stock</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -363,106 +333,46 @@ export function InventoryVariantForm({
                   <TableRow key={item.id}>
                     <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                     <TableCell>{item.product_name}</TableCell>
-                    {hasColorVariants && (
-                      <TableCell>
-                        {editingItem?.id === item.id ? (
-                          <Input
-                            value={editingItem.color_name || ''}
-                            onChange={(e) => setEditingItem({...editingItem, color_name: e.target.value})}
-                            className="w-24"
-                          />
-                        ) : (
-                          item.color_name || '-'
-                        )}
-                      </TableCell>
-                    )}
-                    {hasSizeVariants && (
-                      <TableCell>
-                        {editingItem?.id === item.id ? (
-                          <Input
-                            value={editingItem.size_name || ''}
-                            onChange={(e) => setEditingItem({...editingItem, size_name: e.target.value})}
-                            className="w-20"
-                          />
-                        ) : (
-                          item.size_name || '-'
-                        )}
-                      </TableCell>
-                    )}
+                    {hasColorVariants && <TableCell>{item.color_name || '-'}</TableCell>}
+                    {hasSizeVariants && <TableCell>{item.size_name || '-'}</TableCell>}
                     <TableCell>
-                      {editingItem?.id === item.id ? (
+                      <RealTimeStockIndicator
+                        productId={item.product_id}
+                        productInventoryId={item.id}
+                        showDetails={true}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
                         <Input
                           type="number"
-                          min="0"
-                          value={editingItem.stock_quantity}
-                          onChange={(e) => setEditingItem({...editingItem, stock_quantity: parseInt(e.target.value) || 0})}
+                          min="1"
+                          placeholder="Qty"
                           className="w-20"
+                          value={stockUpdates[item.id] || ''}
+                          onChange={(e) => setStockUpdates(prev => ({
+                            ...prev,
+                            [item.id]: parseInt(e.target.value) || 0
+                          }))}
                         />
-                      ) : (
-                        <Input
-                          type="number"
-                          min="0"
-                          value={item.stock_quantity}
-                          onChange={(e) => {
-                            const newStock = parseInt(e.target.value) || 0;
-                            handleStockUpdate(item.id, newStock);
-                          }}
-                          className="w-20"
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-green-600">
-                        {item.available_stock}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-orange-600">
-                        {item.reserved_stock}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {editingItem?.id === item.id ? (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditItem(editingItem)}
-                              className="text-green-600 hover:text-green-700"
-                            >
-                              <Save className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingItem(null)}
-                              className="text-gray-600 hover:text-gray-700"
-                            >
-                              ✕
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingItem(item)}
-                              className="text-blue-600 hover:text-blue-700"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
+                        <Button
+                          size="sm"
+                          onClick={() => handleStockUpdate(item.id, stockUpdates[item.id] || 0)}
+                          disabled={!stockUpdates[item.id] || stockUpdates[item.id] <= 0}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteItem(item.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

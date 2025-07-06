@@ -3,12 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useCartPricing } from './useCartPricing';
 import { useComboManager } from './useComboManager';
-import {
-  validateCartItems,
-  showCartCleanupNotification,
-  getVariantStockInfo,
-  validateStock
-} from '@/utils/inventoryManager';
+import { validateCartItems, showCartCleanupNotification } from '@/utils/cartValidation';
+import { validateStock } from '@/utils/inventoryManager';
 
 interface CartItem {
   id: string;
@@ -226,28 +222,6 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const validateStockForCart = async (productId: string, productInventoryId: string | null = null, requestedQuantity: number): Promise<boolean> => {
-    try {
-      console.log('=== CART STOCK VALIDATION ===');
-      console.log('Validating stock for cart addition:', { productId, productInventoryId, requestedQuantity });
-
-      const stockValidation = await validateStock(productId, productInventoryId, requestedQuantity);
-
-      if (!stockValidation.isValid) {
-        setErrorWithTimeout(stockValidation.errorMessage || 'Stock validation failed');
-        console.log(`Cart stock validation failed: ${stockValidation.errorMessage}`);
-        return false;
-      }
-
-      console.log(`Cart stock validation passed: ${stockValidation.availableStock} available`);
-      return true;
-    } catch (error) {
-      console.error('Cart stock validation error:', error);
-      setErrorWithTimeout('Error checking stock availability');
-      return false;
-    }
-  };
-
   const addToCart = async (params: AddToCartParams) => {
     setLoading(true);
     setError(null);
@@ -256,16 +230,17 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
       console.log('=== ADDING TO CART ===');
       console.log('Add to cart params:', params);
 
-      const hasStock = await validateStockForCart(
+      // Validate stock before adding
+      const stockValidation = await validateStock(
         params.productId,
         params.productInventoryId,
         params.quantity
       );
 
-      if (!hasStock) {
+      if (!stockValidation.isValid) {
         toast({
           title: "Stock Issue",
-          description: "Not enough stock available for this item",
+          description: stockValidation.errorMessage || "Not enough stock available",
           variant: "destructive",
         });
         return;
@@ -324,16 +299,17 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         const existingItem = cartItems[existingItemIndex];
         const newQuantity = existingItem.quantity + params.quantity;
 
-        const hasStockForUpdate = await validateStockForCart(
+        // Validate stock for the new quantity
+        const newStockValidation = await validateStock(
           params.productId,
           params.productInventoryId,
           newQuantity
         );
 
-        if (!hasStockForUpdate) {
+        if (!newStockValidation.isValid) {
           toast({
             title: "Insufficient Stock",
-            description: `Cannot add more of this item`,
+            description: newStockValidation.errorMessage || "Cannot add more of this item",
             variant: "destructive",
           });
           return;
@@ -382,8 +358,6 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
   const removeFromCart = async (itemId: string) => {
     console.log('Removing item from cart:', itemId);
 
-    const item = cartItems.find(i => i.id === itemId);
-
     setCartItems(prev => prev.filter(item => item.id !== itemId));
 
     toast({
@@ -401,16 +375,17 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     const item = cartItems.find(i => i.id === itemId);
     if (!item) return;
 
-    const hasStock = await validateStockForCart(
+    // Validate stock for the new quantity
+    const stockValidation = await validateStock(
       item.productId,
       item.productInventoryId,
       quantity
     );
 
-    if (!hasStock) {
+    if (!stockValidation.isValid) {
       toast({
         title: "Insufficient Stock",
-        description: "Not enough items in stock for this quantity",
+        description: stockValidation.errorMessage || "Not enough items in stock for this quantity",
         variant: "destructive",
       });
       return;

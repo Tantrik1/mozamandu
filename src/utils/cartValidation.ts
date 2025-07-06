@@ -1,6 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { getVariantStockInfo, validateCartStock } from './inventoryManager';
+import { validateCartStock, validateStock } from '@/utils/inventoryManager';
 
 interface CartItem {
   id: string;
@@ -67,28 +68,21 @@ export async function validateCartItems(cartItems: CartItem[]): Promise<Validati
         continue;
       }
 
-      // Validate inventory using unified stock system
-      const stockInfo = await getVariantStockInfo(
+      // Validate stock using unified stock system
+      const stockValidation = await validateStock(
         item.productId,
-        item.productInventoryId
+        item.productInventoryId,
+        item.quantity
       );
 
-      if (!stockInfo.isValid) {
-        console.log(`Stock validation failed for ${item.productId}: ${stockInfo.errorMessage}`);
-        removedItems.push(item);
-        errors.push(`"${item.productName}" has inventory issues and was removed from cart`);
-        continue;
-      }
-
-      // Check if we have enough stock
-      if (stockInfo.stockAmount < item.quantity) {
-        console.log(`Insufficient stock for ${item.productId}: available ${stockInfo.stockAmount}, needed ${item.quantity}`);
-
-        if (stockInfo.stockAmount > 0) {
+      if (!stockValidation.isValid) {
+        console.log(`Stock validation failed for ${item.productId}: ${stockValidation.errorMessage}`);
+        
+        if (stockValidation.availableStock > 0) {
           // Adjust quantity to available stock
-          item.quantity = stockInfo.stockAmount;
+          item.quantity = stockValidation.availableStock;
           validItems.push(item);
-          errors.push(`"${item.productName}" quantity reduced to ${stockInfo.stockAmount} (available stock)`);
+          errors.push(`"${item.productName}" quantity reduced to ${stockValidation.availableStock} (available stock)`);
         } else {
           // No stock available, remove item
           removedItems.push(item);
@@ -129,25 +123,17 @@ export async function validateSingleCartItem(item: CartItem): Promise<{
   errorMessage?: string;
 }> {
   try {
-    const stockInfo = await getVariantStockInfo(
+    const validation = await validateStock(
       item.productId,
-      item.productInventoryId
+      item.productInventoryId,
+      item.quantity
     );
 
-    if (!stockInfo.isValid) {
+    if (!validation.isValid) {
       return {
-        isValid: false,
-        errorMessage: stockInfo.errorMessage || 'Item validation failed'
-      };
-    }
-
-    if (stockInfo.stockAmount < item.quantity) {
-      return {
-        isValid: stockInfo.stockAmount > 0,
-        adjustedQuantity: stockInfo.stockAmount,
-        errorMessage: stockInfo.stockAmount > 0
-          ? `Only ${stockInfo.stockAmount} items available`
-          : 'Item is out of stock'
+        isValid: validation.availableStock > 0,
+        adjustedQuantity: validation.availableStock,
+        errorMessage: validation.errorMessage
       };
     }
 
