@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { CreateProductVariantForm } from './CreateProductVariantForm';
+import { ColorVariant } from '@/types/admin';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -24,7 +25,6 @@ const productSchema = z.object({
   is_featured: z.boolean().default(false),
   has_color_variants: z.boolean().default(false),
   color_has_size_variants: z.boolean().default(false),
-  stock_quantity: z.number().min(0, 'Stock quantity must be positive').optional(),
   status: z.enum(['active', 'inactive']).default('active'),
 });
 
@@ -37,22 +37,6 @@ interface Subcategory {
   id: string;
   name: string;
   category_id: string;
-}
-
-interface SizeVariant {
-  id?: string;
-  size_name: string;
-  size_code?: string;
-  stock_quantity: number;
-}
-
-interface ColorVariant {
-  id?: string;
-  color_name: string;
-  image_url?: string;
-  has_sizes: boolean;
-  stock_quantity?: number;
-  size_variants: SizeVariant[];
 }
 
 interface EnhancedProductFormProps {
@@ -86,7 +70,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: EnhancedPro
       is_featured: false,
       has_color_variants: false,
       color_has_size_variants: false,
-      stock_quantity: 0,
       status: 'active',
     },
   });
