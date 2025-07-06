@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +11,7 @@ import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Truck } from 'lucide-rea
 import { toast } from '@/hooks/use-toast';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useCheckoutValidation } from './CheckoutValidation';
-import { validateCheckoutStock, processCheckoutStock } from '@/utils/inventoryManager';
+import { validateCartStock, processCheckoutStock } from '@/utils/inventoryManager';
 
 export function UniversalCheckout() {
   const { cartItems, removeFromCart, updateQuantity, clearCart } = useRobustCart();
@@ -67,13 +66,13 @@ export function UniversalCheckout() {
       console.log('=== STARTING CHECKOUT PROCESS ===');
       
       // Validate stock before proceeding
-      const stockValidation = await validateStock(cartItems);
+      const stockValidation = await validateCartStock(cartItems);
       console.log('Stock validation result:', stockValidation);
       
       if (!stockValidation.isValid) {
         toast({
           title: 'Stock Validation Failed',
-          description: stockValidation.error || 'Some items are out of stock',
+          description: stockValidation.errorMessages?.[0] || 'Some items are out of stock',
           variant: 'destructive',
         });
         return;
@@ -119,7 +118,7 @@ export function UniversalCheckout() {
           shipping_method: 'Standard Delivery',
           order_notes: '',
           user_id: user?.id || null,
-          status: 'pending_payment',
+          status: 'pending_payment' as const,
           subtotal: subtotal,
           delivery_charge: deliveryCharge,
           promocode_discount: promoDiscount,
