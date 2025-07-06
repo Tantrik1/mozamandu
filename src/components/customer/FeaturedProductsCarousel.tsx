@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { calculateTotalProductStock } from '@/utils/unifiedStockManager';
+import { calculateTotalProductStock } from '@/utils/inventoryManager';
 import { ProductCard } from '@/components/customer/ProductCard';
 import {
   Carousel,

@@ -5,7 +5,7 @@ import { ProductCard } from '@/components/customer/ProductCard';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Footer } from '@/components/layout/Footer';
-import { calculateTotalProductStock } from '@/utils/unifiedStockManager';
+import { calculateTotalProductStock } from '@/utils/inventoryManager';
 
 interface Product {
   id: string;
@@ -35,7 +35,7 @@ export default function Products() {
   const fetchProducts = async () => {
     try {
       console.log('🔄 Products: Starting data fetch');
-      
+
       const { data, error } = await supabase
         .from('products')
         .select(`
@@ -56,7 +56,7 @@ export default function Products() {
         setProducts([]);
       } else {
         console.log('✅ Products: Data loaded:', data?.length || 0);
-        
+
         // Calculate accurate stock for each product using breakdown table
         const productsWithStock = await Promise.all(
           (data || []).map(async (product) => {
@@ -67,7 +67,7 @@ export default function Products() {
             };
           })
         );
-        
+
         setProducts(productsWithStock);
       }
     } catch (error) {

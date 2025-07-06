@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Footer } from '@/components/layout/Footer';
-import { calculateTotalProductStock } from '@/utils/unifiedStockManager';
+import { calculateTotalProductStock } from '@/utils/inventoryManager';
 import { ProductCard } from '@/components/customer/ProductCard';
 
 interface Product {

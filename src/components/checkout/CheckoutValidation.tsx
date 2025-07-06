@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { validateCartStock } from '@/utils/unifiedStockManager';
+import { validateCartStock } from '@/utils/inventoryManager';
 
 export interface ValidationResult {
   isValid: boolean;

@@ -8,7 +8,7 @@ import { CreateProductForm } from './CreateProductForm';
 import { EditProductForm } from './EditProductForm';
 import { ProductDetailView } from './ProductDetailView';
 import { Pencil, Trash2, Plus, Package, Eye } from 'lucide-react';
-import { getProductStockSummary } from '@/utils/stockCalculation';
+import { getProductStockSummary } from '@/utils/inventoryManager';
 import { ProductEditBlockedModal } from './ProductEditBlockedModal';
 import { validateProductEditability, ProductEditValidationResult } from '@/utils/productEditValidation';
 

@@ -103,6 +103,65 @@ export interface CartItem {
   sizeVariantId?: string;
 }
 
+export interface CartItemForValidation {
+  id: string;
+  productId: string;
+  productName: string;
+  productInventoryId?: string | null;
+  colorName?: string;
+  sizeName?: string;
+  quantity: number;
+  basePrice: number;
+  subcategoryId: string;
+  image_url?: string;
+}
+
+export interface CartValidationResult {
+  validItems: CartItemForValidation[];
+  removedItems: CartItemForValidation[];
+  errors: string[];
+}
+
+export interface ProductStockSummary {
+  productId: string;
+  productName: string;
+  categoryName?: string;
+  subcategoryName?: string;
+  totalStockQuantity: number;
+  totalReservedStock: number;
+  totalAvailableStock: number;
+  variantCount: number;
+  lowStockVariants: number;
+  outOfStockVariants: number;
+  stockStatus: 'In Stock' | 'Low Stock' | 'Out of Stock' | 'Mixed';
+  lastUpdated: string;
+  isActive: boolean;
+}
+
+export interface StockCalculationResult {
+  totalItems: number;
+  activeItems: number;
+  lowStockItems: number;
+  outOfStockItems: number;
+  totalStockValue: number;
+  totalAvailableValue: number;
+  totalReservedValue: number;
+  averageStockLevel: number;
+  stockTurnoverRatio: number;
+}
+
+export interface VariantStockDetail {
+  variantId: string;
+  colorName?: string;
+  sizeName?: string;
+  stockQuantity: number;
+  reservedStock: number;
+  availableStock: number;
+  lowStockThreshold: number;
+  stockStatus: 'In Stock' | 'Low Stock' | 'Out of Stock';
+  lastUpdated: string;
+}
+
 export interface StockValidationResult {
   isValid: boolean;
   errors: string[];
@@ -649,6 +708,134 @@ async function processOrderItemStockChange(
 // ============================================================================
 
 /**
+ * Validate and clean cart items
+ */
+export async function validateCartItems(cartItems: CartItemForValidation[]): Promise<CartValidationResult> {
+  const validItems: CartItemForValidation[] = [];
+  const removedItems: CartItemForValidation[] = [];
+  const errors: string[] = [];
+
+  for (const item of cartItems) {
+    try {
+      // Check if product still exists and is active
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('id, name, status, subcategory_id, selling_price')
+        .eq('id', item.productId)
+        .single();
+
+      if (productError || !product) {
+        removedItems.push(item);
+        errors.push(`Product "${item.productName}" no longer exists`);
+        continue;
+      }
+
+      if (product.status !== 'active') {
+        removedItems.push(item);
+        errors.push(`Product "${item.productName}" is no longer available`);
+        continue;
+      }
+
+      // Validate stock availability
+      const stockValidation = await validateStock(
+        item.productId,
+        item.productInventoryId,
+        item.quantity
+      );
+
+      if (!stockValidation.isValid) {
+        removedItems.push(item);
+        errors.push(`Insufficient stock for "${item.productName}": ${stockValidation.errorMessage}`);
+        continue;
+      }
+
+      // Update item with current product data
+      const updatedItem: CartItemForValidation = {
+        ...item,
+        productName: product.name,
+        subcategoryId: product.subcategory_id,
+        basePrice: product.selling_price || item.basePrice
+      };
+
+      validItems.push(updatedItem);
+    } catch (error) {
+      console.error('Error validating cart item:', error);
+      removedItems.push(item);
+      errors.push(`Error validating "${item.productName}"`);
+    }
+  }
+
+  return { validItems, removedItems, errors };
+}
+
+/**
+ * Show cart cleanup notification
+ */
+export function showCartCleanupNotification(
+  removedItems: CartItemForValidation[],
+  errors: string[]
+): void {
+  if (removedItems.length > 0) {
+    toast.error(`${removedItems.length} items were removed from your cart due to availability changes.`);
+    // Log detailed errors for debugging
+    console.log('Cart cleanup details:', { removedItems, errors });
+  }
+}
+
+/**
+ * Validate stock for a product
+ */
+export async function validateStock(
+  productId: string,
+  productInventoryId: string | null = null,
+  requestedQuantity: number = 1
+): Promise<{
+  isValid: boolean;
+  errorMessage?: string;
+  availableStock: number;
+}> {
+  try {
+    const stockInfo = await getRealTimeStock(productId, productInventoryId);
+
+    if (!stockInfo) {
+      return {
+        isValid: false,
+        errorMessage: 'Product not found in inventory',
+        availableStock: 0
+      };
+    }
+
+    if (!stockInfo.is_active) {
+      return {
+        isValid: false,
+        errorMessage: 'Product is not active',
+        availableStock: 0
+      };
+    }
+
+    if (stockInfo.available_stock < requestedQuantity) {
+      return {
+        isValid: false,
+        errorMessage: `Only ${stockInfo.available_stock} items available`,
+        availableStock: stockInfo.available_stock
+      };
+    }
+
+    return {
+      isValid: true,
+      availableStock: stockInfo.available_stock
+    };
+  } catch (error) {
+    console.error('Error in validateStock:', error);
+    return {
+      isValid: false,
+      errorMessage: 'Error checking stock availability',
+      availableStock: 0
+    };
+  }
+}
+
+/**
  * Validate stock availability for checkout
  * This checks if there's enough available stock for all items in cart
  */
@@ -660,19 +847,22 @@ export async function validateCheckoutStock(cartItems: CartItem[]): Promise<Stoc
     const insufficientItems: StockValidationResult['insufficientItems'] = [];
 
     for (const item of cartItems) {
-      const { productId, quantity, colorVariantId, sizeVariantId } = item;
+      const { productInventoryId, quantity, productId, colorVariantId, sizeVariantId } = item;
 
-      // Get current inventory for this product variant
+      if (!productInventoryId) {
+        errors.push(`No inventory record for product ${productId}`);
+        continue;
+      }
+
+      // Get current inventory for this inventory record
       const { data: inventory, error } = await supabase
         .from('product_inventory')
         .select('*')
-        .eq('product_id', productId)
-        .eq('color_variant_id', colorVariantId || null)
-        .eq('size_variant_id', sizeVariantId || null)
+        .eq('id', productInventoryId)
         .single();
 
       if (error || !inventory) {
-        errors.push(`Product inventory not found for product ${productId}`);
+        errors.push(`Product inventory not found for productInventoryId ${productInventoryId}`);
         continue;
       }
 
@@ -735,18 +925,30 @@ export async function processCheckoutStock(
 
     // Process each item to reserve stock
     for (const item of orderItems) {
-      const { productId, quantity, colorVariantId, sizeVariantId } = item;
-
+      const { productInventoryId, quantity } = item;
+      if (!productInventoryId) {
+        console.error('No productInventoryId for item', item);
+        return false;
+      }
+      // Get inventory record to extract productId, colorVariantId, sizeVariantId
+      const { data: inventory, error } = await supabase
+        .from('product_inventory')
+        .select('product_id, color_variant_id, size_variant_id')
+        .eq('id', productInventoryId)
+        .single();
+      if (error || !inventory) {
+        console.error('Inventory record not found for reservation', productInventoryId);
+        return false;
+      }
       const success = await reserveStock(
-        productId,
+        productInventoryId, // pass inventory id as productId for reservation
         quantity,
-        colorVariantId,
-        sizeVariantId,
+        inventory.color_variant_id,
+        inventory.size_variant_id,
         orderId
       );
-
       if (!success) {
-        console.error(`Failed to reserve stock for product ${productId}`);
+        console.error(`Failed to reserve stock for inventory ${productInventoryId}`);
         // Try to release any already reserved stock
         await rollbackCheckoutStockReservations(orderItems.slice(0, orderItems.indexOf(item)), orderId);
         return false;
@@ -773,7 +975,7 @@ async function rollbackCheckoutStockReservations(
 
     for (const item of reservedItems) {
       await releaseStock(
-        item.productId,
+        item.productInventoryId || '',
         item.quantity,
         item.colorVariantId,
         item.sizeVariantId,
@@ -1222,6 +1424,740 @@ export async function setLowStockThreshold(
     toast.error('Failed to update low stock threshold');
     return false;
   }
+}
+
+/**
+ * Get real-time stock information for a product
+ */
+export async function getRealTimeStock(
+  productId: string,
+  productInventoryId?: string | null
+): Promise<{
+  stock_quantity: number;
+  reserved_stock: number;
+  available_stock: number;
+  is_active: boolean;
+} | null> {
+  try {
+    let query = supabase
+      .from('product_inventory')
+      .select('stock_quantity, reserved_stock, available_stock, is_active');
+
+    if (productInventoryId) {
+      query = query.eq('id', productInventoryId);
+    } else {
+      query = query.eq('product_id', productId);
+    }
+
+    const { data, error } = await query.single();
+
+    if (error) {
+      console.error('Error fetching stock info:', error);
+      return null;
+    }
+
+    return {
+      stock_quantity: data.stock_quantity,
+      reserved_stock: data.reserved_stock,
+      available_stock: data.available_stock || 0,
+      is_active: data.is_active || true
+    };
+  } catch (error) {
+    console.error('Error in getRealTimeStock:', error);
+    return null;
+  }
+}
+
+/**
+ * Calculate total stock for a product (sum of all variants)
+ */
+export async function calculateTotalProductStock(productId: string): Promise<number> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('available_stock')
+      .eq('product_id', productId)
+      .eq('is_active', true);
+
+    if (error || !data) {
+      return 0;
+    }
+
+    return data.reduce((sum, item) => sum + (item.available_stock || 0), 0);
+  } catch (error) {
+    console.error('Error calculating total product stock:', error);
+    return 0;
+  }
+}
+
+/**
+ * Validate stock for a single cart item
+ */
+export async function validateCartItemStock(
+  productId: string,
+  quantity: number,
+  colorVariantId?: string,
+  sizeVariantId?: string
+): Promise<{
+  productId: string;
+  colorVariantId?: string;
+  sizeVariantId?: string;
+  requestedQuantity: number;
+  availableStock: number;
+  isValid: boolean;
+  errorMessage?: string;
+}> {
+  try {
+    const variantStock = await getVariantStockInfo(productId, colorVariantId, sizeVariantId);
+
+    if (!variantStock) {
+      return {
+        productId,
+        colorVariantId,
+        sizeVariantId,
+        requestedQuantity: quantity,
+        availableStock: 0,
+        isValid: false,
+        errorMessage: 'Product variant not found in inventory'
+      };
+    }
+
+    if (!variantStock.isActive) {
+      return {
+        productId,
+        colorVariantId,
+        sizeVariantId,
+        requestedQuantity: quantity,
+        availableStock: variantStock.availableStock,
+        isValid: false,
+        errorMessage: 'Product variant is not active'
+      };
+    }
+
+    const isValid = variantStock.availableStock >= quantity;
+
+    return {
+      productId,
+      colorVariantId,
+      sizeVariantId,
+      requestedQuantity: quantity,
+      availableStock: variantStock.availableStock,
+      isValid,
+      errorMessage: isValid ? undefined : `Insufficient stock. Available: ${variantStock.availableStock}, Requested: ${quantity}`
+    };
+  } catch (error) {
+    console.error('Error validating cart item stock:', error);
+    return {
+      productId,
+      colorVariantId,
+      sizeVariantId,
+      requestedQuantity: quantity,
+      availableStock: 0,
+      isValid: false,
+      errorMessage: 'Error validating stock'
+    };
+  }
+}
+
+/**
+ * Get variant stock information
+ */
+export async function getVariantStockInfo(
+  productId: string,
+  colorVariantId?: string,
+  sizeVariantId?: string
+): Promise<{
+  colorVariantId?: string;
+  sizeVariantId?: string;
+  colorName?: string;
+  sizeName?: string;
+  stockQuantity: number;
+  reservedStock: number;
+  availableStock: number;
+  isActive: boolean;
+} | null> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('color_variant_id', colorVariantId || null)
+      .eq('size_variant_id', sizeVariantId || null)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      colorVariantId: data.color_variant_id,
+      sizeVariantId: data.size_variant_id,
+      colorName: data.color_name,
+      sizeName: data.size_name,
+      stockQuantity: data.stock_quantity,
+      reservedStock: data.reserved_stock,
+      availableStock: data.available_stock || 0,
+      isActive: data.is_active || true
+    };
+  } catch (error) {
+    console.error('Error getting variant stock info:', error);
+    return null;
+  }
+}
+
+/**
+ * Get comprehensive stock summary for a product
+ */
+export async function getProductStockSummary(productId: string): Promise<ProductStockSummary | null> {
+  try {
+    // Get all inventory records for the product
+    const { data: inventoryData, error: inventoryError } = await supabase
+      .from('product_inventory')
+      .select('*')
+      .eq('product_id', productId);
+
+    if (inventoryError || !inventoryData) {
+      console.error('Error fetching inventory data:', inventoryError);
+      return null;
+    }
+
+    if (inventoryData.length === 0) {
+      return null;
+    }
+
+    // Calculate totals
+    const totalStockQuantity = inventoryData.reduce((sum, item) => sum + item.stock_quantity, 0);
+    const totalReservedStock = inventoryData.reduce((sum, item) => sum + item.reserved_stock, 0);
+    const totalAvailableStock = inventoryData.reduce((sum, item) => sum + (item.available_stock || 0), 0);
+
+    const variantCount = inventoryData.length;
+    const lowStockVariants = inventoryData.filter(item =>
+      (item.available_stock || 0) > 0 &&
+      (item.available_stock || 0) <= (item.low_stock_threshold || 10)
+    ).length;
+
+    const outOfStockVariants = inventoryData.filter(item =>
+      (item.available_stock || 0) === 0
+    ).length;
+
+    // Determine overall stock status
+    let stockStatus: ProductStockSummary['stockStatus'];
+    if (outOfStockVariants === variantCount) {
+      stockStatus = 'Out of Stock';
+    } else if (lowStockVariants === variantCount || (lowStockVariants > 0 && outOfStockVariants === 0)) {
+      stockStatus = 'Low Stock';
+    } else if (lowStockVariants === 0 && outOfStockVariants === 0) {
+      stockStatus = 'In Stock';
+    } else {
+      stockStatus = 'Mixed';
+    }
+
+    // Get product details
+    const { data: productData, error: productError } = await supabase
+      .from('products')
+      .select(`
+        name,
+        categories(name),
+        subcategories(name)
+      `)
+      .eq('id', productId)
+      .single();
+
+    if (productError) {
+      console.error('Error fetching product data:', productError);
+    }
+
+    // Get the most recent update time
+    const lastUpdated = inventoryData.reduce((latest, item) => {
+      const itemTime = new Date(item.updated_at || item.created_at).getTime();
+      const latestTime = new Date(latest).getTime();
+      return itemTime > latestTime ? item.updated_at || item.created_at : latest;
+    }, inventoryData[0].updated_at || inventoryData[0].created_at);
+
+    // Check if any variant is active
+    const isActive = inventoryData.some(item => item.is_active);
+
+    return {
+      productId,
+      productName: productData?.name || inventoryData[0].product_name || 'Unknown Product',
+      categoryName: productData?.categories?.name,
+      subcategoryName: productData?.subcategories?.name,
+      totalStockQuantity,
+      totalReservedStock,
+      totalAvailableStock,
+      variantCount,
+      lowStockVariants,
+      outOfStockVariants,
+      stockStatus,
+      lastUpdated,
+      isActive
+    };
+  } catch (error) {
+    console.error('Error in getProductStockSummary:', error);
+    return null;
+  }
+}
+
+/**
+ * Get detailed stock information for all variants of a product
+ */
+export async function getProductVariantStockDetails(productId: string): Promise<VariantStockDetail[]> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('*')
+      .eq('product_id', productId)
+      .order('color_name', { ascending: true })
+      .order('size_name', { ascending: true });
+
+    if (error || !data) {
+      console.error('Error fetching variant stock details:', error);
+      return [];
+    }
+
+    return data.map(item => ({
+      variantId: item.id,
+      colorName: item.color_name,
+      sizeName: item.size_name,
+      stockQuantity: item.stock_quantity,
+      reservedStock: item.reserved_stock,
+      availableStock: item.available_stock || 0,
+      lowStockThreshold: item.low_stock_threshold || 10,
+      stockStatus: (item.available_stock || 0) === 0 ? 'Out of Stock' :
+        (item.available_stock || 0) <= (item.low_stock_threshold || 10) ? 'Low Stock' : 'In Stock',
+      lastUpdated: item.updated_at || item.created_at
+    }));
+  } catch (error) {
+    console.error('Error in getProductVariantStockDetails:', error);
+    return [];
+  }
+}
+
+/**
+ * Get comprehensive stock calculations for the entire inventory
+ */
+export async function getInventoryStockCalculations(): Promise<StockCalculationResult> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('stock_quantity, reserved_stock, available_stock, is_active, cost_price');
+
+    if (error || !data) {
+      console.error('Error fetching inventory data for calculations:', error);
+      return {
+        totalItems: 0,
+        activeItems: 0,
+        lowStockItems: 0,
+        outOfStockItems: 0,
+        totalStockValue: 0,
+        totalAvailableValue: 0,
+        totalReservedValue: 0,
+        averageStockLevel: 0,
+        stockTurnoverRatio: 0
+      };
+    }
+
+    const totalItems = data.length;
+    const activeItems = data.filter(item => item.is_active).length;
+    const lowStockItems = data.filter(item =>
+      (item.available_stock || 0) > 0 &&
+      (item.available_stock || 0) <= 10
+    ).length;
+    const outOfStockItems = data.filter(item => (item.available_stock || 0) === 0).length;
+
+    const totalStockValue = data.reduce((sum, item) =>
+      sum + ((item.cost_price || 0) * item.stock_quantity), 0
+    );
+    const totalAvailableValue = data.reduce((sum, item) =>
+      sum + ((item.cost_price || 0) * (item.available_stock || 0)), 0
+    );
+    const totalReservedValue = data.reduce((sum, item) =>
+      sum + ((item.cost_price || 0) * item.reserved_stock), 0
+    );
+
+    const averageStockLevel = totalItems > 0 ?
+      data.reduce((sum, item) => sum + item.stock_quantity, 0) / totalItems : 0;
+
+    const stockTurnoverRatio = totalStockValue > 0 ?
+      totalAvailableValue / totalStockValue : 0;
+
+    return {
+      totalItems,
+      activeItems,
+      lowStockItems,
+      outOfStockItems,
+      totalStockValue,
+      totalAvailableValue,
+      totalReservedValue,
+      averageStockLevel,
+      stockTurnoverRatio
+    };
+  } catch (error) {
+    console.error('Error in getInventoryStockCalculations:', error);
+    return {
+      totalItems: 0,
+      activeItems: 0,
+      lowStockItems: 0,
+      outOfStockItems: 0,
+      totalStockValue: 0,
+      totalAvailableValue: 0,
+      totalReservedValue: 0,
+      averageStockLevel: 0,
+      stockTurnoverRatio: 0
+    };
+  }
+}
+
+/**
+ * Get stock summary for multiple products
+ */
+export async function getMultipleProductStockSummaries(productIds: string[]): Promise<ProductStockSummary[]> {
+  try {
+    const summaries: ProductStockSummary[] = [];
+
+    for (const productId of productIds) {
+      const summary = await getProductStockSummary(productId);
+      if (summary) {
+        summaries.push(summary);
+      }
+    }
+
+    return summaries;
+  } catch (error) {
+    console.error('Error in getMultipleProductStockSummaries:', error);
+    return [];
+  }
+}
+
+/**
+ * Calculate stock utilization percentage
+ */
+export function calculateStockUtilization(availableStock: number, totalStock: number): number {
+  if (totalStock === 0) return 0;
+  return Math.round((availableStock / totalStock) * 100);
+}
+
+/**
+ * Calculate stock turnover rate
+ */
+export function calculateStockTurnoverRate(
+  totalStock: number,
+  reservedStock: number,
+  timePeriod: number = 30
+): number {
+  if (totalStock === 0) return 0;
+  const availableStock = totalStock - reservedStock;
+  return Math.round((availableStock / totalStock) * (365 / timePeriod));
+}
+
+/**
+ * Get stock alerts for products
+ */
+export async function getStockAlerts(threshold: number = 10): Promise<ProductStockSummary[]> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('product_id')
+      .lte('available_stock', threshold)
+      .eq('is_active', true);
+
+    if (error || !data) {
+      return [];
+    }
+
+    // Get unique product IDs
+    const uniqueProductIds = [...new Set(data.map(item => item.product_id))];
+
+    // Get summaries for these products
+    return await getMultipleProductStockSummaries(uniqueProductIds);
+  } catch (error) {
+    console.error('Error in getStockAlerts:', error);
+    return [];
+  }
+}
+
+/**
+ * Calculate stock value by category
+ */
+export async function getStockValueByCategory(): Promise<Array<{
+  categoryName: string;
+  totalValue: number;
+  itemCount: number;
+  averageValue: number;
+}>> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select(`
+        stock_quantity,
+        cost_price,
+        categories(name)
+      `)
+      .eq('is_active', true);
+
+    if (error || !data) {
+      return [];
+    }
+
+    // Group by category
+    const categoryGroups = data.reduce((groups, item) => {
+      const categoryName = (item.categories as any)?.name || 'Uncategorized';
+      if (!groups[categoryName]) {
+        groups[categoryName] = {
+          categoryName,
+          totalValue: 0,
+          itemCount: 0,
+          averageValue: 0
+        };
+      }
+
+      groups[categoryName].totalValue += (item.cost_price || 0) * item.stock_quantity;
+      groups[categoryName].itemCount += 1;
+
+      return groups;
+    }, {} as Record<string, any>);
+
+    // Calculate averages
+    Object.values(categoryGroups).forEach((group: any) => {
+      group.averageValue = group.itemCount > 0 ? group.totalValue / group.itemCount : 0;
+    });
+
+    return Object.values(categoryGroups);
+  } catch (error) {
+    console.error('Error in getStockValueByCategory:', error);
+    return [];
+  }
+}
+
+/**
+ * Get product inventory for a specific product
+ */
+export async function getProductInventory(productId: string): Promise<InventoryItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('*')
+      .eq('product_id', productId)
+      .order('color_name', { ascending: true })
+      .order('size_name', { ascending: true });
+
+    if (error) throw error;
+
+    // Transform data to match InventoryItem interface
+    return (data || []).map(item => ({
+      id: item.id,
+      product_id: item.product_id,
+      sku: item.sku,
+      color_variant_id: item.color_variant_id,
+      size_variant_id: item.size_variant_id,
+      product_name: item.product_name,
+      color_name: item.color_name,
+      size_name: item.size_name,
+      size_code: item.size_code,
+      stock_quantity: item.stock_quantity,
+      reserved_stock: item.reserved_stock,
+      available_stock: item.available_stock || 0,
+      low_stock_threshold: item.low_stock_threshold || 10,
+      cost_price: item.cost_price,
+      selling_price: item.selling_price,
+      category_id: item.category_id,
+      subcategory_id: item.subcategory_id,
+      category_name: item.category_name,
+      subcategory_name: item.subcategory_name,
+      is_active: item.is_active || true,
+      created_at: item.created_at || '',
+      updated_at: item.updated_at || ''
+    }));
+  } catch (error) {
+    console.error('Error fetching product inventory:', error);
+    return [];
+  }
+}
+
+/**
+ * Update an inventory item
+ */
+export async function updateInventoryItem(
+  inventoryId: string,
+  updates: Partial<{
+    stock_quantity: number;
+    reserved_stock: number;
+    available_stock: number;
+    low_stock_threshold: number;
+    cost_price: number;
+    selling_price: number;
+    is_active: boolean;
+  }>
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('product_inventory')
+      .update(updates)
+      .eq('id', inventoryId);
+
+    if (error) throw error;
+
+    return true;
+  } catch (error) {
+    console.error('Error updating inventory item:', error);
+    return false;
+  }
+}
+
+/**
+ * Create a new inventory item
+ */
+export async function createInventoryItem(
+  inventoryData: {
+    product_id: string;
+    sku: string;
+    color_variant_id?: string;
+    size_variant_id?: string;
+    product_name: string;
+    color_name?: string;
+    size_name?: string;
+    size_code?: string;
+    stock_quantity: number;
+    reserved_stock: number;
+    available_stock: number;
+    low_stock_threshold: number;
+    cost_price?: number;
+    selling_price?: number;
+    category_id?: string;
+    subcategory_id?: string;
+    category_name?: string;
+    subcategory_name?: string;
+    is_active: boolean;
+  }
+): Promise<InventoryItem | null> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .insert(inventoryData)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return data ? {
+      id: data.id,
+      product_id: data.product_id,
+      sku: data.sku,
+      color_variant_id: data.color_variant_id,
+      size_variant_id: data.size_variant_id,
+      product_name: data.product_name,
+      color_name: data.color_name,
+      size_name: data.size_name,
+      size_code: data.size_code,
+      stock_quantity: data.stock_quantity,
+      reserved_stock: data.reserved_stock,
+      available_stock: data.available_stock || 0,
+      low_stock_threshold: data.low_stock_threshold || 10,
+      cost_price: data.cost_price,
+      selling_price: data.selling_price,
+      category_id: data.category_id,
+      subcategory_id: data.subcategory_id,
+      category_name: data.category_name,
+      subcategory_name: data.subcategory_name,
+      is_active: data.is_active || true,
+      created_at: data.created_at || '',
+      updated_at: data.updated_at || ''
+    } : null;
+  } catch (error) {
+    console.error('Error creating inventory item:', error);
+    return null;
+  }
+}
+
+/**
+ * Create inventory for a product (used when creating new products)
+ */
+export async function createInventoryForProduct(
+  productId: string,
+  productName: string,
+  categoryId: string,
+  subcategoryId: string,
+  categoryName: string,
+  subcategoryName: string,
+  costPrice: number,
+  sellingPrice: number
+): Promise<boolean> {
+  try {
+    // Generate SKU for the product
+    const sku = await generateProductSKU(productName);
+
+    // Create base inventory item
+    const inventoryData = {
+      product_id: productId,
+      sku,
+      product_name: productName,
+      stock_quantity: 0,
+      reserved_stock: 0,
+      available_stock: 0,
+      low_stock_threshold: 10,
+      cost_price: costPrice,
+      selling_price: sellingPrice,
+      category_id: categoryId,
+      subcategory_id: subcategoryId,
+      category_name: categoryName,
+      subcategory_name: subcategoryName,
+      is_active: true
+    };
+
+    const { error } = await supabase
+      .from('product_inventory')
+      .insert(inventoryData);
+
+    if (error) throw error;
+
+    return true;
+  } catch (error) {
+    console.error('Error creating inventory for product:', error);
+    return false;
+  }
+}
+
+/**
+ * Generate a unique SKU for a product
+ */
+export async function generateProductSKU(productName: string): Promise<string> {
+  try {
+    // Create base SKU from product name
+    const baseSku = productName
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .substring(0, 6);
+
+    // Add timestamp to ensure uniqueness
+    const timestamp = Date.now().toString().slice(-4);
+    const sku = `${baseSku}${timestamp}`;
+
+    // Check if SKU already exists
+    const { data: existing } = await supabase
+      .from('product_inventory')
+      .select('id')
+      .eq('sku', sku)
+      .single();
+
+    if (existing) {
+      // If exists, add random suffix
+      const randomSuffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+      return `${sku}${randomSuffix}`;
+    }
+
+    return sku;
+  } catch (error) {
+    console.error('Error generating SKU:', error);
+    // Fallback SKU
+    return `PROD${Date.now()}`;
+  }
+}
+
+/**
+ * Validate cart stock (for checkout validation)
+ */
+export async function validateCartStock(cartItems: CartItem[]): Promise<StockValidationResult> {
+  return await validateCheckoutStock(cartItems);
 }
 
 /**
