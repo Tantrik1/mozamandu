@@ -1,232 +1,219 @@
+
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { useAuth } from '@/hooks/useAuth';
-import { toast } from '@/hooks/use-toast';
-import { Eye, EyeOff, AlertTriangle } from 'lucide-react';
-import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useToast } from '@/hooks/use-toast';
+import { Eye, EyeOff, Mail, Lock, User, Phone } from 'lucide-react';
+
+const signUpSchema = z.object({
+  full_name: z.string().min(2, 'Full name must be at least 2 characters'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string(),
+  contact_number: z.string().min(10, 'Contact number must be at least 10 digits'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+type SignUpFormData = z.infer<typeof signUpSchema>;
 
 interface SignUpFormProps {
-  onSuccess: () => void;
+  onSuccess?: () => void;
+  onSwitchToLogin?: () => void;
 }
 
-export function SignUpForm({ onSuccess }: SignUpFormProps) {
-  const { signUp } = useAuth();
+export function SignUpForm({ onSuccess, onSwitchToLogin }: SignUpFormProps) {
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const { toast } = useToast();
 
-  const [signUpData, setSignUpData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
+  const form = useForm<SignUpFormData>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: {
+      full_name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      contact_number: '',
+    },
   });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Check if password meets all criteria
-  const isPasswordStrong = (password: string) => {
-    const requirements = [
-      password.length >= 8,
-      /[A-Z]/.test(password),
-      /[a-z]/.test(password),
-      /\d/.test(password),
-      /[!@#$%^&*(),.?":{}|<>]/.test(password)
-    ];
-    return requirements.every(req => req);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate form
-    const newErrors: Record<string, string> = {};
-
-    if (!signUpData.fullName.trim()) {
-      newErrors.fullName = 'Full name is required';
-    }
-
-    if (!signUpData.email || !/\S+@\S+\.\S+/.test(signUpData.email)) {
-      newErrors.email = 'Valid email is required';
-    }
-
-    if (!signUpData.password || signUpData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
-
-    if (signUpData.password !== signUpData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-
-    if (!agreeToTerms) {
-      newErrors.terms = 'You must agree to the terms and conditions';
-    }
-
-    setErrors(newErrors);
-
-    if (Object.keys(newErrors).length > 0) {
-      return;
-    }
-
-    setIsLoading(true);
-    setErrors({});
-
-    const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
-
-    if (error) {
-      setErrors({ form: error.message });
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
+  const onSubmit = async (data: SignUpFormData) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            full_name: data.full_name,
+            contact_number: data.contact_number,
+          },
+        },
       });
-    } else {
-      toast({
-        title: "Account Created!",
-        description: "We've sent you a verification email. Please check your inbox and verify your account before signing in.",
-      });
-      onSuccess();
-    }
 
-    setIsLoading(false);
+      if (error) throw error;
+
+      toast({
+        title: 'Registration Successful',
+        description: 'Please check your email to verify your account.',
+      });
+
+      onSuccess?.();
+    } catch (error: any) {
+      toast({
+        title: 'Registration Failed',
+        description: error.message || 'An error occurred during registration.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <TooltipProvider>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {errors.form && (
-          <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
-            {errors.form}
-          </div>
-        )}
+    <div className="space-y-6">
+      <style>
+        {`
+          .signup-form {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          }
+        `}
+      </style>
+      
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900">Create Account</h2>
+        <p className="text-gray-600 mt-2">Join us to start shopping</p>
+      </div>
 
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <div>
-          <Label htmlFor="signup-name">Full Name</Label>
-          <Input
-            id="signup-name"
-            type="text"
-            value={signUpData.fullName}
-            onChange={(e) => setSignUpData({ ...signUpData, fullName: e.target.value })}
-            placeholder="Enter your full name"
-            disabled={isLoading}
-          />
-          {errors.fullName && <p className="text-sm text-red-600 mt-1">{errors.fullName}</p>}
-        </div>
-
-        <div>
-          <Label htmlFor="signup-email">Email Address</Label>
-          <Input
-            id="signup-email"
-            type="email"
-            value={signUpData.email}
-            onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
-            placeholder="Enter your email"
-            disabled={isLoading}
-          />
-          {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
-        </div>
-
-        <div>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="signup-password">Password</Label>
-            {signUpData.password && !isPasswordStrong(signUpData.password) && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <AlertTriangle className="h-4 w-4 text-orange-500 cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-xs">
-                  <PasswordStrengthIndicator password={signUpData.password} />
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </div>
+          <Label htmlFor="full_name">Full Name</Label>
           <div className="relative">
+            <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
-              id="signup-password"
-              type={showPassword ? "text" : "password"}
-              value={signUpData.password}
-              onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
-              placeholder="Create a password"
-              className="pr-10"
-              disabled={isLoading}
+              id="full_name"
+              {...form.register('full_name')}
+              placeholder="Enter your full name"
+              className="pl-10"
+            />
+          </div>
+          {form.formState.errors.full_name && (
+            <p className="text-sm text-red-500 mt-1">{form.formState.errors.full_name.message}</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="email">Email</Label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              id="email"
+              type="email"
+              {...form.register('email')}
+              placeholder="Enter your email"
+              className="pl-10"
+            />
+          </div>
+          {form.formState.errors.email && (
+            <p className="text-sm text-red-500 mt-1">{form.formState.errors.email.message}</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="contact_number">Contact Number</Label>
+          <div className="relative">
+            <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              id="contact_number"
+              {...form.register('contact_number')}
+              placeholder="Enter your contact number"
+              className="pl-10"
+            />
+          </div>
+          {form.formState.errors.contact_number && (
+            <p className="text-sm text-red-500 mt-1">{form.formState.errors.contact_number.message}</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="password">Password</Label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              {...form.register('password')}
+              placeholder="Enter your password"
+              className="pl-10 pr-10"
             />
             <button
               type="button"
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
               onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          {errors.password && <p className="text-sm text-red-600 mt-1">{errors.password}</p>}
+          {form.formState.errors.password && (
+            <p className="text-sm text-red-500 mt-1">{form.formState.errors.password.message}</p>
+          )}
         </div>
 
         <div>
-          <Label htmlFor="signup-confirm">Confirm Password</Label>
+          <Label htmlFor="confirmPassword">Confirm Password</Label>
           <div className="relative">
+            <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
-              id="signup-confirm"
-              type={showConfirmPassword ? "text" : "password"}
-              value={signUpData.confirmPassword}
-              onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
+              id="confirmPassword"
+              type={showConfirmPassword ? 'text' : 'password'}
+              {...form.register('confirmPassword')}
               placeholder="Confirm your password"
-              className="pr-10"
-              disabled={isLoading}
+              className="pl-10 pr-10"
             />
             <button
               type="button"
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
             >
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          {errors.confirmPassword && <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>}
+          {form.formState.errors.confirmPassword && (
+            <p className="text-sm text-red-500 mt-1">{form.formState.errors.confirmPassword.message}</p>
+          )}
         </div>
 
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="terms"
-            checked={agreeToTerms}
-            onCheckedChange={(checked) => setAgreeToTerms(checked as boolean)}
-            disabled={isLoading}
-          />
-          <Label htmlFor="terms" className="text-sm">
-            I agree to the{' '}
-            <a href="/terms" target="_blank" className="text-red-600 hover:underline">
-              Terms and Conditions
-            </a>{' '}
-            and{' '}
-            <a href="/privacy" target="_blank" className="text-red-600 hover:underline">
-              Privacy Policy
-            </a>
-          </Label>
-        </div>
-        {errors.terms && <p className="text-sm text-red-600">{errors.terms}</p>}
-
-        <Button
-          type="submit"
-          className="w-full bg-red-600 hover:bg-red-700"
-          disabled={isLoading}
-        >
-          {isLoading ? 'Creating Account...' : 'Create Account'}
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? 'Creating Account...' : 'Create Account'}
         </Button>
       </form>
-      <style jsx>{`
-        input:focus {
-          outline: none;
-          box-shadow: 0 0 0 2px #ef4444, 0 2px 8px 0 #fca5a5;
-          transition: box-shadow 0.2s;
-        }
-        .bg-gradient-futuristic {
-          background: linear-gradient(135deg, #fff 0%, #ffe5e5 100%);
-        }
-      `}</style>
-    </TooltipProvider>
+
+      {onSwitchToLogin && (
+        <div className="text-center">
+          <p className="text-sm text-gray-600">
+            Already have an account?{' '}
+            <button
+              onClick={onSwitchToLogin}
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Sign In
+            </button>
+          </p>
+        </div>
+      )}
+    </div>
   );
 }

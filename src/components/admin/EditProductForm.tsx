@@ -350,7 +350,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
       const { data, error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(fileName, imageFile);
+        .upload(fileName, file);
 
       if (uploadError) throw uploadError;
 
@@ -376,10 +376,27 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   // Handler to add a new row (for new variation)
   const handleAddInventoryRow = () => {
-    setInventoryRows(rows => [
-      ...rows,
-      { id: '', product_id: productId, sku: '', product_name: form.getValues('name'), color_name: '', size_name: '', size_code: '', stock_quantity: 0, reserved_stock: 0, available_stock: 0, is_active: true, created_at: '', updated_at: '' }
-    ]);
+    const newRow: InventoryItem = {
+      id: '',
+      product_id: productId,
+      sku: '',
+      product_name: form.getValues('name'),
+      category_id: form.getValues('category_id'),
+      subcategory_id: form.getValues('subcategory_id'),
+      color_name: '',
+      size_name: '',
+      size_code: '',
+      stock_quantity: 0,
+      reserved_stock: 0,
+      available_stock: 0,
+      cost_price: form.getValues('cost_price'),
+      selling_price: form.getValues('selling_price'),
+      is_active: true,
+      created_at: '',
+      updated_at: ''
+    };
+    
+    setInventoryRows(rows => [...rows, newRow]);
   };
 
   // Enhanced onSubmit to handle inventory updates
@@ -845,9 +862,9 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
       <ProductEditBlockedModal
         isOpen={editBlockedModal.isOpen}
+        onClose={closeEditBlockedModal}
         reason={editBlockedModal.reason}
         pendingOrdersCount={editBlockedModal.pendingOrdersCount}
-        onClose={closeEditBlockedModal}
       />
     </div>
   );
