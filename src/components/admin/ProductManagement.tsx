@@ -190,6 +190,10 @@ export default function ProductManagement() {
           setEditingProduct(viewingProduct);
           setViewingProduct(null);
         }}
+        onDelete={(productId) => {
+          handleDeleteProduct(productId);
+          setViewingProduct(null);
+        }}
       />
     );
   }

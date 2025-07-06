@@ -717,3 +717,74 @@ export const getProductStockSummary = async (productId: string): Promise<{ total
     return { total_stock: 0, available_stock: 0 };
   }
 };
+
+export const validateCartStock = async (cartItems: any[]): Promise<{isValid: boolean, errorMessages: string[]}> => {
+  try {
+    const errorMessages: string[] = [];
+    
+    for (const item of cartItems) {
+      const { data: inventory, error } = await supabase
+        .from('product_inventory')
+        .select('available_stock')
+        .eq('id', item.product_inventory_id)
+        .single();
+
+      if (error) {
+        errorMessages.push(`Failed to check stock for item ${item.product_name}`);
+        continue;
+      }
+
+      if (!inventory || inventory.available_stock < item.quantity) {
+        errorMessages.push(`Insufficient stock for ${item.product_name}. Available: ${inventory?.available_stock || 0}, Requested: ${item.quantity}`);
+      }
+    }
+
+    return {
+      isValid: errorMessages.length === 0,
+      errorMessages
+    };
+  } catch (error) {
+    console.error('Error validating cart stock:', error);
+    return {
+      isValid: false,
+      errorMessages: ['Failed to validate stock availability']
+    };
+  }
+};
+
+export const validateCheckoutStock = async (cartItems: any[]): Promise<boolean> => {
+  const result = await validateCartStock(cartItems);
+  return result.isValid;
+};
+
+export const processCheckoutStock = async (cartItems: any[]): Promise<boolean> => {
+  try {
+    for (const item of cartItems) {
+      const success = await reserveStock(item.product_inventory_id, item.quantity, 'Checkout reservation');
+      if (!success) {
+        return false;
+      }
+    }
+    return true;
+  } catch (error) {
+    console.error('Error processing checkout stock:', error);
+    return false;
+  }
+};
+
+export const calculateTotalProductStock = async (productId: string): Promise<number> => {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('available_stock')
+      .eq('product_id', productId)
+      .eq('is_active', true);
+
+    if (error) throw error;
+    
+    return (data || []).reduce((total, item) => total + (item.available_stock || 0), 0);
+  } catch (error) {
+    console.error('Error calculating total product stock:', error);
+    return 0;
+  }
+};
