@@ -258,7 +258,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: EnhancedPro
         is_featured: data.is_featured,
         has_color_variants: data.has_color_variants,
         color_has_size_variants: data.color_has_size_variants,
-        stock_quantity: (!data.has_color_variants && !data.color_has_size_variants) ? data.stock_quantity || null : null,
         status: data.status,
         image_url: currentImageUrl,
       };

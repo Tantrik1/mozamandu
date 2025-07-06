@@ -8,6 +8,8 @@ export interface InventoryItem {
   product_name: string;
   category_id: string;
   subcategory_id: string;
+  color_variant_id?: string;
+  size_variant_id?: string;
   color_name?: string;
   size_name?: string;
   size_code?: string;
@@ -20,6 +22,66 @@ export interface InventoryItem {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface InventoryOverview {
+  id?: string;
+  product_name?: string;
+  category_name?: string;
+  subcategory_name?: string;
+  variant_name?: string;
+  size_name?: string;
+  product_sku?: string;
+  stock_quantity?: number;
+  reserved_stock?: number;
+  available_stock?: number;
+  low_stock_threshold?: number;
+  stock_status?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LowStockAlert {
+  id?: string;
+  product_name?: string;
+  category_name?: string;
+  subcategory_name?: string;
+  variant_name?: string;
+  size_name?: string;
+  product_sku?: string;
+  stock_quantity?: number;
+  reserved_stock?: number;
+  available_stock?: number;
+  low_stock_threshold: number;
+  stock_needed?: number;
+  updated_at?: string;
+}
+
+export interface InventoryAnalytics {
+  total_items: number;
+  active_items: number;
+  total_available_stock: number;
+  total_reserved_stock: number;
+  low_stock_items: number;
+  out_of_stock_items: number;
+  total_stock_value: number;
+}
+
+export interface InventoryChange {
+  action_type: string;
+  product_name: string;
+  variant_name: string;
+  size_name: string;
+  change_amount: number;
+  reason: string;
+  created_at: string;
+}
+
+export interface InventorySummary {
+  total_stock: number;
+  available_stock: number;
+  reserved_stock: number;
+  variant_count: number;
 }
 
 export const updateOrderStatus = async (
@@ -63,7 +125,7 @@ export const getInventoryItems = async (): Promise<InventoryItem[]> => {
   }
 };
 
-export const getInventoryOverview = async (): Promise<any[]> => {
+export const getInventoryOverview = async (): Promise<InventoryOverview[]> => {
   try {
     const { data, error } = await supabase
       .from('inventory_overview')
@@ -77,7 +139,7 @@ export const getInventoryOverview = async (): Promise<any[]> => {
   }
 };
 
-export const getLowStockAlerts = async (): Promise<any[]> => {
+export const getLowStockAlerts = async (): Promise<LowStockAlert[]> => {
   try {
     const { data, error } = await supabase
       .from('low_stock_alerts')
@@ -91,15 +153,14 @@ export const getLowStockAlerts = async (): Promise<any[]> => {
   }
 };
 
-export const getInventoryAnalytics = async (): Promise<any> => {
+export const getInventoryAnalytics = async (): Promise<InventoryAnalytics> => {
   try {
     const { data, error } = await supabase
       .rpc('get_detailed_inventory_analytics');
 
     if (error) throw error;
     
-    // Convert the result to the expected format
-    const analytics: any = {
+    const analytics: InventoryAnalytics = {
       total_items: 0,
       active_items: 0,
       total_available_stock: 0,
@@ -149,7 +210,7 @@ export const getInventoryAnalytics = async (): Promise<any> => {
 export const getInventoryHistory = async (
   productId?: string,
   daysBack: number = 30
-): Promise<any[]> => {
+): Promise<InventoryChange[]> => {
   try {
     const { data, error } = await supabase
       .rpc('get_inventory_history', {
@@ -378,6 +439,25 @@ export const searchInventory = async (query: string): Promise<InventoryItem[]> =
   }
 };
 
+export const useInventoryRealtime = (channel: string) => {
+  return {
+    subscribe: (callback: (payload: any) => void) => {
+      const subscription = supabase
+        .channel(channel)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'product_inventory'
+        }, callback)
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(subscription);
+      };
+    }
+  };
+};
+
 export const subscribeToInventoryChanges = (
   productId: string,
   callback: (payload: any) => void
@@ -433,25 +513,6 @@ export const getRealTimeStock = async (productId: string, productInventoryId?: s
     console.error('Error fetching real-time stock:', error);
     return null;
   }
-};
-
-export const useInventoryRealtime = (channel: string) => {
-  return {
-    subscribe: (callback: (payload: any) => void) => {
-      const subscription = supabase
-        .channel(channel)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'product_inventory'
-        }, callback)
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(subscription);
-      };
-    }
-  };
 };
 
 export const generateProductSKU = async (
@@ -542,5 +603,117 @@ export const updateInventoryItem = async (
   } catch (error) {
     console.error('Error updating inventory item:', error);
     return false;
+  }
+};
+
+export const getProductInventory = async (productId: string): Promise<InventoryItem[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('is_active', true);
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching product inventory:', error);
+    return [];
+  }
+};
+
+export const getInventorySummary = async (productId: string): Promise<InventorySummary> => {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('stock_quantity, available_stock, reserved_stock')
+      .eq('product_id', productId)
+      .eq('is_active', true);
+
+    if (error) throw error;
+    
+    const summary = (data || []).reduce((acc, item) => ({
+      total_stock: acc.total_stock + (item.stock_quantity || 0),
+      available_stock: acc.available_stock + (item.available_stock || 0),
+      reserved_stock: acc.reserved_stock + (item.reserved_stock || 0),
+      variant_count: acc.variant_count + 1
+    }), {
+      total_stock: 0,
+      available_stock: 0,
+      reserved_stock: 0,
+      variant_count: 0
+    });
+
+    return summary;
+  } catch (error) {
+    console.error('Error fetching inventory summary:', error);
+    return {
+      total_stock: 0,
+      available_stock: 0,
+      reserved_stock: 0,
+      variant_count: 0
+    };
+  }
+};
+
+export const syncProductToInventory = async (productId: string): Promise<boolean> => {
+  try {
+    // This would sync a product to the inventory system
+    // For now, we'll just return true as the implementation depends on business logic
+    return true;
+  } catch (error) {
+    console.error('Error syncing product to inventory:', error);
+    return false;
+  }
+};
+
+export const deleteInventoryItem = async (inventoryId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('product_inventory')
+      .delete()
+      .eq('id', inventoryId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting inventory item:', error);
+    return false;
+  }
+};
+
+export const addStock = async (
+  inventoryId: string,
+  quantity: number,
+  reason: string = 'Stock addition'
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('product_inventory')
+      .update({
+        stock_quantity: supabase.raw(`stock_quantity + ${quantity}`),
+        available_stock: supabase.raw(`available_stock + ${quantity}`),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', inventoryId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error adding stock:', error);
+    return false;
+  }
+};
+
+export const getProductStockSummary = async (productId: string): Promise<{ total_stock: number; available_stock: number }> => {
+  try {
+    const summary = await getInventorySummary(productId);
+    return {
+      total_stock: summary.total_stock,
+      available_stock: summary.available_stock
+    };
+  } catch (error) {
+    console.error('Error fetching product stock summary:', error);
+    return { total_stock: 0, available_stock: 0 };
   }
 };
