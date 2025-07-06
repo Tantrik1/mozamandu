@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -100,6 +99,8 @@ interface Order {
   shipping_method: string;
   order_notes: string;
   user_id: string | null;
+  contact_number: string;
+  delivery_address: string;
 }
 
 interface CustomerOrder {
@@ -223,7 +224,7 @@ export function OrderManagement() {
     setError(null);
 
     try {
-      // Fetch guest orders
+      // Fetch guest orders - map the response to match our interface
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('*')
@@ -233,10 +234,19 @@ export function OrderManagement() {
         console.error('Error fetching orders:', ordersError);
         setError('Failed to fetch orders');
       } else {
-        setOrders(ordersData || []);
+        // Map database fields to our interface
+        const mappedOrders = (ordersData || []).map(order => ({
+          ...order,
+          customer_phone: order.contact_number,
+          customer_address: order.delivery_address,
+          payment_method: order.payment_method_id || 'unknown',
+          shipping_method: 'standard',
+          order_notes: order.whatsapp_number || ''
+        }));
+        setOrders(mappedOrders);
       }
 
-      // Fetch customer orders
+      // Fetch customer orders - map the response to match our interface
       const { data: customerOrdersData, error: customerOrdersError } = await supabase
         .from('customer_orders')
         .select('*')
@@ -246,10 +256,17 @@ export function OrderManagement() {
         console.error('Error fetching customer orders:', customerOrdersError);
         setError('Failed to fetch customer orders');
       } else {
-        setCustomerOrders(customerOrdersData || []);
+        // Map database fields to our interface
+        const mappedCustomerOrders = (customerOrdersData || []).map(order => ({
+          ...order,
+          payment_method: order.payment_method_id || 'unknown',
+          shipping_method: 'standard',
+          order_notes: order.whatsapp_number || ''
+        }));
+        setCustomerOrders(mappedCustomerOrders);
       }
 
-      // Fetch order items
+      // Fetch order items - map the response to match our interface
       const { data: orderItemsData, error: orderItemsError } = await supabase
         .from('order_items')
         .select('*');
@@ -258,10 +275,16 @@ export function OrderManagement() {
         console.error('Error fetching order items:', orderItemsError);
         setError('Failed to fetch order items');
       } else {
-        setOrderItems(orderItemsData || []);
+        // Map database fields to our interface (add default values for missing fields)
+        const mappedOrderItems = (orderItemsData || []).map(item => ({
+          ...item,
+          unit_price: 0, // Default value
+          total_price: 0  // Default value
+        }));
+        setOrderItems(mappedOrderItems);
       }
 
-      // Fetch customer order items
+      // Fetch customer order items - map the response to match our interface
       const { data: customerOrderItemsData, error: customerOrderItemsError } = await supabase
         .from('customer_order_items')
         .select('*');
@@ -270,7 +293,13 @@ export function OrderManagement() {
         console.error('Error fetching customer order items:', customerOrderItemsError);
         setError('Failed to fetch customer order items');
       } else {
-        setCustomerOrderItems(customerOrderItemsData || []);
+        // Map database fields to our interface (add default values for missing fields)
+        const mappedCustomerOrderItems = (customerOrderItemsData || []).map(item => ({
+          ...item,
+          unit_price: 0, // Default value
+          total_price: 0  // Default value
+        }));
+        setCustomerOrderItems(mappedCustomerOrderItems);
       }
     } catch (error) {
       console.error('Error fetching data:', error);

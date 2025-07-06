@@ -14,7 +14,6 @@ export interface Product {
   image_url?: string;
   created_at: string;
   updated_at: string;
-  // Remove stock_quantity as it's now in product_inventory table
 }
 
 export interface ColorVariant {
@@ -23,12 +22,113 @@ export interface ColorVariant {
   image_url?: string;
   has_sizes: boolean;
   size_variants: SizeVariant[];
-  // Remove stock_quantity as it's now in product_inventory table
 }
 
 export interface SizeVariant {
   id?: string;
   size_name: string;
   size_code?: string;
-  // Remove stock_quantity as it's now in product_inventory table
+}
+
+export interface Order {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  status: string;
+  total_amount: number;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  customer_address: string;
+  payment_method: string;
+  shipping_method: string;
+  order_notes: string;
+  user_id: string | null;
+  contact_number: string;
+  delivery_address: string;
+}
+
+export interface CustomerOrder {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  status: string;
+  total_amount: number;
+  payment_method: string;
+  shipping_method: string;
+  order_notes: string;
+  user_id: string;
+}
+
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  product_inventory_id: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+}
+
+export interface CustomerOrderItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  product_inventory_id: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+}
+
+export interface InventoryOverview {
+  id?: string;
+  product_name?: string;
+  category_name?: string;
+  subcategory_name?: string;
+  variant_name?: string;
+  size_name?: string;
+  product_sku?: string;
+  stock_quantity?: number;
+  reserved_stock?: number;
+  available_stock?: number;
+  low_stock_threshold?: number;
+  stock_status?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LowStockAlert {
+  id?: string;
+  product_name?: string;
+  category_name?: string;
+  subcategory_name?: string;
+  variant_name?: string;
+  size_name?: string;
+  product_sku?: string;
+  stock_quantity?: number;
+  reserved_stock?: number;
+  available_stock?: number;
+  low_stock_threshold: number;
+  stock_needed?: number;
+  updated_at?: string;
+}
+
+export interface InventoryAnalytics {
+  total_items: number;
+  active_items: number;
+  total_available_stock: number;
+  total_reserved_stock: number;
+  low_stock_items: number;
+  out_of_stock_items: number;
+  total_stock_value: number;
+}
+
+export interface InventoryChange {
+  action_type: string;
+  product_name: string;
+  variant_name: string;
+  size_name: string;
+  change_amount: number;
+  reason: string;
+  created_at: string;
 }

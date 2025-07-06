@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -174,7 +173,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: EnhancedPro
         is_featured: Boolean(product.is_featured),
         has_color_variants: Boolean(product.has_color_variants),
         color_has_size_variants: Boolean(product.color_has_size_variants),
-        stock_quantity: product.stock_quantity ? Number(product.stock_quantity) : 0,
         status: product.status,
       });
 
@@ -460,18 +458,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: EnhancedPro
                   </div>
                 </div>
 
-                {!watchedHasColorVariants && !watchedColorHasSizeVariants && (
-                  <div>
-                    <Label htmlFor="stock_quantity">Stock Quantity *</Label>
-                    <Input
-                      id="stock_quantity"
-                      type="number"
-                      {...form.register('stock_quantity', { valueAsNumber: true })}
-                      placeholder="0"
-                    />
-                  </div>
-                )}
-
                 <div>
                   <Label htmlFor="status">Status</Label>
                   <Select
@@ -545,9 +531,9 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: EnhancedPro
 
         {(watchedHasColorVariants || watchedColorHasSizeVariants) && (
           <CreateProductVariantForm
-            hasColorVariants={watchedHasColorVariants}
+            colorVariants={colorVariants}
+            setColorVariants={setColorVariants}
             hasSizeVariants={watchedColorHasSizeVariants}
-            onVariantsChange={setColorVariants}
           />
         )}
 

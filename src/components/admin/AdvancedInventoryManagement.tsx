@@ -89,7 +89,17 @@ export default function AdvancedInventoryManagement() {
 
       setInventoryItems(items);
       setInventoryOverview(overview);
-      setLowStockAlerts(alerts);
+      // Convert InventoryItem[] to LowStockAlert[] with proper mapping
+      const mappedAlerts = items
+        .filter(item => item.available_stock <= (item.low_stock_threshold || 10))
+        .map(item => ({
+          ...item,
+          low_stock_threshold: item.low_stock_threshold || 10,
+          stock_needed: Math.max(0, (item.low_stock_threshold || 10) - item.available_stock),
+          variant_name: item.color_name,
+          product_sku: item.sku
+        }));
+      setLowStockAlerts(mappedAlerts);
       setAnalytics(analyticsData);
     } catch (error) {
       console.error('Error loading inventory data:', error);
