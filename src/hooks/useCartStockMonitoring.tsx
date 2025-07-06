@@ -72,5 +72,3 @@ export function useCartStockMonitoring(cartItems: CartItem[]) {
     invalidItems,
   };
 }
-
-export { useCartStockMonitoring };

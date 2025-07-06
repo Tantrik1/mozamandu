@@ -223,10 +223,12 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
     setLoading(true);
     try {
       await addToCart({ 
+        id: `${product.id}-${selectedInventory.id}-${Date.now()}`,
         productId: product.id, 
         productInventoryId: selectedInventory.id, 
         quantity,
         price,
+        basePrice: price,
         productName: product.name,
         imageUrl: currentImage,
         colorName: selectedColor,

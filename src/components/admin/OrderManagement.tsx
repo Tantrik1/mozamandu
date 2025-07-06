@@ -41,7 +41,6 @@ interface Order {
   contact_number: string;
   delivery_address: string;
   total_amount: number;
-  payment_method?: string;
   payment_method_id?: string;
   status: string;
   created_at: string;
@@ -96,13 +95,7 @@ export function OrderManagement() {
 
       if (error) throw error;
       
-      // Add default payment_method for orders that don't have it
-      const ordersWithPaymentMethod = (data || []).map(order => ({
-        ...order,
-        payment_method: order.payment_method || order.payment_method_id || 'Unknown'
-      }));
-      
-      setOrders(ordersWithPaymentMethod);
+      setOrders(data || []);
     } catch (error) {
       console.error('Error fetching orders:', error);
       toast.error('Failed to fetch orders');
@@ -370,8 +363,8 @@ export function OrderManagement() {
                 {viewingOrder.total_amount}
               </div>
               <div>
-                <span className="font-semibold">Payment Method:</span>{' '}
-                {viewingOrder.payment_method}
+                <span className="font-semibold">Payment Method ID:</span>{' '}
+                {viewingOrder.payment_method_id || 'Not specified'}
               </div>
               <div>
                 <span className="font-semibold">Status:</span>{' '}
