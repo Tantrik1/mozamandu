@@ -16,6 +16,7 @@ export interface Product {
   updated_at: string;
 }
 
+// Database schema aligned types - no stock_quantity here as it's managed in product_inventory
 export interface ColorVariant {
   id?: string;
   color_name: string;

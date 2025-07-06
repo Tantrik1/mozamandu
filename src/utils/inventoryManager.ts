@@ -1,500 +1,67 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Product, ColorVariant, SizeVariant } from '@/types/admin';
+import { LowStockAlert } from '@/types/admin';
 
-export interface InventoryItem {
+export async function validateCartStock(cartItems: Array<{
   id: string;
-  product_id: string;
-  sku: string;
-  product_name: string;
-  category_id: string;
-  subcategory_id: string;
-  color_variant_id?: string;
-  size_variant_id?: string;
-  color_name?: string;
-  size_name?: string;
-  size_code?: string;
-  cost_price: number;
-  selling_price?: number;
+  productId: string;
+  productName: string;
+  productInventoryId?: string | null;
+  quantity: number;
+  basePrice: number;
+  subcategoryId: string;
+}>): Promise<{
+  isValid: boolean;
+  errorMessages: string[];
+}> {
+  try {
+    const errors: string[] = [];
+    
+    for (const item of cartItems) {
+      // Validate stock for each item
+      const stock = await getRealTimeStock(item.productId, item.productInventoryId);
+      
+      if (!stock) {
+        errors.push(`Product "${item.productName}" not found in inventory`);
+        continue;
+      }
+      
+      if (!stock.is_active) {
+        errors.push(`Product "${item.productName}" is not available`);
+        continue;
+      }
+      
+      if (stock.available_stock < item.quantity) {
+        errors.push(`Only ${stock.available_stock} units available for "${item.productName}"`);
+        continue;
+      }
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errorMessages: errors
+    };
+  } catch (error) {
+    console.error('Error validating cart stock:', error);
+    return {
+      isValid: false,
+      errorMessages: ['Error validating cart stock']
+    };
+  }
+}
+
+export async function getRealTimeStock(
+  productId: string,
+  productInventoryId?: string | null
+): Promise<{
   stock_quantity: number;
   reserved_stock: number;
   available_stock: number;
-  low_stock_threshold?: number;
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface InventoryOverview {
-  id?: string;
-  product_name?: string;
-  category_name?: string;
-  subcategory_name?: string;
-  variant_name?: string;
-  size_name?: string;
-  product_sku?: string;
-  stock_quantity?: number;
-  reserved_stock?: number;
-  available_stock?: number;
-  low_stock_threshold?: number;
-  stock_status?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface LowStockAlert {
-  id?: string;
-  product_name?: string;
-  category_name?: string;
-  subcategory_name?: string;
-  variant_name?: string;
-  size_name?: string;
-  product_sku?: string;
-  stock_quantity?: number;
-  reserved_stock?: number;
-  available_stock?: number;
-  low_stock_threshold: number;
-  stock_needed?: number;
-  updated_at?: string;
-}
-
-export interface InventoryAnalytics {
-  total_items: number;
-  active_items: number;
-  total_available_stock: number;
-  total_reserved_stock: number;
-  low_stock_items: number;
-  out_of_stock_items: number;
-  total_stock_value: number;
-}
-
-export interface InventoryChange {
-  action_type: string;
-  product_name: string;
-  variant_name: string;
-  size_name: string;
-  change_amount: number;
-  reason: string;
-  created_at: string;
-}
-
-export interface InventorySummary {
-  total_stock: number;
-  available_stock: number;
-  reserved_stock: number;
-  variant_count: number;
-}
-
-export const updateOrderStatus = async (
-  orderId: string,
-  newStatus: string,
-  isCustomerOrder: boolean = false
-): Promise<boolean> => {
-  try {
-    const tableName = isCustomerOrder ? 'customer_orders' : 'orders';
-    
-    const { error } = await supabase
-      .from(tableName)
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq('id', orderId);
-
-    if (error) {
-      console.error('Error updating order status:', error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error updating order status:', error);
-    return false;
-  }
-};
-
-export const getInventoryItems = async (): Promise<InventoryItem[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('product_inventory')
-      .select('*')
-      .eq('is_active', true)
-      .order('product_name');
-
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching inventory items:', error);
-    return [];
-  }
-};
-
-export const getInventoryOverview = async (): Promise<InventoryOverview[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('inventory_overview')
-      .select('*');
-
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching inventory overview:', error);
-    return [];
-  }
-};
-
-export const getLowStockAlerts = async (): Promise<LowStockAlert[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('low_stock_alerts')
-      .select('*');
-
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching low stock alerts:', error);
-    return [];
-  }
-};
-
-export const getInventoryAnalytics = async (): Promise<InventoryAnalytics> => {
-  try {
-    const { data, error } = await supabase
-      .rpc('get_detailed_inventory_analytics');
-
-    if (error) throw error;
-    
-    const analytics: InventoryAnalytics = {
-      total_items: 0,
-      active_items: 0,
-      total_available_stock: 0,
-      total_reserved_stock: 0,
-      low_stock_items: 0,
-      out_of_stock_items: 0,
-      total_stock_value: 0,
-    };
-
-    if (data) {
-      data.forEach((item: any) => {
-        switch (item.metric_name) {
-          case 'total_products':
-            analytics.total_items = Number(item.metric_value);
-            break;
-          case 'active_products':
-            analytics.active_items = Number(item.metric_value);
-            break;
-          case 'low_stock_items':
-            analytics.low_stock_items = Number(item.metric_value);
-            break;
-          case 'out_of_stock_items':
-            analytics.out_of_stock_items = Number(item.metric_value);
-            break;
-          case 'total_stock_value':
-            analytics.total_stock_value = Number(item.metric_value);
-            break;
-        }
-      });
-    }
-
-    return analytics;
-  } catch (error) {
-    console.error('Error fetching inventory analytics:', error);
-    return {
-      total_items: 0,
-      active_items: 0,
-      total_available_stock: 0,
-      total_reserved_stock: 0,
-      low_stock_items: 0,
-      out_of_stock_items: 0,
-      total_stock_value: 0,
-    };
-  }
-};
-
-export const getInventoryHistory = async (
-  productId?: string,
-  daysBack: number = 30
-): Promise<InventoryChange[]> => {
-  try {
-    const { data, error } = await supabase
-      .rpc('get_inventory_history', {
-        p_product_id: productId || null,
-        p_days_back: daysBack
-      });
-
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching inventory history:', error);
-    return [];
-  }
-};
-
-export const updateStock = async (
-  productId: string,
-  stockChange: number,
-  colorVariantId?: string,
-  sizeVariantId?: string,
-  reservationChange: number = 0,
-  reason: string = 'Manual update'
-): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase
-      .rpc('safe_update_stock', {
-        p_product_id: productId,
-        p_stock_change: stockChange,
-        p_color_variant_id: colorVariantId || null,
-        p_size_variant_id: sizeVariantId || null,
-        p_reservation_change: reservationChange,
-        p_reason: reason
-      });
-
-    if (error) throw error;
-    return data === true;
-  } catch (error) {
-    console.error('Error updating stock:', error);
-    return false;
-  }
-};
-
-export const reserveStock = async (
-  productInventoryId: string,
-  quantity: number,
-  reason: string = 'Stock reservation'
-): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('product_inventory')
-      .update({
-        reserved_stock: supabase.raw(`reserved_stock + ${quantity}`),
-        available_stock: supabase.raw(`available_stock - ${quantity}`),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', productInventoryId);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error reserving stock:', error);
-    return false;
-  }
-};
-
-export const releaseStock = async (
-  productInventoryId: string,
-  quantity: number,
-  reason: string = 'Stock release'
-): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('product_inventory')
-      .update({
-        reserved_stock: supabase.raw(`reserved_stock - ${quantity}`),
-        available_stock: supabase.raw(`available_stock + ${quantity}`),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', productInventoryId);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error releasing stock:', error);
-    return false;
-  }
-};
-
-export const deductStock = async (
-  productInventoryId: string,
-  quantity: number,
-  reason: string = 'Stock deduction'
-): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('product_inventory')
-      .update({
-        stock_quantity: supabase.raw(`stock_quantity - ${quantity}`),
-        available_stock: supabase.raw(`available_stock - ${quantity}`),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', productInventoryId);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error deducting stock:', error);
-    return false;
-  }
-};
-
-export const restoreStock = async (
-  productInventoryId: string,
-  quantity: number,
-  reason: string = 'Stock restoration'
-): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('product_inventory')
-      .update({
-        stock_quantity: supabase.raw(`stock_quantity + ${quantity}`),
-        available_stock: supabase.raw(`available_stock + ${quantity}`),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', productInventoryId);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error restoring stock:', error);
-    return false;
-  }
-};
-
-export const rollbackStockReservations = async (orderId: string): Promise<boolean> => {
-  try {
-    // Fetch all order items for the given order ID
-    const { data: orderItems, error: fetchError } = await supabase
-      .from('order_items')
-      .select('*')
-      .eq('order_id', orderId);
-
-    if (fetchError) {
-      console.error('Error fetching order items:', fetchError);
-      return false;
-    }
-
-    // If there are no order items, return true (nothing to rollback)
-    if (!orderItems || orderItems.length === 0) {
-      return true;
-    }
-
-    // Loop through each order item and release the reserved stock
-    for (const item of orderItems) {
-      const { product_inventory_id, quantity } = item;
-
-      // Release the reserved stock
-      const { error: releaseError } = await supabase
-        .from('product_inventory')
-        .update({
-          reserved_stock: supabase.raw(`reserved_stock - ${quantity}`),
-          available_stock: supabase.raw(`available_stock + ${quantity}`)
-        })
-        .eq('id', product_inventory_id);
-
-      if (releaseError) {
-        console.error('Error releasing stock for item:', item, releaseError);
-        return false; // Or continue and log all failures
-      }
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error rolling back stock reservations:', error);
-    return false;
-  }
-};
-
-export const bulkUpdateStock = async (updates: any[]): Promise<{ success: number; errors: number }> => {
-  try {
-    const { data, error } = await supabase
-      .rpc('bulk_update_inventory', { p_updates: updates });
-
-    if (error) throw error;
-    return {
-      success: data?.[0]?.success_count || 0,
-      errors: data?.[0]?.error_count || 0
-    };
-  } catch (error) {
-    console.error('Error bulk updating stock:', error);
-    return { success: 0, errors: updates.length };
-  }
-};
-
-export const setLowStockThreshold = async (
-  inventoryId: string,
-  threshold: number
-): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('product_inventory')
-      .update({ low_stock_threshold: threshold })
-      .eq('id', inventoryId);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error setting low stock threshold:', error);
-    return false;
-  }
-};
-
-export const searchInventory = async (query: string): Promise<InventoryItem[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('product_inventory')
-      .select('*')
-      .or(`product_name.ilike.%${query}%,sku.ilike.%${query}%,color_name.ilike.%${query}%,size_name.ilike.%${query}%`)
-      .eq('is_active', true);
-
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error searching inventory:', error);
-    return [];
-  }
-};
-
-export const useInventoryRealtime = (channel: string) => {
-  return {
-    subscribe: (callback: (payload: any) => void) => {
-      const subscription = supabase
-        .channel(channel)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'product_inventory'
-        }, callback)
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(subscription);
-      };
-    }
-  };
-};
-
-export const subscribeToInventoryChanges = (
-  productId: string,
-  callback: (payload: any) => void
-) => {
-  const subscription = supabase
-    .channel(`product_inventory:${productId}`)
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'product_inventory',
-      filter: `product_id=eq.${productId}`
-    }, callback)
-    .subscribe();
-
-  return subscription;
-};
-
-export const subscribeToAllInventoryChanges = (
-  callback: (payload: any) => void
-) => {
-  const subscription = supabase
-    .channel('product_inventory_all')
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'product_inventory'
-    }, callback)
-    .subscribe();
-
-  return subscription;
-};
-
-export const getRealTimeStock = async (productId: string, productInventoryId?: string) => {
+} | null> {
   try {
     let query = supabase
       .from('product_inventory')
-      .select('*')
+      .select('stock_quantity, reserved_stock, available_stock, is_active')
       .eq('product_id', productId);
 
     if (productInventoryId) {
@@ -503,288 +70,303 @@ export const getRealTimeStock = async (productId: string, productInventoryId?: s
 
     const { data, error } = await query.single();
 
-    if (error) {
-      console.error('Error fetching real-time stock:', error);
+    if (error || !data) {
+      console.log(`No inventory found for product ${productId}`);
       return null;
     }
 
     return data;
   } catch (error) {
-    console.error('Error fetching real-time stock:', error);
+    console.error('Error getting real-time stock:', error);
     return null;
   }
-};
+}
 
-export const generateProductSKU = async (
-  productName: string,
-  colorName?: string,
-  sizeName?: string
-): Promise<string> => {
+export async function getLowStockAlerts(): Promise<LowStockAlert[]> {
   try {
     const { data, error } = await supabase
-      .rpc('generate_product_sku', {
-        p_product_name: productName,
-        p_color_name: colorName || null,
-        p_size_name: sizeName || null
-      });
-
-    if (error) throw error;
-    return data || `${productName.substring(0, 8).toUpperCase()}-${Date.now()}`;
-  } catch (error) {
-    console.error('Error generating SKU:', error);
-    return `${productName.substring(0, 8).toUpperCase()}-${Date.now()}`;
-  }
-};
-
-export const createInventoryForProduct = async (
-  productId: string,
-  productName: string,
-  categoryId: string,
-  subcategoryId: string,
-  costPrice: number,
-  sellingPrice?: number
-): Promise<boolean> => {
-  try {
-    const sku = await generateProductSKU(productName);
-    
-    const { error } = await supabase
-      .from('product_inventory')
-      .insert({
-        product_id: productId,
-        sku,
-        product_name: productName,
-        category_id: categoryId,
-        subcategory_id: subcategoryId,
-        cost_price: costPrice,
-        selling_price: sellingPrice,
-        stock_quantity: 0,
-        reserved_stock: 0,
-        available_stock: 0,
-        is_active: true
-      });
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error creating inventory for product:', error);
-    return false;
-  }
-};
-
-export const createInventoryItem = async (item: any): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('product_inventory')
-      .insert(item);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error creating inventory item:', error);
-    return false;
-  }
-};
-
-export const updateInventoryItem = async (
-  inventoryId: string,
-  updates: Partial<InventoryItem>
-): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('product_inventory')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', inventoryId);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error updating inventory item:', error);
-    return false;
-  }
-};
-
-export const getProductInventory = async (productId: string): Promise<InventoryItem[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('product_inventory')
+      .from('low_stock_alerts')
       .select('*')
-      .eq('product_id', productId)
-      .eq('is_active', true);
+      .order('updated_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching low stock alerts:', error);
+      return [];
+    }
+
     return data || [];
   } catch (error) {
-    console.error('Error fetching product inventory:', error);
+    console.error('Error in getLowStockAlerts:', error);
     return [];
   }
-};
+}
 
-export const getInventorySummary = async (productId: string): Promise<InventorySummary> => {
+export async function updateInventoryStock(
+  inventoryId: string,
+  stockChange: number,
+  reason: string = 'Manual update'
+): Promise<boolean> {
   try {
     const { data, error } = await supabase
-      .from('product_inventory')
-      .select('stock_quantity, available_stock, reserved_stock')
-      .eq('product_id', productId)
-      .eq('is_active', true);
-
-    if (error) throw error;
-    
-    const summary = (data || []).reduce((acc, item) => ({
-      total_stock: acc.total_stock + (item.stock_quantity || 0),
-      available_stock: acc.available_stock + (item.available_stock || 0),
-      reserved_stock: acc.reserved_stock + (item.reserved_stock || 0),
-      variant_count: acc.variant_count + 1
-    }), {
-      total_stock: 0,
-      available_stock: 0,
-      reserved_stock: 0,
-      variant_count: 0
-    });
-
-    return summary;
-  } catch (error) {
-    console.error('Error fetching inventory summary:', error);
-    return {
-      total_stock: 0,
-      available_stock: 0,
-      reserved_stock: 0,
-      variant_count: 0
-    };
-  }
-};
-
-export const syncProductToInventory = async (productId: string): Promise<boolean> => {
-  try {
-    // This would sync a product to the inventory system
-    // For now, we'll just return true as the implementation depends on business logic
-    return true;
-  } catch (error) {
-    console.error('Error syncing product to inventory:', error);
-    return false;
-  }
-};
-
-export const deleteInventoryItem = async (inventoryId: string): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('product_inventory')
-      .delete()
-      .eq('id', inventoryId);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error deleting inventory item:', error);
-    return false;
-  }
-};
-
-export const addStock = async (
-  inventoryId: string,
-  quantity: number,
-  reason: string = 'Stock addition'
-): Promise<boolean> => {
-  try {
-    const { error } = await supabase
       .from('product_inventory')
       .update({
-        stock_quantity: supabase.raw(`stock_quantity + ${quantity}`),
-        available_stock: supabase.raw(`available_stock + ${quantity}`),
+        stock_quantity: stockChange,
         updated_at: new Date().toISOString()
       })
-      .eq('id', inventoryId);
+      .eq('id', inventoryId)
+      .select()
+      .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error updating inventory stock:', error);
+      return false;
+    }
+
+    console.log('Successfully updated inventory stock:', data);
     return true;
   } catch (error) {
-    console.error('Error adding stock:', error);
+    console.error('Error in updateInventoryStock:', error);
     return false;
   }
-};
+}
 
-export const getProductStockSummary = async (productId: string): Promise<{ total_stock: number; available_stock: number }> => {
+export async function reserveStock(
+  productId: string,
+  quantity: number,
+  orderId: string,
+  productInventoryId?: string | null
+): Promise<boolean> {
   try {
-    const summary = await getInventorySummary(productId);
-    return {
-      total_stock: summary.total_stock,
-      available_stock: summary.available_stock
-    };
-  } catch (error) {
-    console.error('Error fetching product stock summary:', error);
-    return { total_stock: 0, available_stock: 0 };
-  }
-};
-
-export const validateCartStock = async (cartItems: any[]): Promise<{isValid: boolean, errorMessages: string[]}> => {
-  try {
-    const errorMessages: string[] = [];
+    const orderStatus: 'pending_payment' = 'pending_payment';
     
-    for (const item of cartItems) {
-      const { data: inventory, error } = await supabase
-        .from('product_inventory')
-        .select('available_stock')
-        .eq('id', item.product_inventory_id)
-        .single();
+    console.log('Reserving stock:', { productId, quantity, orderId, productInventoryId });
 
-      if (error) {
-        errorMessages.push(`Failed to check stock for item ${item.product_name}`);
-        continue;
-      }
-
-      if (!inventory || inventory.available_stock < item.quantity) {
-        errorMessages.push(`Insufficient stock for ${item.product_name}. Available: ${inventory?.available_stock || 0}, Requested: ${item.quantity}`);
-      }
+    // Get current stock
+    const currentStock = await getRealTimeStock(productId, productInventoryId);
+    
+    if (!currentStock) {
+      console.error('Product not found in inventory');
+      return false;
     }
 
-    return {
-      isValid: errorMessages.length === 0,
-      errorMessages
-    };
-  } catch (error) {
-    console.error('Error validating cart stock:', error);
-    return {
-      isValid: false,
-      errorMessages: ['Failed to validate stock availability']
-    };
-  }
-};
-
-export const validateCheckoutStock = async (cartItems: any[]): Promise<boolean> => {
-  const result = await validateCartStock(cartItems);
-  return result.isValid;
-};
-
-export const processCheckoutStock = async (cartItems: any[]): Promise<boolean> => {
-  try {
-    for (const item of cartItems) {
-      const success = await reserveStock(item.product_inventory_id, item.quantity, 'Checkout reservation');
-      if (!success) {
-        return false;
-      }
+    if (currentStock.available_stock < quantity) {
+      console.error('Insufficient stock available');
+      return false;
     }
+
+    // Update reserved stock
+    const newReservedStock = currentStock.reserved_stock + quantity;
+    const newAvailableStock = currentStock.stock_quantity - newReservedStock;
+
+    let updateQuery = supabase
+      .from('product_inventory')
+      .update({
+        reserved_stock: newReservedStock,
+        available_stock: newAvailableStock,
+        updated_at: new Date().toISOString()
+      })
+      .eq('product_id', productId);
+
+    if (productInventoryId) {
+      updateQuery = updateQuery.eq('id', productInventoryId);
+    }
+
+    const { error } = await updateQuery;
+
+    if (error) {
+      console.error('Error updating reserved stock:', error);
+      return false;
+    }
+
+    console.log('Successfully reserved stock');
     return true;
   } catch (error) {
-    console.error('Error processing checkout stock:', error);
+    console.error('Error reserving stock:', error);
     return false;
   }
-};
+}
 
-export const calculateTotalProductStock = async (productId: string): Promise<number> => {
+export async function releaseStock(
+  productId: string,
+  quantity: number,
+  orderId: string,
+  productInventoryId?: string | null
+): Promise<boolean> {
+  try {
+    console.log('Releasing stock:', { productId, quantity, orderId, productInventoryId });
+
+    // Get current stock
+    const currentStock = await getRealTimeStock(productId, productInventoryId);
+    
+    if (!currentStock) {
+      console.error('Product not found in inventory');
+      return false;
+    }
+
+    // Update reserved stock
+    const newReservedStock = Math.max(0, currentStock.reserved_stock - quantity);
+    const newAvailableStock = currentStock.stock_quantity - newReservedStock;
+
+    let updateQuery = supabase
+      .from('product_inventory')
+      .update({
+        reserved_stock: newReservedStock,
+        available_stock: newAvailableStock,
+        updated_at: new Date().toISOString()
+      })
+      .eq('product_id', productId);
+
+    if (productInventoryId) {
+      updateQuery = updateQuery.eq('id', productInventoryId);
+    }
+
+    const { error } = await updateQuery;
+
+    if (error) {
+      console.error('Error updating reserved stock:', error);
+      return false;
+    }
+
+    console.log('Successfully released stock');
+    return true;
+  } catch (error) {
+    console.error('Error releasing stock:', error);
+    return false;
+  }
+}
+
+export async function confirmStockReservation(
+  productId: string,
+  quantity: number,
+  orderId: string,
+  productInventoryId?: string | null
+): Promise<boolean> {
+  try {
+    console.log('Confirming stock reservation:', { productId, quantity, orderId, productInventoryId });
+
+    // Get current stock
+    const currentStock = await getRealTimeStock(productId, productInventoryId);
+    
+    if (!currentStock) {
+      console.error('Product not found in inventory');
+      return false;
+    }
+
+    // Reduce actual stock quantity and reserved stock
+    const newStockQuantity = Math.max(0, currentStock.stock_quantity - quantity);
+    const newReservedStock = Math.max(0, currentStock.reserved_stock - quantity);
+    const newAvailableStock = newStockQuantity - newReservedStock;
+
+    let updateQuery = supabase
+      .from('product_inventory')
+      .update({
+        stock_quantity: newStockQuantity,
+        reserved_stock: newReservedStock,
+        available_stock: newAvailableStock,
+        updated_at: new Date().toISOString()
+      })
+      .eq('product_id', productId);
+
+    if (productInventoryId) {
+      updateQuery = updateQuery.eq('id', productInventoryId);
+    }
+
+    const { error } = await updateQuery;
+
+    if (error) {
+      console.error('Error confirming stock reservation:', error);
+      return false;
+    }
+
+    console.log('Successfully confirmed stock reservation');
+    return true;
+  } catch (error) {
+    console.error('Error confirming stock reservation:', error);
+    return false;
+  }
+}
+
+export async function getInventoryAnalytics(): Promise<{
+  total_items: number;
+  active_items: number;
+  total_available_stock: number;
+  total_reserved_stock: number;
+  low_stock_items: number;
+  out_of_stock_items: number;
+  total_stock_value: number;
+}> {
   try {
     const { data, error } = await supabase
       .from('product_inventory')
-      .select('available_stock')
-      .eq('product_id', productId)
-      .eq('is_active', true);
+      .select('stock_quantity, reserved_stock, available_stock, is_active, cost_price');
 
-    if (error) throw error;
-    
-    return (data || []).reduce((total, item) => total + (item.available_stock || 0), 0);
+    if (error) {
+      console.error('Error fetching inventory analytics:', error);
+      return {
+        total_items: 0,
+        active_items: 0,
+        total_available_stock: 0,
+        total_reserved_stock: 0,
+        low_stock_items: 0,
+        out_of_stock_items: 0,
+        total_stock_value: 0
+      };
+    }
+
+    const analytics = (data || []).reduce((acc, item) => {
+      acc.total_items += 1;
+      if (item.is_active) acc.active_items += 1;
+      acc.total_available_stock += item.available_stock || 0;
+      acc.total_reserved_stock += item.reserved_stock || 0;
+      if ((item.available_stock || 0) <= 5) acc.low_stock_items += 1;
+      if ((item.available_stock || 0) === 0) acc.out_of_stock_items += 1;
+      acc.total_stock_value += (item.stock_quantity || 0) * (item.cost_price || 0);
+      return acc;
+    }, {
+      total_items: 0,
+      active_items: 0,
+      total_available_stock: 0,
+      total_reserved_stock: 0,
+      low_stock_items: 0,
+      out_of_stock_items: 0,
+      total_stock_value: 0
+    });
+
+    return analytics;
   } catch (error) {
-    console.error('Error calculating total product stock:', error);
-    return 0;
+    console.error('Error in getInventoryAnalytics:', error);
+    return {
+      total_items: 0,
+      active_items: 0,
+      total_available_stock: 0,
+      total_reserved_stock: 0,
+      low_stock_items: 0,
+      out_of_stock_items: 0,
+      total_stock_value: 0
+    };
   }
-};
+}
+
+export async function bulkUpdateStock(updates: Array<{
+  inventoryId: string;
+  stockQuantity: number;
+  reason?: string;
+}>): Promise<boolean> {
+  try {
+    console.log('Performing bulk stock update:', updates.length, 'items');
+
+    const results = await Promise.all(
+      updates.map(update => 
+        updateInventoryStock(update.inventoryId, update.stockQuantity, update.reason)
+      )
+    );
+
+    const successCount = results.filter(result => result).length;
+    console.log(`Bulk update completed: ${successCount}/${updates.length} successful`);
+
+    return successCount === updates.length;
+  } catch (error) {
+    console.error('Error in bulkUpdateStock:', error);
+    return false;
+  }
+}
