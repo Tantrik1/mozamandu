@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -222,20 +221,7 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
     }
     setLoading(true);
     try {
-      await addToCart({ 
-        id: `${product.id}-${selectedInventory.id}-${Date.now()}`,
-        productId: product.id, 
-        productInventoryId: selectedInventory.id, 
-        quantity,
-        price,
-        basePrice: price,
-        productName: product.name,
-        imageUrl: currentImage,
-        colorName: selectedColor,
-        sizeName: selectedSize,
-        sku: selectedInventory.id,
-        subcategoryId: product.subcategory_id
-      });
+      await addToCart({ productId: product.id, productInventoryId: selectedInventory.id, quantity });
       setAdded(true);
       setTimeout(() => setAdded(false), 1200);
     } catch (error) {
@@ -275,12 +261,10 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
           </span>
         )}
       </div>
-      
       {/* Card Content */}
       <div className="flex flex-col flex-1 p-4 gap-2">
         <h3 className="font-extrabold text-lg md:text-xl text-gray-900 mb-0 truncate text-center">{product.name}</h3>
         <div className="text-gray-500 text-xs text-center mb-1 line-clamp-2 min-h-[2.5em]">{product.description}</div>
-        
         {/* Pricing */}
         <div className="flex items-center justify-center gap-2 mb-1">
           {(productPricing.mode === 'discount' || productPricing.mode === 'combo') && (
@@ -288,7 +272,8 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
           )}
           <span className="font-bold text-xl text-red-600 animate-fade-in">Rs. {productPricing.finalPrice}</span>
         </div>
-        
+        {/* MOQ Info for Discount */}
+        {/* MOQ Info for Discount */}
         {/* Color Dropdown */}
         {colorOptions.length > 0 && (
           <div className="mb-1 w-full flex justify-center">
@@ -304,7 +289,6 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
             </Select>
           </div>
         )}
-        
         {/* Size Pills */}
         {sizeOptions.length > 0 && (
           <div className="flex flex-wrap items-center justify-center gap-2 mb-1">
@@ -327,7 +311,6 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
             })}
           </div>
         )}
-        
         {/* Quantity Selector */}
         <div className="flex items-center justify-center gap-2 mb-1">
           <Button
@@ -358,12 +341,10 @@ export function ProductCard({ product, subcategoryPrice, isCompact = false }: Pr
             +
           </Button>
         </div>
-        
         {/* Stock Info */}
         <div className="text-xs text-gray-500 text-center mb-1">
           {availableStock > 0 ? `${availableStock} in stock` : 'Out of stock'}
         </div>
-        
         {/* Add to Cart Button */}
         <Button
           className={`w-full mt-1 py-2 font-bold text-base flex items-center justify-center gap-2 rounded-xl transition-all duration-200 ${availableStock === 0 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 shadow-lg'} ${added ? 'animate-bounce' : ''}`}

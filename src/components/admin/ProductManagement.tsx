@@ -1,98 +1,232 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Plus, Edit, Trash2, Eye, Search, Package } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 import { CreateProductForm } from './CreateProductForm';
-import { EnhancedProductForm } from './EnhancedProductForm';
+import { EditProductForm } from './EditProductForm';
 import { ProductDetailView } from './ProductDetailView';
+import { Pencil, Trash2, Plus, Package, Eye } from 'lucide-react';
 import { getProductStockSummary } from '@/utils/inventoryManager';
-import { Product } from '@/types/admin';
-import { toast } from 'sonner';
+import { ProductEditBlockedModal } from './ProductEditBlockedModal';
+import { validateProductEditability, ProductEditValidationResult } from '@/utils/productEditValidation';
 
-export default function ProductManagement() {
+interface Product {
+  id: string;
+  name: string;
+  description: string | null;
+  cost_price: number;
+  selling_price: number | null;
+  category_id: string;
+  subcategory_id: string;
+  image_url: string | null;
+  is_featured: boolean;
+  has_color_variants: boolean;
+  color_has_size_variants: boolean;
+  stock_quantity: number | null;
+  status: 'active' | 'inactive';
+  categories: { name: string } | null;
+  subcategories: { name: string } | null;
+}
+
+interface Category {
+  id: string;
+  name: string;
+}
+
+interface Subcategory {
+  id: string;
+  name: string;
+  category_id: string;
+}
+
+export function ProductManagement() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [viewingProductId, setViewingProductId] = useState<string | null>(null);
+  const [productStocks, setProductStocks] = useState<Record<string, number>>({});
+  const [stockLoading, setStockLoading] = useState<Record<string, boolean>>({});
+  const [editBlockedModal, setEditBlockedModal] = useState<{
+    isOpen: boolean;
+    reason: string;
+    pendingOrdersCount?: number;
+  }>({
+    isOpen: false,
+    reason: '',
+    pendingOrdersCount: 0
+  });
+  const { toast } = useToast();
+
+  // New filter state
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [categories, setCategories] = useState<any[]>([]);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<string | null>(null);
-  const [viewingProduct, setViewingProduct] = useState<string | null>(null);
-  const [stockData, setStockData] = useState<{[key: string]: {total_stock: number, available_stock: number}}>({});
+  const [subcategoryFilter, setSubcategoryFilter] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'selling_price'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Filtered subcategories
+  const filteredSubcategories = categoryFilter
+    ? subcategories.filter((sub) => sub.category_id === categoryFilter)
+    : subcategories;
+
+  // Filtered products with search
+  const displayedProducts = products.filter(product => {
+    const matchesSearch =
+      !searchTerm ||
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesCategory = !categoryFilter || product.category_id === categoryFilter;
+    const matchesSubcategory = !subcategoryFilter || product.subcategory_id === subcategoryFilter;
+    return matchesSearch && matchesCategory && matchesSubcategory;
+  });
 
   useEffect(() => {
     fetchProducts();
     fetchCategories();
+    fetchSubcategories();
   }, []);
 
+  useEffect(() => {
+    if (products.length > 0) {
+      calculateProductStocks();
+    }
+  }, [products]);
+
+  // Refetch products when filters or sort change
+  useEffect(() => {
+    fetchProducts();
+  }, [categoryFilter, subcategoryFilter, sortBy, sortOrder]);
+
+  const fetchCategories = async () => {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('id, name')
+      .eq('status', 'on')
+      .order('name');
+
+    if (!error && data) {
+      setCategories(data);
+    }
+  };
+
+  const fetchSubcategories = async () => {
+    const { data, error } = await supabase
+      .from('subcategories')
+      .select('id, name, category_id')
+      .eq('status', 'on')
+      .order('name');
+
+    if (!error && data) {
+      setSubcategories(data);
+    }
+  };
+
+  const buildQuery = () => {
+    let query = supabase
+      .from('products')
+      .select(`
+        *,
+        categories(name),
+        subcategories(name)
+      `);
+
+    // Apply new filters
+    if (categoryFilter) {
+      query = query.eq('category_id', categoryFilter);
+    }
+    if (subcategoryFilter) {
+      query = query.eq('subcategory_id', subcategoryFilter);
+    }
+    // Apply sorting
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+    return query;
+  };
+
   const fetchProducts = async () => {
-    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          categories (
-            id,
-            name
-          ),
-          subcategories (
-            id,
-            name
-          )
-        `)
-        .order('created_at', { ascending: false });
+      setLoading(true);
+      const query = buildQuery();
+      const { data, error } = await query;
 
       if (error) throw error;
 
-      const productsWithStock = await Promise.all(
-        (data || []).map(async (product) => {
-          const stockSummary = await getProductStockSummary(product.id);
-          setStockData(prev => ({
-            ...prev,
-            [product.id]: {
-              total_stock: stockSummary.totalStock || 0,
-              available_stock: stockSummary.availableStock || 0
-            }
-          }));
-          return product;
-        })
-      );
-      
-      setProducts(productsWithStock);
+      // Map the data to ensure proper typing
+      const mappedProducts: Product[] = (data || []).map(product => ({
+        ...product,
+        color_has_size_variants: product.color_has_size_variants || false
+      }));
+
+      setProducts(mappedProducts);
     } catch (error) {
       console.error('Error fetching products:', error);
-      toast.error('Failed to fetch products');
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch products',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('id, name')
-        .eq('status', 'on')
-        .order('name');
+  const calculateProductStocks = async () => {
+    console.log('Calculating stocks for', products.length, 'products');
+    const stocks: Record<string, number> = {};
+    const loadingStates: Record<string, boolean> = {};
 
-      if (error) throw error;
-      setCategories(data || []);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
+    // Set loading states
+    products.forEach(product => {
+      loadingStates[product.id] = true;
+    });
+    setStockLoading(loadingStates);
+
+    for (const product of products) {
+      try {
+        console.log(`Calculating stock for product: ${product.name} (${product.id})`);
+        const stock = await getProductStockSummary(product.id);
+        stocks[product.id] = stock;
+        console.log(`Stock calculated for ${product.name}: ${stock}`);
+
+        // Update loading state for this product
+        setStockLoading(prev => ({ ...prev, [product.id]: false }));
+      } catch (error) {
+        console.error('Error calculating stock for product:', product.id, error);
+        stocks[product.id] = product.stock_quantity || 0;
+        setStockLoading(prev => ({ ...prev, [product.id]: false }));
+      }
     }
+
+    console.log('Final stock calculations:', stocks);
+    setProductStocks(stocks);
   };
 
-  const handleDeleteProduct = async (productId: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
+  const handleView = (productId: string) => {
+    setViewingProductId(productId);
+  };
+
+  const handleEdit = async (productId: string) => {
+    // Validate if product can be edited
+    const validation = await validateProductEditability(productId);
+
+    if (!validation.canEdit) {
+      setEditBlockedModal({
+        isOpen: true,
+        reason: validation.reason || 'Product cannot be edited at this time.',
+        pendingOrdersCount: validation.pendingOrdersCount
+      });
+      return;
+    }
+
+    setEditingProductId(productId);
+  };
+
+  const handleDelete = async (productId: string, productName: string) => {
+    if (!confirm(`Are you sure you want to delete "${productName}"?`)) return;
 
     try {
       const { error } = await supabase
@@ -102,293 +236,340 @@ export default function ProductManagement() {
 
       if (error) throw error;
 
-      toast.success('Product deleted successfully');
+      toast({
+        title: 'Success',
+        description: 'Product deleted successfully',
+      });
+
       fetchProducts();
     } catch (error) {
       console.error('Error deleting product:', error);
-      toast.error('Failed to delete product');
+      toast({
+        title: 'Error',
+        description: 'Failed to delete product',
+        variant: 'destructive',
+      });
     }
   };
 
-  const handleStatusChange = async (productId: string, newStatus: 'active' | 'inactive') => {
-    try {
-      const { error } = await supabase
-        .from('products')
-        .update({ status: newStatus })
-        .eq('id', productId);
+  const handleCreateSave = () => {
+    setIsCreateFormOpen(false);
+    fetchProducts();
+  };
 
-      if (error) throw error;
+  const handleCreateCancel = () => {
+    setIsCreateFormOpen(false);
+  };
 
-      toast.success('Product status updated successfully');
-      fetchProducts();
-    } catch (error) {
-      console.error('Error updating product status:', error);
-      toast.error('Failed to update product status');
+  const handleEditSave = () => {
+    setEditingProductId(null);
+    fetchProducts();
+  };
+
+  const handleEditCancel = () => {
+    setEditingProductId(null);
+  };
+
+  const handleDetailViewEdit = async () => {
+    if (viewingProductId) {
+      // Validate if product can be edited
+      const validation = await validateProductEditability(viewingProductId);
+
+      if (!validation.canEdit) {
+        setEditBlockedModal({
+          isOpen: true,
+          reason: validation.reason || 'Product cannot be edited at this time.',
+          pendingOrdersCount: validation.pendingOrdersCount
+        });
+        return;
+      }
+
+      setEditingProductId(viewingProductId);
+      setViewingProductId(null);
     }
   };
 
-  // Filter products based on search and filters
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = !categoryFilter || product.category_id === categoryFilter;
-    const matchesStatus = !statusFilter || product.status === statusFilter;
-    
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
-
-  const getStatusBadge = (status: string) => {
-    return status === 'active' ? (
-      <Badge variant="default">Active</Badge>
-    ) : (
-      <Badge variant="secondary">Inactive</Badge>
-    );
+  const handleDetailViewDelete = () => {
+    setViewingProductId(null);
+    fetchProducts();
   };
 
-  const getStockBadge = (productId: string) => {
-    const stock = stockData[productId];
-    if (!stock) return <Badge variant="outline">Loading...</Badge>;
-    
-    if (stock.available_stock === 0) {
-      return <Badge variant="destructive">Out of Stock</Badge>;
-    } else if (stock.available_stock < 10) {
-      return <Badge variant="secondary">Low Stock</Badge>;
-    } else {
-      return <Badge variant="default">In Stock</Badge>;
-    }
+  const handleDetailViewBack = () => {
+    setViewingProductId(null);
   };
 
-  if (showCreateForm) {
-    return (
-      <CreateProductForm
-        onSave={() => {
-          setShowCreateForm(false);
-          fetchProducts();
-        }}
-        onCancel={() => setShowCreateForm(false)}
-      />
-    );
+  const closeEditBlockedModal = () => {
+    setEditBlockedModal({
+      isOpen: false,
+      reason: '',
+      pendingOrdersCount: 0
+    });
+  };
+
+  if (loading) {
+    return <div className="flex justify-center p-8">Loading products...</div>;
   }
 
-  if (editingProduct) {
-    return (
-      <EnhancedProductForm
-        productId={editingProduct}
-        onSave={() => {
-          setEditingProduct(null);
-          fetchProducts();
-        }}
-        onCancel={() => setEditingProduct(null)}
-      />
-    );
-  }
-
-  if (viewingProduct) {
+  if (viewingProductId) {
     return (
       <ProductDetailView
-        productId={viewingProduct}
-        onBack={() => setViewingProduct(null)}
-        onEdit={() => {
-          setEditingProduct(viewingProduct);
-          setViewingProduct(null);
-        }}
-        onDelete={(productId) => {
-          handleDeleteProduct(productId);
-          setViewingProduct(null);
-        }}
+        productId={viewingProductId}
+        onEdit={handleDetailViewEdit}
+        onDelete={handleDetailViewDelete}
+        onBack={handleDetailViewBack}
+      />
+    );
+  }
+
+  if (isCreateFormOpen) {
+    return (
+      <CreateProductForm
+        onSave={handleCreateSave}
+        onCancel={handleCreateCancel}
+      />
+    );
+  }
+
+  if (editingProductId) {
+    return (
+      <EditProductForm
+        productId={editingProductId}
+        onSave={handleEditSave}
+        onCancel={handleEditCancel}
       />
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Product Management</h1>
-          <p className="text-muted-foreground">
-            Manage your product catalog and inventory
-          </p>
+          <h2 className="text-2xl font-bold">Product Management</h2>
+          <p className="text-gray-600">Manage your product catalog with advanced filtering</p>
         </div>
-        <Button onClick={() => setShowCreateForm(true)}>
+        <Button onClick={() => setIsCreateFormOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Product
         </Button>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-          <CardDescription>Filter products by various criteria</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <Label htmlFor="search">Search</Label>
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="search"
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
+      {/* New Filter Bar */}
+      <div className="sticky top-0 z-10 mb-4">
+        <Card className="shadow border border-gray-200 bg-white/95 backdrop-blur p-4">
+          <div className="flex flex-col md:flex-row md:items-end gap-4">
+            {/* Search Bar */}
+            <div className="flex-1 min-w-[220px]">
+              <label className="block text-sm font-medium mb-1" htmlFor="product-search">Search</label>
+              <input
+                id="product-search"
+                type="text"
+                className="w-full border rounded px-3 py-2"
+                placeholder="Search by name or description..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
             </div>
-            <div>
-              <Label htmlFor="category">Category</Label>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex-1 min-w-[180px]">
+              <label className="block text-sm font-medium mb-1" htmlFor="category-filter">Category</label>
+              <select
+                id="category-filter"
+                className="w-full border rounded px-3 py-2"
+                value={categoryFilter}
+                onChange={e => {
+                  setCategoryFilter(e.target.value);
+                  setSubcategoryFilter(''); // Reset subcategory when category changes
+                }}
+              >
+                <option value="">All Categories</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
             </div>
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex-1 min-w-[180px]">
+              <label className="block text-sm font-medium mb-1" htmlFor="subcategory-filter">Subcategory</label>
+              <select
+                id="subcategory-filter"
+                className="w-full border rounded px-3 py-2"
+                value={subcategoryFilter}
+                onChange={e => setSubcategoryFilter(e.target.value)}
+                disabled={!categoryFilter && filteredSubcategories.length === 0}
+              >
+                <option value="">All Subcategories</option>
+                {filteredSubcategories.map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.name}</option>
+                ))}
+              </select>
+            </div>
+            {/* Sort By */}
+            <div className="flex-1 min-w-[180px]">
+              <label className="block text-sm font-medium mb-1" htmlFor="sort-by">Sort By</label>
+              <select
+                id="sort-by"
+                className="w-full border rounded px-3 py-2"
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as 'name' | 'selling_price')}
+              >
+                <option value="name">Name</option>
+                <option value="selling_price">Price</option>
+              </select>
+            </div>
+            {/* Sort Order */}
+            <div className="flex-1 min-w-[180px]">
+              <label className="block text-sm font-medium mb-1" htmlFor="sort-order">Order</label>
+              <select
+                id="sort-order"
+                className="w-full border rounded px-3 py-2"
+                value={sortOrder}
+                onChange={e => setSortOrder(e.target.value as 'asc' | 'desc')}
+              >
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
             </div>
             <div className="flex items-end">
               <Button
+                type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => {
-                  setSearchQuery('');
                   setCategoryFilter('');
-                  setStatusFilter('');
+                  setSubcategoryFilter('');
+                  setSortBy('name');
+                  setSortOrder('asc');
                 }}
+                disabled={!categoryFilter && !subcategoryFilter && sortBy === 'name' && sortOrder === 'asc'}
               >
-                Clear Filters
+                Reset
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </Card>
+      </div>
 
-      {/* Products Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Products ({filteredProducts.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">Loading products...</div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Stock</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Featured</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProducts.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          {product.image_url && (
-                            <img
-                              src={product.image_url}
-                              alt={product.name}
-                              className="w-10 h-10 object-cover rounded"
-                            />
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          Showing {displayedProducts.length} product{displayedProducts.length !== 1 ? 's' : ''}
+        </p>
+      </div>
+
+      <div className="grid gap-4">
+        {displayedProducts.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+            <p>No products found matching your filters</p>
+          </div>
+        ) : (
+          displayedProducts.map((product) => (
+            <Card key={product.id}>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex space-x-4">
+                    {product.image_url && (
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="w-16 h-16 object-cover rounded-lg border"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <h3 className="text-lg font-semibold">{product.name}</h3>
+                        <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>
+                          {product.status}
+                        </Badge>
+                        {product.is_featured && (
+                          <Badge variant="outline">Featured</Badge>
+                        )}
+                      </div>
+
+                      <div className="text-sm text-gray-600 space-y-1">
+                        <p>
+                          <span className="font-medium">Category:</span> {product.categories?.name}
+                          {' > '}
+                          <span className="font-medium">Subcategory:</span> {product.subcategories?.name}
+                        </p>
+                        <p>
+                          <span className="font-medium">Cost Price:</span> Rs {product.cost_price}
+                          {product.selling_price && (
+                            <>
+                              {' | '}
+                              <span className="font-medium">Selling Price:</span> Rs {product.selling_price}
+                            </>
                           )}
-                          <div>
-                            <div className="font-medium">{product.name}</div>
-                            {product.description && (
-                              <div className="text-sm text-gray-500 truncate w-48">
-                                {product.description}
-                              </div>
+                        </p>
+                        <p>
+                          <span className="font-medium">Stock:</span>
+                          <Badge variant="outline" className="ml-2">
+                            {stockLoading[product.id] ? (
+                              <span className="animate-pulse">Calculating...</span>
+                            ) : (
+                              productStocks[product.id] !== undefined ? productStocks[product.id] : 'Unknown'
+                            )}
+                          </Badge>
+                          {(product.has_color_variants || product.color_has_size_variants) && (
+                            <span className="text-xs text-gray-500 ml-2">
+                              (Calculated from variants)
+                            </span>
+                          )}
+                        </p>
+                        {(product.has_color_variants || product.color_has_size_variants) && (
+                          <div className="flex items-center space-x-1">
+                            {product.has_color_variants && (
+                              <Badge variant="outline" className="text-xs">Color Variants</Badge>
+                            )}
+                            {product.color_has_size_variants && (
+                              <Badge variant="outline" className="text-xs">Size Variants</Badge>
                             )}
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div>{(product as any).categories?.name}</div>
-                          <div className="text-gray-500">{(product as any).subcategories?.name}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">Rs. {product.selling_price || 'N/A'}</div>
-                          <div className="text-sm text-gray-500">Cost: Rs. {product.cost_price}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          {getStockBadge(product.id)}
-                          <div className="text-xs text-gray-500">
-                            {stockData[product.id] && `${stockData[product.id].available_stock} available`}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(product.status)}</TableCell>
-                      <TableCell>
-                        {product.is_featured ? (
-                          <Badge variant="default">Featured</Badge>
-                        ) : (
-                          <Badge variant="outline">Regular</Badge>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setViewingProduct(product.id)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingProduct(product.id)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteProduct(product.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                        {product.description && (
+                          <p className="text-gray-500 mt-2 line-clamp-2">{product.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleView(product.id)}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(product.id)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(product.id, product.name)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Product Edit Blocked Modal */}
+      <ProductEditBlockedModal
+        isOpen={editBlockedModal.isOpen}
+        onClose={closeEditBlockedModal}
+        reason={editBlockedModal.reason}
+        pendingOrdersCount={editBlockedModal.pendingOrdersCount}
+      />
     </div>
   );
 }

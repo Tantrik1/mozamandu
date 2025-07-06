@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -22,10 +21,10 @@ interface Product {
   is_featured: boolean;
   has_color_variants: boolean;
   color_has_size_variants: boolean;
+  stock_quantity: number | null;
   status: 'active' | 'inactive';
   categories: { name: string } | null;
   subcategories: { name: string } | null;
-  // Note: stock_quantity removed - handled by inventory system
 }
 
 interface ProductDetailViewProps {
@@ -69,7 +68,7 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
 
       if (error) throw error;
 
-      // Map the data to ensure proper typing (without stock_quantity)
+      // Map the data to ensure proper typing
       const mappedProduct: Product = {
         ...data,
         color_has_size_variants: data.color_has_size_variants || false

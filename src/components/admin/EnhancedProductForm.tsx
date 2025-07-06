@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,7 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { CreateProductVariantForm } from './CreateProductVariantForm';
-import { ColorVariant } from '@/types/admin';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -25,6 +25,7 @@ const productSchema = z.object({
   is_featured: z.boolean().default(false),
   has_color_variants: z.boolean().default(false),
   color_has_size_variants: z.boolean().default(false),
+  stock_quantity: z.number().min(0, 'Stock quantity must be positive').optional(),
   status: z.enum(['active', 'inactive']).default('active'),
 });
 
@@ -37,6 +38,22 @@ interface Subcategory {
   id: string;
   name: string;
   category_id: string;
+}
+
+interface SizeVariant {
+  id?: string;
+  size_name: string;
+  size_code?: string;
+  stock_quantity: number;
+}
+
+interface ColorVariant {
+  id?: string;
+  color_name: string;
+  image_url?: string;
+  has_sizes: boolean;
+  stock_quantity?: number;
+  size_variants: SizeVariant[];
 }
 
 interface EnhancedProductFormProps {
@@ -70,6 +87,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: EnhancedPro
       is_featured: false,
       has_color_variants: false,
       color_has_size_variants: false,
+      stock_quantity: 0,
       status: 'active',
     },
   });
@@ -156,6 +174,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: EnhancedPro
         is_featured: Boolean(product.is_featured),
         has_color_variants: Boolean(product.has_color_variants),
         color_has_size_variants: Boolean(product.color_has_size_variants),
+        stock_quantity: product.stock_quantity ? Number(product.stock_quantity) : 0,
         status: product.status,
       });
 
@@ -241,6 +260,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: EnhancedPro
         is_featured: data.is_featured,
         has_color_variants: data.has_color_variants,
         color_has_size_variants: data.color_has_size_variants,
+        stock_quantity: (!data.has_color_variants && !data.color_has_size_variants) ? data.stock_quantity || null : null,
         status: data.status,
         image_url: currentImageUrl,
       };
@@ -440,6 +460,18 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: EnhancedPro
                   </div>
                 </div>
 
+                {!watchedHasColorVariants && !watchedColorHasSizeVariants && (
+                  <div>
+                    <Label htmlFor="stock_quantity">Stock Quantity *</Label>
+                    <Input
+                      id="stock_quantity"
+                      type="number"
+                      {...form.register('stock_quantity', { valueAsNumber: true })}
+                      placeholder="0"
+                    />
+                  </div>
+                )}
+
                 <div>
                   <Label htmlFor="status">Status</Label>
                   <Select
@@ -513,9 +545,9 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: EnhancedPro
 
         {(watchedHasColorVariants || watchedColorHasSizeVariants) && (
           <CreateProductVariantForm
-            colorVariants={colorVariants}
-            setColorVariants={setColorVariants}
+            hasColorVariants={watchedHasColorVariants}
             hasSizeVariants={watchedColorHasSizeVariants}
+            onVariantsChange={setColorVariants}
           />
         )}
 

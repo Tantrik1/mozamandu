@@ -241,20 +241,6 @@ export type Database = {
             foreignKeyName: "customer_order_items_product_inventory_id_fkey"
             columns: ["product_inventory_id"]
             isOneToOne: false
-            referencedRelation: "inventory_overview"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "customer_order_items_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
-            referencedRelation: "low_stock_alerts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "customer_order_items_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
             referencedRelation: "product_inventory"
             referencedColumns: ["id"]
           },
@@ -490,7 +476,7 @@ export type Database = {
           color_variant_id: string | null
           created_at: string | null
           id: string
-          ip_address: unknown | null
+          ip_address: string | null
           new_available_stock: number | null
           new_reserved_stock: number | null
           new_stock_quantity: number | null
@@ -514,7 +500,7 @@ export type Database = {
           color_variant_id?: string | null
           created_at?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: string | null
           new_available_stock?: number | null
           new_reserved_stock?: number | null
           new_stock_quantity?: number | null
@@ -538,7 +524,7 @@ export type Database = {
           color_variant_id?: string | null
           created_at?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: string | null
           new_available_stock?: number | null
           new_reserved_stock?: number | null
           new_stock_quantity?: number | null
@@ -580,20 +566,6 @@ export type Database = {
             foreignKeyName: "inventory_audit_log_product_inventory_id_fkey"
             columns: ["product_inventory_id"]
             isOneToOne: false
-            referencedRelation: "inventory_overview"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_audit_log_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
-            referencedRelation: "low_stock_alerts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_audit_log_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
             referencedRelation: "product_inventory"
             referencedColumns: ["id"]
           },
@@ -609,6 +581,13 @@ export type Database = {
             columns: ["subcategory_id"]
             isOneToOne: false
             referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audit_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -769,20 +748,6 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_overview"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
-            referencedRelation: "low_stock_alerts"
             referencedColumns: ["id"]
           },
           {
@@ -1054,13 +1019,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "product_inventory_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "product_inventory_color_variant_id_fkey"
             columns: ["color_variant_id"]
             isOneToOne: false
@@ -1079,13 +1037,6 @@ export type Database = {
             columns: ["size_variant_id"]
             isOneToOne: false
             referencedRelation: "size_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_inventory_subcategory_id_fkey"
-            columns: ["subcategory_id"]
-            isOneToOne: false
-            referencedRelation: "subcategories"
             referencedColumns: ["id"]
           },
         ]
@@ -1343,72 +1294,12 @@ export type Database = {
       }
     }
     Views: {
-      inventory_overview: {
-        Row: {
-          available_stock: number | null
-          category_name: string | null
-          created_at: string | null
-          id: string | null
-          low_stock_threshold: number | null
-          product_name: string | null
-          product_sku: string | null
-          reserved_stock: number | null
-          size_name: string | null
-          stock_quantity: number | null
-          stock_status: string | null
-          subcategory_name: string | null
-          updated_at: string | null
-          variant_name: string | null
-        }
-        Relationships: []
-      }
-      low_stock_alerts: {
-        Row: {
-          available_stock: number | null
-          category_name: string | null
-          id: string | null
-          low_stock_threshold: number | null
-          product_name: string | null
-          product_sku: string | null
-          reserved_stock: number | null
-          size_name: string | null
-          stock_needed: number | null
-          stock_quantity: number | null
-          subcategory_name: string | null
-          updated_at: string | null
-          variant_name: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
-      bulk_update_inventory: {
-        Args: { p_updates: Json }
-        Returns: {
-          success_count: number
-          error_count: number
-          errors: Json
-        }[]
-      }
-      export_inventory_data: {
-        Args: { p_include_inactive?: boolean }
-        Returns: {
-          product_id: string
-          sku: string
-          product_name: string
-          category_name: string
-          subcategory_name: string
-          color_name: string
-          size_name: string
-          stock_quantity: number
-          reserved_stock: number
-          available_stock: number
-          low_stock_threshold: number
-          cost_price: number
-          selling_price: number
-          stock_status: string
-          last_updated: string
-        }[]
+      calculate_product_stock: {
+        Args: { product_uuid: string }
+        Returns: number
       }
       generate_order_number: {
         Args: Record<PropertyKey, never>
@@ -1426,63 +1317,63 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
-      get_detailed_inventory_analytics: {
-        Args: Record<PropertyKey, never>
+      get_product_inventory_summary: {
+        Args: { product_uuid: string }
         Returns: {
-          metric_name: string
-          metric_value: number
-          description: string
-        }[]
-      }
-      get_inventory_history: {
-        Args: { p_product_id?: string; p_days_back?: number }
-        Returns: {
-          action_type: string
-          product_name: string
-          variant_name: string
-          size_name: string
-          change_amount: number
-          reason: string
-          created_at: string
+          total_stock: number
+          available_stock: number
+          reserved_stock: number
+          variant_count: number
         }[]
       }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
-      reconcile_inventory: {
+      migrate_to_product_inventory: {
         Args: Record<PropertyKey, never>
-        Returns: number
+        Returns: string
+      }
+      update_color_variant_stock: {
+        Args: { variant_id: string; stock_change: number }
+        Returns: undefined
+      }
+      update_inventory_stock: {
+        Args: {
+          inventory_id: string
+          stock_change: number
+          operation_type?: string
+        }
+        Returns: boolean
+      }
+      update_product_stock: {
+        Args: { product_id: string; stock_change: number }
+        Returns: undefined
+      }
+      update_size_variant_stock: {
+        Args: { variant_id: string; stock_change: number }
+        Returns: undefined
       }
       safe_update_stock: {
         Args: {
           p_product_id: string
           p_stock_change: number
-          p_color_variant_id?: string
-          p_size_variant_id?: string
-          p_reservation_change?: number
-          p_reason?: string
+          p_color_variant_id?: string | null
+          p_size_variant_id?: string | null
+          p_reservation_change?: number | null
+          p_reason?: string | null
         }
         Returns: boolean
-      }
-      validate_inventory_integrity: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          inventory_id: string
-          product_name: string
-          issue_type: string
-          description: string
-        }[]
       }
     }
     Enums: {
       category_status: "on" | "off"
       order_status:
-        | "pending_payment"
-        | "payment_confirmed"
-        | "on_delivery"
-        | "delivered"
-        | "cancelled"
+      | "pending_payment"
+      | "payment_confirmed"
+      | "on_delivery"
+      | "delivered"
+      | "cancelled"
       product_status: "active" | "inactive"
       user_role: "admin" | "customer"
     }
@@ -1496,106 +1387,108 @@ type DefaultSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+  | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+  ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+    Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+    Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-    ? R
-    : never
+  ? R
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
+    DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+      Row: infer R
+    }
+  ? R
+  : never
+  : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
+    Insert: infer I
+  }
+  ? I
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Insert: infer I
+  }
+  ? I
+  : never
+  : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+    Update: infer U
+  }
+  ? U
+  : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
       Update: infer U
     }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
+  ? U
+  : never
+  : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["Enums"]
+  | { schema: keyof Database },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+  ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+  : never = never,
 > = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["CompositeTypes"]
+  | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+  ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+  : never = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
   ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
 
 export const Constants = {
   public: {

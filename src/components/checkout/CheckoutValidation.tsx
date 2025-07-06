@@ -1,7 +1,7 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { validateCartStock } from '@/utils/inventoryManager';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -16,30 +16,17 @@ export const useCheckoutValidation = () => {
       console.log('=== CHECKOUT STOCK VALIDATION ===');
       console.log('Validating stock for checkout items:', cartItems.length);
 
-      const errorMessages: string[] = [];
-      
-      for (const item of cartItems) {
-        const { data: inventory, error } = await supabase
-          .from('product_inventory')
-          .select('available_stock')
-          .eq('id', item.product_inventory_id)
-          .single();
+      const result = await validateCartStock(cartItems);
 
-        if (error) {
-          errorMessages.push(`Failed to check stock for item ${item.product_name}`);
-          continue;
-        }
+      if (!result.isValid) {
+        const errorMessage = result.errorMessages.length > 0
+          ? result.errorMessages[0]
+          : 'Some items have insufficient stock';
 
-        if (!inventory || inventory.available_stock < item.quantity) {
-          errorMessages.push(`Insufficient stock for ${item.product_name}. Available: ${inventory?.available_stock || 0}, Requested: ${item.quantity}`);
-        }
-      }
-
-      if (errorMessages.length > 0) {
-        console.log('Checkout stock validation failed:', errorMessages[0]);
+        console.log('Checkout stock validation failed:', errorMessage);
         return {
           isValid: false,
-          error: errorMessages[0]
+          error: errorMessage
         };
       }
 

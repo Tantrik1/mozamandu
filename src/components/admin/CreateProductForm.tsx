@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { CreateProductVariantForm } from './CreateProductVariantForm';
-import { createInventoryItem, generateProductSKU } from '@/utils/inventoryManager';
+import { createInventoryForProduct, createInventoryItem, generateProductSKU } from '@/utils/inventoryManager';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 const productSchema = z.object({

@@ -1,7 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { validateCartStock } from '@/utils/inventoryManager';
+import { getVariantStockInfo, validateCartStock } from './inventoryManager';
 
 interface CartItem {
   id: string;
@@ -68,15 +67,33 @@ export async function validateCartItems(cartItems: CartItem[]): Promise<Validati
         continue;
       }
 
-      // Validate stock using unified stock system
-      const stockValidation = await validateCartStock([item]);
+      // Validate inventory using unified stock system
+      const stockInfo = await getVariantStockInfo(
+        item.productId,
+        item.productInventoryId
+      );
 
-      if (!stockValidation.isValid) {
-        console.log(`Stock validation failed for ${item.productId}: ${stockValidation.errorMessages?.[0]}`);
-        
-        // For now, remove items that fail validation
+      if (!stockInfo.isValid) {
+        console.log(`Stock validation failed for ${item.productId}: ${stockInfo.errorMessage}`);
         removedItems.push(item);
-        errors.push(`"${item.productName}" was removed due to stock issues`);
+        errors.push(`"${item.productName}" has inventory issues and was removed from cart`);
+        continue;
+      }
+
+      // Check if we have enough stock
+      if (stockInfo.stockAmount < item.quantity) {
+        console.log(`Insufficient stock for ${item.productId}: available ${stockInfo.stockAmount}, needed ${item.quantity}`);
+
+        if (stockInfo.stockAmount > 0) {
+          // Adjust quantity to available stock
+          item.quantity = stockInfo.stockAmount;
+          validItems.push(item);
+          errors.push(`"${item.productName}" quantity reduced to ${stockInfo.stockAmount} (available stock)`);
+        } else {
+          // No stock available, remove item
+          removedItems.push(item);
+          errors.push(`"${item.productName}" is out of stock and was removed from cart`);
+        }
         continue;
       }
 
@@ -112,12 +129,25 @@ export async function validateSingleCartItem(item: CartItem): Promise<{
   errorMessage?: string;
 }> {
   try {
-    const validation = await validateCartStock([item]);
+    const stockInfo = await getVariantStockInfo(
+      item.productId,
+      item.productInventoryId
+    );
 
-    if (!validation.isValid) {
+    if (!stockInfo.isValid) {
       return {
         isValid: false,
-        errorMessage: validation.errorMessages?.[0] || 'Stock validation failed'
+        errorMessage: stockInfo.errorMessage || 'Item validation failed'
+      };
+    }
+
+    if (stockInfo.stockAmount < item.quantity) {
+      return {
+        isValid: stockInfo.stockAmount > 0,
+        adjustedQuantity: stockInfo.stockAmount,
+        errorMessage: stockInfo.stockAmount > 0
+          ? `Only ${stockInfo.stockAmount} items available`
+          : 'Item is out of stock'
       };
     }
 

@@ -1,105 +1,135 @@
-
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
+import { Navigate, Routes, Route } from 'react-router-dom';
+import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { CategoryManagement } from '@/components/admin/CategoryManagement';
+import { SubcategoryManagement } from '@/components/admin/SubcategoryManagement';
+import { ProductManagement } from '@/components/admin/ProductManagement';
+import { InventoryManagement } from '@/components/admin/InventoryManagement';
+import { EnhancedOrderManagement } from '@/components/admin/EnhancedOrderManagement';
+import { CustomerManagement } from '@/components/admin/CustomerManagement';
+import { ComboManagement } from '@/components/admin/ComboManagement';
+import { PromocodeManagement } from '@/components/admin/PromocodeManagement';
+import { PaymentMethodManagement } from '@/components/admin/PaymentMethodManagement';
+import { DeliveryChargeManagement } from '@/components/admin/DeliveryChargeManagement';
+import { NoticeManagement } from '@/components/admin/NoticeManagement';
+import { TopBarTextManagement } from '@/components/admin/TopBarTextManagement';
+import { AdminSettings } from '@/components/admin/AdminSettings';
+import { FAQManagement } from '@/components/admin/FAQManagement';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { DashboardStats } from '@/components/admin/DashboardStats';
+import { OrdersChart } from '@/components/admin/OrdersChart';
+import { TopProducts } from '@/components/admin/TopProducts';
+import { TopCustomers } from '@/components/admin/TopCustomers';
+import { RecentNotifications } from '@/components/admin/RecentNotifications';
+import { RevenueOverview } from '@/components/admin/RevenueOverview';
+import { OrderAnalytics } from '@/components/admin/OrderAnalytics';
+import { CustomerAnalytics } from '@/components/admin/CustomerAnalytics';
+import { RefreshCw } from 'lucide-react';
+import { NavbarManagement } from '@/components/admin/NavbarManagement';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Users, Package, Settings } from 'lucide-react';
-import ProductManagement from '@/components/admin/ProductManagement';
+
+function AdminDashboard() {
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <p className="text-gray-600">Comprehensive business analytics and insights</p>
+        </div>
+      </div>
+
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="revenue">Revenue</TabsTrigger>
+          <TabsTrigger value="orders">Orders</TabsTrigger>
+          <TabsTrigger value="customers">Customers</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          <DashboardStats />
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <OrdersChart />
+            <div className="grid grid-cols-1 gap-6">
+              <TopProducts />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <TopCustomers />
+            <RecentNotifications />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="revenue">
+          <RevenueOverview />
+        </TabsContent>
+
+        <TabsContent value="orders">
+          <OrderAnalytics />
+        </TabsContent>
+
+        <TabsContent value="customers">
+          <CustomerAnalytics />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
 
 export default function EnhancedAdmin() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const { user, userProfile, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+        Loading...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (!userProfile || userProfile.role !== 'admin') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
+          <p className="text-gray-600">You don't have permission to access this page.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Enhanced Admin Dashboard</h1>
-          <p className="text-gray-600 mt-2">Comprehensive management system for your business</p>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="products">Products</TabsTrigger>
-            <TabsTrigger value="orders">Orders</TabsTrigger>
-            <TabsTrigger value="inventory">Inventory</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="dashboard" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Products</CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">125</div>
-                  <p className="text-xs text-muted-foreground">+12% from last month</p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">1,234</div>
-                  <p className="text-xs text-muted-foreground">+8% from last month</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Revenue</CardTitle>
-                  <BarChart className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">₹45,231</div>
-                  <p className="text-xs text-muted-foreground">+20% from last month</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
-                  <Settings className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">23</div>
-                  <p className="text-xs text-muted-foreground">Need attention</p>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="products" className="space-y-6">
-            <ProductManagement />
-          </TabsContent>
-
-          <TabsContent value="orders" className="space-y-6">
-            <div className="text-center py-12">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Orders Management</h3>
-              <p className="text-gray-600">Order management functionality coming soon...</p>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="inventory" className="space-y-6">
-            <div className="text-center py-12">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Inventory Management</h3>
-              <p className="text-gray-600">Inventory management functionality coming soon...</p>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="settings" className="space-y-6">
-            <div className="text-center py-12">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Settings</h3>
-              <p className="text-gray-600">Admin settings functionality coming soon...</p>
-            </div>
-          </TabsContent>
-        </Tabs>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <AdminSidebar />
+        <main className="flex-1 overflow-auto">
+          <Routes>
+            <Route index element={<AdminDashboard />} />
+            <Route path="categories" element={<CategoryManagement />} />
+            <Route path="subcategories" element={<SubcategoryManagement />} />
+            <Route path="products" element={<ProductManagement />} />
+            <Route path="inventory" element={<InventoryManagement />} />
+            <Route path="orders" element={<EnhancedOrderManagement />} />
+            <Route path="customers" element={<CustomerManagement />} />
+            <Route path="combos" element={<ComboManagement />} />
+            <Route path="promocodes" element={<PromocodeManagement />} />
+            <Route path="payments" element={<PaymentMethodManagement />} />
+            <Route path="delivery-charges" element={<DeliveryChargeManagement />} />
+            <Route path="notices" element={<NoticeManagement />} />
+            <Route path="top-bar-text" element={<TopBarTextManagement />} />
+            <Route path="navbar" element={<NavbarManagement />} />
+            <Route path="faqs" element={<FAQManagement />} />
+            <Route path="settings" element={<AdminSettings />} />
+          </Routes>
+        </main>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }
