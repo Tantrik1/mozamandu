@@ -1,530 +1,782 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Eye, Search, Filter, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '@/components/ui/alert';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
+  Copy,
+  Edit,
+  PackageCheck,
+  Plus,
+  RefreshCw,
+  Trash2,
+  User,
+  Eye,
+  Package,
+  Ban,
+  CheckCircle2,
+  Clock4,
+  Truck,
+  AlertCircle,
+  FileText,
+  CreditCard,
+  Wallet,
+  Contact2,
+  Mail,
+  Phone,
+  MapPin,
+} from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { handleOrderStatusUpdate } from '@/utils/inventoryManager';
-import { AdminPasswordDialog } from '@/components/admin/AdminPasswordDialog';
+import { format } from 'date-fns';
+import { DateRange } from 'react-day-picker';
+import { cn } from '@/lib/utils';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command';
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  updateOrderStatus,
+  rollbackStockReservations
+} from '@/utils/inventoryManager';
 
 interface Order {
   id: string;
-  order_number: string;
+  created_at: string;
+  updated_at: string;
+  status: string;
+  total_amount: number;
   customer_name: string;
   customer_email: string;
-  contact_number: string;
-  total_amount: number;
-  paid_amount: number;
-  remaining_amount: number;
-  status: 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled';
-  created_at: string;
-  combo_applied: boolean;
-  promocode_used: string | null;
-  promocode_discount: number;
-  payment_screenshot_url: string | null;
+  customer_phone: string;
+  customer_address: string;
+  payment_method: string;
+  shipping_method: string;
+  order_notes: string;
   user_id: string | null;
-  delivery_address: string;
-  delivery_charge: number;
-  subtotal: number;
-  order_type: 'guest' | 'customer' | 'admin';
-  source_table: 'orders' | 'customer_orders';
 }
 
-interface OrderItemDetail {
+interface CustomerOrder {
   id: string;
-  product_name: string;
-  color_name: string | null;
-  size_name: string | null;
+  created_at: string;
+  updated_at: string;
+  status: string;
+  total_amount: number;
+  payment_method: string;
+  shipping_method: string;
+  order_notes: string;
+  user_id: string;
+}
+
+interface OrderItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  product_inventory_id: string;
   quantity: number;
   unit_price: number;
   total_price: number;
-  pricing_mode: string;
+}
+
+interface CustomerOrderItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  product_inventory_id: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+}
+
+interface DataTableColumnHeaderProps<TData, TValue> {
+  column: {
+    id: string;
+    title: string;
+    accessorKey?: string;
+    cell?: (info: { row: { original: TData } }) => JSX.Element;
+  };
+  onSort: (columnId: string, direction: 'asc' | 'desc') => void;
+  sortColumn: string | null;
+  sortDirection: 'asc' | 'desc' | null;
+}
+
+function DataTableColumnHeader<TData, TValue>({
+  column,
+  onSort,
+  sortColumn,
+  sortDirection,
+}: DataTableColumnHeaderProps<TData, TValue>) {
+  const isSorted = sortColumn === column.id && !!sortDirection;
+
+  const handleClick = () => {
+    if (isSorted) {
+      onSort(column.id, sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      onSort(column.id, 'asc');
+    }
+  };
+
+  return (
+    <TableHead className="cursor-pointer" onClick={handleClick}>
+      <div className="flex items-center">
+        {column.title}
+        {isSorted && (
+          <ChevronsUpDown
+            className={cn(
+              'ml-auto h-4 w-4',
+              sortDirection === 'desc' ? 'rotate-0' : 'rotate-180'
+            )}
+          />
+        )}
+      </div>
+    </TableHead>
+  );
+}
+
+interface Filter {
+  status?: string;
+  paymentMethod?: string;
+  shippingMethod?: string;
+  dateRange?: DateRange | undefined;
 }
 
 export function OrderManagement() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [orderItemDetails, setOrderItemDetails] = useState<{ [key: string]: OrderItemDetail[] }>({});
+  const [customerOrders, setCustomerOrders] = useState<CustomerOrder[]>([]);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [customerOrderItems, setCustomerOrderItems] = useState<CustomerOrderItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [error, setError] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [pendingStatusUpdate, setPendingStatusUpdate] = useState<{ order: Order; newStatus: string } | null>(null);
-  const navigate = useNavigate();
+  const [selectedCustomerOrder, setSelectedCustomerOrder] = useState<CustomerOrder | null>(null);
+  const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
+  const [isCustomerOrderDetailsOpen, setIsCustomerOrderDetailsOpen] = useState(false);
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [isEditingOrder, setIsEditingOrder] = useState(false);
+  const [isDeletingOrder, setIsDeletingOrder] = useState(false);
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
+  const [filter, setFilter] = useState<Filter>({});
+  const [isCustomerOrderView, setIsCustomerOrderView] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('');
+  const [shippingMethodFilter, setShippingMethodFilter] = useState<string>('');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [isBulkActionsOpen, setIsBulkActionsOpen] = useState(false);
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [isBulkStatusUpdateDialogOpen, setIsBulkStatusUpdateDialogOpen] = useState(false);
+  const [bulkUpdateStatus, setBulkUpdateStatus] = useState<string>('');
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+  const [isNewStatusDialogOpen, setIsNewStatusDialogOpen] = useState(false);
+  const [newStatus, setNewStatus] = useState<string>('');
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  const fetchOrders = async (showRefreshing = false) => {
-    if (showRefreshing) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+  const loadOrders = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
     try {
-      console.log('Fetching orders for admin dashboard...');
+      // Fetch guest orders
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      const [ordersResponse, customerOrdersResponse] = await Promise.all([
-        supabase
-          .from('orders')
-          .select(`
-            id,
-            order_number,
-            customer_name,
-            customer_email,
-            contact_number,
-            total_amount,
-            paid_amount,
-            remaining_amount,
-            status,
-            created_at,
-            combo_applied,
-            promocode_used,
-            promocode_discount,
-            payment_screenshot_url,
-            user_id,
-            delivery_address,
-            delivery_charge,
-            subtotal
-          `)
-          .order('created_at', { ascending: false }),
-
-        supabase
-          .from('customer_orders')
-          .select(`
-            id,
-            order_number,
-            customer_name,
-            customer_email,
-            contact_number,
-            total_amount,
-            paid_amount,
-            remaining_amount,
-            status,
-            created_at,
-            combo_applied,
-            promocode_used,
-            promocode_discount,
-            payment_screenshot_url,
-            user_id,
-            delivery_address,
-            delivery_charge,
-            subtotal
-          `)
-          .order('created_at', { ascending: false })
-      ]);
-
-      if (ordersResponse.error) {
-        console.error('Error fetching orders:', ordersResponse.error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch orders",
-          variant: "destructive",
-        });
-        return;
+      if (ordersError) {
+        console.error('Error fetching orders:', ordersError);
+        setError('Failed to fetch orders');
+      } else {
+        setOrders(ordersData || []);
       }
 
-      if (customerOrdersResponse.error) {
-        console.error('Error fetching customer orders:', customerOrdersResponse.error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch customer orders",
-          variant: "destructive",
-        });
-        return;
+      // Fetch customer orders
+      const { data: customerOrdersData, error: customerOrdersError } = await supabase
+        .from('customer_orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (customerOrdersError) {
+        console.error('Error fetching customer orders:', customerOrdersError);
+        setError('Failed to fetch customer orders');
+      } else {
+        setCustomerOrders(customerOrdersData || []);
       }
 
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, role');
+      // Fetch order items
+      const { data: orderItemsData, error: orderItemsError } = await supabase
+        .from('order_items')
+        .select('*');
 
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch user profiles",
-          variant: "destructive",
-        });
-        return;
+      if (orderItemsError) {
+        console.error('Error fetching order items:', orderItemsError);
+        setError('Failed to fetch order items');
+      } else {
+        setOrderItems(orderItemsData || []);
       }
 
-      const profilesMap = new Map(profiles?.map(p => [p.id, p.role]) || []);
+      // Fetch customer order items
+      const { data: customerOrderItemsData, error: customerOrderItemsError } = await supabase
+        .from('customer_order_items')
+        .select('*');
 
-      const processedOrders = (ordersResponse.data || []).map(order => ({
-        ...order,
-        order_type: determineOrderType(order.user_id, profilesMap),
-        source_table: 'orders' as const
-      }));
-
-      const processedCustomerOrders = (customerOrdersResponse.data || []).map(order => ({
-        ...order,
-        order_type: 'customer' as const,
-        source_table: 'customer_orders' as const
-      }));
-
-      const allOrders = [...processedOrders, ...processedCustomerOrders]
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      console.log('Orders fetched successfully:', allOrders.length);
-      setOrders(allOrders);
+      if (customerOrderItemsError) {
+        console.error('Error fetching customer order items:', customerOrderItemsError);
+        setError('Failed to fetch customer order items');
+      } else {
+        setCustomerOrderItems(customerOrderItemsData || []);
+      }
     } catch (error) {
-      console.error('Unexpected error fetching orders:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch orders",
-        variant: "destructive",
-      });
+      console.error('Error fetching data:', error);
+      setError('Failed to fetch data');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
+  }, []);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
+
+  const onSort = (columnId: string, direction: 'asc' | 'desc') => {
+    setSortColumn(columnId);
+    setSortDirection(direction);
   };
 
-  const determineOrderType = (userId: string | null, profilesMap: Map<string, string>): 'guest' | 'customer' | 'admin' => {
-    if (!userId) return 'guest';
-    const role = profilesMap.get(userId);
-    return role === 'admin' ? 'admin' : 'customer';
-  };
+  const sortedOrders = [...orders].sort((a, b) => {
+    if (!sortColumn) return 0;
+    const aValue = a[sortColumn as keyof Order];
+    const bValue = b[sortColumn as keyof Order];
 
-  const fetchOrderItemDetails = async (order: Order) => {
-    const orderId = order.id;
-    if (orderItemDetails[orderId]) return;
-
-    try {
-      const tableName = order.source_table === 'customer_orders' ? 'customer_order_item_details' : 'order_item_details';
-
-      const { data, error } = await supabase
-        .from(tableName)
-        .select('*')
-        .eq('order_id', orderId);
-
-      if (!error && data) {
-        setOrderItemDetails(prev => ({ ...prev, [orderId]: data }));
-      }
-    } catch (error) {
-      console.error('Error fetching order item details:', error);
-    }
-  };
-
-  const updateOrderStatus = async (order: Order, newStatus: string) => {
-    // Check if this is a cancellation and requires password confirmation
-    if (newStatus === 'cancelled' && order.status !== 'cancelled') {
-      setPendingStatusUpdate({ order, newStatus });
-      setPasswordDialogOpen(true);
-      return;
-    }
-
-    await performStatusUpdate(order, newStatus);
-  };
-
-  const performStatusUpdate = async (order: Order, newStatus: string) => {
-    try {
-      const oldStatus = order.status;
-      const tableName = order.source_table === 'customer_orders' ? 'customer_orders' : 'orders';
-      const isCustomerOrder = order.source_table === 'customer_orders';
-
-      console.log(`Updating order status: ${oldStatus} -> ${newStatus} for ${order.order_number}`);
-      console.log(`Order type: ${order.order_type}, Source table: ${order.source_table}`);
-
-      // Update order status in database
-      const { error } = await supabase
-        .from(tableName)
-        .update({
-          status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', order.id);
-
-      if (error) {
-        console.error('Error updating order status:', error);
-        toast({
-          title: "Error",
-          description: "Failed to update order status",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Handle stock changes based on status change
-      console.log(`Processing stock changes for order status: ${oldStatus} -> ${newStatus}`);
-      const stockUpdated = await handleOrderStatusUpdate(
-        order.id,
-        oldStatus,
-        newStatus,
-        isCustomerOrder
-      );
-
-      if (!stockUpdated) {
-        console.error('Failed to update stock for order status change');
-        toast({
-          title: "Warning",
-          description: "Order status updated but stock processing failed",
-          variant: "destructive",
-        });
-      } else {
-        console.log('Stock updated successfully for order status change');
-      }
-
-      toast({
-        title: "Success",
-        description: "Order status updated successfully",
-      });
-      fetchOrders(true);
-    } catch (error) {
-      console.error('Unexpected error updating order status:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update order status",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handlePasswordConfirm = () => {
-    if (pendingStatusUpdate) {
-      performStatusUpdate(pendingStatusUpdate.order, pendingStatusUpdate.newStatus);
-      setPendingStatusUpdate(null);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
-      case 'payment_confirmed': return 'bg-blue-100 text-blue-800';
-      case 'on_delivery': return 'bg-purple-100 text-purple-800';
-      case 'delivered': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getOrderTypeColor = (orderType: string) => {
-    switch (orderType) {
-      case 'guest': return 'bg-gray-100 text-gray-800';
-      case 'customer': return 'bg-blue-100 text-blue-800';
-      case 'admin': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customer_email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
   });
 
-  const handleViewOrder = (order: Order) => {
-    if (order.source_table === 'customer_orders') {
-      navigate(`/customer-order-summary/${order.id}`);
-    } else {
-      navigate(`/admin/order-summary/${order.id}`);
+  const filteredOrders = sortedOrders.filter(order => {
+    const matchesSearch =
+      order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.customer_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.customer_phone.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus = !statusFilter || order.status === statusFilter;
+    const matchesPaymentMethod = !paymentMethodFilter || order.payment_method === paymentMethodFilter;
+    const matchesShippingMethod = !shippingMethodFilter || order.shipping_method === shippingMethodFilter;
+
+    const matchesDateRange = !dateRange?.from || !dateRange?.to ||
+      (new Date(order.created_at) >= dateRange.from && new Date(order.created_at) <= dateRange.to);
+
+    return matchesSearch && matchesStatus && matchesPaymentMethod && matchesShippingMethod && matchesDateRange;
+  });
+
+  const sortedCustomerOrders = [...customerOrders].sort((a, b) => {
+    if (!sortColumn) return 0;
+    const aValue = a[sortColumn as keyof CustomerOrder];
+    const bValue = b[sortColumn as keyof CustomerOrder];
+
+    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const filteredCustomerOrders = sortedCustomerOrders.filter(order => {
+    const matchesSearch =
+      order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.user_id.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus = !statusFilter || order.status === statusFilter;
+    const matchesPaymentMethod = !paymentMethodFilter || order.payment_method === paymentMethodFilter;
+    const matchesShippingMethod = !shippingMethodFilter || order.shipping_method === shippingMethodFilter;
+
+    const matchesDateRange = !dateRange?.from || !dateRange?.to ||
+      (new Date(order.created_at) >= dateRange.from && new Date(order.created_at) <= dateRange.to);
+
+    return matchesSearch && matchesStatus && matchesPaymentMethod && matchesShippingMethod && matchesDateRange;
+  });
+
+  const handleCancelOrder = async (orderId: string, isCustomerOrder: boolean = false) => {
+    try {
+      const success = await updateOrderStatus(orderId, 'cancelled', isCustomerOrder);
+    
+      if (success) {
+        // Reload orders after successful cancellation
+        await loadOrders();
+        toast({
+          title: 'Success',
+          description: 'Order cancelled successfully',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to cancel order',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      toast({
+        title: 'Error',
+        description: 'Error cancelling order',
+        variant: 'destructive',
+      });
     }
   };
 
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <RefreshCw className="h-4 w-4 animate-spin" />
-          <span>Loading orders...</span>
-        </div>
-      </div>
-    );
-  }
+  const handleConfirmOrder = async (orderId: string, isCustomerOrder: boolean = false) => {
+    try {
+      const success = await updateOrderStatus(orderId, 'confirmed', isCustomerOrder);
+      if (success) {
+        await loadOrders();
+        toast({
+          title: 'Success',
+          description: 'Order confirmed successfully',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to confirm order',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error confirming order:', error);
+      toast({
+        title: 'Error',
+        description: 'Error confirming order',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleShipOrder = async (orderId: string, isCustomerOrder: boolean = false) => {
+    try {
+      const success = await updateOrderStatus(orderId, 'shipped', isCustomerOrder);
+      if (success) {
+        await loadOrders();
+        toast({
+          title: 'Success',
+          description: 'Order shipped successfully',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to ship order',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error shipping order:', error);
+      toast({
+        title: 'Error',
+        description: 'Error shipping order',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeliverOrder = async (orderId: string, isCustomerOrder: boolean = false) => {
+    try {
+      const success = await updateOrderStatus(orderId, 'delivered', isCustomerOrder);
+      if (success) {
+        await loadOrders();
+        toast({
+          title: 'Success',
+          description: 'Order delivered successfully',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to deliver order',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error delivering order:', error);
+      toast({
+        title: 'Error',
+        description: 'Error delivering order',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRefundOrder = async (orderId: string, isCustomerOrder: boolean = false) => {
+    try {
+      const success = await updateOrderStatus(orderId, 'refunded', isCustomerOrder);
+      if (success) {
+        await loadOrders();
+        toast({
+          title: 'Success',
+          description: 'Order refunded successfully',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to refund order',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error refunding order:', error);
+      toast({
+        title: 'Error',
+        description: 'Error refunding order',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleOrderStatusUpdate = async (orderId: string, newStatus: string, isCustomerOrder: boolean = false) => {
+    try {
+      const success = await updateOrderStatus(orderId, newStatus, isCustomerOrder);
+      if (success) {
+        await loadOrders();
+        toast({
+          title: 'Success',
+          description: `Order status updated to ${newStatus} successfully`,
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to update order status',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast({
+        title: 'Error',
+        description: 'Error updating order status',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleBulkStatusUpdate = async () => {
+    try {
+      for (const orderId of selectedOrders) {
+        await updateOrderStatus(orderId, bulkUpdateStatus, isCustomerOrderView);
+      }
+      await loadOrders();
+      toast({
+        title: 'Success',
+        description: `Updated status to ${bulkUpdateStatus} for ${selectedOrders.length} orders`,
+      });
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast({
+        title: 'Error',
+        description: 'Error updating order status',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBulkStatusUpdateDialogOpen(false);
+      setIsBulkActionsOpen(false);
+      setSelectedOrders([]);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      for (const orderId of selectedOrders) {
+        if (isCustomerOrderView) {
+          await supabase.from('customer_orders').delete().eq('id', orderId);
+        } else {
+          await supabase.from('orders').delete().eq('id', orderId);
+        }
+      }
+      await loadOrders();
+      toast({
+        title: 'Success',
+        description: `Deleted ${selectedOrders.length} orders`,
+      });
+    } catch (error) {
+      console.error('Error deleting orders:', error);
+      toast({
+        title: 'Error',
+        description: 'Error deleting orders',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBulkDeleteDialogOpen(false);
+      setIsBulkActionsOpen(false);
+      setSelectedOrders([]);
+    }
+  };
+
+  const handleCreateNewStatus = async () => {
+    try {
+      for (const orderId of selectedOrders) {
+        await updateOrderStatus(orderId, newStatus, isCustomerOrderView);
+      }
+      await loadOrders();
+      toast({
+        title: 'Success',
+        description: `Updated status to ${newStatus} for ${selectedOrders.length} orders`,
+      });
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast({
+        title: 'Error',
+        description: 'Error updating order status',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsNewStatusDialogOpen(false);
+      setIsBulkActionsOpen(false);
+      setSelectedOrders([]);
+    }
+  };
+
+  const handleToggleOrderSelection = (orderId: string) => {
+    setSelectedOrders(prev => {
+      if (prev.includes(orderId)) {
+        return prev.filter(id => id !== orderId);
+      } else {
+        return [...prev, orderId];
+      }
+    });
+  };
+
+  const handleToggleSelectAllOrders = () => {
+    if (isCustomerOrderView) {
+      if (selectedOrders.length === filteredCustomerOrders.length) {
+        setSelectedOrders([]);
+      } else {
+        setSelectedOrders(filteredCustomerOrders.map(order => order.id));
+      }
+    } else {
+      if (selectedOrders.length === filteredOrders.length) {
+        setSelectedOrders([]);
+      } else {
+        setSelectedOrders(filteredOrders.map(order => order.id));
+      }
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending_payment':
+        return <Clock4 className="h-4 w-4 text-gray-500" />;
+      case 'confirmed':
+        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+      case 'processing':
+        return <Clock4 className="h-4 w-4 text-blue-500" />;
+      case 'shipped':
+        return <Truck className="h-4 w-4 text-blue-500" />;
+      case 'delivered':
+        return <PackageCheck className="h-4 w-4 text-green-500" />;
+      case 'cancelled':
+        return <Ban className="h-4 w-4 text-red-500" />;
+      case 'refunded':
+        return <CreditCard className="h-4 w-4 text-orange-500" />;
+      default:
+        return <AlertCircle className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getPaymentMethodIcon = (paymentMethod: string) => {
+    switch (paymentMethod) {
+      case 'credit_card':
+        return <CreditCard className="h-4 w-4 text-gray-500" />;
+      case 'wallet':
+        return <Wallet className="h-4 w-4 text-gray-500" />;
+      default:
+        return <CreditCard className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getShippingMethodIcon = (shippingMethod: string) => {
+    switch (shippingMethod) {
+      case 'standard':
+        return <Package className="h-4 w-4 text-gray-500" />;
+      case 'express':
+        return <Truck className="h-4 w-4 text-gray-500" />;
+      default:
+        return <Package className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getContactInfoIcon = (contactInfo: string) => {
+    switch (contactInfo) {
+      case 'customer_name':
+        return <Contact2 className="h-4 w-4 text-gray-500" />;
+      case 'customer_email':
+        return <Mail className="h-4 w-4 text-gray-500" />;
+      case 'customer_phone':
+        return <Phone className="h-4 w-4 text-gray-500" />;
+      case 'customer_address':
+        return <MapPin className="h-4 w-4 text-gray-500" />;
+      default:
+        return <Contact2 className="h-4 w-4 text-gray-500" />;
+    }
+  };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Order Management</h1>
-        <Button onClick={() => fetchOrders(true)} disabled={refreshing}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Order Management</h2>
+        <Button variant="outline" onClick={loadOrders} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">{orders.length}</div>
-            <p className="text-xs text-muted-foreground">Total Orders</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">{orders.filter(o => o.status === 'pending_payment').length}</div>
-            <p className="text-xs text-muted-foreground">Pending Orders</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">{orders.filter(o => o.status === 'delivered').length}</div>
-            <p className="text-xs text-muted-foreground">Delivered Orders</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">{orders.filter(o => o.order_type === 'guest').length}</div>
-            <p className="text-xs text-muted-foreground">Guest Orders</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">{orders.filter(o => o.order_type === 'customer').length}</div>
-            <p className="text-xs text-muted-foreground">Customer Orders</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="mb-4">
-        <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
-          <TabsList className="grid grid-cols-6 w-full">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="pending_payment">Pending</TabsTrigger>
-            <TabsTrigger value="payment_confirmed">Payment Confirmed</TabsTrigger>
-            <TabsTrigger value="on_delivery">On Delivery</TabsTrigger>
-            <TabsTrigger value="delivered">Delivered</TabsTrigger>
-            <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex gap-4 items-center">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search by order number, customer name, or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {error && (
+        <Alert variant="destructive">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Orders ({filteredOrders.length})</CardTitle>
+          <CardTitle>Orders</CardTitle>
+          <CardDescription>Manage and view all orders</CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order #</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Paid</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.map((order) => (
-                <TableRow key={`${order.source_table}-${order.id}`}>
-                  <TableCell className="font-medium">{order.order_number}</TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{order.customer_name}</p>
-                      <p className="text-sm text-gray-600">{order.customer_email}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getOrderTypeColor(order.order_type)}>
-                      {order.order_type.charAt(0).toUpperCase() + order.order_type.slice(1)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>Rs. {order.total_amount.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="text-green-600">Rs. {order.paid_amount.toFixed(2)}</p>
-                      {order.remaining_amount > 0 && (
-                        <p className="text-sm text-orange-600">
-                          Remaining: Rs. {order.remaining_amount.toFixed(2)}
-                        </p>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={order.status}
-                      onValueChange={(value) => updateOrderStatus(order, value)}
-                    >
-                      <SelectTrigger className="w-40">
-                        <SelectValue>
-                          <Badge className={getStatusColor(order.status)}>
-                            {order.status.replace('_', ' ')}
-                          </Badge>
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                        <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
-                        <SelectItem value="on_delivery">On Delivery</SelectItem>
-                        <SelectItem value="delivered">Delivered</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(order.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewOrder(order)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          {filteredOrders.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No orders found</p>
-              <Button onClick={() => fetchOrders(true)} className="mt-2">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh Orders
-              </Button>
+        <CardContent>
+          <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 md:space-x-4">
+            <div className="flex-1">
+              <Input
+                type="text"
+                placeholder="Search orders..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Admin Password Dialog */}
-      <AdminPasswordDialog
-        isOpen={passwordDialogOpen}
-        onClose={() => {
-          setPasswordDialogOpen(false);
-          setPendingStatusUpdate(null);
-        }}
-        onConfirm={handlePasswordConfirm}
-        title="Confirm Order Cancellation"
-        message="This action cannot be undone. Order status cannot be changed after cancellation. Please enter your admin password to confirm."
-        actionType="cancel_order"
-      />
-    </div>
-  );
-}
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm" onClick={() => setIsCustomerOrderView(!isCustomerOrderView)}>
+                {isCustomerOrderView ? 'Switch to Guest Orders' : 'Switch to Customer Orders'}
+              </Button>
+              <Dialog open={isFilterDialogOpen} onOpenChange={setIsFilterDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Filters
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Filter Orders</DialogTitle>
+                    <DialogDescription>
+                      Filter orders based on various criteria
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status</Label>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="All statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">All statuses</SelectItem>
+                          <SelectItem value="pending_payment">Pending Payment</SelectItem>
+                          <SelectItem value="confirmed">Confirmed</SelectItem>
+                          <SelectItem value="processing">Processing</SelectItem>
+                          <SelectItem value="shipped">Shipped</SelectItem>
+                          <SelectItem value="delivered">Delivered</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                          <SelectItem value="refunded">Refunded</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="payment-method">Payment Method</Label>
+                      <Select value={paymentMethodFilter} onValueChange={setPaymentMethodFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="All payment methods" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">All payment methods</SelectItem>
+                          <SelectItem value="credit_card">Credit Card</SelectItem>
+                          <SelectItem value="wallet">Wallet</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="shipping-method">Shipping Method</Label>
+                      <Select value={shippingMethodFilter} onValueChange={setShippingMethodFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="All shipping methods" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">All shipping methods</SelectItem>
+                          <SelectItem value="standard">Standard</SelectItem>
+                          <SelectItem value="express">Express</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Date Range</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={'outline'}
+                            className={cn(
+                              'w-[300px] justify-start text-left font-normal',
+                              !dateRange?.from && 'text-muted-foreground'
+                            )}
+                          >
+                            <Calendar className="mr-2 h-4 w-4" />
+                            {dateRange?.from ? (
+                              dateRange.to ? (
+                                <>
+                                  {format(dateRange.from, 'LLL dd, y')} -{' '}
+                                  {format(dateRange.to, 'LLL dd, y')}
+                                </>
+                              ) : (
+                                format(dateRange.from, 'LLL dd, y')
+                              )
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="

@@ -28,6 +28,7 @@ export function useRealTimeInventory({
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   // Fetch initial data
   const fetchStockData = useCallback(async () => {
@@ -55,6 +56,7 @@ export function useRealTimeInventory({
 
     const subscription = subscribeToInventoryChanges(productId, (payload) => {
       console.log('Inventory change detected:', payload);
+      setLastUpdate(new Date());
       
       // Filter for specific inventory item if provided
       if (productInventoryId && payload.new?.id !== productInventoryId) {
@@ -83,6 +85,7 @@ export function useRealTimeInventory({
     stockData,
     loading,
     error,
+    lastUpdate,
     refetch: fetchStockData
   };
 }

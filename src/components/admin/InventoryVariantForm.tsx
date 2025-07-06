@@ -69,7 +69,7 @@ export function InventoryVariantForm({
   });
 
   // Real-time inventory monitoring
-  const { lastUpdate } = useRealTimeInventory({
+  const { lastUpdate, refetch } = useRealTimeInventory({
     productId,
     enableRealTime: true
   });
