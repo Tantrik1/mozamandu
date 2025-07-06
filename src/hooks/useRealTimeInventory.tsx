@@ -54,30 +54,40 @@ export function useRealTimeInventory({
 
     fetchStockData();
 
-    const subscription = subscribeToInventoryChanges(productId, (payload) => {
-      console.log('Inventory change detected:', payload);
-      setLastUpdate(new Date());
-      
-      // Filter for specific inventory item if provided
-      if (productInventoryId && payload.new?.id !== productInventoryId) {
-        return;
-      }
+    let subscription: any;
 
-      // Update stock data
-      if (payload.eventType === 'UPDATE' && payload.new) {
-        setStockData({
-          stock_quantity: payload.new.stock_quantity,
-          reserved_stock: payload.new.reserved_stock,
-          available_stock: payload.new.available_stock,
-          is_active: payload.new.is_active
-        });
-      } else if (payload.eventType === 'DELETE') {
-        setStockData(null);
-      }
-    });
+    const setupSubscription = async () => {
+      const unsubscribe = await subscribeToInventoryChanges(productId, (payload) => {
+        console.log('Inventory change detected:', payload);
+        setLastUpdate(new Date());
+        
+        // Filter for specific inventory item if provided
+        if (productInventoryId && payload.new?.id !== productInventoryId) {
+          return;
+        }
+
+        // Update stock data
+        if (payload.eventType === 'UPDATE' && payload.new) {
+          setStockData({
+            stock_quantity: payload.new.stock_quantity,
+            reserved_stock: payload.new.reserved_stock,
+            available_stock: payload.new.available_stock,
+            is_active: payload.new.is_active
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setStockData(null);
+        }
+      });
+
+      subscription = { unsubscribe };
+    };
+
+    setupSubscription();
 
     return () => {
-      subscription.unsubscribe();
+      if (subscription?.unsubscribe) {
+        subscription.unsubscribe();
+      }
     };
   }, [productId, productInventoryId, enableRealTime, fetchStockData]);
 
@@ -95,14 +105,24 @@ export function useRealTimeInventoryMonitor(callback?: (payload: any) => void) {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   useEffect(() => {
-    const subscription = subscribeToAllInventoryChanges((payload) => {
-      console.log('Global inventory change:', payload);
-      setLastUpdate(new Date());
-      callback?.(payload);
-    });
+    let subscription: any;
+
+    const setupSubscription = async () => {
+      const unsubscribe = await subscribeToAllInventoryChanges((payload) => {
+        console.log('Global inventory change:', payload);
+        setLastUpdate(new Date());
+        callback?.(payload);
+      });
+
+      subscription = { unsubscribe };
+    };
+
+    setupSubscription();
 
     return () => {
-      subscription.unsubscribe();
+      if (subscription?.unsubscribe) {
+        subscription.unsubscribe();
+      }
     };
   }, [callback]);
 

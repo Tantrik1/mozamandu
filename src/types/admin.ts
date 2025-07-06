@@ -1,4 +1,3 @@
-
 export interface Product {
   id: string;
   name: string;
@@ -34,24 +33,26 @@ export interface SizeVariant {
 export interface InventoryItem {
   id: string;
   product_id: string;
-  sku: string;
+  color_variant_id?: string | null;
+  size_variant_id?: string | null;
   product_name: string;
-  category_id: string;
-  subcategory_id: string;
-  category_name?: string;
-  subcategory_name?: string;
-  color_name?: string;
-  size_name?: string;
-  size_code?: string;
+  sku: string;
+  color_name?: string | null;
+  size_name?: string | null;
+  size_code?: string | null;
   stock_quantity: number;
   reserved_stock: number;
   available_stock: number;
-  low_stock_threshold?: number;
-  cost_price?: number;
-  selling_price?: number;
+  low_stock_threshold?: number | null;
+  cost_price?: number | null;
+  selling_price?: number | null;
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  category_id?: string | null;
+  subcategory_id?: string | null;
+  category_name?: string | null;
+  subcategory_name?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface InventorySummary {

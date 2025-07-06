@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -59,7 +58,10 @@ export default function ProductManagement() {
           const stockSummary = await getProductStockSummary(product.id);
           setStockData(prev => ({
             ...prev,
-            [product.id]: stockSummary
+            [product.id]: {
+              total_stock: stockSummary.totalStock || 0,
+              available_stock: stockSummary.availableStock || 0
+            }
           }));
           return product;
         })
