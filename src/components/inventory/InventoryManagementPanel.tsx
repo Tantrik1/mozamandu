@@ -15,6 +15,7 @@ import {
 } from '@/utils/inventoryManager';
 import { useRealTimeInventoryMonitor } from '@/hooks/useRealTimeInventory';
 import { RealTimeStockIndicator } from './RealTimeStockIndicator';
+import { LowStockAlert } from '@/types/admin';
 
 interface InventoryManagementPanelProps {
   productId?: string;
@@ -25,7 +26,7 @@ export function InventoryManagementPanel({
   productId, 
   showGlobalView = false 
 }: InventoryManagementPanelProps) {
-  const [lowStockItems, setLowStockItems] = useState<InventoryItem[]>([]);
+  const [lowStockItems, setLowStockItems] = useState<LowStockAlert[]>([]);
   const [summary, setSummary] = useState<InventorySummary>({
     total_stock: 0,
     available_stock: 0,
@@ -45,7 +46,7 @@ export function InventoryManagementPanel({
       setLoading(true);
       
       const [alerts, summaryData] = await Promise.all([
-        getLowStockAlerts(10),
+        getLowStockAlerts(),
         productId ? getInventorySummary(productId) : Promise.resolve({
           total_stock: 0,
           available_stock: 0,
@@ -190,14 +191,18 @@ export function InventoryManagementPanel({
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <h4 className="font-medium">{item.product_name}</h4>
-                      <RealTimeStockIndicator
-                        productId={item.product_id}
-                        productInventoryId={item.id}
-                        showDetails={true}
-                      />
+                      {item.product_id && (
+                        <RealTimeStockIndicator
+                          productId={item.product_id}
+                          productInventoryId={item.id}
+                          showDetails={true}
+                        />
+                      )}
                     </div>
                     <div className="text-sm text-gray-600">
-                      SKU: {item.sku}
+                      {item.sku && (
+                        <>SKU: {item.sku}</>
+                      )}
                       {item.color_name && (
                         <span className="ml-2">• Color: {item.color_name}</span>
                       )}
@@ -213,16 +218,16 @@ export function InventoryManagementPanel({
                       min="1"
                       placeholder="Qty"
                       className="w-20"
-                      value={addingStock[item.id] || ''}
+                      value={addingStock[item.id || ''] || ''}
                       onChange={(e) => setAddingStock(prev => ({
                         ...prev,
-                        [item.id]: parseInt(e.target.value) || 0
+                        [item.id || '']: parseInt(e.target.value) || 0
                       }))}
                     />
                     <Button
                       size="sm"
-                      onClick={() => handleAddStock(item.id, addingStock[item.id] || 0)}
-                      disabled={!addingStock[item.id] || addingStock[item.id] <= 0}
+                      onClick={() => handleAddStock(item.id || '', addingStock[item.id || ''] || 0)}
+                      disabled={!addingStock[item.id || ''] || addingStock[item.id || ''] <= 0}
                     >
                       <Plus className="h-4 w-4 mr-1" />
                       Add Stock

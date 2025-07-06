@@ -1,10 +1,11 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useCartPricing } from './useCartPricing';
 import { useComboManager } from './useComboManager';
 import { validateCartItems, showCartCleanupNotification } from '@/utils/cartValidation';
-import { validateStock } from '@/utils/inventoryManager';
+import { validateCartStock } from '@/utils/inventoryManager';
 
 interface CartItem {
   id: string;
@@ -231,7 +232,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
       console.log('Add to cart params:', params);
 
       // Validate stock before adding
-      const stockValidation = await validateStock(
+      const stockValidation = await validateCartStock(
         params.productId,
         params.productInventoryId,
         params.quantity
@@ -300,7 +301,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         const newQuantity = existingItem.quantity + params.quantity;
 
         // Validate stock for the new quantity
-        const newStockValidation = await validateStock(
+        const newStockValidation = await validateCartStock(
           params.productId,
           params.productInventoryId,
           newQuantity
@@ -376,7 +377,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     if (!item) return;
 
     // Validate stock for the new quantity
-    const stockValidation = await validateStock(
+    const stockValidation = await validateCartStock(
       item.productId,
       item.productInventoryId,
       quantity

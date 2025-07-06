@@ -1,4 +1,3 @@
-
 export interface Product {
   id: string;
   name: string;
@@ -14,6 +13,7 @@ export interface Product {
   image_url?: string;
   created_at: string;
   updated_at: string;
+  // Note: stock_quantity removed - products don't directly store inventory
 }
 
 export interface ColorVariant {
@@ -22,12 +22,14 @@ export interface ColorVariant {
   image_url?: string;
   has_sizes: boolean;
   size_variants: SizeVariant[];
+  // Note: stock_quantity removed - handled by inventory system
 }
 
 export interface SizeVariant {
   id?: string;
   size_name: string;
   size_code?: string;
+  // Note: stock_quantity removed - handled by inventory system
 }
 
 export interface Order {
@@ -99,12 +101,15 @@ export interface InventoryOverview {
 
 export interface LowStockAlert {
   id?: string;
+  product_id?: string;
   product_name?: string;
   category_name?: string;
   subcategory_name?: string;
   variant_name?: string;
   size_name?: string;
   product_sku?: string;
+  sku?: string;
+  color_name?: string | null;
   stock_quantity?: number;
   reserved_stock?: number;
   available_stock?: number;

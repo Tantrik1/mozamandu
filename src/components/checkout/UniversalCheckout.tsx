@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,12 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Truck } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { useCart } from '@/hooks/useCart';
+import { useRobustCart } from '@/hooks/useRobustCart';
 import { useCheckoutValidation } from './CheckoutValidation';
 import { validateCheckoutStock, processCheckoutStock } from '@/utils/inventoryManager';
 
 export function UniversalCheckout() {
-  const { cartItems, removeFromCart, updateQuantity, clearCart } = useCart();
+  const { cartItems, removeFromCart, updateQuantity, clearCart } = useRobustCart();
   const [customerInfo, setCustomerInfo] = useState({
     name: '',
     email: '',
@@ -30,7 +31,7 @@ export function UniversalCheckout() {
 
   const { validateStock, validatePromoCode, validatePaymentAmount } = useCheckoutValidation();
 
-  const subtotal = cartItems.reduce((acc, item) => acc + (item.unit_price * item.quantity), 0);
+  const subtotal = cartItems.reduce((acc, item) => acc + (item.basePrice * item.quantity), 0);
   const totalAmount = subtotal + deliveryCharge - promoDiscount;
 
   useEffect(() => {
@@ -102,22 +103,30 @@ export function UniversalCheckout() {
         }
       }
 
-      // Create order
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Create order using orders table (not customer_orders)
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
           customer_name: customerInfo.name,
           customer_email: customerInfo.email,
-          customer_phone: customerInfo.contact,
-          customer_address: customerInfo.address,
+          contact_number: customerInfo.contact,
+          delivery_address: customerInfo.address,
           total_amount: totalAmount,
           payment_method: paymentType === 'full' ? 'Full Payment' : 'Partial Payment',
           shipping_method: 'Standard Delivery',
           order_notes: '',
-          user_id: supabase.auth.user()?.id,
-          contact_number: customerInfo.contact,
-          delivery_address: customerInfo.address,
-          status: 'pending',
+          user_id: user?.id || null,
+          status: 'pending_payment',
+          subtotal: subtotal,
+          delivery_charge: deliveryCharge,
+          promocode_discount: promoDiscount,
+          paid_amount: paymentType === 'full' ? totalAmount : partialAmount,
+          remaining_amount: paymentType === 'full' ? 0 : totalAmount - partialAmount,
+          payment_percentage: paymentType === 'full' ? 100 : Math.round((partialAmount / totalAmount) * 100),
+          promocode_used: promoCode || null,
         })
         .select()
         .single();
@@ -130,11 +139,9 @@ export function UniversalCheckout() {
           .from('order_items')
           .insert({
             order_id: order.id,
-            product_id: item.product_id,
-            product_inventory_id: item.product_inventory_id,
+            product_id: item.productId,
+            product_inventory_id: item.productInventoryId,
             quantity: item.quantity,
-            unit_price: item.unit_price,
-            total_price: item.unit_price * item.quantity,
           });
 
         if (itemError) throw itemError;
@@ -198,19 +205,19 @@ export function UniversalCheckout() {
                         {item.image_url && (
                           <img
                             src={item.image_url}
-                            alt={item.product_name}
+                            alt={item.productName}
                             className="w-16 h-16 object-cover rounded"
                           />
                         )}
                         <div className="flex-1">
-                          <h4 className="font-medium">{item.product_name}</h4>
-                          {item.color_name && (
-                            <p className="text-sm text-gray-500">Color: {item.color_name}</p>
+                          <h4 className="font-medium">{item.productName}</h4>
+                          {item.colorName && (
+                            <p className="text-sm text-gray-500">Color: {item.colorName}</p>
                           )}
-                          {item.size_name && (
-                            <p className="text-sm text-gray-500">Size: {item.size_name}</p>
+                          {item.sizeName && (
+                            <p className="text-sm text-gray-500">Size: {item.sizeName}</p>
                           )}
-                          <p className="text-lg font-semibold">Rs. {item.unit_price}</p>
+                          <p className="text-lg font-semibold">Rs. {item.basePrice}</p>
                         </div>
                         <div className="flex items-center space-x-2">
                           <Button
