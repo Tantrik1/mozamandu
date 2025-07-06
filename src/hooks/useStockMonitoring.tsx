@@ -6,7 +6,7 @@ import { getRealTimeStock, getLowStockAlerts } from '@/utils/inventoryManager';
 interface StockAlert {
     id: string;
     product_name: string;
-    sku: string;
+    product_sku?: string;
     color_name?: string | null;
     size_name?: string | null;
     available_stock: number;
@@ -40,19 +40,19 @@ export function useStockMonitoring(config: StockMonitoringConfig = {}) {
     const fetchStockAlerts = useCallback(async () => {
         try {
             setError(null);
-            const alerts = await getLowStockAlerts(lowStockThreshold);
+            const alerts = await getLowStockAlerts();
 
             const formattedAlerts: StockAlert[] = alerts.map(item => ({
-                id: item.id,
-                product_name: item.product_name,
-                sku: item.sku,
+                id: item.id || '',
+                product_name: item.product_name || '',
+                product_sku: item.product_sku,
                 color_name: item.color_name,
                 size_name: item.size_name,
-                available_stock: item.available_stock,
-                stock_quantity: item.stock_quantity,
-                reserved_stock: item.reserved_stock,
+                available_stock: item.available_stock || 0,
+                stock_quantity: item.stock_quantity || 0,
+                reserved_stock: item.reserved_stock || 0,
                 threshold: lowStockThreshold,
-                type: item.available_stock === 0 ? 'out_of_stock' : 'low_stock'
+                type: (item.available_stock || 0) === 0 ? 'out_of_stock' : 'low_stock'
             }));
 
             setStockAlerts(formattedAlerts);
@@ -375,4 +375,4 @@ export function useCartStockMonitoring(cartItems: Array<{
         invalidItems,
         validateCartStock
     };
-} 
+}

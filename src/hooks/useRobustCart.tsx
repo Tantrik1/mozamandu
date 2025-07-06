@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -232,16 +231,20 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
       console.log('Add to cart params:', params);
 
       // Validate stock before adding
-      const stockValidation = await validateCartStock(
-        params.productId,
-        params.productInventoryId,
-        params.quantity
-      );
+      const stockValidation = await validateCartStock([{
+        id: `temp-${params.productId}`,
+        productId: params.productId,
+        productName: 'temp',
+        productInventoryId: params.productInventoryId,
+        quantity: params.quantity,
+        basePrice: 0,
+        subcategoryId: 'temp'
+      }]);
 
       if (!stockValidation.isValid) {
         toast({
           title: "Stock Issue",
-          description: stockValidation.errorMessage || "Not enough stock available",
+          description: stockValidation.errorMessages?.[0] || "Not enough stock available",
           variant: "destructive",
         });
         return;
@@ -301,16 +304,15 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
         const newQuantity = existingItem.quantity + params.quantity;
 
         // Validate stock for the new quantity
-        const newStockValidation = await validateCartStock(
-          params.productId,
-          params.productInventoryId,
-          newQuantity
-        );
+        const newStockValidation = await validateCartStock([{
+          ...existingItem,
+          quantity: newQuantity
+        }]);
 
         if (!newStockValidation.isValid) {
           toast({
             title: "Insufficient Stock",
-            description: newStockValidation.errorMessage || "Cannot add more of this item",
+            description: newStockValidation.errorMessages?.[0] || "Cannot add more of this item",
             variant: "destructive",
           });
           return;
@@ -377,16 +379,15 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     if (!item) return;
 
     // Validate stock for the new quantity
-    const stockValidation = await validateCartStock(
-      item.productId,
-      item.productInventoryId,
+    const stockValidation = await validateCartStock([{
+      ...item,
       quantity
-    );
+    }]);
 
     if (!stockValidation.isValid) {
       toast({
         title: "Insufficient Stock",
-        description: stockValidation.errorMessage || "Not enough items in stock for this quantity",
+        description: stockValidation.errorMessages?.[0] || "Not enough items in stock for this quantity",
         variant: "destructive",
       });
       return;
