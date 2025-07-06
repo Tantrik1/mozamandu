@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Product } from '@/types/admin';
@@ -28,27 +29,39 @@ export interface InventoryItem {
 }
 
 export interface InventoryOverview {
-  total_items: number;
-  active_items: number;
-  total_stock: number;
-  available_stock: number;
-  reserved_stock: number;
-  low_stock_items: number;
-  out_of_stock_items: number;
-  total_stock_value: number;
+  id?: string;
+  product_name?: string;
+  category_name?: string;
+  subcategory_name?: string;
+  variant_name?: string;
+  size_name?: string;
+  product_sku?: string;
+  stock_quantity?: number;
+  reserved_stock?: number;
+  available_stock?: number;
+  low_stock_threshold?: number;
+  stock_status?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface LowStockAlert {
-  id: string;
-  product_id: string;
-  product_name: string;
-  sku: string;
+  id?: string;
+  product_id?: string;
+  product_name?: string;
+  category_name?: string;
+  subcategory_name?: string;
+  variant_name?: string;
+  size_name?: string;
+  product_sku?: string;
+  sku?: string;
   color_name?: string | null;
-  size_name?: string | null;
-  stock_quantity: number;
-  reserved_stock: number;
-  available_stock: number;
+  stock_quantity?: number;
+  reserved_stock?: number;
+  available_stock?: number;
   low_stock_threshold: number;
+  stock_needed?: number;
+  updated_at?: string;
 }
 
 export interface InventoryAnalytics {
@@ -81,6 +94,22 @@ export interface InventorySummary {
   reserved_stock: number;
   variant_count: number;
 }
+
+export const generateProductSKU = async (productName: string, colorName?: string, sizeName?: string): Promise<string> => {
+  try {
+    const { data, error } = await supabase.rpc('generate_product_sku', {
+      p_product_name: productName,
+      p_color_name: colorName || null,
+      p_size_name: sizeName || null
+    });
+
+    if (error) throw error;
+    return data || `${productName.substring(0, 8).toUpperCase()}-${Date.now()}`;
+  } catch (error) {
+    console.error('Error generating SKU:', error);
+    return `${productName.substring(0, 8).toUpperCase()}-${Date.now()}`;
+  }
+};
 
 export const getInventoryItems = async (): Promise<InventoryItem[]> => {
   try {
@@ -138,18 +167,40 @@ export const getLowStockAlerts = async (): Promise<LowStockAlert[]> => {
 
 export const getInventoryAnalytics = async (): Promise<InventoryAnalytics | null> => {
   try {
+    // Since inventory_analytics table doesn't exist, calculate from product_inventory
     const { data, error } = await supabase
-      .from('inventory_analytics')
-      .select('*')
-      .limit(1)
-      .single();
+      .from('product_inventory')
+      .select('*');
 
     if (error) {
-      console.error('Error fetching inventory analytics:', error);
+      console.error('Error fetching inventory for analytics:', error);
       return null;
     }
 
-    return data || null;
+    if (!data) return null;
+
+    const totalItems = data.length;
+    const activeItems = data.filter(item => item.is_active).length;
+    const totalStock = data.reduce((sum, item) => sum + item.stock_quantity, 0);
+    const totalAvailableStock = data.reduce((sum, item) => sum + item.available_stock, 0);
+    const totalReservedStock = data.reduce((sum, item) => sum + item.reserved_stock, 0);
+    const lowStockItems = data.filter(item => item.available_stock <= (item.low_stock_threshold || 10)).length;
+    const outOfStockItems = data.filter(item => item.available_stock === 0).length;
+    const totalStockValue = data.reduce((sum, item) => sum + ((item.cost_price || 0) * item.stock_quantity), 0);
+
+    return {
+      total_items: totalItems,
+      active_items: activeItems,
+      total_stock: totalStock,
+      total_available_stock: totalAvailableStock,
+      total_reserved_stock: totalReservedStock,
+      low_stock_items: lowStockItems,
+      out_of_stock_items: outOfStockItems,
+      total_stock_value: totalStockValue,
+      average_item_cost: totalItems > 0 ? totalStockValue / totalItems : 0,
+      stock_utilization_rate: totalStock > 0 ? (totalReservedStock / totalStock) * 100 : 0,
+      stock_turnover_rate: totalStock > 0 ? (totalAvailableStock / totalStock) * 100 : 0,
+    };
   } catch (error) {
     console.error('Error in getInventoryAnalytics:', error);
     return null;
@@ -159,9 +210,9 @@ export const getInventoryAnalytics = async (): Promise<InventoryAnalytics | null
 export const getInventoryHistory = async (inventoryId: string): Promise<InventoryChange[]> => {
   try {
     const { data, error } = await supabase
-      .from('inventory_changes')
+      .from('inventory_audit_log')
       .select('*')
-      .eq('inventory_id', inventoryId)
+      .eq('product_inventory_id', inventoryId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -169,7 +220,15 @@ export const getInventoryHistory = async (inventoryId: string): Promise<Inventor
       throw new Error('Failed to fetch inventory history');
     }
 
-    return data || [];
+    return (data || []).map(item => ({
+      id: item.id,
+      inventory_id: item.product_inventory_id || '',
+      change_type: item.action_type,
+      quantity_change: item.change_amount || 0,
+      reason: item.reason || '',
+      created_at: item.created_at || '',
+      user_id: item.user_id || '',
+    }));
   } catch (error) {
     console.error('Error in getInventoryHistory:', error);
     return [];
@@ -417,10 +476,9 @@ export const getProductInventory = async (productId: string): Promise<InventoryI
 export const getInventorySummary = async (productId: string): Promise<InventorySummary> => {
   try {
     const { data, error } = await supabase
-      .from('product_inventory_summary')
-      .select('*')
-      .eq('product_id', productId)
-      .single();
+      .from('product_inventory')
+      .select('stock_quantity, reserved_stock, available_stock')
+      .eq('product_id', productId);
 
     if (error) {
       console.error('Error fetching inventory summary:', error);
@@ -432,11 +490,21 @@ export const getInventorySummary = async (productId: string): Promise<InventoryS
       };
     }
 
+    let totalStock = 0;
+    let availableStock = 0;
+    let reservedStock = 0;
+
+    data?.forEach((item) => {
+      totalStock += item.stock_quantity;
+      availableStock += item.available_stock;
+      reservedStock += item.reserved_stock;
+    });
+
     return {
-      total_stock: data?.total_stock || 0,
-      available_stock: data?.available_stock || 0,
-      reserved_stock: data?.reserved_stock || 0,
-      variant_count: data?.variant_count || 0,
+      total_stock: totalStock,
+      available_stock: availableStock,
+      reserved_stock: reservedStock,
+      variant_count: data?.length || 0,
     };
   } catch (error) {
     console.error('Error in getInventorySummary:', error);
@@ -536,9 +604,10 @@ export const deleteInventoryItem = async (inventoryId: string): Promise<boolean>
 
 export const addStock = async (inventoryId: string, quantity: number, reason: string): Promise<boolean> => {
   try {
-    const { error } = await supabase.rpc('add_stock_to_inventory', {
-      p_inventory_id: inventoryId,
-      p_quantity: quantity,
+    const { error } = await supabase.rpc('safe_update_stock', {
+      p_product_id: inventoryId,
+      p_stock_change: quantity,
+      p_reservation_change: 0,
       p_reason: reason,
     });
 
@@ -589,7 +658,7 @@ export const getRealTimeStock = async (productId: string, productInventoryId?: s
   }
 };
 
-export const subscribeToInventoryChanges = (productId: string, callback: (payload: any) => void) => {
+export const subscribeToInventoryChanges = async (productId: string, callback: (payload: any) => void) => {
   const channel = supabase.channel(`product-inventory-${productId}`);
 
   channel
@@ -607,10 +676,10 @@ export const subscribeToInventoryChanges = (productId: string, callback: (payloa
     )
     .subscribe();
 
-  return channel;
+  return () => channel.unsubscribe();
 };
 
-export const subscribeToAllInventoryChanges = (callback: (payload: any) => void) => {
+export const subscribeToAllInventoryChanges = async (callback: (payload: any) => void) => {
   const channel = supabase.channel('all-inventory-changes');
 
   channel
@@ -627,7 +696,7 @@ export const subscribeToAllInventoryChanges = (callback: (payload: any) => void)
     )
     .subscribe();
 
-  return channel;
+  return () => channel.unsubscribe();
 };
 
 export const getProductStockSummary = async (productId: string) => {
@@ -668,6 +737,25 @@ export const getProductStockSummary = async (productId: string) => {
       availableStock: 0,
       reservedStock: 0,
     };
+  }
+};
+
+export const calculateTotalProductStock = async (productId: string): Promise<number> => {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('available_stock')
+      .eq('product_id', productId);
+
+    if (error) {
+      console.error('Error calculating total product stock:', error);
+      return 0;
+    }
+
+    return data?.reduce((total, item) => total + item.available_stock, 0) || 0;
+  } catch (error) {
+    console.error('Error in calculateTotalProductStock:', error);
+    return 0;
   }
 };
 
@@ -817,12 +905,12 @@ export async function handleOrderStatusUpdate(orderId: string, newStatus: string
 
 export const updateOrderStatus = async (
   orderId: string,
-  newStatus: string
+  newStatus: 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled'
 ): Promise<{ success: boolean; error?: string }> => {
   try {
     const { error } = await supabase
       .from('orders')
-      .update({ status: newStatus as any })
+      .update({ status: newStatus })
       .eq('id', orderId);
 
     if (error) {

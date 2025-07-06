@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -93,7 +94,14 @@ export function OrderManagement() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setOrders(data || []);
+      
+      // Add default payment_method for orders that don't have it
+      const ordersWithPaymentMethod = (data || []).map(order => ({
+        ...order,
+        payment_method: order.payment_method || 'Unknown'
+      }));
+      
+      setOrders(ordersWithPaymentMethod);
     } catch (error) {
       console.error('Error fetching orders:', error);
       toast.error('Failed to fetch orders');
@@ -113,7 +121,7 @@ export function OrderManagement() {
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     try {
-      const result = await updateOrderStatus(orderId, newStatus);
+      const result = await updateOrderStatus(orderId, newStatus as any);
       if (result.success) {
         toast.success('Order status updated successfully');
         fetchOrders();
@@ -134,7 +142,9 @@ export function OrderManagement() {
         if (rollbackSuccess) {
           toast.success('Order cancelled and stock released');
         } else {
-          toast.warning('Order cancelled but stock rollback failed');
+          toast('Order cancelled but stock rollback failed', { 
+            description: 'Please check inventory manually'
+          });
         }
         fetchOrders();
       } else {
@@ -171,7 +181,7 @@ export function OrderManagement() {
         );
       case 'delivered':
         return (
-          <Badge variant="success">
+          <Badge variant="default">
             <CheckCircle className="h-4 w-4 mr-2" />
             Delivered
           </Badge>
