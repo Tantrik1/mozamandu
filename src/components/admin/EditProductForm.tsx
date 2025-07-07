@@ -350,7 +350,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
       const { data, error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(fileName, imageFile);
+        .upload(fileName, file);
 
       if (uploadError) throw uploadError;
 
@@ -378,7 +378,22 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const handleAddInventoryRow = () => {
     setInventoryRows(rows => [
       ...rows,
-      { id: '', product_id: productId, sku: '', product_name: form.getValues('name'), color_name: '', size_name: '', size_code: '', stock_quantity: 0, reserved_stock: 0, available_stock: 0, is_active: true, created_at: '', updated_at: '' }
+      { 
+        id: '', 
+        product_id: productId, 
+        sku: '', 
+        product_name: form.getValues('name'), 
+        color_name: '', 
+        size_name: '', 
+        size_code: '', 
+        stock_quantity: 0, 
+        reserved_stock: 0, 
+        available_stock: 0, 
+        low_stock_threshold: 10,
+        is_active: true, 
+        created_at: '', 
+        updated_at: '' 
+      }
     ]);
   };
 
@@ -434,11 +449,28 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
       // Save inventory changes
       for (const row of inventoryRows) {
-        const { available_stock, ...updatableFields } = row;
+        const updateData = {
+          product_id: row.product_id,
+          sku: row.sku,
+          color_variant_id: row.color_variant_id,
+          size_variant_id: row.size_variant_id,
+          product_name: row.product_name,
+          color_name: row.color_name,
+          size_name: row.size_name,
+          size_code: row.size_code,
+          stock_quantity: row.stock_quantity,
+          reserved_stock: row.reserved_stock,
+          available_stock: row.stock_quantity - row.reserved_stock,
+          low_stock_threshold: row.low_stock_threshold,
+          cost_price: row.cost_price,
+          selling_price: row.selling_price,
+          is_active: row.is_active
+        };
+
         if (row.id) {
-          await updateInventoryItem(row.id, updatableFields);
+          await updateInventoryItem(row.id, updateData);
         } else {
-          await createInventoryItem(updatableFields);
+          await createInventoryItem(updateData);
         }
       }
 
