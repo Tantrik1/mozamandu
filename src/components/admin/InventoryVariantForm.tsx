@@ -16,6 +16,7 @@ import {
   syncProductToInventory,
   createInventoryItem,
   deleteInventoryItem,
+  generateProductSKU,
   InventoryItem,
   InventorySummary 
 } from '@/utils/inventoryManager';
@@ -48,10 +49,10 @@ export function InventoryVariantForm({
 }: InventoryVariantFormProps) {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [summary, setSummary] = useState<InventorySummary>({
-    total_stock: 0,
-    available_stock: 0,
-    reserved_stock: 0,
-    variant_count: 0
+    totalProducts: 0,
+    lowStockItems: 0,
+    outOfStockItems: 0,
+    totalValue: 0
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -77,7 +78,7 @@ export function InventoryVariantForm({
       setIsLoading(true);
       const [inventoryData, summaryData] = await Promise.all([
         getProductInventory(productId),
-        getInventorySummary(productId)
+        getInventorySummary()
       ]);
       
       setInventory(inventoryData);
@@ -123,9 +124,6 @@ export function InventoryVariantForm({
       const item = inventory.find(i => i.id === inventoryId);
       if (!item) return;
 
-      const stockChange = newStock - item.stock_quantity;
-      
-      // Update in database
       const { error } = await supabase
         .from('product_inventory')
         .update({ stock_quantity: newStock })
@@ -175,17 +173,28 @@ export function InventoryVariantForm({
     if (!productId) return;
 
     try {
+      const sku = await generateProductSKU(
+        productName,
+        hasColorVariants ? newVariant.colorName : undefined,
+        hasSizeVariants ? newVariant.sizeName : undefined
+      );
+
       const item = {
         product_id: productId,
+        sku,
         product_name: productName,
-        color_name: hasColorVariants ? newVariant.colorName : null,
-        size_name: hasSizeVariants ? newVariant.sizeName : null,
-        size_code: hasSizeVariants ? newVariant.sizeCode : null,
+        color_name: hasColorVariants ? newVariant.colorName : '',
+        size_name: hasSizeVariants ? newVariant.sizeName : '',
+        size_code: hasSizeVariants ? newVariant.sizeCode : '',
         stock_quantity: newVariant.stockQuantity,
+        reserved_stock: 0,
+        available_stock: newVariant.stockQuantity,
+        low_stock_threshold: 10,
         cost_price: costPrice,
         selling_price: sellingPrice,
-        color_variant_id: null,
-        size_variant_id: null
+        is_active: true,
+        color_variant_id: undefined,
+        size_variant_id: undefined
       };
 
       await createInventoryItem(item);
@@ -258,10 +267,10 @@ export function InventoryVariantForm({
             <div>
               <CardTitle>Inventory Management</CardTitle>
               <div className="flex gap-4 mt-2">
-                <Badge variant="outline">Total: {summary.total_stock}</Badge>
-                <Badge variant="outline" className="text-green-600">Available: {summary.available_stock}</Badge>
-                <Badge variant="outline" className="text-orange-600">Reserved: {summary.reserved_stock}</Badge>
-                <Badge variant="secondary">Variants: {summary.variant_count}</Badge>
+                <Badge variant="outline">Total: {summary.totalProducts}</Badge>
+                <Badge variant="outline" className="text-green-600">Low Stock: {summary.lowStockItems}</Badge>
+                <Badge variant="outline" className="text-orange-600">Out of Stock: {summary.outOfStockItems}</Badge>
+                <Badge variant="secondary">Value: ${summary.totalValue.toFixed(2)}</Badge>
               </div>
             </div>
             <div className="flex gap-2">

@@ -1,33 +1,44 @@
-import { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Edit, Eye, Trash2, Search, Filter, MoreHorizontal } from 'lucide-react';
+import { toast } from 'sonner';
 import { CreateProductForm } from './CreateProductForm';
-import { EditProductForm } from './EditProductForm';
 import { ProductDetailView } from './ProductDetailView';
-import { Pencil, Trash2, Plus, Package, Eye } from 'lucide-react';
+import { EnhancedProductForm } from './EnhancedProductForm';
 import { getProductStockSummary } from '@/utils/inventoryManager';
-import { ProductEditBlockedModal } from './ProductEditBlockedModal';
-import { validateProductEditability, ProductEditValidationResult } from '@/utils/productEditValidation';
 
 interface Product {
   id: string;
   name: string;
-  description: string | null;
+  description?: string;
   cost_price: number;
-  selling_price: number | null;
+  selling_price?: number;
   category_id: string;
   subcategory_id: string;
-  image_url: string | null;
   is_featured: boolean;
   has_color_variants: boolean;
   color_has_size_variants: boolean;
-  stock_quantity: number | null;
-  status: 'active' | 'inactive';
-  categories: { name: string } | null;
-  subcategories: { name: string } | null;
+  status: string;
+  image_url?: string;
+  created_at: string;
+  updated_at: string;
+  categories: {
+    id: string;
+    name: string;
+  };
+  subcategories: {
+    id: string;
+    name: string;
+  };
 }
 
 interface Category {
@@ -41,535 +52,405 @@ interface Subcategory {
   category_id: string;
 }
 
-export function ProductManagement() {
+export default function ProductManagement() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
-  const [editingProductId, setEditingProductId] = useState<string | null>(null);
-  const [viewingProductId, setViewingProductId] = useState<string | null>(null);
-  const [productStocks, setProductStocks] = useState<Record<string, number>>({});
-  const [stockLoading, setStockLoading] = useState<Record<string, boolean>>({});
-  const [editBlockedModal, setEditBlockedModal] = useState<{
-    isOpen: boolean;
-    reason: string;
-    pendingOrdersCount?: number;
-  }>({
-    isOpen: false,
-    reason: '',
-    pendingOrdersCount: 0
-  });
-  const { toast } = useToast();
-
-  // New filter state
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [subcategoryFilter, setSubcategoryFilter] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'selling_price'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [searchTerm, setSearchTerm] = useState('');
-
-  // Filtered subcategories
-  const filteredSubcategories = categoryFilter
-    ? subcategories.filter((sub) => sub.category_id === categoryFilter)
-    : subcategories;
-
-  // Filtered products with search
-  const displayedProducts = products.filter(product => {
-    const matchesSearch =
-      !searchTerm ||
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCategory = !categoryFilter || product.category_id === categoryFilter;
-    const matchesSubcategory = !subcategoryFilter || product.subcategory_id === subcategoryFilter;
-    return matchesSearch && matchesCategory && matchesSubcategory;
-  });
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [currentView, setCurrentView] = useState<'list' | 'create' | 'edit' | 'detail'>('list');
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [stockSummaries, setStockSummaries] = useState<{[key: string]: number}>({});
 
   useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-    fetchSubcategories();
+    fetchData();
   }, []);
 
-  useEffect(() => {
-    if (products.length > 0) {
-      calculateProductStocks();
-    }
-  }, [products]);
-
-  // Refetch products when filters or sort change
-  useEffect(() => {
-    fetchProducts();
-  }, [categoryFilter, subcategoryFilter, sortBy, sortOrder]);
-
-  const fetchCategories = async () => {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('id, name')
-      .eq('status', 'on')
-      .order('name');
-
-    if (!error && data) {
-      setCategories(data);
-    }
-  };
-
-  const fetchSubcategories = async () => {
-    const { data, error } = await supabase
-      .from('subcategories')
-      .select('id, name, category_id')
-      .eq('status', 'on')
-      .order('name');
-
-    if (!error && data) {
-      setSubcategories(data);
-    }
-  };
-
-  const buildQuery = () => {
-    let query = supabase
-      .from('products')
-      .select(`
-        *,
-        categories(name),
-        subcategories(name)
-      `);
-
-    // Apply new filters
-    if (categoryFilter) {
-      query = query.eq('category_id', categoryFilter);
-    }
-    if (subcategoryFilter) {
-      query = query.eq('subcategory_id', subcategoryFilter);
-    }
-    // Apply sorting
-    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
-    return query;
-  };
-
-  const fetchProducts = async () => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const query = buildQuery();
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Map the data to ensure proper typing
-      const mappedProducts: Product[] = (data || []).map(product => ({
-        ...product,
-        color_has_size_variants: product.color_has_size_variants || false
-      }));
-
-      setProducts(mappedProducts);
+      const [productsData, categoriesData, subcategoriesData] = await Promise.all([
+        fetchProducts(),
+        fetchCategories(),
+        fetchSubcategories()
+      ]);
+      
+      setProducts(productsData);
+      setCategories(categoriesData);
+      setSubcategories(subcategoriesData);
+      
+      // Fetch stock summaries for each product
+      const summaries: {[key: string]: number} = {};
+      for (const product of productsData) {
+        try {
+          const summary = await getProductStockSummary(product.id);
+          summaries[product.id] = summary.totalStock;
+        } catch (error) {
+          console.error(`Error fetching stock for product ${product.id}:`, error);
+          summaries[product.id] = 0;
+        }
+      }
+      setStockSummaries(summaries);
     } catch (error) {
-      console.error('Error fetching products:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch products',
-        variant: 'destructive',
-      });
+      console.error('Error fetching data:', error);
+      toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateProductStocks = async () => {
-    console.log('Calculating stocks for', products.length, 'products');
-    const stocks: Record<string, number> = {};
-    const loadingStates: Record<string, boolean> = {};
+  const fetchProducts = async () => {
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        categories (id, name),
+        subcategories (id, name)
+      `)
+      .order('created_at', { ascending: false });
 
-    // Set loading states
-    products.forEach(product => {
-      loadingStates[product.id] = true;
-    });
-    setStockLoading(loadingStates);
-
-    for (const product of products) {
-      try {
-        console.log(`Calculating stock for product: ${product.name} (${product.id})`);
-        const stock = await getProductStockSummary(product.id);
-        stocks[product.id] = stock;
-        console.log(`Stock calculated for ${product.name}: ${stock}`);
-
-        // Update loading state for this product
-        setStockLoading(prev => ({ ...prev, [product.id]: false }));
-      } catch (error) {
-        console.error('Error calculating stock for product:', product.id, error);
-        stocks[product.id] = product.stock_quantity || 0;
-        setStockLoading(prev => ({ ...prev, [product.id]: false }));
-      }
-    }
-
-    console.log('Final stock calculations:', stocks);
-    setProductStocks(stocks);
+    if (error) throw error;
+    return data || [];
   };
 
-  const handleView = (productId: string) => {
-    setViewingProductId(productId);
+  const fetchCategories = async () => {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .order('name');
+
+    if (error) throw error;
+    return data || [];
   };
 
-  const handleEdit = async (productId: string) => {
-    // Validate if product can be edited
-    const validation = await validateProductEditability(productId);
+  const fetchSubcategories = async () => {
+    const { data, error } = await supabase
+      .from('subcategories')
+      .select('*')
+      .order('name');
 
-    if (!validation.canEdit) {
-      setEditBlockedModal({
-        isOpen: true,
-        reason: validation.reason || 'Product cannot be edited at this time.',
-        pendingOrdersCount: validation.pendingOrdersCount
-      });
-      return;
-    }
-
-    setEditingProductId(productId);
+    if (error) throw error;
+    return data || [];
   };
 
-  const handleDelete = async (productId: string, productName: string) => {
-    if (!confirm(`Are you sure you want to delete "${productName}"?`)) return;
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
 
     try {
       const { error } = await supabase
         .from('products')
         .delete()
-        .eq('id', productId);
+        .eq('id', productToDelete.id);
 
       if (error) throw error;
 
-      toast({
-        title: 'Success',
-        description: 'Product deleted successfully',
-      });
-
-      fetchProducts();
+      setProducts(prev => prev.filter(p => p.id !== productToDelete.id));
+      setDeleteDialog(false);
+      setProductToDelete(null);
+      toast.success('Product deleted successfully');
     } catch (error) {
       console.error('Error deleting product:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete product',
-        variant: 'destructive',
-      });
+      toast.error('Failed to delete product');
     }
   };
 
-  const handleCreateSave = () => {
-    setIsCreateFormOpen(false);
-    fetchProducts();
-  };
-
-  const handleCreateCancel = () => {
-    setIsCreateFormOpen(false);
-  };
-
-  const handleEditSave = () => {
-    setEditingProductId(null);
-    fetchProducts();
-  };
-
-  const handleEditCancel = () => {
-    setEditingProductId(null);
-  };
-
-  const handleDetailViewEdit = async () => {
-    if (viewingProductId) {
-      // Validate if product can be edited
-      const validation = await validateProductEditability(viewingProductId);
-
-      if (!validation.canEdit) {
-        setEditBlockedModal({
-          isOpen: true,
-          reason: validation.reason || 'Product cannot be edited at this time.',
-          pendingOrdersCount: validation.pendingOrdersCount
-        });
-        return;
-      }
-
-      setEditingProductId(viewingProductId);
-      setViewingProductId(null);
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <Badge variant="default">Active</Badge>;
+      case 'inactive':
+        return <Badge variant="secondary">Inactive</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  const handleDetailViewDelete = () => {
-    setViewingProductId(null);
-    fetchProducts();
-  };
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = !selectedCategory || product.category_id === selectedCategory;
+    const matchesStatus = !selectedStatus || product.status === selectedStatus;
+    
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
 
-  const handleDetailViewBack = () => {
-    setViewingProductId(null);
-  };
-
-  const closeEditBlockedModal = () => {
-    setEditBlockedModal({
-      isOpen: false,
-      reason: '',
-      pendingOrdersCount: 0
-    });
-  };
-
-  if (loading) {
-    return <div className="flex justify-center p-8">Loading products...</div>;
-  }
-
-  if (viewingProductId) {
-    return (
-      <ProductDetailView
-        productId={viewingProductId}
-        onEdit={handleDetailViewEdit}
-        onDelete={handleDetailViewDelete}
-        onBack={handleDetailViewBack}
-      />
-    );
-  }
-
-  if (isCreateFormOpen) {
+  if (currentView === 'create') {
     return (
       <CreateProductForm
-        onSave={handleCreateSave}
-        onCancel={handleCreateCancel}
+        onSave={() => {
+          setCurrentView('list');
+          fetchData();
+        }}
+        onCancel={() => setCurrentView('list')}
       />
     );
   }
 
-  if (editingProductId) {
+  if (currentView === 'edit' && selectedProduct) {
     return (
-      <EditProductForm
-        productId={editingProductId}
-        onSave={handleEditSave}
-        onCancel={handleEditCancel}
+      <EnhancedProductForm
+        productId={selectedProduct.id}
+        onSave={() => {
+          setCurrentView('list');
+          fetchData();
+        }}
+        onCancel={() => setCurrentView('list')}
+      />
+    );
+  }
+
+  if (currentView === 'detail' && selectedProduct) {
+    return (
+      <ProductDetailView
+        product={selectedProduct}
+        onEdit={() => setCurrentView('edit')}
+        onBack={() => setCurrentView('list')}
+        onDelete={(product) => {
+          setProductToDelete(product);
+          setDeleteDialog(true);
+        }}
       />
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Product Management</h2>
-          <p className="text-gray-600">Manage your product catalog with advanced filtering</p>
+          <h1 className="text-3xl font-bold">Product Management</h1>
+          <p className="text-muted-foreground">
+            Manage your product catalog and inventory
+          </p>
         </div>
-        <Button onClick={() => setIsCreateFormOpen(true)}>
+        <Button onClick={() => setCurrentView('create')}>
           <Plus className="h-4 w-4 mr-2" />
           Add Product
         </Button>
       </div>
 
-      {/* New Filter Bar */}
-      <div className="sticky top-0 z-10 mb-4">
-        <Card className="shadow border border-gray-200 bg-white/95 backdrop-blur p-4">
-          <div className="flex flex-col md:flex-row md:items-end gap-4">
-            {/* Search Bar */}
-            <div className="flex-1 min-w-[220px]">
-              <label className="block text-sm font-medium mb-1" htmlFor="product-search">Search</label>
-              <input
-                id="product-search"
-                type="text"
-                className="w-full border rounded px-3 py-2"
-                placeholder="Search by name or description..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Products</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{products.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Products</CardTitle>
+            <Badge className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {products.filter(p => p.status === 'active').length}
             </div>
-            <div className="flex-1 min-w-[180px]">
-              <label className="block text-sm font-medium mb-1" htmlFor="category-filter">Category</label>
-              <select
-                id="category-filter"
-                className="w-full border rounded px-3 py-2"
-                value={categoryFilter}
-                onChange={e => {
-                  setCategoryFilter(e.target.value);
-                  setSubcategoryFilter(''); // Reset subcategory when category changes
-                }}
-              >
-                <option value="">All Categories</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Featured Products</CardTitle>
+            <Star className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {products.filter(p => p.is_featured).length}
             </div>
-            <div className="flex-1 min-w-[180px]">
-              <label className="block text-sm font-medium mb-1" htmlFor="subcategory-filter">Subcategory</label>
-              <select
-                id="subcategory-filter"
-                className="w-full border rounded px-3 py-2"
-                value={subcategoryFilter}
-                onChange={e => setSubcategoryFilter(e.target.value)}
-                disabled={!categoryFilter && filteredSubcategories.length === 0}
-              >
-                <option value="">All Subcategories</option>
-                {filteredSubcategories.map(sub => (
-                  <option key={sub.id} value={sub.id}>{sub.name}</option>
-                ))}
-              </select>
-            </div>
-            {/* Sort By */}
-            <div className="flex-1 min-w-[180px]">
-              <label className="block text-sm font-medium mb-1" htmlFor="sort-by">Sort By</label>
-              <select
-                id="sort-by"
-                className="w-full border rounded px-3 py-2"
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value as 'name' | 'selling_price')}
-              >
-                <option value="name">Name</option>
-                <option value="selling_price">Price</option>
-              </select>
-            </div>
-            {/* Sort Order */}
-            <div className="flex-1 min-w-[180px]">
-              <label className="block text-sm font-medium mb-1" htmlFor="sort-order">Order</label>
-              <select
-                id="sort-order"
-                className="w-full border rounded px-3 py-2"
-                value={sortOrder}
-                onChange={e => setSortOrder(e.target.value as 'asc' | 'desc')}
-              >
-                <option value="asc">Ascending</option>
-                <option value="desc">Descending</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setCategoryFilter('');
-                  setSubcategoryFilter('');
-                  setSortBy('name');
-                  setSortOrder('asc');
-                }}
-                disabled={!categoryFilter && !subcategoryFilter && sortBy === 'name' && sortOrder === 'asc'}
-              >
-                Reset
-              </Button>
-            </div>
-          </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Categories</CardTitle>
+            <Grid className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{categories.length}</div>
+          </CardContent>
         </Card>
       </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600">
-          Showing {displayedProducts.length} product{displayedProducts.length !== 1 ? 's' : ''}
-        </p>
-      </div>
-
-      <div className="grid gap-4">
-        {displayedProducts.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <p>No products found matching your filters</p>
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Categories</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        ) : (
-          displayedProducts.map((product) => (
-            <Card key={product.id}>
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex space-x-4">
-                    {product.image_url && (
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="w-16 h-16 object-cover rounded-lg border"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    )}
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <h3 className="text-lg font-semibold">{product.name}</h3>
-                        <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>
-                          {product.status}
-                        </Badge>
-                        {product.is_featured && (
-                          <Badge variant="outline">Featured</Badge>
-                        )}
-                      </div>
+        </CardContent>
+      </Card>
 
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <p>
-                          <span className="font-medium">Category:</span> {product.categories?.name}
-                          {' > '}
-                          <span className="font-medium">Subcategory:</span> {product.subcategories?.name}
-                        </p>
-                        <p>
-                          <span className="font-medium">Cost Price:</span> Rs {product.cost_price}
-                          {product.selling_price && (
-                            <>
-                              {' | '}
-                              <span className="font-medium">Selling Price:</span> Rs {product.selling_price}
-                            </>
-                          )}
-                        </p>
-                        <p>
-                          <span className="font-medium">Stock:</span>
-                          <Badge variant="outline" className="ml-2">
-                            {stockLoading[product.id] ? (
-                              <span className="animate-pulse">Calculating...</span>
-                            ) : (
-                              productStocks[product.id] !== undefined ? productStocks[product.id] : 'Unknown'
-                            )}
-                          </Badge>
-                          {(product.has_color_variants || product.color_has_size_variants) && (
-                            <span className="text-xs text-gray-500 ml-2">
-                              (Calculated from variants)
-                            </span>
-                          )}
-                        </p>
-                        {(product.has_color_variants || product.color_has_size_variants) && (
-                          <div className="flex items-center space-x-1">
-                            {product.has_color_variants && (
-                              <Badge variant="outline" className="text-xs">Color Variants</Badge>
-                            )}
-                            {product.color_has_size_variants && (
-                              <Badge variant="outline" className="text-xs">Size Variants</Badge>
-                            )}
+      {/* Products Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Products ({filteredProducts.length})</CardTitle>
+          <CardDescription>
+            Manage your product catalog
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Pricing</TableHead>
+                  <TableHead>Stock</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredProducts.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell>
+                      <div className="flex items-center space-x-3">
+                        {product.image_url && (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-10 h-10 rounded-md object-cover"
+                          />
+                        )}
+                        <div>
+                          <div className="font-medium">{product.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {product.description?.substring(0, 50)}...
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{product.categories?.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {product.subcategories?.name}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">
+                          Cost: ${product.cost_price}
+                        </div>
+                        {product.selling_price && (
+                          <div className="text-sm text-muted-foreground">
+                            Sell: ${product.selling_price}
                           </div>
                         )}
-                        {product.description && (
-                          <p className="text-gray-500 mt-2 line-clamp-2">{product.description}</p>
-                        )}
                       </div>
-                    </div>
-                  </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {stockSummaries[product.id] || 0} units
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(product.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedProduct(product);
+                            setCurrentView('detail');
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedProduct(product);
+                            setCurrentView('edit');
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setProductToDelete(product);
+                            setDeleteDialog(true);
+                          }}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleView(product.id)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(product.id)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(product.id, product.name)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
-      {/* Product Edit Blocked Modal */}
-      <ProductEditBlockedModal
-        isOpen={editBlockedModal.isOpen}
-        onClose={closeEditBlockedModal}
-        reason={editBlockedModal.reason}
-        pendingOrdersCount={editBlockedModal.pendingOrdersCount}
-      />
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Product</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{productToDelete?.name}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteProduct}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { CreateProductVariantForm } from './CreateProductVariantForm';
-import { createInventoryForProduct, createInventoryItem, generateProductSKU } from '@/utils/inventoryManager';
+import { createInventoryItem, generateProductSKU } from '@/utils/inventoryManager';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 const productSchema = z.object({
