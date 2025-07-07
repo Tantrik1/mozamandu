@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface InventoryItem {
@@ -51,11 +50,15 @@ export interface InventoryOverview {
   id: string;
   product_name: string;
   sku: string;
+  product_sku?: string;
   stock_quantity: number;
   reserved_stock: number;
   available_stock: number;
   category_name: string;
   subcategory_name: string;
+  variant_name?: string;
+  size_name?: string;
+  stock_status?: string;
 }
 
 export interface LowStockAlert {
@@ -242,7 +245,6 @@ export const getProductStockSummary = async (productId: string): Promise<Product
   });
 };
 
-// Additional functions for advanced inventory management
 export const getInventoryOverview = async (): Promise<InventoryOverview[]> => {
   const { data, error } = await supabase
     .from('product_inventory')
@@ -254,11 +256,16 @@ export const getInventoryOverview = async (): Promise<InventoryOverview[]> => {
     id: item.id,
     product_name: item.product_name,
     sku: item.sku,
+    product_sku: item.sku,
     stock_quantity: item.stock_quantity,
     reserved_stock: item.reserved_stock,
     available_stock: item.available_stock,
     category_name: item.category_name || '',
-    subcategory_name: item.subcategory_name || ''
+    subcategory_name: item.subcategory_name || '',
+    variant_name: item.color_name,
+    size_name: item.size_name,
+    stock_status: item.available_stock === 0 ? 'Out of Stock' : 
+                  item.available_stock <= (item.low_stock_threshold || 10) ? 'Low Stock' : 'In Stock'
   }));
 };
 
@@ -339,7 +346,8 @@ export const updateStock = async (
   colorVariantId?: string,
   sizeVariantId?: string,
   reservationChange: number = 0,
-  reason: string = 'Manual update'
+  reason: string = 'Manual update',
+  categoryId?: string
 ): Promise<boolean> => {
   const { data, error } = await supabase.rpc('safe_update_stock', {
     p_product_id: productId,
@@ -406,13 +414,18 @@ export const setLowStockThreshold = async (inventoryId: string, threshold: numbe
   return true;
 };
 
-export const searchInventory = async (query: string): Promise<InventoryItem[]> => {
-  const { data, error } = await supabase
+export const searchInventory = async (query: string, filters?: { categoryId?: string }): Promise<InventoryItem[]> => {
+  let queryBuilder = supabase
     .from('product_inventory')
     .select('*')
     .or(`product_name.ilike.%${query}%,sku.ilike.%${query}%,color_name.ilike.%${query}%,size_name.ilike.%${query}%`)
     .order('created_at', { ascending: true });
 
+  if (filters?.categoryId) {
+    queryBuilder = queryBuilder.eq('category_id', filters.categoryId);
+  }
+
+  const { data, error } = await queryBuilder;
   if (error) throw error;
   return data as InventoryItem[];
 };

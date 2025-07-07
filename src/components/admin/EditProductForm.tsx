@@ -288,48 +288,41 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageUpload = async (uploadedFile: File) => {
+    if (!uploadedFile) return;
 
-    console.log('Starting image upload for file:', file.name);
     setUploadingImage(true);
-
     try {
-      // Create preview immediately
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-
-      // Upload to Supabase storage
-      const fileExt = file.name.split('.').pop();
+      const fileExt = uploadedFile.name.split('.').pop();
       const fileName = `product-${Date.now()}.${fileExt}`;
-
+      
       const { data, error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(fileName, file);
+        .upload(fileName, uploadedFile);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        throw uploadError;
+      }
 
       const { data: urlData } = supabase.storage
         .from('product-images')
         .getPublicUrl(fileName);
 
-      setImageFile(file);
+      setFormData(prev => ({
+        ...prev,
+        image_url: urlData.publicUrl
+      }));
 
-      console.log('Image uploaded successfully:', urlData.publicUrl);
       toast({
-        title: 'Success',
-        description: 'Image uploaded successfully',
+        title: "Success",
+        description: "Image uploaded successfully",
       });
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.error('Upload error:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to upload image',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to upload image",
+        variant: "destructive",
       });
     } finally {
       setUploadingImage(false);

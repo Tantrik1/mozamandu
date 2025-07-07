@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Edit, Eye, Trash2, Search, Filter, MoreHorizontal } from 'lucide-react';
+import { Plus, Edit, Eye, Trash2, Search, Filter, MoreHorizontal, Package, Star, Grid } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateProductForm } from './CreateProductForm';
 import { ProductDetailView } from './ProductDetailView';
@@ -206,12 +206,15 @@ export default function ProductManagement() {
   if (currentView === 'detail' && selectedProduct) {
     return (
       <ProductDetailView
-        product={selectedProduct}
+        productId={selectedProduct.id}
         onEdit={() => setCurrentView('edit')}
         onBack={() => setCurrentView('list')}
-        onDelete={(product) => {
-          setProductToDelete(product);
-          setDeleteDialog(true);
+        onDelete={(productId) => {
+          const product = products.find(p => p.id === productId);
+          if (product) {
+            setProductToDelete(product);
+            setDeleteDialog(true);
+          }
         }}
       />
     );

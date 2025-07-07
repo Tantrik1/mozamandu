@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
-import { useCart } from '@/contexts/CartContext';
+import { useRobustCart } from '@/hooks/useRobustCart';
 import { usePromoCode } from '@/hooks/usePromoCode';
 import { useCheckoutData } from '@/hooks/useCheckoutData';
 import { PaymentMethodSection } from './PaymentMethodSection';
