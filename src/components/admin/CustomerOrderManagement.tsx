@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -7,7 +8,7 @@ import { Loader2, Eye, RefreshCw } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useOrderStockManagement } from '@/hooks/useOrderStockManagement';
 
-interface Order {
+interface CustomerOrder {
   id: string;
   order_number: string;
   customer_name: string;
@@ -22,17 +23,17 @@ interface Order {
   payment_method: { name: string } | null;
 }
 
-export function OrderManagement() {
-  const [orders, setOrders] = useState<Order[]>([]);
+export function CustomerOrderManagement() {
+  const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
   const { handleOrderStatusChange, processing: stockProcessing } = useOrderStockManagement();
 
-  const fetchOrders = async () => {
+  const fetchCustomerOrders = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('orders')
+        .from('customer_orders')
         .select(`
           *,
           payment_method:payment_method_id (name)
@@ -45,10 +46,10 @@ export function OrderManagement() {
 
       setOrders(data || []);
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.error('Error fetching customer orders:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch orders",
+        description: "Failed to fetch customer orders",
         variant: "destructive",
       });
     } finally {
@@ -66,7 +67,7 @@ export function OrderManagement() {
       
       // Update order status in database
       const { error } = await supabase
-        .from('orders')
+        .from('customer_orders')
         .update({ status: newStatus })
         .eq('id', orderId);
 
@@ -75,24 +76,24 @@ export function OrderManagement() {
       }
 
       // Handle stock changes based on status change
-      const stockSuccess = await handleOrderStatusChange(orderId, newStatus, oldStatus, false);
+      const stockSuccess = await handleOrderStatusChange(orderId, newStatus, oldStatus, true);
       
       if (!stockSuccess) {
         console.warn('Stock operation had issues, but order status was updated');
       }
 
       // Refresh orders list
-      await fetchOrders();
+      await fetchCustomerOrders();
       
       toast({
         title: "Order Updated",
-        description: "Order status has been updated successfully",
+        description: "Customer order status has been updated successfully",
       });
     } catch (error) {
-      console.error('Error updating order:', error);
+      console.error('Error updating customer order:', error);
       toast({
         title: "Error",
-        description: "Failed to update order status",
+        description: "Failed to update customer order status",
         variant: "destructive",
       });
     } finally {
@@ -115,14 +116,14 @@ export function OrderManagement() {
   };
 
   useEffect(() => {
-    fetchOrders();
+    fetchCustomerOrders();
   }, []);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin mr-2" />
-        Loading orders...
+        Loading customer orders...
       </div>
     );
   }
@@ -131,11 +132,11 @@ export function OrderManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Orders</h1>
-          <p className="text-gray-600">Manage all orders placed through the system</p>
+          <h1 className="text-2xl font-bold">Customer Orders</h1>
+          <p className="text-gray-600">Manage orders from registered customers</p>
         </div>
         <Button 
-          onClick={fetchOrders} 
+          onClick={fetchCustomerOrders} 
           variant="outline"
           disabled={loading}
         >
@@ -244,8 +245,8 @@ export function OrderManagement() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        // Navigate to order details
-                        window.open(`/order-summary/${order.id}`, '_blank');
+                        // Navigate to customer order details
+                        window.open(`/customer-order-summary/${order.id}`, '_blank');
                       }}
                     >
                       <Eye className="h-4 w-4 mr-1" />
@@ -261,7 +262,7 @@ export function OrderManagement() {
 
       {orders.length === 0 && (
         <div className="text-center py-8">
-          <p className="text-gray-500">No orders found</p>
+          <p className="text-gray-500">No customer orders found</p>
         </div>
       )}
     </div>

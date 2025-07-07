@@ -27,6 +27,7 @@ import { CustomerAnalytics } from '@/components/admin/CustomerAnalytics';
 import { RefreshCw } from 'lucide-react';
 import { NavbarManagement } from '@/components/admin/NavbarManagement';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CustomerOrderManagement } from '@/components/admin/CustomerOrderManagement';
 
 function AdminDashboard() {
   return (
@@ -117,6 +118,7 @@ export default function EnhancedAdmin() {
             <Route path="products" element={<ProductManagement />} />
             <Route path="inventory" element={<InventoryManagement />} />
             <Route path="orders" element={<EnhancedOrderManagement />} />
+            <Route path="customer-orders" element={<CustomerOrderManagement />} />
             <Route path="customers" element={<CustomerManagement />} />
             <Route path="combos" element={<ComboManagement />} />
             <Route path="promocodes" element={<PromocodeManagement />} />

@@ -1,4 +1,3 @@
-
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
@@ -27,6 +26,7 @@ import { OrderAnalytics } from '@/components/admin/OrderAnalytics';
 import { CustomerAnalytics } from '@/components/admin/CustomerAnalytics';
 import { NavbarManagement } from '@/components/admin/NavbarManagement';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CustomerOrderManagement } from '@/components/admin/CustomerOrderManagement';
 
 function AdminDashboard() {
   return (
@@ -108,6 +108,7 @@ export default function Admin() {
             <Route path="products" element={<ProductManagement />} />
             <Route path="inventory" element={<InventoryManagement />} />
             <Route path="orders" element={<EnhancedOrderManagement />} />
+            <Route path="customer-orders" element={<CustomerOrderManagement />} />
             <Route path="customers" element={<CustomerManagement />} />
             <Route path="combos" element={<ComboManagement />} />
             <Route path="promocodes" element={<PromocodeManagement />} />

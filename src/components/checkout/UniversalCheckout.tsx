@@ -14,7 +14,8 @@ import { DeliveryLocationSelector } from './DeliveryLocationSelector';
 import { PromoCodeSection } from './PromoCodeSection';
 import { PaymentMethodSection } from './PaymentMethodSection';
 import { OrderSummaryCard } from './OrderSummaryCard';
-import { validateCheckoutStock, processCheckoutStock } from '@/utils/inventoryManager';
+import { validateCheckoutStock } from '@/utils/inventoryManager';
+import { reserveStockForOrder, type StockReservationItem } from '@/utils/stockReservationManager';
 
 interface FormErrors {
   [key: string]: string;
@@ -323,6 +324,9 @@ export function UniversalCheckout() {
       const orderItemsTable = isCustomerOrder() ? 'customer_order_items' : 'order_items';
       const orderItemDetailsTable = isCustomerOrder() ? 'customer_order_item_details' : 'order_item_details';
 
+      // Prepare stock reservation items
+      const stockReservationItems: StockReservationItem[] = [];
+
       for (const item of cartItems) {
         // Get inventory details for the item
         let inventoryItem = null;
@@ -349,6 +353,15 @@ export function UniversalCheckout() {
         };
 
         orderItems.push(orderItem);
+
+        // Prepare stock reservation item
+        if (item.productInventoryId) {
+          stockReservationItems.push({
+            productId: item.productId,
+            productInventoryId: item.productInventoryId,
+            quantity: item.quantity
+          });
+        }
 
         // Create order item details (for display)
         const pricing = getItemPricing(item);
@@ -402,26 +415,23 @@ export function UniversalCheckout() {
 
       console.log('Order items created successfully');
 
-      // Process stock changes for the order
-      console.log('Processing stock changes for order...');
-      const orderItemsForStock = cartItems.map(item => ({
-        productId: item.productId,
-        productInventoryId: item.productInventoryId || null,
-        quantity: item.quantity
-      }));
-
-      const stockProcessed = await processCheckoutStock(orderItemsForStock, orderResult.id);
-
-      if (!stockProcessed) {
-        console.error('Failed to process stock changes for order');
-        // Don't fail the order, but log the error
-        toast({
-          title: "Warning",
-          description: "Order created but stock processing failed. Please contact support.",
-          variant: "destructive",
-        });
-      } else {
-        console.log('Stock changes processed successfully');
+      // RESERVE STOCK FOR THE ORDER
+      console.log('Reserving stock for order...');
+      if (stockReservationItems.length > 0) {
+        const reservationResult = await reserveStockForOrder(stockReservationItems, orderResult.id);
+        
+        if (!reservationResult.success) {
+          console.error('Stock reservation failed:', reservationResult.message);
+          
+          // Show warning but don't fail the order
+          toast({
+            title: "Stock Reservation Warning",
+            description: `Order created but stock reservation had issues: ${reservationResult.message}`,
+            variant: "destructive",
+          });
+        } else {
+          console.log('Stock reservation successful:', reservationResult.message);
+        }
       }
 
       // Send order creation email
@@ -451,7 +461,7 @@ export function UniversalCheckout() {
 
       toast({
         title: "Order Placed Successfully!",
-        description: `Your order #${orderResult.order_number} has been placed successfully. Stock has been updated and a confirmation email has been sent.`,
+        description: `Your order #${orderResult.order_number} has been placed successfully. Stock has been reserved and a confirmation email has been sent.`,
       });
 
       // Redirect to appropriate order summary page
