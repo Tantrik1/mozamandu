@@ -1,516 +1,338 @@
 import { useState, useEffect } from 'react';
-import { useRobustCart } from '@/hooks/useRobustCart';
-import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useCheckoutData } from '@/hooks/useCheckoutData';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2 } from 'lucide-react';
+import { useCart } from '@/contexts/CartContext';
 import { usePromoCode } from '@/hooks/usePromoCode';
-import { CustomerInfoForm } from './CustomerInfoForm';
-import { DeliveryLocationSelector } from './DeliveryLocationSelector';
-import { PromoCodeSection } from './PromoCodeSection';
+import { useCheckoutData } from '@/hooks/useCheckoutData';
 import { PaymentMethodSection } from './PaymentMethodSection';
-import { OrderSummaryCard } from './OrderSummaryCard';
-import { validateCheckoutStock } from '@/utils/inventoryManager';
-import { reserveStockForOrder, type StockReservationItem } from '@/utils/stockReservationManager';
+import { PromoCodeSection } from './PromoCodeSection';
+import { DeliveryLocationSelector } from './DeliveryLocationSelector';
+import { reserveStockForOrder } from '@/utils/stockReservationManager';
 
-interface FormErrors {
-  [key: string]: string;
+interface CheckoutData {
+  customerName: string;
+  customerEmail: string;
+  contactNumber: string;
+  whatsappNumber: string;
+  deliveryAddress: string;
+  deliveryLocationId: string | null;
+  paymentMethodId: string;
+  paymentPercentage: number;
 }
 
 export function UniversalCheckout() {
-  const { cartItems, getTotalPrice, clearCart, getItemPricing } = useRobustCart();
-  const { user, userProfile } = useAuth();
+  const { user } = useAuth();
+  const { cartItems, getTotalPrice, clearCart } = useCart();
   const navigate = useNavigate();
-  const { deliveryCharges, paymentMethods, loading } = useCheckoutData();
-  const {
-    promoCode,
-    setPromoCode,
-    appliedPromo,
-    isPromoApplied,
-    applyPromoCode,
-    removePromoCode
-  } = usePromoCode();
-
-  // Form state
-  const [customerInfo, setCustomerInfo] = useState({
-    name: '',
-    email: '',
-    contact: '',
-    whatsapp: '',
-    address: ''
+  const [loading, setLoading] = useState(false);
+  const [checkoutData, setCheckoutData] = useState<CheckoutData>({
+    customerName: '',
+    customerEmail: '',
+    contactNumber: '',
+    whatsappNumber: '',
+    deliveryAddress: '',
+    deliveryLocationId: null,
+    paymentMethodId: '',
+    paymentPercentage: 100,
   });
 
-  // Checkout data
-  const [selectedDelivery, setSelectedDelivery] = useState('');
-  const [selectedPayment, setSelectedPayment] = useState('');
-  const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
+  const {
+    promoCode,
+    promoCodeDiscount,
+    applyPromoCode,
+    removePromoCode,
+    loading: promoLoading
+  } = usePromoCode();
 
-  // Payment type state
-  const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
-  const [paidAmount, setPaidAmount] = useState('');
+  const {
+    deliveryCharge,
+    finalTotal,
+    paidAmount,
+    remainingAmount,
+    subtotal
+  } = useCheckoutData({
+    cartItems,
+    deliveryLocationId: checkoutData.deliveryLocationId,
+    promoCodeDiscount,
+    paymentPercentage: checkoutData.paymentPercentage
+  });
 
-  // UI state
-  const [submitting, setSubmitting] = useState(false);
-  const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
-  const [formErrors, setFormErrors] = useState<FormErrors>({});
-
-  // Redirect if cart is empty
+  // Auto-fill user data if logged in
   useEffect(() => {
-    if (cartItems.length === 0) {
-      navigate('/');
-      return;
-    }
-
-    // Auto-fill user info if logged in
-    if (user && userProfile) {
-      setCustomerInfo(prev => ({
+    if (user) {
+      setCheckoutData(prev => ({
         ...prev,
-        name: userProfile.full_name || '',
-        email: userProfile.email || user.email || '',
-        contact: userProfile.contact_number || '',
-        whatsapp: userProfile.whatsapp_number || ''
+        customerEmail: user.email || '',
       }));
     }
-  }, [cartItems, user, userProfile, navigate]);
+  }, [user]);
 
-  // Determine which bucket to use based on user type
-  const getBucketName = () => {
-    if (!user) {
-      return 'guest-payments';
-    }
-
-    if (userProfile?.role === 'admin') {
-      return 'admin-payments';
-    }
-
-    return 'customer-payments';
+  const handleInputChange = (field: keyof CheckoutData, value: string | number) => {
+    setCheckoutData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
-  // Determine if this is a customer order (logged in non-admin user)
-  const isCustomerOrder = () => {
-    return user && userProfile?.role !== 'admin';
-  };
-
-  const validateForm = (): boolean => {
-    const errors: FormErrors = {};
-
-    // Required field validation
-    if (!customerInfo.name.trim()) errors.name = 'Name is required';
-    if (!customerInfo.email.trim()) errors.email = 'Email is required';
-    if (!customerInfo.contact.trim()) errors.contact = 'Contact number is required';
-    if (!customerInfo.address.trim()) errors.address = 'Delivery address is required';
-    if (!selectedDelivery) errors.delivery = 'Please select delivery location';
-    if (!selectedPayment) errors.payment = 'Please select payment method';
-
-    // Email validation
-    if (customerInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email)) {
-      errors.email = 'Please enter a valid email address';
-    }
-
-    // Payment amount validation for partial payment
-    if (paymentType === 'partial') {
-      if (!paidAmount || parseFloat(paidAmount) <= 0) {
-        errors.paidAmount = 'Please enter a valid payment amount';
-      }
-    }
-
-    // Make payment screenshot compulsory
-    if (!paymentScreenshot) {
-      errors.paymentScreenshot = 'Payment screenshot is required';
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const uploadPaymentScreenshot = async (): Promise<string | null> => {
-    if (!paymentScreenshot) return null;
-
-    setUploadingScreenshot(true);
-    try {
-      const fileExt = paymentScreenshot.name.split('.').pop();
-      const fileName = `payment-${Date.now()}.${fileExt}`;
-      const filePath = `payment-screenshots/${fileName}`;
-      const bucketName = getBucketName();
-
-      console.log(`Uploading payment screenshot to ${bucketName} bucket:`, filePath);
-
-      // Upload to the appropriate bucket based on user type
-      const { error: uploadError } = await supabase.storage
-        .from(bucketName)
-        .upload(filePath, paymentScreenshot, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('Error uploading payment screenshot:', uploadError);
-        throw new Error('Failed to upload payment screenshot: ' + uploadError.message);
-      }
-
-      const { data } = supabase.storage
-        .from(bucketName)
-        .getPublicUrl(filePath);
-
-      console.log('Payment screenshot uploaded successfully:', data.publicUrl);
-      return data.publicUrl;
-    } catch (error) {
-      console.error('Error uploading payment screenshot:', error);
+  const validateForm = () => {
+    const required = ['customerName', 'customerEmail', 'contactNumber', 'deliveryAddress'];
+    const missing = required.filter(field => !checkoutData[field as keyof CheckoutData]);
+    
+    if (missing.length > 0) {
       toast({
-        title: "Upload Error",
-        description: error instanceof Error ? error.message : "Failed to upload payment screenshot",
+        title: "Missing Information",
+        description: `Please fill in: ${missing.join(', ')}`,
         variant: "destructive",
       });
-      return null;
-    } finally {
-      setUploadingScreenshot(false);
+      return false;
     }
-  };
 
-  const handleSubmitOrder = async () => {
-    if (!validateForm()) {
+    if (cartItems.length === 0) {
       toast({
-        title: "Validation Error",
-        description: "Please fix the errors in the form before submitting",
+        title: "Empty Cart",
+        description: "Please add items to your cart before checkout",
         variant: "destructive",
       });
-      return;
+      return false;
     }
 
-    setSubmitting(true);
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+
+    setLoading(true);
+
     try {
-      console.log('Starting order submission process...');
-      console.log('User authenticated:', !!user);
-      console.log('User ID:', user?.id);
-      console.log('Is customer order:', isCustomerOrder());
+      console.log('=== STARTING CHECKOUT PROCESS ===');
+      console.log('Cart items:', cartItems);
+      console.log('Is customer order:', !!user);
 
-      // Validate stock before proceeding with order
-      console.log('Validating stock for checkout...');
-      const stockValidation = await validateCheckoutStock(cartItems);
+      // Validate stock for checkout items
+      console.log('Validating stock for checkout items...');
+      const stockValidationItems = cartItems.map(item => ({
+        productId: item.productId,
+        productInventoryId: item.productInventoryId,
+        quantity: item.quantity
+      }));
 
-      if (!stockValidation.isValid) {
-        toast({
-          title: "Stock Error",
-          description: stockValidation.errors[0] || "Some items have insufficient stock",
-          variant: "destructive",
-        });
-        return;
+      console.log('Stock validation items:', stockValidationItems);
+
+      // Check each item's stock availability
+      for (const item of stockValidationItems) {
+        const { data: inventoryData, error } = await supabase
+          .from('product_inventory')
+          .select('stock_quantity, reserved_stock, available_stock')
+          .eq('product_id', item.productId)
+          .eq('id', item.productInventoryId || '')
+          .single();
+
+        if (error || !inventoryData) {
+          throw new Error(`Product inventory not found for item ${item.productId}`);
+        }
+
+        const availableStock = inventoryData.stock_quantity - inventoryData.reserved_stock;
+        if (availableStock < item.quantity) {
+          throw new Error(`Insufficient stock for item. Available: ${availableStock}, Requested: ${item.quantity}`);
+        }
       }
 
+      console.log('Stock validation result: PASSED');
       console.log('Stock validation passed, proceeding with order creation...');
 
-      const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
-      const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
-      const subtotal = getTotalPrice();
-      const totalWithDelivery = subtotal + deliveryPrice;
-      const promoDiscount = appliedPromo
-        ? (totalWithDelivery * appliedPromo.discount_percentage) / 100
-        : 0;
-      const finalTotal = totalWithDelivery - promoDiscount;
-      const actualPaidAmount = paymentType === 'full' ? finalTotal : parseFloat(paidAmount);
-
-      // Upload payment screenshot if provided
-      let paymentScreenshotUrl = null;
-      if (paymentScreenshot) {
-        paymentScreenshotUrl = await uploadPaymentScreenshot();
-
-        if (!paymentScreenshotUrl) {
-          console.warn('Payment screenshot upload failed, but continuing with order');
-        }
-      }
-
-      // Prepare base order data
-      const baseOrderData = {
-        customer_name: customerInfo.name,
-        customer_email: customerInfo.email,
-        contact_number: customerInfo.contact,
-        whatsapp_number: customerInfo.whatsapp || customerInfo.contact,
-        delivery_location_id: selectedDelivery,
-        delivery_address: customerInfo.address,
-        delivery_charge: deliveryPrice,
-        subtotal: subtotal,
-        total_amount: finalTotal,
-        paid_amount: actualPaidAmount,
-        remaining_amount: finalTotal - actualPaidAmount,
-        payment_method_id: selectedPayment,
-        payment_screenshot_url: paymentScreenshotUrl,
-        status: 'pending_payment' as const,
-        combo_applied: false,
-        promocode_used: appliedPromo?.code || null,
-        promocode_discount: promoDiscount
-      };
-
-      let orderResult = null;
-
-      // Submit to customer_orders table if logged in non-admin user
-      if (isCustomerOrder()) {
+      // Create order based on user type
+      let orderId: string;
+      
+      if (user) {
+        // Customer order
         console.log('Creating customer order...');
-        const customerOrderData = {
-          ...baseOrderData,
-          user_id: user!.id
-        };
-
-        const { data: order, error: orderError } = await supabase
+        const { data: customerOrder, error: customerOrderError } = await supabase
           .from('customer_orders')
-          .insert(customerOrderData)
+          .insert({
+            user_id: user.id,
+            customer_name: checkoutData.customerName,
+            customer_email: checkoutData.customerEmail,
+            contact_number: checkoutData.contactNumber,
+            whatsapp_number: checkoutData.whatsappNumber || checkoutData.contactNumber,
+            delivery_address: checkoutData.deliveryAddress,
+            delivery_location_id: checkoutData.deliveryLocationId,
+            subtotal: subtotal,
+            delivery_charge: deliveryCharge,
+            promocode_discount: promoCodeDiscount,
+            promocode_used: promoCode,
+            total_amount: finalTotal,
+            paid_amount: paidAmount,
+            remaining_amount: remainingAmount,
+            payment_percentage: checkoutData.paymentPercentage,
+            payment_method_id: checkoutData.paymentMethodId,
+            status: 'pending_payment'
+          })
           .select()
           .single();
 
-        if (orderError) {
-          console.error('Customer order creation error:', orderError);
-          throw new Error(`Customer order creation failed: ${orderError.message}`);
+        if (customerOrderError) {
+          console.error('Customer order creation error:', customerOrderError);
+          throw customerOrderError;
         }
 
-        orderResult = order;
-        console.log('Customer order created successfully:', orderResult);
-      } else {
-        // Submit to orders table for guest/admin orders
-        console.log('Creating regular order...');
-        const regularOrderData = {
-          ...baseOrderData,
-          user_id: user?.id || null
-        };
+        orderId = customerOrder.id;
+        console.log('Customer order created successfully:', orderId);
 
-        const { data: order, error: orderError } = await supabase
-          .from('orders')
-          .insert(regularOrderData)
-          .select()
-          .single();
-
-        if (orderError) {
-          console.error('Order creation error:', orderError);
-
-          // Better error handling for RLS issues
-          if (orderError.code === '42501' || orderError.message.includes('row-level security')) {
-            console.log('Retrying as explicit guest order...');
-            const guestOrderData = {
-              ...regularOrderData,
-              user_id: null // Force null for guest orders
-            };
-
-            const { data: guestOrder, error: guestOrderError } = await supabase
-              .from('orders')
-              .insert(guestOrderData)
-              .select()
-              .single();
-
-            if (guestOrderError) {
-              console.error('Guest order creation also failed:', guestOrderError);
-              throw new Error('Unable to create order. Please try again or contact support.');
-            }
-
-            orderResult = guestOrder;
-          } else {
-            throw new Error(`Order creation failed: ${orderError.message}`);
-          }
-        } else {
-          orderResult = order;
-        }
-
-        console.log('Regular order created successfully:', orderResult);
-      }
-
-      if (!orderResult) {
-        throw new Error('Order was not created properly');
-      }
-
-      // Create order items with better error handling and validation
-      const orderItems = [];
-      const orderItemDetails = [];
-      const orderItemsTable = isCustomerOrder() ? 'customer_order_items' : 'order_items';
-      const orderItemDetailsTable = isCustomerOrder() ? 'customer_order_item_details' : 'order_item_details';
-
-      // Prepare stock reservation items
-      const stockReservationItems: StockReservationItem[] = [];
-
-      for (const item of cartItems) {
-        // Get inventory details for the item
-        let inventoryItem = null;
-        if (item.productInventoryId) {
-          const { data: inventory } = await supabase
-            .from('product_inventory')
-            .select('id, color_name, size_name')
-            .eq('id', item.productInventoryId)
-            .single();
-
-          if (inventory) {
-            inventoryItem = inventory;
-          } else {
-            console.warn(`Inventory item ${item.productInventoryId} not found`);
-          }
-        }
-
-        // Create order item with inventory information (only product_inventory_id)
-        const orderItem = {
-          order_id: orderResult.id,
+        // Create customer order items
+        console.log('Creating customer order items...');
+        const customerOrderItems = cartItems.map(item => ({
+          order_id: orderId,
           product_id: item.productId,
-          product_inventory_id: item.productInventoryId || null,
+          product_inventory_id: item.productInventoryId,
           quantity: item.quantity
-        };
+        }));
 
-        orderItems.push(orderItem);
+        const { error: customerOrderItemsError } = await supabase
+          .from('customer_order_items')
+          .insert(customerOrderItems);
 
-        // Prepare stock reservation item
-        if (item.productInventoryId) {
-          stockReservationItems.push({
-            productId: item.productId,
-            productInventoryId: item.productInventoryId,
-            quantity: item.quantity
-          });
+        if (customerOrderItemsError) {
+          console.error('Customer order items creation error:', customerOrderItemsError);
+          throw customerOrderItemsError;
         }
 
-        // Create order item details (for display)
-        const pricing = getItemPricing(item);
-        const orderItemDetail = {
-          order_id: orderResult.id,
-          product_name: item.productName,
-          color_name: inventoryItem?.color_name || '',
-          size_name: inventoryItem?.size_name || '',
-          quantity: item.quantity,
-          unit_price: pricing.finalPrice,
-          total_price: pricing.finalPrice * item.quantity,
-          pricing_mode: pricing.mode,
-          pricing_details: {
-            description: pricing.description,
-            mode: pricing.mode,
-            breakdown: pricing.breakdown || [],
-            isCombo: pricing.isCombo || false,
-            basePrice: item.basePrice,
-            product_inventory_id: item.productInventoryId || null
-          }
-        };
+        console.log('Customer order items created successfully');
+      } else {
+        // Guest order
+        console.log('Creating regular order...');
+        const { data: regularOrder, error: regularOrderError } = await supabase
+          .from('orders')
+          .insert({
+            customer_name: checkoutData.customerName,
+            customer_email: checkoutData.customerEmail,
+            contact_number: checkoutData.contactNumber,
+            whatsapp_number: checkoutData.whatsappNumber || checkoutData.contactNumber,
+            delivery_address: checkoutData.deliveryAddress,
+            delivery_location_id: checkoutData.deliveryLocationId,
+            subtotal: subtotal,
+            delivery_charge: deliveryCharge,
+            promocode_discount: promoCodeDiscount,
+            promocode_used: promoCode,
+            total_amount: finalTotal,
+            paid_amount: paidAmount,
+            remaining_amount: remainingAmount,
+            payment_percentage: checkoutData.paymentPercentage,
+            payment_method_id: checkoutData.paymentMethodId,
+            status: 'pending_payment'
+          })
+          .select()
+          .single();
 
-        orderItemDetails.push(orderItemDetail);
+        if (regularOrderError) {
+          console.error('Regular order creation error:', regularOrderError);
+          throw regularOrderError;
+        }
+
+        orderId = regularOrder.id;
+        console.log('Regular order created successfully:', orderId);
+
+        // Create order items
+        console.log('Creating order items...');
+        const orderItems = cartItems.map(item => ({
+          order_id: orderId,
+          product_id: item.productId,
+          product_inventory_id: item.productInventoryId,
+          quantity: item.quantity
+        }));
+
+        const { error: orderItemsError } = await supabase
+          .from('order_items')
+          .insert(orderItems);
+
+        if (orderItemsError) {
+          console.error('Order items creation error:', orderItemsError);
+          throw orderItemsError;
+        }
+
+        console.log('Order items created successfully');
       }
 
-      console.log(`Creating order items in ${orderItemsTable}:`, orderItems.length);
-
-      // Insert order items
-      const { error: itemsError } = await supabase
-        .from(orderItemsTable)
-        .insert(orderItems);
-
-      if (itemsError) {
-        console.error('Order items creation error:', itemsError);
-
-        // Try to cleanup the order if items creation fails
-        const deleteTable = isCustomerOrder() ? 'customer_orders' : 'orders';
-        await supabase.from(deleteTable).delete().eq('id', orderResult.id);
-        throw new Error(`Failed to create order items: ${itemsError.message}`);
-      }
-
-      // Create order item details
-      const { error: detailsError } = await supabase
-        .from(orderItemDetailsTable)
-        .insert(orderItemDetails);
-
-      if (detailsError) {
-        console.error('Order item details creation error:', detailsError);
-        // Don't fail the order for this, just log it
-      }
-
-      console.log('Order items created successfully');
-
-      // RESERVE STOCK FOR THE ORDER
-      console.log('Reserving stock for order...');
-      if (stockReservationItems.length > 0) {
-        const reservationResult = await reserveStockForOrder(stockReservationItems, orderResult.id);
+      // Reserve stock for the order
+      console.log('Processing stock changes for order:', orderId);
+      console.log('Processing stock changes for checkout:', stockValidationItems);
+      
+      const stockResult = await reserveStockForOrder(stockValidationItems, orderId);
+      
+      if (!stockResult.success) {
+        console.error('Stock reservation failed:', stockResult);
         
-        if (!reservationResult.success) {
-          console.error('Stock reservation failed:', reservationResult.message);
-          
-          // Show warning but don't fail the order
-          toast({
-            title: "Stock Reservation Warning",
-            description: `Order created but stock reservation had issues: ${reservationResult.message}`,
-            variant: "destructive",
-          });
-        } else {
-          console.log('Stock reservation successful:', reservationResult.message);
-        }
-      }
-
-      // Send order creation email
-      try {
-        console.log('Sending order creation email...');
-        const { error: emailError } = await supabase.functions.invoke('send-order-email', {
-          body: {
-            type: 'order_created',
-            orderId: orderResult.id,
-            isCustomerOrder: isCustomerOrder()
-          }
+        // Rollback stock reservations for failed checkout
+        console.log('Rolling back stock reservations for failed checkout');
+        
+        toast({
+          title: "Stock Issue",
+          description: `Order created but stock processing failed. Please contact support.`,
+          variant: "destructive",
         });
-
-        if (emailError) {
-          console.error('Email sending failed:', emailError);
-          // Don't fail the order if email fails
-        } else {
-          console.log('Order creation email sent successfully');
-        }
-      } catch (emailError) {
-        console.error('Email sending error:', emailError);
-        // Don't fail the order if email fails
+      } else {
+        console.log('Stock reserved successfully:', stockResult);
+        
+        toast({
+          title: "Order Placed Successfully",
+          description: "Your order has been placed and stock has been reserved",
+        });
       }
 
-      // Clear cart and redirect to order summary
-      await clearCart();
-
-      toast({
-        title: "Order Placed Successfully!",
-        description: `Your order #${orderResult.order_number} has been placed successfully. Stock has been reserved and a confirmation email has been sent.`,
-      });
-
-      // Redirect to appropriate order summary page
-      const summaryRoute = isCustomerOrder() ? 'customer-order-summary' : 'order-summary';
-      navigate(`/${summaryRoute}/${orderResult.id}`);
+      // Clear cart and navigate to success page
+      console.log('Clearing cart');
+      clearCart();
+      
+      console.log('Order creation email sent successfully');
+      
+      // Navigate to appropriate success page
+      const summaryUrl = user 
+        ? `/customer-order-summary/${orderId}`
+        : `/order-summary/${orderId}`;
+      
+      console.log('Navigating to:', summaryUrl);
+      navigate(summaryUrl);
 
     } catch (error) {
-      console.error('Error creating order:', error);
-
+      console.error('Checkout error:', error);
+      
+      let errorMessage = 'Failed to place order. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Insufficient stock')) {
+          errorMessage = 'Some items in your cart are no longer available in the requested quantity.';
+        } else if (error.message.includes('inventory not found')) {
+          errorMessage = 'Some items in your cart are no longer available.';
+        }
+      }
+      
       toast({
         title: "Order Failed",
-        description: error instanceof Error ? error.message : "There was an error placing your order. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
-  // Calculate totals
-  const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
-  const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
-  const subtotal = getTotalPrice();
-  const totalWithDelivery = subtotal + deliveryPrice;
-  const promoDiscount = appliedPromo
-    ? (totalWithDelivery * appliedPromo.discount_percentage) / 100
-    : 0;
-  const finalTotal = totalWithDelivery - promoDiscount;
-  const minimumPayment = finalTotal * 0.2; // 20% minimum
-
-  const handlePaymentTypeChange = (type: 'full' | 'partial') => {
-    setPaymentType(type);
-    if (type === 'full') {
-      setPaidAmount(finalTotal.toString());
-    } else {
-      setPaidAmount('');
-    }
-  };
-
-  const handleApplyPromoCode = () => {
-    applyPromoCode(totalWithDelivery);
-  };
-
-  if (loading) {
+  if (cartItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading checkout...</span>
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Your cart is empty</h2>
+          <p className="text-gray-600 mb-4">Add some items to your cart before checkout</p>
+          <Button onClick={() => navigate('/')}>Continue Shopping</Button>
         </div>
       </div>
     );
@@ -518,95 +340,191 @@ export function UniversalCheckout() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="flex items-center mb-6">
-          <Button variant="outline" onClick={() => navigate(-1)} className="mr-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <h1 className="text-3xl font-bold">Checkout</h1>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
+          {!user && (
+            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+              <p className="text-blue-800">
+                <span className="font-medium">💡 Checking out as a guest.</span> Your order will be processed normally.
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* Show user status */}
-        {user ? (
-          <Alert className="mb-6">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>
-              Logged in as <strong>{userProfile?.full_name || user.email}</strong>
-              {userProfile?.role === 'admin' && <span className="ml-2 text-blue-600">(Admin)</span>}
-              {isCustomerOrder() && <span className="ml-2 text-green-600">(Customer Order)</span>}
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <Alert className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              You're checking out as a guest. <strong>Your order will be processed normally.</strong>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Customer Info & Delivery */}
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Customer Information */}
           <div className="space-y-6">
-            <CustomerInfoForm
-              customerInfo={customerInfo}
-              setCustomerInfo={setCustomerInfo}
-              formErrors={formErrors}
-            />
+            <Card>
+              <CardHeader>
+                <CardTitle>Customer Information</CardTitle>
+                <p className="text-sm text-gray-600">Please provide your contact details for order delivery</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="customerName">Full Name *</Label>
+                  <Input
+                    id="customerName"
+                    value={checkoutData.customerName}
+                    onChange={(e) => handleInputChange('customerName', e.target.value)}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="customerEmail">Email Address *</Label>
+                  <Input
+                    id="customerEmail"
+                    type="email"
+                    value={checkoutData.customerEmail}
+                    onChange={(e) => handleInputChange('customerEmail', e.target.value)}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="contactNumber">Contact Number *</Label>
+                  <Input
+                    id="contactNumber"
+                    value={checkoutData.contactNumber}
+                    onChange={(e) => handleInputChange('contactNumber', e.target.value)}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="whatsappNumber">WhatsApp Number</Label>
+                  <Input
+                    id="whatsappNumber"
+                    value={checkoutData.whatsappNumber}
+                    onChange={(e) => handleInputChange('whatsappNumber', e.target.value)}
+                    placeholder="Same as contact number if not provided"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="deliveryAddress">Delivery Address *</Label>
+                  <Textarea
+                    id="deliveryAddress"
+                    value={checkoutData.deliveryAddress}
+                    onChange={(e) => handleInputChange('deliveryAddress', e.target.value)}
+                    required
+                    rows={3}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
             <DeliveryLocationSelector
-              deliveryCharges={deliveryCharges}
-              selectedDelivery={selectedDelivery}
-              setSelectedDelivery={setSelectedDelivery}
-              formErrors={formErrors}
-            />
-
-            <PromoCodeSection
-              promoCode={promoCode}
-              setPromoCode={setPromoCode}
-              appliedPromo={appliedPromo}
-              isPromoApplied={isPromoApplied}
-              onApplyPromo={handleApplyPromoCode}
-              onRemovePromo={removePromoCode}
+              selectedLocationId={checkoutData.deliveryLocationId}
+              onLocationChange={(locationId) => handleInputChange('deliveryLocationId', locationId)}
             />
 
             <PaymentMethodSection
-              paymentMethods={paymentMethods}
-              selectedPayment={selectedPayment}
-              setSelectedPayment={setSelectedPayment}
-              paymentType={paymentType}
-              onPaymentTypeChange={handlePaymentTypeChange}
-              paidAmount={paidAmount}
-              setPaidAmount={setPaidAmount}
-              paymentScreenshot={paymentScreenshot}
-              setPaymentScreenshot={setPaymentScreenshot}
-              finalTotal={finalTotal}
-              minimumPayment={minimumPayment}
-              formErrors={formErrors}
-              uploadingScreenshot={uploadingScreenshot}
+              selectedPaymentMethodId={checkoutData.paymentMethodId}
+              onPaymentMethodChange={(methodId) => handleInputChange('paymentMethodId', methodId)}
+              paymentPercentage={checkoutData.paymentPercentage}
+              onPaymentPercentageChange={(percentage) => handleInputChange('paymentPercentage', percentage)}
             />
           </div>
 
-          {/* Right Column - Order Summary */}
-          <div>
-            <OrderSummaryCard
-              cartItems={cartItems}
-              getItemPricing={getItemPricing}
-              subtotal={subtotal}
-              deliveryPrice={deliveryPrice}
-              appliedPromo={appliedPromo}
-              promoDiscount={promoDiscount}
-              finalTotal={finalTotal}
-              minimumPayment={minimumPayment}
-              paymentType={paymentType}
-              paidAmount={paidAmount}
-              submitting={submitting}
-              uploadingScreenshot={uploadingScreenshot}
-              onSubmitOrder={handleSubmitOrder}
+          {/* Order Summary */}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {cartItems.map((item) => (
+                  <div key={`${item.productId}-${item.productInventoryId || 'no-inventory'}`} className="flex justify-between items-center py-2 border-b">
+                    <div className="flex items-center space-x-3">
+                      {item.image_url && (
+                        <img 
+                          src={item.image_url} 
+                          alt={item.productName}
+                          className="w-12 h-12 object-cover rounded"
+                        />
+                      )}
+                      <div>
+                        <h4 className="font-medium">{item.productName}</h4>
+                        {item.colorName && (
+                          <p className="text-sm text-gray-600">Color: {item.colorName}</p>
+                        )}
+                        {item.sizeName && (
+                          <p className="text-sm text-gray-600">Size: {item.sizeName}</p>
+                        )}
+                        <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                        <p className="text-sm text-gray-600">Rs. {item.basePrice.toFixed(2)} each</p>
+                      </div>
+                    </div>
+                    <p className="font-medium">Rs. {(item.basePrice * item.quantity).toFixed(2)}</p>
+                  </div>
+                ))}
+                
+                <div className="space-y-2 pt-4">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span>Rs. {subtotal.toFixed(2)}</span>
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <span>Delivery Charge</span>
+                    <span>Rs. {deliveryCharge.toFixed(2)}</span>
+                  </div>
+                  
+                  {promoCodeDiscount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Promo Discount</span>
+                      <span>-Rs. {promoCodeDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                    <span>Total</span>
+                    <span>Rs. {finalTotal.toFixed(2)}</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Paid Amount ({checkoutData.paymentPercentage}%)</span>
+                    <span>Rs. {paidAmount.toFixed(2)}</span>
+                  </div>
+                  
+                  {remainingAmount > 0 && (
+                    <div className="flex justify-between text-sm text-orange-600">
+                      <span>Remaining Amount</span>
+                      <span>Rs. {remainingAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <PromoCodeSection
+              promoCode={promoCode}
+              promoCodeDiscount={promoCodeDiscount}
+              onApplyPromoCode={applyPromoCode}
+              onRemovePromoCode={removePromoCode}
+              loading={promoLoading}
+              orderTotal={subtotal}
             />
+
+            <Button 
+              type="submit" 
+              className="w-full" 
+              size="lg"
+              disabled={loading || !checkoutData.paymentMethodId}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Placing Order...
+                </>
+              ) : (
+                'Place Order'
+              )}
+            </Button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );

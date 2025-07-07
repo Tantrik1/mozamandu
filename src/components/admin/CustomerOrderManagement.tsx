@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -7,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Eye, RefreshCw } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useOrderStockManagement } from '@/hooks/useOrderStockManagement';
+
+type OrderStatus = 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled';
 
 interface CustomerOrder {
   id: string;
@@ -17,10 +18,10 @@ interface CustomerOrder {
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;
-  status: string;
+  status: OrderStatus;
   created_at: string;
   delivery_address: string;
-  payment_method: { name: string } | null;
+  payment_method_id: string | null;
 }
 
 export function CustomerOrderManagement() {
@@ -36,7 +37,7 @@ export function CustomerOrderManagement() {
         .from('customer_orders')
         .select(`
           *,
-          payment_method:payment_method_id (name)
+          payment_methods!left (name)
         `)
         .order('created_at', { ascending: false });
 
@@ -57,13 +58,15 @@ export function CustomerOrderManagement() {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
       setUpdatingOrder(orderId);
       
       // Get current order to know old status
       const currentOrder = orders.find(order => order.id === orderId);
-      const oldStatus = currentOrder?.status || '';
+      const oldStatus = currentOrder?.status || 'pending_payment';
+      
+      console.log('Updating customer order status:', { orderId, oldStatus, newStatus });
       
       // Update order status in database
       const { error } = await supabase
@@ -101,14 +104,14 @@ export function CustomerOrderManagement() {
     }
   };
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeVariant = (status: OrderStatus) => {
     switch (status) {
       case 'delivered':
         return 'default';
       case 'cancelled':
         return 'destructive';
-      case 'confirmed':
-      case 'processing':
+      case 'payment_confirmed':
+      case 'on_delivery':
         return 'secondary';
       default:
         return 'outline';
@@ -163,9 +166,6 @@ export function CustomerOrderManagement() {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Payment
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -211,7 +211,7 @@ export function CustomerOrderManagement() {
                     <div className="flex items-center space-x-2">
                       <Select
                         value={order.status}
-                        onValueChange={(value) => updateOrderStatus(order.id, value)}
+                        onValueChange={(value: OrderStatus) => updateOrderStatus(order.id, value)}
                         disabled={updatingOrder === order.id || stockProcessing}
                       >
                         <SelectTrigger className="w-40">
@@ -219,9 +219,8 @@ export function CustomerOrderManagement() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                          <SelectItem value="confirmed">Confirmed</SelectItem>
-                          <SelectItem value="processing">Processing</SelectItem>
-                          <SelectItem value="shipped">Shipped</SelectItem>
+                          <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
+                          <SelectItem value="on_delivery">On Delivery</SelectItem>
                           <SelectItem value="delivered">Delivered</SelectItem>
                           <SelectItem value="cancelled">Cancelled</SelectItem>
                         </SelectContent>
@@ -234,9 +233,6 @@ export function CustomerOrderManagement() {
                       {order.status.replace('_', ' ').toUpperCase()}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {order.payment_method?.name || 'N/A'}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(order.created_at).toLocaleDateString()}
                   </td>
@@ -245,7 +241,6 @@ export function CustomerOrderManagement() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        // Navigate to customer order details
                         window.open(`/customer-order-summary/${order.id}`, '_blank');
                       }}
                     >

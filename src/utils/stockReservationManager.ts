@@ -38,7 +38,7 @@ export async function reserveStockForOrder(
         .single();
 
       if (inventoryError || !inventoryData) {
-        console.error(`Inventory not found for product ${item.productId}`);
+        console.error(`Inventory not found for product ${item.productId}:`, inventoryError);
         failedItems.push({
           item,
           reason: 'Inventory record not found'
@@ -58,11 +58,14 @@ export async function reserveStockForOrder(
       }
 
       // Reserve the stock
+      const newReservedStock = inventoryData.reserved_stock + item.quantity;
+      const newAvailableStock = inventoryData.stock_quantity - newReservedStock;
+
       const { error: updateError } = await supabase
         .from('product_inventory')
         .update({
-          reserved_stock: inventoryData.reserved_stock + item.quantity,
-          available_stock: inventoryData.stock_quantity - (inventoryData.reserved_stock + item.quantity),
+          reserved_stock: newReservedStock,
+          available_stock: newAvailableStock,
           updated_at: new Date().toISOString()
         })
         .eq('id', inventoryData.id);
@@ -84,16 +87,16 @@ export async function reserveStockForOrder(
           product_id: item.productId,
           action_type: 'reservation',
           old_reserved_stock: inventoryData.reserved_stock,
-          new_reserved_stock: inventoryData.reserved_stock + item.quantity,
+          new_reserved_stock: newReservedStock,
           old_available_stock: inventoryData.stock_quantity - inventoryData.reserved_stock,
-          new_available_stock: inventoryData.stock_quantity - (inventoryData.reserved_stock + item.quantity),
+          new_available_stock: newAvailableStock,
           change_amount: item.quantity,
           reason: `Stock reserved for order ${orderId}`,
           order_id: orderId
         });
 
       reservedItems.push(item);
-      console.log(`Reserved ${item.quantity} units for product ${item.productId}`);
+      console.log(`Successfully reserved ${item.quantity} units for product ${item.productId}`);
 
     } catch (error) {
       console.error('Error reserving stock:', error);
@@ -144,7 +147,7 @@ export async function fulfillStockForOrder(
         .single();
 
       if (inventoryError || !inventoryData) {
-        console.error(`Inventory not found for product ${item.productId}`);
+        console.error(`Inventory not found for product ${item.productId}:`, inventoryError);
         failedItems.push({
           item,
           reason: 'Inventory record not found'
@@ -205,7 +208,7 @@ export async function fulfillStockForOrder(
         });
 
       fulfilledItems.push(item);
-      console.log(`Fulfilled ${item.quantity} units for product ${item.productId}`);
+      console.log(`Successfully fulfilled ${item.quantity} units for product ${item.productId}`);
 
     } catch (error) {
       console.error('Error fulfilling stock:', error);
@@ -256,7 +259,7 @@ export async function releaseStockForOrder(
         .single();
 
       if (inventoryError || !inventoryData) {
-        console.error(`Inventory not found for product ${item.productId}`);
+        console.error(`Inventory not found for product ${item.productId}:`, inventoryError);
         failedItems.push({
           item,
           reason: 'Inventory record not found'
@@ -303,7 +306,7 @@ export async function releaseStockForOrder(
         });
 
       releasedItems.push(item);
-      console.log(`Released ${item.quantity} units for product ${item.productId}`);
+      console.log(`Successfully released ${item.quantity} units for product ${item.productId}`);
 
     } catch (error) {
       console.error('Error releasing stock:', error);
@@ -335,19 +338,30 @@ export async function releaseStockForOrder(
 export async function getOrderItemsForStockOperation(orderId: string, isCustomerOrder: boolean = false): Promise<StockReservationItem[]> {
   const table = isCustomerOrder ? 'customer_order_items' : 'order_items';
   
+  console.log(`Fetching order items from ${table} for order ${orderId}`);
+  
   const { data: orderItems, error } = await supabase
     .from(table)
     .select('product_id, product_inventory_id, quantity')
     .eq('order_id', orderId);
 
-  if (error || !orderItems) {
+  if (error) {
     console.error('Error fetching order items:', error);
     return [];
   }
 
-  return orderItems.map(item => ({
+  if (!orderItems || orderItems.length === 0) {
+    console.log('No order items found for order:', orderId);
+    return [];
+  }
+
+  const stockItems = orderItems.map(item => ({
     productId: item.product_id,
     productInventoryId: item.product_inventory_id,
     quantity: item.quantity
   }));
+
+  console.log('Retrieved order items for stock operation:', stockItems);
+  
+  return stockItems;
 }

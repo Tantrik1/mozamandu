@@ -1,8 +1,9 @@
+
 import {
   LayoutDashboard,
   ShoppingCart,
   Users,
-  Category,
+  FolderOpen,
   ListChecks,
   Package,
   User,
@@ -79,7 +80,7 @@ export function AdminSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <Link to="/admin/categories">
-                    <Category className="mr-2 h-4 w-4" />
+                    <FolderOpen className="mr-2 h-4 w-4" />
                     Categories
                   </Link>
                 </SidebarMenuButton>

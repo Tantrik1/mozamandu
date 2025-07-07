@@ -81,6 +81,7 @@ export function useOrderStockManagement() {
           description: "Please manually verify stock availability for this uncancelled order",
           variant: "destructive",
         });
+        return false;
       }
       else if (oldStatus === 'delivered' && newStatus !== 'delivered') {
         // Order undelivered: we would need to add stock back
@@ -91,6 +92,7 @@ export function useOrderStockManagement() {
           description: "Please manually adjust stock for this order status change",
           variant: "destructive",
         });
+        return false;
       }
 
       console.log('Stock operation result:', stockResult);
