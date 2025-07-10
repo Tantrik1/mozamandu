@@ -56,15 +56,21 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
       const savedCart = localStorage.getItem(CART_STORAGE_KEY);
       if (savedCart) {
         const items = JSON.parse(savedCart);
+        // Ensure all items have the required price property
+        const itemsWithPrice = items.map((item: any) => ({
+          ...item,
+          price: item.price || item.basePrice * item.quantity
+        }));
+        
         // Only validate if products exist, no stock checking
-        const { validItems, removedItems, errors } = await validateCartItems(items);
+        const { validItems, removedItems, errors } = await validateCartItems(itemsWithPrice);
         
         if (removedItems.length > 0) {
           showCartCleanupNotification(removedItems, errors);
         }
         
         setCartItems(validItems);
-        if (validItems.length !== items.length) {
+        if (validItems.length !== itemsWithPrice.length) {
           localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(validItems));
         }
       }
@@ -84,7 +90,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
     const newItem: CartItem = {
       ...item,
       id: `${item.productId}-${item.productInventoryId || 'default'}-${Date.now()}`,
-      price: item.basePrice
+      price: item.basePrice * item.quantity
     };
 
     const existingItemIndex = cartItems.findIndex(

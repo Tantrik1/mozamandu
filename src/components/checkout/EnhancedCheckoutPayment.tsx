@@ -33,6 +33,7 @@ export function EnhancedCheckoutPayment({
 }: EnhancedCheckoutPaymentProps) {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   useEffect(() => {
     fetchPaymentMethods();
@@ -64,6 +65,15 @@ export function EnhancedCheckoutPayment({
   };
 
   const selectedMethod = paymentMethods.find(method => method.id === selectedPaymentMethod);
+
+  const handleFileSelect = (file: File | null) => {
+    setSelectedFile(file);
+    if (file) {
+      // For now, we'll use a placeholder URL
+      // In a real implementation, you'd upload the file to storage
+      onPaymentScreenshotChange(`uploaded-${file.name}`);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -153,9 +163,8 @@ export function EnhancedCheckoutPayment({
         </CardHeader>
         <CardContent>
           <PaymentScreenshotUpload
-            onUploadComplete={onPaymentScreenshotChange}
-            currentImageUrl={paymentScreenshotUrl}
-            onRemove={() => onPaymentScreenshotChange('')}
+            onFileSelect={handleFileSelect}
+            selectedFile={selectedFile}
           />
           <div className="mt-4 p-3 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-700">

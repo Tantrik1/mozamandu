@@ -50,12 +50,10 @@ export function CustomerHeader() {
     checkTopBarVisibility();
   }, []);
 
-  // Check if top bar is visible by looking for the top bar element
   const checkTopBarVisibility = () => {
     const topBar = document.querySelector('[data-testid="top-bar"]') || document.querySelector('.bg-red-600');
     setIsTopBarVisible(!!topBar);
 
-    // Set up a mutation observer to watch for top bar changes
     const observer = new MutationObserver(() => {
       const topBar = document.querySelector('[data-testid="top-bar"]') || document.querySelector('.bg-red-600');
       setIsTopBarVisible(!!topBar);
@@ -66,13 +64,11 @@ export function CustomerHeader() {
     return () => observer.disconnect();
   };
 
-  // Close mobile menu on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
     setExpandedCategory(null);
   }, [location.pathname]);
 
-  // Handle body scroll lock
   useEffect(() => {
     if (isMobileMenuOpen) {
       document.body.style.overflow = 'hidden';
@@ -80,7 +76,6 @@ export function CustomerHeader() {
       document.body.style.overflow = '';
     }
 
-    // Cleanup on unmount
     return () => {
       document.body.style.overflow = '';
     };
@@ -181,14 +176,13 @@ export function CustomerHeader() {
   const handleMegaMenuMouseLeave = () => {
     const timeout = setTimeout(() => {
       setOpenMegaMenu(null);
-    }, 150); // 150ms delay
+    }, 150);
     setMegaMenuCloseTimeout(timeout);
   };
 
   const renderCategoryItem = (item: NavbarItem) => {
     const category = item.category;
     if (!category) return null;
-    // Use a fixed offset for the mega menu
     const megaMenuTopPosition = isTopBarVisible ? 'top-20' : 'top-16';
     return (
       <div
