@@ -2,12 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Search, Filter } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductCard } from '@/components/customer/ProductCard';
-import { calculateTotalProductStock } from '@/utils/inventoryManager';
 
 interface Product {
   id: string;
@@ -18,6 +15,7 @@ interface Product {
   image_url?: string;
   status: string;
   subcategory_id: string;
+  is_featured?: boolean;
   subcategories: {
     name: string;
     selling_price: number;
@@ -28,7 +26,6 @@ export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
 
   useEffect(() => {
     fetchProducts();

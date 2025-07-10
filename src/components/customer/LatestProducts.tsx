@@ -1,7 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
-import { calculateTotalProductStock } from '@/utils/inventoryManager';
 import { ProductCard } from './ProductCard';
 
 export function LatestProducts() {
@@ -9,10 +8,10 @@ export function LatestProducts() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchProducts();
+    fetchLatestProducts();
   }, []);
 
-  const fetchProducts = async () => {
+  const fetchLatestProducts = async () => {
     try {
       const { data, error } = await supabase
         .from('products')
@@ -28,16 +27,7 @@ export function LatestProducts() {
         .limit(8);
 
       if (error) throw error;
-      
-      // Fetch stock for each product
-      const productsWithStock = await Promise.all(
-        data.map(async (product: any) => {
-          const totalStock = await calculateTotalProductStock(product.id);
-          return { ...product, totalStock };
-        })
-      );
-
-      setProducts(productsWithStock);
+      setProducts(data || []);
     } catch (error) {
       console.error('Error fetching latest products:', error);
     } finally {
@@ -47,33 +37,42 @@ export function LatestProducts() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center min-h-[200px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p>Loading latest products...</p>
+      <section className="py-16 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-12">Latest Products</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div key={index} className="bg-white rounded-lg shadow-sm overflow-hidden animate-pulse">
+                <div className="w-full h-48 bg-gray-200"></div>
+                <div className="p-4">
+                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded mb-3 w-3/4"></div>
+                  <div className="h-8 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      </section>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h2 className="text-2xl font-bold mb-4">Latest Products</h2>
-      {products.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-8">
-            <p className="text-gray-500">No products found</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {products.map((product: any) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-      )}
-    </div>
+    <section className="py-16 bg-gray-50">
+      <div className="container mx-auto px-4">
+        <h2 className="text-3xl font-bold text-center mb-12">Latest Products</h2>
+        {products.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center text-gray-500">
+            <p>No products available at the moment.</p>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

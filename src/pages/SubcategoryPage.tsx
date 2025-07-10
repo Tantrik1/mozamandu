@@ -1,11 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { calculateTotalProductStock } from '@/utils/inventoryManager';
 import { ProductCard } from '@/components/customer/ProductCard';
 
 export default function SubcategoryPage() {
@@ -34,7 +32,13 @@ export default function SubcategoryPage() {
       // Fetch products for the subcategory
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          subcategories (
+            name,
+            selling_price
+          )
+        `)
         .eq('subcategory_id', subcategoryId)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
@@ -76,7 +80,7 @@ export default function SubcategoryPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <Link to="/products" className="inline-flex items-center mb-4">
+        <Link to="/products" className="inline-flex items-center mb-4 text-primary hover:text-primary/80">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Products
         </Link>
