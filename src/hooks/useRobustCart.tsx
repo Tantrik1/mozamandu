@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { validateCartItems, showCartCleanupNotification } from '@/utils/cartValidation';
 
 export interface CartItem {
@@ -11,7 +11,7 @@ export interface CartItem {
   sizeName?: string;
   quantity: number;
   basePrice: number;
-  price: number; // Calculated price
+  price: number;
   subcategoryId: string;
   image_url?: string;
   // Legacy support
@@ -21,7 +21,29 @@ export interface CartItem {
 
 const CART_STORAGE_KEY = 'robust_cart_items';
 
+interface CartContextType {
+  cartItems: CartItem[];
+  isLoading: boolean;
+  addToCart: (item: Omit<CartItem, 'id' | 'price'>) => void;
+  removeFromCart: (itemId: string) => void;
+  updateQuantity: (itemId: string, quantity: number) => void;
+  clearCart: () => void;
+  getTotalPrice: () => number;
+  getTotalItems: () => number;
+  refreshCart: () => Promise<void>;
+}
+
+const CartContext = createContext<CartContextType | undefined>(undefined);
+
 export function useRobustCart() {
+  const context = useContext(CartContext);
+  if (context === undefined) {
+    throw new Error('useRobustCart must be used within a RobustCartProvider');
+  }
+  return context;
+}
+
+export function RobustCartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -34,7 +56,7 @@ export function useRobustCart() {
       const savedCart = localStorage.getItem(CART_STORAGE_KEY);
       if (savedCart) {
         const items = JSON.parse(savedCart);
-        // Validate cart items
+        // Only validate if products exist, no stock checking
         const { validItems, removedItems, errors } = await validateCartItems(items);
         
         if (removedItems.length > 0) {
@@ -118,7 +140,7 @@ export function useRobustCart() {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
-  return {
+  const value: CartContextType = {
     cartItems,
     isLoading,
     addToCart,
@@ -129,4 +151,10 @@ export function useRobustCart() {
     getTotalItems,
     refreshCart: loadCart
   };
+
+  return (
+    <CartContext.Provider value={value}>
+      {children}
+    </CartContext.Provider>
+  );
 }

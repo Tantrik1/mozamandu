@@ -186,7 +186,7 @@ export function InventoryManagement() {
                         <Badge variant="destructive">Out of Stock</Badge>
                       )}
                       {item.stock_status === 'Low Stock' && (
-                        <Badge variant="warning">Low Stock</Badge>
+                        <Badge variant="secondary">Low Stock</Badge>
                       )}
                       {item.stock_status === 'In Stock' && (
                         <Badge variant="secondary">In Stock</Badge>

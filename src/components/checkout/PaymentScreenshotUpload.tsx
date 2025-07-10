@@ -1,8 +1,9 @@
 
-import React, { useRef } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload, X } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface PaymentScreenshotUploadProps {
   onFileSelect: (file: File | null) => void;
@@ -10,57 +11,52 @@ interface PaymentScreenshotUploadProps {
 }
 
 export function PaymentScreenshotUpload({ onFileSelect, selectedFile }: PaymentScreenshotUploadProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null;
-    onFileSelect(file);
-  };
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Invalid file type',
+          description: 'Please select an image file',
+          variant: 'destructive',
+        });
+        return;
+      }
 
-  const handleRemoveFile = () => {
-    onFileSelect(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: 'File too large',
+          description: 'Please select an image smaller than 5MB',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      onFileSelect(file);
     }
   };
 
   return (
-    <div>
+    <div className="space-y-2">
       <Label htmlFor="payment-screenshot">Payment Screenshot</Label>
-      <div className="mt-2">
-        <input
-          ref={fileInputRef}
-          id="payment-screenshot"
-          type="file"
-          accept="image/*"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-        
-        {selectedFile ? (
-          <div className="flex items-center justify-between p-3 border rounded-md">
-            <span className="text-sm truncate">{selectedFile.name}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleRemoveFile}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Payment Screenshot
-          </Button>
-        )}
-      </div>
+      <Input
+        id="payment-screenshot"
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+      />
+      {selectedFile && (
+        <div className="text-sm text-green-600">
+          Selected: {selectedFile.name}
+        </div>
+      )}
+      <p className="text-xs text-gray-500">
+        Upload a screenshot of your payment confirmation (max 5MB)
+      </p>
     </div>
   );
 }

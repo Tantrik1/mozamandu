@@ -1,255 +1,254 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, Upload } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-interface SizeVariant {
-    id?: string;
-    size_name: string;
-    size_code?: string;
-}
-
-interface ColorVariant {
-    id?: string;
-    color_name: string;
-    image_url?: string;
-    has_sizes: boolean;
-    size_variants: SizeVariant[];
-}
+import { supabase } from '@/integrations/supabase/client';
+import { ColorVariant, SizeVariant } from '@/types/product';
 
 interface EditProductVariantFormProps {
-    colorVariants: ColorVariant[];
-    setColorVariants: (variants: ColorVariant[]) => void;
-    hasSizeVariants: boolean;
+  productId: string;
+  hasColorVariants: boolean;
+  hasSizeVariants: boolean;
+  onVariantsChange: () => void;
 }
 
 export function EditProductVariantForm({
-    colorVariants,
-    setColorVariants,
-    hasSizeVariants,
+  productId,
+  hasColorVariants,
+  hasSizeVariants,
+  onVariantsChange
 }: EditProductVariantFormProps) {
-    const [uploadingImages, setUploadingImages] = useState<{ [key: number]: boolean }>({});
-    const { toast } = useToast();
+  const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
-    const addColorVariant = () => {
-        const newVariant: ColorVariant = {
-            color_name: '',
-            has_sizes: hasSizeVariants,
-            size_variants: []
-        };
-        setColorVariants([...colorVariants, newVariant]);
+  useEffect(() => {
+    if (hasColorVariants) {
+      fetchColorVariants();
+    }
+  }, [productId, hasColorVariants]);
+
+  const fetchColorVariants = async () => {
+    const { data, error } = await supabase
+      .from('color_variants')
+      .select(`
+        *,
+        size_variants (*)
+      `)
+      .eq('product_id', productId);
+
+    if (error) {
+      console.error('Error fetching color variants:', error);
+    } else {
+      setColorVariants(data || []);
+    }
+  };
+
+  const addColorVariant = () => {
+    const newVariant: ColorVariant = {
+      color_name: '',
+      image_url: '',
+      has_sizes: hasSizeVariants,
+      size_variants: []
     };
+    setColorVariants([...colorVariants, newVariant]);
+  };
 
-    const updateColorVariant = (index: number, field: keyof ColorVariant, value: any) => {
-        const updated = [...colorVariants];
-        updated[index] = { ...updated[index], [field]: value };
-        setColorVariants(updated);
+  const updateColorVariant = (index: number, field: keyof ColorVariant, value: any) => {
+    const updated = [...colorVariants];
+    updated[index] = { ...updated[index], [field]: value };
+    setColorVariants(updated);
+  };
+
+  const addSizeVariant = (colorIndex: number) => {
+    const updated = [...colorVariants];
+    if (!updated[colorIndex].size_variants) {
+      updated[colorIndex].size_variants = [];
+    }
+    updated[colorIndex].size_variants.push({
+      size_name: '',
+      size_code: ''
+    });
+    setColorVariants(updated);
+  };
+
+  const updateSizeVariant = (colorIndex: number, sizeIndex: number, field: keyof SizeVariant, value: string) => {
+    const updated = [...colorVariants];
+    if (!updated[colorIndex].size_variants) {
+      updated[colorIndex].size_variants = [];
+    }
+    updated[colorIndex].size_variants[sizeIndex] = {
+      ...updated[colorIndex].size_variants[sizeIndex],
+      [field]: value
     };
+    setColorVariants(updated);
+  };
 
-    const removeColorVariant = (index: number) => {
-        const updated = colorVariants.filter((_, i) => i !== index);
-        setColorVariants(updated);
-    };
+  const saveVariants = async () => {
+    setLoading(true);
+    try {
+      // Save each color variant
+      for (const variant of colorVariants) {
+        if (variant.color_name.trim()) {
+          let colorVariantId = variant.id;
+          
+          if (colorVariantId) {
+            // Update existing
+            const { error } = await supabase
+              .from('color_variants')
+              .update({
+                color_name: variant.color_name,
+                image_url: variant.image_url,
+                has_sizes: variant.has_sizes
+              })
+              .eq('id', colorVariantId);
+            
+            if (error) throw error;
+          } else {
+            // Create new
+            const { data, error } = await supabase
+              .from('color_variants')
+              .insert({
+                product_id: productId,
+                color_name: variant.color_name,
+                image_url: variant.image_url,
+                has_sizes: variant.has_sizes
+              })
+              .select()
+              .single();
+            
+            if (error) throw error;
+            colorVariantId = data.id;
+          }
 
-    const addSizeVariant = (colorIndex: number) => {
-        const updated = [...colorVariants];
-        const newSizeVariant: SizeVariant = {
-            size_name: '',
-            size_code: ''
-        };
-        updated[colorIndex].size_variants.push(newSizeVariant);
-        setColorVariants(updated);
-    };
-
-    const updateSizeVariant = (colorIndex: number, sizeIndex: number, field: keyof SizeVariant, value: any) => {
-        const updated = [...colorVariants];
-        updated[colorIndex].size_variants[sizeIndex] = {
-            ...updated[colorIndex].size_variants[sizeIndex],
-            [field]: value
-        };
-        setColorVariants(updated);
-    };
-
-    const removeSizeVariant = (colorIndex: number, sizeIndex: number) => {
-        const updated = [...colorVariants];
-        updated[colorIndex].size_variants = updated[colorIndex].size_variants.filter((_, i) => i !== sizeIndex);
-        setColorVariants(updated);
-    };
-
-    const handleImageUpload = async (file: File, colorIndex: number) => {
-        if (!file) return;
-
-        setUploadingImages(prev => ({ ...prev, [colorIndex]: true }));
-
-        try {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `color-variant-${Date.now()}.${fileExt}`;
-
-            const { data, error: uploadError } = await supabase.storage
-                .from('product-images')
-                .upload(fileName, file);
-
-            if (uploadError) {
-                throw uploadError;
+          // Save size variants if applicable
+          if (hasSizeVariants && variant.size_variants) {
+            for (const sizeVariant of variant.size_variants) {
+              if (sizeVariant.size_name.trim()) {
+                if (sizeVariant.id) {
+                  // Update existing
+                  const { error } = await supabase
+                    .from('size_variants')
+                    .update({
+                      size_name: sizeVariant.size_name,
+                      size_code: sizeVariant.size_code
+                    })
+                    .eq('id', sizeVariant.id);
+                  
+                  if (error) throw error;
+                } else {
+                  // Create new
+                  const { error } = await supabase
+                    .from('size_variants')
+                    .insert({
+                      color_variant_id: colorVariantId,
+                      size_name: sizeVariant.size_name,
+                      size_code: sizeVariant.size_code
+                    });
+                  
+                  if (error) throw error;
+                }
+              }
             }
-
-            const { data: urlData } = supabase.storage
-                .from('product-images')
-                .getPublicUrl(fileName);
-
-            updateColorVariant(colorIndex, 'image_url', urlData.publicUrl);
-
-            toast({
-                title: "Success",
-                description: "Image uploaded successfully",
-            });
-        } catch (error) {
-            console.error('Upload error:', error);
-            toast({
-                title: "Error",
-                description: "Failed to upload image",
-                variant: "destructive",
-            });
-        } finally {
-            setUploadingImages(prev => ({ ...prev, [colorIndex]: false }));
+          }
         }
-    };
+      }
 
-    return (
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h3 className="text-lg font-semibold">Product Variants</h3>
-                    <p className="text-sm text-gray-600">
-                        Configure color and size variants for your product
-                    </p>
-                </div>
-                <Button type="button" onClick={addColorVariant} variant="outline">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Color Variant
-                </Button>
+      toast({
+        title: 'Success',
+        description: 'Product variants saved successfully',
+      });
+
+      onVariantsChange();
+      fetchColorVariants();
+    } catch (error) {
+      console.error('Error saving variants:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save product variants',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!hasColorVariants) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Product Variants</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {colorVariants.map((variant, colorIndex) => (
+          <div key={colorIndex} className="border p-4 rounded-lg space-y-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Color Name</Label>
+                <Input
+                  value={variant.color_name}
+                  onChange={(e) => updateColorVariant(colorIndex, 'color_name', e.target.value)}
+                  placeholder="Red, Blue, etc."
+                />
+              </div>
+              <div>
+                <Label>Image URL</Label>
+                <Input
+                  value={variant.image_url || ''}
+                  onChange={(e) => updateColorVariant(colorIndex, 'image_url', e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                />
+              </div>
             </div>
 
-            <div className="space-y-4">
-                {colorVariants.map((variant, colorIndex) => (
-                    <Card key={colorIndex} className="p-4">
-                        <CardHeader className="pb-3">
-                            <div className="flex justify-between items-center">
-                                <CardTitle className="text-base">
-                                    Color Variant {colorIndex + 1}
-                                </CardTitle>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeColorVariant(colorIndex)}
-                                    className="text-red-600 hover:text-red-700"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <Label>Color Name *</Label>
-                                    <Input
-                                        value={variant.color_name}
-                                        onChange={(e) => updateColorVariant(colorIndex, 'color_name', e.target.value)}
-                                        placeholder="e.g., Red, Blue, Black"
-                                    />
-                                </div>
-
-                                <div>
-                                    <Label>Color Image</Label>
-                                    <div className="flex items-center space-x-2">
-                                        <Input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => {
-                                                const file = e.target.files?.[0];
-                                                if (file) handleImageUpload(file, colorIndex);
-                                            }}
-                                            disabled={uploadingImages[colorIndex]}
-                                        />
-                                        {uploadingImages[colorIndex] && (
-                                            <span className="text-sm text-gray-500">Uploading...</span>
-                                        )}
-                                    </div>
-                                    {variant.image_url && (
-                                        <div className="mt-2">
-                                            <img
-                                                src={variant.image_url}
-                                                alt={variant.color_name}
-                                                className="w-16 h-16 object-cover rounded border"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {hasSizeVariants && (
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center">
-                                        <Label>Size Variants</Label>
-                                        <Button
-                                            type="button"
-                                            onClick={() => addSizeVariant(colorIndex)}
-                                            variant="outline"
-                                            size="sm"
-                                        >
-                                            <Plus className="h-4 w-4 mr-2" />
-                                            Add Size
-                                        </Button>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        {variant.size_variants.map((sizeVariant, sizeIndex) => (
-                                            <div key={sizeIndex} className="flex items-center space-x-2 p-2 border rounded">
-                                                <div className="flex-1">
-                                                    <Input
-                                                        value={sizeVariant.size_name}
-                                                        onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_name', e.target.value)}
-                                                        placeholder="Size name (e.g., S, M, L, XL)"
-                                                    />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <Input
-                                                        value={sizeVariant.size_code || ''}
-                                                        onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_code', e.target.value)}
-                                                        placeholder="Size code (optional)"
-                                                    />
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => removeSizeVariant(colorIndex, sizeIndex)}
-                                                    className="text-red-600 hover:text-red-700"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+            {hasSizeVariants && (
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label>Size Variants</Label>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => addSizeVariant(colorIndex)}
+                  >
+                    Add Size
+                  </Button>
+                </div>
+                
+                {variant.size_variants?.map((sizeVariant, sizeIndex) => (
+                  <div key={sizeIndex} className="grid grid-cols-2 gap-2">
+                    <Input
+                      value={sizeVariant.size_name}
+                      onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_name', e.target.value)}
+                      placeholder="Size name (S, M, L)"
+                    />
+                    <Input
+                      value={sizeVariant.size_code || ''}
+                      onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_code', e.target.value)}
+                      placeholder="Size code (SM, MD, LG)"
+                    />
+                  </div>
                 ))}
-            </div>
-
-            {colorVariants.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                    <p>No color variants added yet.</p>
-                    <p className="text-sm">Click "Add Color Variant" to get started.</p>
-                </div>
+              </div>
             )}
+          </div>
+        ))}
+
+        <div className="flex space-x-2">
+          <Button type="button" variant="outline" onClick={addColorVariant}>
+            Add Color Variant
+          </Button>
+          <Button onClick={saveVariants} disabled={loading}>
+            {loading ? 'Saving...' : 'Save Variants'}
+          </Button>
         </div>
-    );
-} 
+      </CardContent>
+    </Card>
+  );
+}
