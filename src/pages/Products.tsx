@@ -4,7 +4,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { ProductCard } from '@/components/customer/ProductCard';
+import { EnhancedProductCard } from '@/components/customer/EnhancedProductCard';
+import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { Footer } from '@/components/layout/Footer';
 
 interface Product {
   id: string;
@@ -16,10 +18,14 @@ interface Product {
   status: string;
   subcategory_id: string;
   is_featured?: boolean;
+  has_color_variants?: boolean;
+  color_has_size_variants?: boolean;
   subcategories: {
     name: string;
     selling_price: number;
+    minimum_quantity: number;
   };
+  color_variants?: any[];
 }
 
 export default function Products() {
@@ -39,7 +45,19 @@ export default function Products() {
           *,
           subcategories (
             name,
-            selling_price
+            selling_price,
+            minimum_quantity
+          ),
+          color_variants (
+            id,
+            color_name,
+            image_url,
+            has_sizes,
+            size_variants (
+              id,
+              size_name,
+              size_code
+            )
           )
         `)
         .eq('status', 'active')
@@ -62,48 +80,56 @@ export default function Products() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p>Loading products...</p>
+      <div className="min-h-screen bg-gray-50">
+        <CustomerHeader />
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex justify-center items-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p>Loading products...</p>
+            </div>
           </div>
         </div>
+        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-4">All Products</h1>
-        
-        <div className="flex gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+    <div className="min-h-screen bg-gray-50">
+      <CustomerHeader />
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-4">All Products</h1>
+          
+          <div className="flex gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {filteredProducts.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-8">
-            <p className="text-gray-500">No products found</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-      )}
+        {filteredProducts.length === 0 ? (
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-gray-500">No products found</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredProducts.map((product) => (
+              <EnhancedProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
+      </div>
+      <Footer />
     </div>
   );
 }

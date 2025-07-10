@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ProductCard } from './ProductCard';
+import { EnhancedProductCard } from './EnhancedProductCard';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -22,7 +22,19 @@ export function FeaturedProductsCarousel() {
           *,
           subcategories (
             name,
-            selling_price
+            selling_price,
+            minimum_quantity
+          ),
+          color_variants (
+            id,
+            color_name,
+            image_url,
+            has_sizes,
+            size_variants (
+              id,
+              size_name,
+              size_code
+            )
           )
         `)
         .eq('status', 'active')
@@ -83,7 +95,7 @@ export function FeaturedProductsCarousel() {
         <div className="relative">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {visibleProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <EnhancedProductCard key={product.id} product={product} />
             ))}
           </div>
 
