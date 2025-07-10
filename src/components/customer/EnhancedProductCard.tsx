@@ -105,7 +105,8 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
     try {
       setLoading(true);
       
-      let productInventoryId = null;
+      // Create the product inventory ID based on variant selection
+      let productInventoryId = product.id;
       if (product.has_color_variants && selectedColor) {
         if (selectedVariant?.has_sizes && selectedSize) {
           productInventoryId = `${product.id}-${selectedColor}-${selectedSize}`;
@@ -114,7 +115,7 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
         }
       }
 
-      const totalStock = await getRealTimeStock(product.id, productInventoryId);
+      const totalStock = await getRealTimeStock(productInventoryId);
       setStock(totalStock);
     } catch (error) {
       console.error('Error fetching stock:', error);
