@@ -1,136 +1,71 @@
-import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-import { validateCartStock } from '@/utils/inventoryManager';
 
-export interface ValidationResult {
-  isValid: boolean;
-  error?: string;
+import { useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+export interface CartItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  colorVariantId?: string;
+  sizeVariantId?: string;
+  inventoryId?: string;
 }
 
-export const useCheckoutValidation = () => {
-  const [isValidating, setIsValidating] = useState(false);
+export const validateCartStock = async (cartItems: CartItem[]): Promise<boolean> => {
+  try {
+    for (const item of cartItems) {
+      if (item.inventoryId) {
+        const { data: inventory, error } = await supabase
+          .from('product_inventory')
+          .select('available_stock')
+          .eq('id', item.inventoryId)
+          .single();
 
-  const validateStock = async (cartItems: any[]): Promise<ValidationResult> => {
-    try {
-      console.log('=== CHECKOUT STOCK VALIDATION ===');
-      console.log('Validating stock for checkout items:', cartItems.length);
+        if (error || !inventory) {
+          throw new Error(`Product ${item.productName} not found in inventory`);
+        }
 
-      const result = await validateCartStock(cartItems);
-
-      if (!result.isValid) {
-        const errorMessage = result.errorMessages.length > 0
-          ? result.errorMessages[0]
-          : 'Some items have insufficient stock';
-
-        console.log('Checkout stock validation failed:', errorMessage);
-        return {
-          isValid: false,
-          error: errorMessage
-        };
+        if (inventory.available_stock < item.quantity) {
+          throw new Error(`Insufficient stock for ${item.productName}. Available: ${inventory.available_stock}, Required: ${item.quantity}`);
+        }
       }
-
-      console.log('All checkout items passed stock validation');
-      return { isValid: true };
-    } catch (error) {
-      console.error('Checkout stock validation error:', error);
-      return {
-        isValid: false,
-        error: 'Failed to validate stock availability. Please try again.'
-      };
     }
-  };
-
-  const validatePromoCode = async (code: string, orderTotal: number): Promise<ValidationResult & { discount?: number }> => {
-    try {
-      const { data: promo, error } = await supabase
-        .from('promocodes')
-        .select('*')
-        .eq('code', code.toUpperCase())
-        .eq('is_active', true)
-        .single();
-
-      if (error || !promo) {
-        return { isValid: false, error: 'Invalid or expired promo code' };
-      }
-
-      // Check if promo code is still valid
-      const now = new Date();
-      const validFrom = new Date(promo.valid_from);
-      const validUntil = promo.valid_until ? new Date(promo.valid_until) : null;
-
-      if (now < validFrom) {
-        return { isValid: false, error: 'Promo code is not yet active' };
-      }
-
-      if (validUntil && now > validUntil) {
-        const expiredDate = validUntil.toLocaleDateString();
-        return { isValid: false, error: `Promo code expired on ${expiredDate}` };
-      }
-
-      // Check minimum order amount
-      if (promo.minimum_order_amount && orderTotal < promo.minimum_order_amount) {
-        return {
-          isValid: false,
-          error: `Minimum order amount for this promo code is $${promo.minimum_order_amount}`
-        };
-      }
-
-      const discount = (orderTotal * promo.discount_percentage) / 100;
-      return { isValid: true, discount };
-    } catch (error) {
-      console.error('Promo validation error:', error);
-      return { isValid: false, error: 'Failed to validate promo code' };
-    }
-  };
-
-  const validatePaymentAmount = (paidAmount: number, totalAmount: number): ValidationResult => {
-    const minimumPayment = totalAmount * 0.2; // 20% minimum
-
-    if (paidAmount < minimumPayment) {
-      return {
-        isValid: false,
-        error: `Minimum payment required: $${minimumPayment.toFixed(2)}`
-      };
-    }
-
-    if (paidAmount > totalAmount) {
-      return {
-        isValid: false,
-        error: `Payment amount cannot exceed total order amount of $${totalAmount.toFixed(2)}`
-      };
-    }
-
-    return { isValid: true };
-  };
-
-  const validateFileUpload = (file: File): ValidationResult => {
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-
-    if (!allowedTypes.includes(file.type)) {
-      return {
-        isValid: false,
-        error: 'Please upload a valid image file (JPEG, PNG, or WebP)'
-      };
-    }
-
-    if (file.size > maxSize) {
-      return {
-        isValid: false,
-        error: 'File size must be less than 5MB'
-      };
-    }
-
-    return { isValid: true };
-  };
-
-  return {
-    validateStock,
-    validatePromoCode,
-    validatePaymentAmount,
-    validateFileUpload,
-    isValidating,
-    setIsValidating
-  };
+    return true;
+  } catch (error) {
+    console.error('Stock validation error:', error);
+    throw error;
+  }
 };
+
+interface CheckoutValidationProps {
+  cartItems: CartItem[];
+  onValidationResult: (isValid: boolean, error?: string) => void;
+}
+
+export function CheckoutValidation({ cartItems, onValidationResult }: CheckoutValidationProps) {
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const validateStock = async () => {
+      try {
+        await validateCartStock(cartItems);
+        onValidationResult(true);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Stock validation failed';
+        toast({
+          title: 'Stock Validation Error',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        onValidationResult(false, errorMessage);
+      }
+    };
+
+    if (cartItems.length > 0) {
+      validateStock();
+    }
+  }, [cartItems, onValidationResult, toast]);
+
+  return null;
+}

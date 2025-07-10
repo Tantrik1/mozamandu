@@ -1,414 +1,259 @@
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { usePromoCode } from '@/hooks/usePromoCode';
 import { useCheckoutData } from '@/hooks/useCheckoutData';
-import { PaymentMethodSection } from './PaymentMethodSection';
-import { PromoCodeSection } from './PromoCodeSection';
-import { DeliveryLocationSelector } from './DeliveryLocationSelector';
-import { reserveStockForOrder } from '@/utils/stockReservationManager';
-
-interface CheckoutData {
-  customerName: string;
-  customerEmail: string;
-  contactNumber: string;
-  whatsappNumber: string;
-  deliveryAddress: string;
-  deliveryLocationId: string | null;
-  paymentMethodId: string;
-  paymentPercentage: number;
-}
+import { CheckoutValidation } from './CheckoutValidation';
+import { PaymentScreenshotUpload } from './PaymentScreenshotUpload';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export function UniversalCheckout() {
-  const { user } = useAuth();
-  const { cartItems, getTotalPrice, clearCart } = useCart();
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [checkoutData, setCheckoutData] = useState<CheckoutData>({
-    customerName: '',
-    customerEmail: '',
-    contactNumber: '',
-    whatsappNumber: '',
-    deliveryAddress: '',
-    deliveryLocationId: null,
-    paymentMethodId: '',
-    paymentPercentage: 100,
-  });
-
-  const {
-    promoCode,
-    promoCodeDiscount,
-    applyPromoCode,
-    removePromoCode,
-    loading: promoLoading
+  const { items: cartItems, getTotalPrice, clearCart } = useRobustCart();
+  const { 
+    promoCode, 
+    setPromoCode, 
+    appliedPromo, 
+    isPromoApplied, 
+    applyPromoCode, 
+    removePromoCode 
   } = usePromoCode();
+  
+  const { 
+    deliveryCharges, 
+    paymentMethods, 
+    loading: dataLoading 
+  } = useCheckoutData();
 
-  const {
-    deliveryCharge,
-    finalTotal,
-    paidAmount,
-    remainingAmount,
-    subtotal
-  } = useCheckoutData({
-    cartItems,
-    deliveryLocationId: checkoutData.deliveryLocationId,
-    promoCodeDiscount,
-    paymentPercentage: checkoutData.paymentPercentage
+  const [customerInfo, setCustomerInfo] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    whatsapp: '',
+    address: ''
   });
 
-  // Auto-fill user data if logged in
-  useEffect(() => {
-    if (user) {
-      setCheckoutData(prev => ({
-        ...prev,
-        customerEmail: user.email || '',
-      }));
-    }
-  }, [user]);
+  const [selectedDeliveryLocation, setSelectedDeliveryLocation] = useState('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
+  const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
+  const [isValidCart, setIsValidCart] = useState(false);
+  const [validationError, setValidationError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleInputChange = (field: keyof CheckoutData, value: string | number) => {
-    setCheckoutData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  const { toast } = useToast();
 
-  const validateForm = () => {
-    const required = ['customerName', 'customerEmail', 'contactNumber', 'deliveryAddress'];
-    const missing = required.filter(field => !checkoutData[field as keyof CheckoutData]);
-    
-    if (missing.length > 0) {
-      toast({
-        title: "Missing Information",
-        description: `Please fill in: ${missing.join(', ')}`,
-        variant: "destructive",
-      });
-      return false;
-    }
+  const subtotal = getTotalPrice();
+  const deliveryCharge = deliveryCharges.find(d => d.id === selectedDeliveryLocation)?.delivery_price || 0;
+  const promoDiscount = isPromoApplied ? (appliedPromo?.discount_percentage || 0) * (subtotal + deliveryCharge) / 100 : 0;
+  const finalTotal = subtotal + deliveryCharge - promoDiscount;
 
-    if (cartItems.length === 0) {
-      toast({
-        title: "Empty Cart",
-        description: "Please add items to your cart before checkout",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    return true;
+  const handleValidationResult = (isValid: boolean, error?: string) => {
+    setIsValidCart(isValid);
+    setValidationError(error || '');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    if (!isValidCart) {
+      toast({
+        title: 'Validation Error',
+        description: validationError || 'Please fix cart issues before proceeding',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-    setLoading(true);
+    setIsSubmitting(true);
 
     try {
-      console.log('=== STARTING CHECKOUT PROCESS ===');
-      console.log('Cart items:', cartItems);
-      console.log('Is customer order:', !!user);
+      // Upload payment screenshot if provided
+      let screenshotUrl = null;
+      if (paymentScreenshot) {
+        const fileExt = paymentScreenshot.name.split('.').pop();
+        const fileName = `payment-${Date.now()}.${fileExt}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('customer-payments')
+          .upload(fileName, paymentScreenshot);
 
-      // Validate stock for checkout items
-      console.log('Validating stock for checkout items...');
-      const stockValidationItems = cartItems.map(item => ({
-        productId: item.productId,
-        productInventoryId: item.productInventoryId,
-        quantity: item.quantity
-      }));
+        if (uploadError) throw uploadError;
 
-      console.log('Stock validation items:', stockValidationItems);
+        const { data: urlData } = supabase.storage
+          .from('customer-payments')
+          .getPublicUrl(fileName);
 
-      // Check each item's stock availability
-      for (const item of stockValidationItems) {
-        const { data: inventoryData, error } = await supabase
-          .from('product_inventory')
-          .select('stock_quantity, reserved_stock, available_stock')
-          .eq('product_id', item.productId)
-          .eq('id', item.productInventoryId || '')
-          .single();
-
-        if (error || !inventoryData) {
-          throw new Error(`Product inventory not found for item ${item.productId}`);
-        }
-
-        const availableStock = inventoryData.stock_quantity - inventoryData.reserved_stock;
-        if (availableStock < item.quantity) {
-          throw new Error(`Insufficient stock for item. Available: ${availableStock}, Requested: ${item.quantity}`);
-        }
+        screenshotUrl = urlData.publicUrl;
       }
 
-      console.log('Stock validation result: PASSED');
-      console.log('Stock validation passed, proceeding with order creation...');
+      // Create order
+      const orderData = {
+        customer_name: customerInfo.name,
+        customer_email: customerInfo.email,
+        contact_number: customerInfo.phone,
+        whatsapp_number: customerInfo.whatsapp,
+        delivery_address: customerInfo.address,
+        delivery_location_id: selectedDeliveryLocation || null,
+        payment_method_id: selectedPaymentMethod || null,
+        subtotal: subtotal,
+        delivery_charge: deliveryCharge,
+        promocode_used: isPromoApplied ? appliedPromo?.code : null,
+        promocode_discount: promoDiscount,
+        total_amount: finalTotal,
+        paid_amount: finalTotal,
+        remaining_amount: 0,
+        payment_screenshot_url: screenshotUrl,
+        status: 'pending_payment'
+      };
 
-      // Create order based on user type
-      let orderId: string;
-      
-      if (user) {
-        // Customer order
-        console.log('Creating customer order...');
-        const { data: customerOrder, error: customerOrderError } = await supabase
-          .from('customer_orders')
-          .insert({
-            user_id: user.id,
-            customer_name: checkoutData.customerName,
-            customer_email: checkoutData.customerEmail,
-            contact_number: checkoutData.contactNumber,
-            whatsapp_number: checkoutData.whatsappNumber || checkoutData.contactNumber,
-            delivery_address: checkoutData.deliveryAddress,
-            delivery_location_id: checkoutData.deliveryLocationId,
-            subtotal: subtotal,
-            delivery_charge: deliveryCharge,
-            promocode_discount: promoCodeDiscount,
-            promocode_used: promoCode,
-            total_amount: finalTotal,
-            paid_amount: paidAmount,
-            remaining_amount: remainingAmount,
-            payment_percentage: checkoutData.paymentPercentage,
-            payment_method_id: checkoutData.paymentMethodId,
-            status: 'pending_payment'
-          })
-          .select()
-          .single();
+      const { data: order, error: orderError } = await supabase
+        .from('customer_orders')
+        .insert(orderData)
+        .select()
+        .single();
 
-        if (customerOrderError) {
-          console.error('Customer order creation error:', customerOrderError);
-          throw customerOrderError;
-        }
+      if (orderError) throw orderError;
 
-        orderId = customerOrder.id;
-        console.log('Customer order created successfully:', orderId);
-
-        // Create customer order items
-        console.log('Creating customer order items...');
-        const customerOrderItems = cartItems.map(item => ({
-          order_id: orderId,
-          product_id: item.productId,
-          product_inventory_id: item.productInventoryId,
-          quantity: item.quantity
-        }));
-
-        const { error: customerOrderItemsError } = await supabase
+      // Create order items
+      for (const item of cartItems) {
+        await supabase
           .from('customer_order_items')
-          .insert(customerOrderItems);
-
-        if (customerOrderItemsError) {
-          console.error('Customer order items creation error:', customerOrderItemsError);
-          throw customerOrderItemsError;
-        }
-
-        console.log('Customer order items created successfully');
-      } else {
-        // Guest order
-        console.log('Creating regular order...');
-        const { data: regularOrder, error: regularOrderError } = await supabase
-          .from('orders')
           .insert({
-            customer_name: checkoutData.customerName,
-            customer_email: checkoutData.customerEmail,
-            contact_number: checkoutData.contactNumber,
-            whatsapp_number: checkoutData.whatsappNumber || checkoutData.contactNumber,
-            delivery_address: checkoutData.deliveryAddress,
-            delivery_location_id: checkoutData.deliveryLocationId,
-            subtotal: subtotal,
-            delivery_charge: deliveryCharge,
-            promocode_discount: promoCodeDiscount,
-            promocode_used: promoCode,
-            total_amount: finalTotal,
-            paid_amount: paidAmount,
-            remaining_amount: remainingAmount,
-            payment_percentage: checkoutData.paymentPercentage,
-            payment_method_id: checkoutData.paymentMethodId,
-            status: 'pending_payment'
-          })
-          .select()
-          .single();
+            order_id: order.id,
+            product_id: item.productId,
+            product_inventory_id: item.inventoryId,
+            quantity: item.quantity
+          });
 
-        if (regularOrderError) {
-          console.error('Regular order creation error:', regularOrderError);
-          throw regularOrderError;
-        }
-
-        orderId = regularOrder.id;
-        console.log('Regular order created successfully:', orderId);
-
-        // Create order items
-        console.log('Creating order items...');
-        const orderItems = cartItems.map(item => ({
-          order_id: orderId,
-          product_id: item.productId,
-          product_inventory_id: item.productInventoryId,
-          quantity: item.quantity
-        }));
-
-        const { error: orderItemsError } = await supabase
-          .from('order_items')
-          .insert(orderItems);
-
-        if (orderItemsError) {
-          console.error('Order items creation error:', orderItemsError);
-          throw orderItemsError;
-        }
-
-        console.log('Order items created successfully');
+        // Create order item details
+        await supabase
+          .from('customer_order_item_details')
+          .insert({
+            order_id: order.id,
+            product_name: item.productName,
+            color_name: item.colorName,
+            size_name: item.sizeName,
+            quantity: item.quantity,
+            unit_price: item.price,
+            total_price: item.price * item.quantity,
+            pricing_mode: 'normal'
+          });
       }
 
-      // Reserve stock for the order
-      console.log('Processing stock changes for order:', orderId);
-      console.log('Processing stock changes for checkout:', stockValidationItems);
-      
-      const stockResult = await reserveStockForOrder(stockValidationItems, orderId);
-      
-      if (!stockResult.success) {
-        console.error('Stock reservation failed:', stockResult);
-        
-        // Rollback stock reservations for failed checkout
-        console.log('Rolling back stock reservations for failed checkout');
-        
-        toast({
-          title: "Stock Issue",
-          description: `Order created but stock processing failed. Please contact support.`,
-          variant: "destructive",
-        });
-      } else {
-        console.log('Stock reserved successfully:', stockResult);
-        
-        toast({
-          title: "Order Placed Successfully",
-          description: "Your order has been placed and stock has been reserved",
-        });
-      }
+      toast({
+        title: 'Success',
+        description: 'Order placed successfully!',
+      });
 
-      // Clear cart and navigate to success page
-      console.log('Clearing cart');
       clearCart();
       
-      console.log('Order creation email sent successfully');
-      
-      // Navigate to appropriate success page
-      const summaryUrl = user 
-        ? `/customer-order-summary/${orderId}`
-        : `/order-summary/${orderId}`;
-      
-      console.log('Navigating to:', summaryUrl);
-      navigate(summaryUrl);
+      // Redirect to success page or reset form
+      setCustomerInfo({
+        name: '',
+        email: '',
+        phone: '',
+        whatsapp: '',
+        address: ''
+      });
+      setSelectedDeliveryLocation('');
+      setSelectedPaymentMethod('');
+      setPaymentScreenshot(null);
 
     } catch (error) {
-      console.error('Checkout error:', error);
-      
-      let errorMessage = 'Failed to place order. Please try again.';
-      
-      if (error instanceof Error) {
-        if (error.message.includes('Insufficient stock')) {
-          errorMessage = 'Some items in your cart are no longer available in the requested quantity.';
-        } else if (error.message.includes('inventory not found')) {
-          errorMessage = 'Some items in your cart are no longer available.';
-        }
-      }
-      
+      console.error('Order submission error:', error);
       toast({
-        title: "Order Failed",
-        description: errorMessage,
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to place order. Please try again.',
+        variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   if (cartItems.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Your cart is empty</h2>
-          <p className="text-gray-600 mb-4">Add some items to your cart before checkout</p>
-          <Button onClick={() => navigate('/')}>Continue Shopping</Button>
-        </div>
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="text-center py-8">
+            <p className="text-lg">Your cart is empty</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
-          {!user && (
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-              <p className="text-blue-800">
-                <span className="font-medium">💡 Checking out as a guest.</span> Your order will be processed normally.
-              </p>
-            </div>
-          )}
-        </div>
+    <div className="container mx-auto px-4 py-8">
+      <CheckoutValidation 
+        cartItems={cartItems.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          colorVariantId: item.colorVariantId,
+          sizeVariantId: item.sizeVariantId,
+          inventoryId: item.inventoryId
+        }))}
+        onValidationResult={handleValidationResult}
+      />
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Customer Information */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Customer Information</CardTitle>
-                <p className="text-sm text-gray-600">Please provide your contact details for order delivery</p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="customerName">Full Name *</Label>
+                  <Label htmlFor="name">Full Name *</Label>
                   <Input
-                    id="customerName"
-                    value={checkoutData.customerName}
-                    onChange={(e) => handleInputChange('customerName', e.target.value)}
+                    id="name"
+                    value={customerInfo.name}
+                    onChange={(e) => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))}
                     required
                   />
                 </div>
-                
                 <div>
-                  <Label htmlFor="customerEmail">Email Address *</Label>
+                  <Label htmlFor="email">Email *</Label>
                   <Input
-                    id="customerEmail"
+                    id="email"
                     type="email"
-                    value={checkoutData.customerEmail}
-                    onChange={(e) => handleInputChange('customerEmail', e.target.value)}
+                    value={customerInfo.email}
+                    onChange={(e) => setCustomerInfo(prev => ({ ...prev, email: e.target.value }))}
                     required
                   />
                 </div>
-                
                 <div>
-                  <Label htmlFor="contactNumber">Contact Number *</Label>
+                  <Label htmlFor="phone">Phone Number *</Label>
                   <Input
-                    id="contactNumber"
-                    value={checkoutData.contactNumber}
-                    onChange={(e) => handleInputChange('contactNumber', e.target.value)}
+                    id="phone"
+                    value={customerInfo.phone}
+                    onChange={(e) => setCustomerInfo(prev => ({ ...prev, phone: e.target.value }))}
                     required
                   />
                 </div>
-                
                 <div>
-                  <Label htmlFor="whatsappNumber">WhatsApp Number</Label>
+                  <Label htmlFor="whatsapp">WhatsApp Number</Label>
                   <Input
-                    id="whatsappNumber"
-                    value={checkoutData.whatsappNumber}
-                    onChange={(e) => handleInputChange('whatsappNumber', e.target.value)}
-                    placeholder="Same as contact number if not provided"
+                    id="whatsapp"
+                    value={customerInfo.whatsapp}
+                    onChange={(e) => setCustomerInfo(prev => ({ ...prev, whatsapp: e.target.value }))}
                   />
                 </div>
-                
                 <div>
-                  <Label htmlFor="deliveryAddress">Delivery Address *</Label>
+                  <Label htmlFor="address">Delivery Address *</Label>
                   <Textarea
-                    id="deliveryAddress"
-                    value={checkoutData.deliveryAddress}
-                    onChange={(e) => handleInputChange('deliveryAddress', e.target.value)}
+                    id="address"
+                    value={customerInfo.address}
+                    onChange={(e) => setCustomerInfo(prev => ({ ...prev, address: e.target.value }))}
                     required
                     rows={3}
                   />
@@ -416,117 +261,141 @@ export function UniversalCheckout() {
               </CardContent>
             </Card>
 
-            <DeliveryLocationSelector
-              selectedLocationId={checkoutData.deliveryLocationId}
-              onLocationChange={(locationId) => handleInputChange('deliveryLocationId', locationId)}
-            />
+            <Card>
+              <CardHeader>
+                <CardTitle>Delivery & Payment</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="delivery">Delivery Location</Label>
+                  <Select value={selectedDeliveryLocation} onValueChange={setSelectedDeliveryLocation}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select delivery location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {deliveryCharges.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.place_name} - Rs. {location.delivery_price}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <PaymentMethodSection
-              selectedPaymentMethodId={checkoutData.paymentMethodId}
-              onPaymentMethodChange={(methodId) => handleInputChange('paymentMethodId', methodId)}
-              paymentPercentage={checkoutData.paymentPercentage}
-              onPaymentPercentageChange={(percentage) => handleInputChange('paymentPercentage', percentage)}
-            />
+                <div>
+                  <Label htmlFor="payment">Payment Method</Label>
+                  <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select payment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {paymentMethods.map((method) => (
+                        <SelectItem key={method.id} value={method.id}>
+                          {method.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedPaymentMethod && (
+                  <PaymentScreenshotUpload
+                    onFileSelect={setPaymentScreenshot}
+                    selectedFile={paymentScreenshot}
+                  />
+                )}
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Order Summary */}
-          <div className="space-y-6">
+          <div>
             <Card>
               <CardHeader>
                 <CardTitle>Order Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {cartItems.map((item) => (
-                  <div key={`${item.productId}-${item.productInventoryId || 'no-inventory'}`} className="flex justify-between items-center py-2 border-b">
-                    <div className="flex items-center space-x-3">
-                      {item.image_url && (
-                        <img 
-                          src={item.image_url} 
-                          alt={item.productName}
-                          className="w-12 h-12 object-cover rounded"
-                        />
-                      )}
-                      <div>
-                        <h4 className="font-medium">{item.productName}</h4>
-                        {item.colorName && (
-                          <p className="text-sm text-gray-600">Color: {item.colorName}</p>
-                        )}
-                        {item.sizeName && (
-                          <p className="text-sm text-gray-600">Size: {item.sizeName}</p>
-                        )}
-                        <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
-                        <p className="text-sm text-gray-600">Rs. {item.basePrice.toFixed(2)} each</p>
-                      </div>
+                <div className="space-y-2">
+                  {cartItems.map((item) => (
+                    <div key={`${item.productId}-${item.colorVariantId}-${item.sizeVariantId}`} className="flex justify-between">
+                      <span>{item.productName} x {item.quantity}</span>
+                      <span>Rs. {(item.price * item.quantity).toFixed(2)}</span>
                     </div>
-                    <p className="font-medium">Rs. {(item.basePrice * item.quantity).toFixed(2)}</p>
-                  </div>
-                ))}
-                
-                <div className="space-y-2 pt-4">
+                  ))}
+                </div>
+
+                <hr />
+
+                <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span>Subtotal</span>
+                    <span>Subtotal:</span>
                     <span>Rs. {subtotal.toFixed(2)}</span>
                   </div>
-                  
                   <div className="flex justify-between">
-                    <span>Delivery Charge</span>
+                    <span>Delivery:</span>
                     <span>Rs. {deliveryCharge.toFixed(2)}</span>
                   </div>
-                  
-                  {promoCodeDiscount > 0 && (
+                  {isPromoApplied && (
                     <div className="flex justify-between text-green-600">
-                      <span>Promo Discount</span>
-                      <span>-Rs. {promoCodeDiscount.toFixed(2)}</span>
+                      <span>Discount ({appliedPromo?.code}):</span>
+                      <span>-Rs. {promoDiscount.toFixed(2)}</span>
                     </div>
                   )}
-                  
-                  <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                    <span>Total</span>
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Total:</span>
                     <span>Rs. {finalTotal.toFixed(2)}</span>
                   </div>
-                  
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>Paid Amount ({checkoutData.paymentPercentage}%)</span>
-                    <span>Rs. {paidAmount.toFixed(2)}</span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Promo code"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value)}
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline"
+                      onClick={() => applyPromoCode(subtotal + deliveryCharge)}
+                    >
+                      Apply
+                    </Button>
                   </div>
-                  
-                  {remainingAmount > 0 && (
-                    <div className="flex justify-between text-sm text-orange-600">
-                      <span>Remaining Amount</span>
-                      <span>Rs. {remainingAmount.toFixed(2)}</span>
-                    </div>
+                  {isPromoApplied && (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      onClick={removePromoCode}
+                    >
+                      Remove Promo Code
+                    </Button>
                   )}
                 </div>
+
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={!isValidCart || isSubmitting || dataLoading}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Placing Order...
+                    </>
+                  ) : (
+                    'Place Order'
+                  )}
+                </Button>
+
+                {!isValidCart && validationError && (
+                  <p className="text-red-500 text-sm">{validationError}</p>
+                )}
               </CardContent>
             </Card>
-
-            <PromoCodeSection
-              promoCode={promoCode}
-              promoCodeDiscount={promoCodeDiscount}
-              onApplyPromoCode={applyPromoCode}
-              onRemovePromoCode={removePromoCode}
-              loading={promoLoading}
-              orderTotal={subtotal}
-            />
-
-            <Button 
-              type="submit" 
-              className="w-full" 
-              size="lg"
-              disabled={loading || !checkoutData.paymentMethodId}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Placing Order...
-                </>
-              ) : (
-                'Place Order'
-              )}
-            </Button>
           </div>
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
   );
 }
