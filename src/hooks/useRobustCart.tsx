@@ -69,9 +69,15 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
           showCartCleanupNotification(removedItems, errors);
         }
         
-        setCartItems(validItems);
-        if (validItems.length !== itemsWithPrice.length) {
-          localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(validItems));
+        // Ensure validItems have price property before setting state
+        const validItemsWithPrice = validItems.map((item: any) => ({
+          ...item,
+          price: item.price || item.basePrice * item.quantity
+        }));
+        
+        setCartItems(validItemsWithPrice);
+        if (validItemsWithPrice.length !== itemsWithPrice.length) {
+          localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(validItemsWithPrice));
         }
       }
     } catch (error) {
