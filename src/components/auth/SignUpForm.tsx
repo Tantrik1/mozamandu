@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -192,7 +191,7 @@ export function SignUpForm() {
               </Button>
             </div>
             {formData.password && (
-              <PasswordStrengthIndicator strength={passwordStrength} />
+              <PasswordStrengthIndicator password={formData.password} />
             )}
             {errors.password && (
               <p className="text-red-500 text-sm mt-1">{errors.password}</p>

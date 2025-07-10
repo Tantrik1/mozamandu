@@ -488,7 +488,11 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         </Card>
 
         {watchedHasColorVariants && (
-          <EditProductVariantForm productId={productId} />
+          <EditProductVariantForm 
+            productId={productId} 
+            hasColorVariants={watchedHasColorVariants}
+            hasSizeVariants={watchedHasColorVariants && form.watch('color_has_size_variants')}
+          />
         )}
 
         <div className="flex justify-end space-x-4">

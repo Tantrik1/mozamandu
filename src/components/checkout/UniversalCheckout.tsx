@@ -16,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export function UniversalCheckout() {
-  const { items: cartItems, getTotalPrice, clearCart } = useRobustCart();
+  const { cartItems, getTotalPrice, clearCart } = useRobustCart();
   const { 
     promoCode, 
     setPromoCode, 
@@ -93,8 +93,9 @@ export function UniversalCheckout() {
         screenshotUrl = urlData.publicUrl;
       }
 
-      // Create order
+      // Create order with user_id (required field)
       const orderData = {
+        user_id: 'guest-user', // For guest checkout
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
         contact_number: customerInfo.phone,
@@ -110,7 +111,7 @@ export function UniversalCheckout() {
         paid_amount: finalTotal,
         remaining_amount: 0,
         payment_screenshot_url: screenshotUrl,
-        status: 'pending_payment'
+        status: 'pending_payment' as const
       };
 
       const { data: order, error: orderError } = await supabase
@@ -128,7 +129,7 @@ export function UniversalCheckout() {
           .insert({
             order_id: order.id,
             product_id: item.productId,
-            product_inventory_id: item.inventoryId,
+            product_inventory_id: item.productInventoryId,
             quantity: item.quantity
           });
 
@@ -141,8 +142,8 @@ export function UniversalCheckout() {
             color_name: item.colorName,
             size_name: item.sizeName,
             quantity: item.quantity,
-            unit_price: item.price,
-            total_price: item.price * item.quantity,
+            unit_price: item.basePrice,
+            total_price: item.basePrice * item.quantity,
             pricing_mode: 'normal'
           });
       }
@@ -154,7 +155,7 @@ export function UniversalCheckout() {
 
       clearCart();
       
-      // Redirect to success page or reset form
+      // Reset form
       setCustomerInfo({
         name: '',
         email: '',
@@ -199,7 +200,7 @@ export function UniversalCheckout() {
           quantity: item.quantity,
           colorVariantId: item.colorVariantId,
           sizeVariantId: item.sizeVariantId,
-          inventoryId: item.inventoryId
+          inventoryId: item.productInventoryId
         }))}
         onValidationResult={handleValidationResult}
       />

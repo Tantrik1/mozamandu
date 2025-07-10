@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 export interface InventoryItem {
   id: string;
@@ -98,6 +99,134 @@ export interface ProductStockSummary {
   reservedStock: number;
   availableStock: number;
 }
+
+// Add missing functions for cart validation
+export const showCartCleanupNotification = (removedItems: any[], errors: string[]) => {
+  console.log('Cart cleanup notification:', { removedItems, errors });
+  toast({
+    title: "Cart Updated",
+    description: `Removed ${removedItems.length} invalid items from cart`,
+    variant: "destructive",
+  });
+};
+
+export const validateCartItems = async (cartItems: any[]) => {
+  const validItems = [];
+  const removedItems = [];
+  const errors = [];
+
+  for (const item of cartItems) {
+    try {
+      // Check if product still exists and is active
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('id, status')
+        .eq('id', item.productId)
+        .single();
+
+      if (productError || !product || product.status !== 'active') {
+        removedItems.push(item);
+        errors.push(`Product ${item.productName} is no longer available`);
+        continue;
+      }
+
+      // If item has inventory ID, validate stock
+      if (item.productInventoryId) {
+        const stockInfo = await getVariantStockInfo(item.productInventoryId);
+        if (!stockInfo.isValid || stockInfo.availableStock < item.quantity) {
+          removedItems.push(item);
+          errors.push(`Insufficient stock for ${item.productName}`);
+          continue;
+        }
+      }
+
+      validItems.push(item);
+    } catch (error) {
+      console.error('Error validating cart item:', error);
+      removedItems.push(item);
+      errors.push(`Error validating ${item.productName}`);
+    }
+  }
+
+  return { validItems, removedItems, errors };
+};
+
+export const getVariantStockInfo = async (inventoryId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('available_stock, is_active')
+      .eq('id', inventoryId)
+      .single();
+
+    if (error || !data) {
+      return { isValid: false, availableStock: 0 };
+    }
+
+    return {
+      isValid: data.is_active,
+      availableStock: data.available_stock
+    };
+  } catch (error) {
+    console.error('Error getting variant stock info:', error);
+    return { isValid: false, availableStock: 0 };
+  }
+};
+
+export const validateStock = async (productId: string, productInventoryId: string | null, requestedQuantity: number) => {
+  try {
+    if (!productInventoryId) {
+      // If no specific inventory ID, check if product has any available stock
+      const { data: inventoryItems, error } = await supabase
+        .from('product_inventory')
+        .select('available_stock')
+        .eq('product_id', productId)
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      const totalAvailable = inventoryItems?.reduce((sum, item) => sum + item.available_stock, 0) || 0;
+      
+      if (totalAvailable < requestedQuantity) {
+        return {
+          isValid: false,
+          errorMessage: `Only ${totalAvailable} items available`,
+          availableStock: totalAvailable
+        };
+      }
+
+      return { isValid: true, availableStock: totalAvailable };
+    }
+
+    // Check specific inventory item
+    const stockInfo = await getVariantStockInfo(productInventoryId);
+    
+    if (!stockInfo.isValid) {
+      return {
+        isValid: false,
+        errorMessage: 'Item is no longer available',
+        availableStock: 0
+      };
+    }
+
+    if (stockInfo.availableStock < requestedQuantity) {
+      return {
+        isValid: false,
+        errorMessage: `Only ${stockInfo.availableStock} items available`,
+        availableStock: stockInfo.availableStock
+      };
+    }
+
+    return { isValid: true, availableStock: stockInfo.availableStock };
+  } catch (error) {
+    console.error('Error validating stock:', error);
+    return {
+      isValid: false,
+      errorMessage: 'Error checking stock availability',
+      availableStock: 0
+    };
+  }
+};
 
 export const generateProductSKU = async (productName: string, colorName?: string, sizeName?: string): Promise<string> => {
   let baseSku = productName
