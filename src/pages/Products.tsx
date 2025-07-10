@@ -1,32 +1,34 @@
 
-import { useEffect, useState } from 'react';
-import { CustomerHeader } from '@/components/customer/CustomerHeader';
-import { ProductCard } from '@/components/customer/ProductCard';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Search, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-import { Footer } from '@/components/layout/Footer';
+import { ProductCard } from '@/components/customer/ProductCard';
 import { calculateTotalProductStock } from '@/utils/inventoryManager';
 
 interface Product {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   cost_price: number;
-  selling_price: number;
-  is_featured: boolean;
-  image_url: string;
-  stock_quantity: number;
-  has_color_variants: boolean;
-  color_has_size_variants: boolean;
-  category_id: string;
+  selling_price?: number;
+  image_url?: string;
+  status: string;
   subcategory_id: string;
-  categories: { name: string };
-  subcategories: { name: string; selling_price: number };
+  subcategories: {
+    name: string;
+    selling_price: number;
+  };
 }
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
 
   useEffect(() => {
     fetchProducts();
@@ -34,97 +36,77 @@ export default function Products() {
 
   const fetchProducts = async () => {
     try {
-      console.log('🔄 Products: Starting data fetch');
-
       const { data, error } = await supabase
         .from('products')
         .select(`
           *,
-          categories!inner (name),
-          subcategories!inner (name, selling_price)
+          subcategories (
+            name,
+            selling_price
+          )
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('❌ Products: Fetch error:', error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch products. Please try again later.",
-          variant: "destructive",
-        });
-        setProducts([]);
-      } else {
-        console.log('✅ Products: Data loaded:', data?.length || 0);
-
-        // Calculate accurate stock for each product using breakdown table
-        const productsWithStock = await Promise.all(
-          (data || []).map(async (product) => {
-            const totalStock = await calculateTotalProductStock(product.id);
-            return {
-              ...product,
-              stock_quantity: totalStock
-            };
-          })
-        );
-
-        setProducts(productsWithStock);
-      }
+      if (error) throw error;
+      setProducts(data || []);
     } catch (error) {
-      console.error('❌ Products: Unexpected error:', error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while loading products.",
-        variant: "destructive",
-      });
-      setProducts([]);
+      console.error('Error fetching products:', error);
     } finally {
       setLoading(false);
     }
   };
 
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <CustomerHeader />
-        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-center items-center min-h-[400px]">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading products...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p>Loading products...</p>
           </div>
         </div>
-        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <CustomerHeader />
-      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Our Products</h1>
-          <p className="text-gray-600 mt-2">Discover our latest collection of gear and accessories</p>
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-4">All Products</h1>
+        
+        <div className="flex gap-4 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
-
-        {products.length === 0 ? (
-          <div className="text-center py-12">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No products available</h3>
-            <p className="text-gray-500">Check back later for new products!</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                subcategoryPrice={product.subcategories?.selling_price || 0}
-              />
-            ))}
-          </div>
-        )}
       </div>
-      <Footer />
+
+      {filteredProducts.length === 0 ? (
+        <Card>
+          <CardContent className="text-center py-8">
+            <p className="text-gray-500">No products found</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredProducts.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

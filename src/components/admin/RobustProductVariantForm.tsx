@@ -1,25 +1,23 @@
-import { useState, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Trash2 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Trash2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/hooks/use-toast';
+import { v4 as uuidv4 } from 'uuid';
 
-interface ColorVariant {
-  id?: string;
+interface Variant {
+  id: string;
   color_name: string;
   image_url?: string;
   has_sizes: boolean;
-  size_variants: SizeVariant[];
+  size_variants: Size[];
 }
 
-interface SizeVariant {
-  id?: string;
+interface Size {
+  id: string;
   size_name: string;
   size_code?: string;
 }
@@ -28,159 +26,218 @@ interface RobustProductVariantFormProps {
   productId: string;
   hasColorVariants: boolean;
   hasSizeVariants: boolean;
+  onVariantsChange: () => void;
 }
 
-export function RobustProductVariantForm({ productId, hasColorVariants, hasSizeVariants }: RobustProductVariantFormProps) {
-  const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
-  const { toast } = useToast();
+export function RobustProductVariantForm({ productId, hasColorVariants, hasSizeVariants, onVariantsChange }: RobustProductVariantFormProps) {
+  const [variants, setVariants] = useState<Variant[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (productId) {
-      fetchExistingVariants();
+    if (hasColorVariants) {
+      fetchVariants();
+    } else {
+      setLoading(false);
     }
-  }, [productId]);
+  }, [productId, hasColorVariants]);
 
-  const fetchExistingVariants = async () => {
+  const fetchVariants = async () => {
+    setLoading(true);
     try {
-      const { data: colors, error: colorError } = await supabase
+      const { data, error } = await supabase
         .from('color_variants')
         .select(`
           *,
-          size_variants(*)
+          size_variants (*)
         `)
         .eq('product_id', productId);
 
-      if (colorError) throw colorError;
-
-      if (colors) {
-        const formattedColors = colors.map(color => ({
-          id: color.id,
-          color_name: color.color_name,
-          image_url: color.image_url || '',
-          has_sizes: color.has_sizes || false,
-          size_variants: color.size_variants?.map((size: any) => ({
-            id: size.id,
-            size_name: size.size_name,
-            size_code: size.size_code || ''
-          })) || []
-        }));
-        setColorVariants(formattedColors);
-      } else {
-        setColorVariants([]);
-      }
+      if (error) throw error;
+      setVariants(data || []);
     } catch (error) {
       console.error('Error fetching variants:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load product variants',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const addColorVariant = () => {
-    setColorVariants(prev => [...prev, {
+  const addVariant = () => {
+    const newVariant: Variant = {
       id: uuidv4(),
       color_name: '',
-      image_url: '',
       has_sizes: hasSizeVariants,
-      size_variants: hasSizeVariants ? [{ id: uuidv4(), size_name: '', size_code: '' }] : []
-    }]);
+      size_variants: hasSizeVariants ? [{ id: uuidv4(), size_name: '' }] : [],
+    };
+    setVariants([...variants, newVariant]);
   };
 
-  const updateColorVariant = (id: string, field: string, value: any) => {
-    setColorVariants(prev => prev.map(variant => {
-      if (variant.id === id) {
-        return { ...variant, [field]: value };
-      }
-      return variant;
-    }));
+  const updateVariant = (variantId: string, key: string, value: any) => {
+    const updatedVariants = variants.map(variant =>
+      variant.id === variantId ? { ...variant, [key]: value } : variant
+    );
+    setVariants(updatedVariants);
   };
 
-  const removeColorVariant = (id: string) => {
-    setColorVariants(prev => prev.filter(variant => variant.id !== id));
-  };
-
-  const addSizeVariant = (colorId: string) => {
-    setColorVariants(prev => prev.map(variant => {
-      if (variant.id === colorId) {
-        return {
-          ...variant,
-          size_variants: [...variant.size_variants, { id: uuidv4(), size_name: '', size_code: '' }]
-        };
-      }
-      return variant;
-    }));
-  };
-
-  const updateSizeVariant = (colorId: string, sizeId: string, field: string, value: any) => {
-    setColorVariants(prev => prev.map(variant => {
-      if (variant.id === colorId) {
-        return {
-          ...variant,
-          size_variants: variant.size_variants.map(size => {
-            if (size.id === sizeId) {
-              return { ...size, [field]: value };
-            }
-            return size;
-          })
-        };
-      }
-      return variant;
-    }));
-  };
-
-  const removeSizeVariant = (colorId: string, sizeId: string) => {
-    setColorVariants(prev => prev.map(variant => {
-      if (variant.id === colorId) {
-        return {
-          ...variant,
-          size_variants: variant.size_variants.filter(size => size.id !== sizeId)
-        };
-      }
-      return variant;
-    }));
-  };
-
-  const saveVariantsToDatabase = async () => {
+  const removeVariant = async (variantId: string) => {
     try {
-      // Delete existing variants
-      const { error: deleteError } = await supabase
+      // Delete from database if it exists
+      const { error } = await supabase
         .from('color_variants')
         .delete()
-        .eq('product_id', productId);
+        .eq('id', variantId);
 
-      if (deleteError) throw deleteError;
+      if (error) throw error;
 
-      // Insert new variants
-      for (const color of colorVariants) {
-        const { id: colorId, size_variants, ...colorData } = color;
-        const { data: insertedColor, error: colorError } = await supabase
+      const newVariants = variants.filter(variant => variant.id !== variantId);
+      setVariants(newVariants);
+      onVariantsChange();
+    } catch (error) {
+      console.error('Error deleting variant:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete variant',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const addSize = (variantId: string) => {
+    const newSize: Size = { id: uuidv4(), size_name: '' };
+    const updatedVariants = variants.map(variant =>
+      variant.id === variantId
+        ? { ...variant, size_variants: [...variant.size_variants, newSize] }
+        : variant
+    );
+    setVariants(updatedVariants);
+  };
+
+  const updateSize = (variantId: string, sizeId: string, key: string, value: any) => {
+    const updatedVariants = variants.map(variant => {
+      if (variant.id === variantId) {
+        const updatedSizes = variant.size_variants.map(size =>
+          size.id === sizeId ? { ...size, [key]: value } : size
+        );
+        return { ...variant, size_variants: updatedSizes };
+      }
+      return variant;
+    });
+    setVariants(updatedVariants);
+  };
+
+  const removeSize = (variantId: string, sizeId: string) => {
+    const updatedVariants = variants.map(variant => {
+      if (variant.id === variantId) {
+        const updatedSizes = variant.size_variants.filter(size => size.id !== sizeId);
+        return { ...variant, size_variants: updatedSizes };
+      }
+      return variant;
+    });
+    setVariants(updatedVariants);
+  };
+
+  const saveVariants = async () => {
+    setLoading(true);
+    try {
+      for (const variant of variants) {
+        // Check if variant exists in database
+        const { data: existingVariant, error: selectError } = await supabase
           .from('color_variants')
-          .insert({
-            product_id: productId,
-            ...colorData,
-            has_sizes: hasSizeVariants
-          })
-          .select()
+          .select('*')
+          .eq('id', variant.id)
           .single();
 
-        if (colorError) throw colorError;
+        if (selectError && selectError.code !== 'PGRST116') throw selectError;
 
-        if (hasSizeVariants && size_variants) {
-          for (const size of size_variants) {
-            const { error: sizeError } = await supabase
+        if (existingVariant) {
+          // Update existing variant
+          const { error: updateError } = await supabase
+            .from('color_variants')
+            .update({
+              color_name: variant.color_name,
+              image_url: variant.image_url,
+              has_sizes: variant.has_sizes,
+              product_id: productId,
+            })
+            .eq('id', variant.id);
+
+          if (updateError) throw updateError;
+
+          // Update or insert size variants
+          for (const size of variant.size_variants) {
+            const { data: existingSize, error: selectSizeError } = await supabase
+              .from('size_variants')
+              .select('*')
+              .eq('id', size.id)
+              .single();
+
+            if (selectSizeError && selectSizeError.code !== 'PGRST116') throw selectSizeError;
+
+            if (existingSize) {
+              // Update existing size
+              const { error: updateSizeError } = await supabase
+                .from('size_variants')
+                .update({
+                  size_name: size.size_name,
+                  size_code: size.size_code,
+                  color_variant_id: variant.id,
+                })
+                .eq('id', size.id);
+
+              if (updateSizeError) throw updateSizeError;
+            } else {
+              // Insert new size
+              const { error: insertSizeError } = await supabase
+                .from('size_variants')
+                .insert({
+                  id: size.id,
+                  size_name: size.size_name,
+                  size_code: size.size_code,
+                  color_variant_id: variant.id,
+                });
+
+              if (insertSizeError) throw insertSizeError;
+            }
+          }
+        } else {
+          // Insert new variant
+          const { error: insertError } = await supabase
+            .from('color_variants')
+            .insert({
+              id: variant.id,
+              color_name: variant.color_name,
+              image_url: variant.image_url,
+              has_sizes: variant.has_sizes,
+              product_id: productId,
+            });
+
+          if (insertError) throw insertError;
+
+          // Insert size variants
+          for (const size of variant.size_variants) {
+            const { error: insertSizeError } = await supabase
               .from('size_variants')
               .insert({
-                color_variant_id: insertedColor.id,
+                id: size.id,
                 size_name: size.size_name,
-                size_code: size.size_code
+                size_code: size.size_code,
+                color_variant_id: variant.id,
               });
 
-            if (sizeError) throw sizeError;
+            if (insertSizeError) throw insertSizeError;
           }
         }
       }
 
       toast({
         title: 'Success',
-        description: 'Variants saved successfully',
+        description: 'Variants saved successfully!',
       });
+      onVariantsChange();
     } catch (error) {
       console.error('Error saving variants:', error);
       toast({
@@ -188,72 +245,83 @@ export function RobustProductVariantForm({ productId, hasColorVariants, hasSizeV
         description: 'Failed to save variants',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
+  if (loading) {
+    return <p>Loading variants...</p>;
+  }
+
   return (
     <div className="space-y-4">
-      <h3 className="text-xl font-semibold">Color Variants</h3>
-      {colorVariants.map((color) => (
-        <Card key={color.id}>
+      {variants.map((variant) => (
+        <Card key={variant.id}>
+          <CardHeader>
+            <CardTitle>Variant: {variant.color_name || 'New Variant'}</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor={`color-name-${color.id}`}>Color Name</Label>
-                <Input
-                  type="text"
-                  id={`color-name-${color.id}`}
-                  value={color.color_name}
-                  onChange={(e) => updateColorVariant(color.id as string, 'color_name', e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor={`color-image-${color.id}`}>Image URL</Label>
-                <Input
-                  type="text"
-                  id={`color-image-${color.id}`}
-                  value={color.image_url || ''}
-                  onChange={(e) => updateColorVariant(color.id as string, 'image_url', e.target.value)}
-                />
-              </div>
+            <div>
+              <Label htmlFor={`color-name-${variant.id}`}>Color Name</Label>
+              <Input
+                id={`color-name-${variant.id}`}
+                type="text"
+                value={variant.color_name}
+                onChange={(e) => updateVariant(variant.id, 'color_name', e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor={`image-url-${variant.id}`}>Image URL</Label>
+              <Input
+                id={`image-url-${variant.id}`}
+                type="text"
+                value={variant.image_url || ''}
+                onChange={(e) => updateVariant(variant.id, 'image_url', e.target.value)}
+              />
             </div>
 
             {hasSizeVariants && (
               <div className="space-y-2">
-                <h4 className="text-lg font-medium">Size Variants</h4>
-                {color.size_variants.map((size) => (
-                  <div key={size.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                    <div>
+                <h4 className="text-sm font-semibold">Sizes</h4>
+                {variant.size_variants.map((size) => (
+                  <div key={size.id} className="flex items-center space-x-2">
+                    <div className="flex-1">
                       <Label htmlFor={`size-name-${size.id}`}>Size Name</Label>
                       <Input
-                        type="text"
                         id={`size-name-${size.id}`}
+                        type="text"
                         value={size.size_name}
-                        onChange={(e) => updateSizeVariant(color.id as string, size.id as string, 'size_name', e.target.value)}
+                        onChange={(e) => updateSize(variant.id, size.id, 'size_name', e.target.value)}
                       />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <Label htmlFor={`size-code-${size.id}`}>Size Code</Label>
                       <Input
-                        type="text"
                         id={`size-code-${size.id}`}
+                        type="text"
                         value={size.size_code || ''}
-                        onChange={(e) => updateSizeVariant(color.id as string, size.id as string, 'size_code', e.target.value)}
+                        onChange={(e) => updateSize(variant.id, size.id, 'size_code', e.target.value)}
                       />
                     </div>
                     <Button
                       type="button"
-                      variant="destructive"
+                      variant="ghost"
                       size="sm"
-                      onClick={() => removeSizeVariant(color.id as string, size.id as string)}
+                      onClick={() => removeSize(variant.id, size.id)}
                     >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Remove
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
-                <Button type="button" variant="secondary" onClick={() => addSizeVariant(color.id as string)}>
-                  Add Size Variant
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addSize(variant.id)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Size
                 </Button>
               </div>
             )}
@@ -261,20 +329,29 @@ export function RobustProductVariantForm({ productId, hasColorVariants, hasSizeV
             <Button
               type="button"
               variant="destructive"
-              onClick={() => removeColorVariant(color.id as string)}
+              onClick={() => removeVariant(variant.id)}
             >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Remove Color Variant
+              <Trash2 className="h-4 w-4 mr-2" />
+              Remove Variant
             </Button>
           </CardContent>
         </Card>
       ))}
 
-      <Button type="button" onClick={addColorVariant}>
-        Add Color Variant
+      <Button
+        type="button"
+        variant="outline"
+        onClick={addVariant}
+      >
+        <Plus className="h-4 w-4 mr-2" />
+        Add Variant
       </Button>
 
-      <Button type="button" onClick={saveVariantsToDatabase}>
+      <Button
+        type="button"
+        onClick={saveVariants}
+        disabled={loading}
+      >
         Save Variants
       </Button>
     </div>

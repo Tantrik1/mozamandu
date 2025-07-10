@@ -10,10 +10,11 @@ import { Loader2 } from 'lucide-react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { usePromoCode } from '@/hooks/usePromoCode';
 import { useCheckoutData } from '@/hooks/useCheckoutData';
-import { CheckoutValidation } from './CheckoutValidation';
 import { PaymentScreenshotUpload } from './PaymentScreenshotUpload';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getVariantStockInfo } from '@/utils/inventoryManager';
+import { reserveStockForOrder, getOrderItemsForStockOperation } from '@/utils/stockReservationManager';
 
 export function UniversalCheckout() {
   const { cartItems, getTotalPrice, clearCart } = useRobustCart();
@@ -43,7 +44,7 @@ export function UniversalCheckout() {
   const [selectedDeliveryLocation, setSelectedDeliveryLocation] = useState('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
-  const [isValidCart, setIsValidCart] = useState(false);
+  const [isValidCart, setIsValidCart] = useState(true);
   const [validationError, setValidationError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -54,10 +55,36 @@ export function UniversalCheckout() {
   const promoDiscount = isPromoApplied ? (appliedPromo?.discount_percentage || 0) * (subtotal + deliveryCharge) / 100 : 0;
   const finalTotal = subtotal + deliveryCharge - promoDiscount;
 
-  const handleValidationResult = (isValid: boolean, error?: string) => {
-    setIsValidCart(isValid);
-    setValidationError(error || '');
-  };
+  // Stock validation during checkout
+  useEffect(() => {
+    const validateStockOnCheckout = async () => {
+      if (cartItems.length === 0) {
+        setIsValidCart(true);
+        return;
+      }
+
+      try {
+        for (const item of cartItems) {
+          if (item.productInventoryId) {
+            const stockInfo = await getVariantStockInfo(item.productId, item.productInventoryId);
+            if (!stockInfo.isValid || (stockInfo.stockAmount || 0) < item.quantity) {
+              setIsValidCart(false);
+              setValidationError(`Insufficient stock for ${item.productName}. Available: ${stockInfo.stockAmount || 0}, Required: ${item.quantity}`);
+              return;
+            }
+          }
+        }
+        setIsValidCart(true);
+        setValidationError('');
+      } catch (error) {
+        console.error('Stock validation error:', error);
+        setIsValidCart(false);
+        setValidationError('Error validating stock availability');
+      }
+    };
+
+    validateStockOnCheckout();
+  }, [cartItems]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +175,29 @@ export function UniversalCheckout() {
           });
       }
 
+      // Reserve stock after order creation using Supabase functions
+      try {
+        const orderItems = await getOrderItemsForStockOperation(order.id, true);
+        await reserveStockForOrder(orderItems, order.id);
+      } catch (stockError) {
+        console.error('Stock reservation error:', stockError);
+        // Continue with order creation even if stock reservation fails
+      }
+
+      // Send order confirmation email
+      try {
+        await supabase.functions.invoke('send-order-email', {
+          body: {
+            type: 'order_created',
+            orderId: order.id,
+            isCustomerOrder: true
+          }
+        });
+      } catch (emailError) {
+        console.error('Email sending error:', emailError);
+        // Continue even if email fails
+      }
+
       toast({
         title: 'Success',
         description: 'Order placed successfully!',
@@ -193,18 +243,6 @@ export function UniversalCheckout() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <CheckoutValidation 
-        cartItems={cartItems.map(item => ({
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          colorVariantId: item.colorVariantId,
-          sizeVariantId: item.sizeVariantId,
-          inventoryId: item.productInventoryId
-        }))}
-        onValidationResult={handleValidationResult}
-      />
-
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-6">
@@ -317,9 +355,9 @@ export function UniversalCheckout() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   {cartItems.map((item) => (
-                    <div key={`${item.productId}-${item.colorVariantId}-${item.sizeVariantId}`} className="flex justify-between">
+                    <div key={item.id} className="flex justify-between">
                       <span>{item.productName} x {item.quantity}</span>
-                      <span>Rs. {(item.price * item.quantity).toFixed(2)}</span>
+                      <span>Rs. {(item.basePrice * item.quantity).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>

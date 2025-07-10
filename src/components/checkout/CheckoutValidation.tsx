@@ -1,7 +1,7 @@
 
 import { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { getVariantStockInfo } from '@/utils/inventoryManager';
 
 export interface CartItem {
   productId: string;
@@ -16,18 +16,14 @@ export const validateCartStock = async (cartItems: CartItem[]): Promise<boolean>
   try {
     for (const item of cartItems) {
       if (item.inventoryId) {
-        const { data: inventory, error } = await supabase
-          .from('product_inventory')
-          .select('available_stock')
-          .eq('id', item.inventoryId)
-          .single();
-
-        if (error || !inventory) {
+        const stockInfo = await getVariantStockInfo(item.productId, item.inventoryId);
+        
+        if (!stockInfo.isValid) {
           throw new Error(`Product ${item.productName} not found in inventory`);
         }
 
-        if (inventory.available_stock < item.quantity) {
-          throw new Error(`Insufficient stock for ${item.productName}. Available: ${inventory.available_stock}, Required: ${item.quantity}`);
+        if ((stockInfo.stockAmount || 0) < item.quantity) {
+          throw new Error(`Insufficient stock for ${item.productName}. Available: ${stockInfo.stockAmount || 0}, Required: ${item.quantity}`);
         }
       }
     }
