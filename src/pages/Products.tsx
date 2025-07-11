@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { EnhancedProductCard } from '@/components/customer/EnhancedProductCard';
+import { AdvancedProductCard } from '@/components/customer/AdvancedProductCard';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
 import { Card, CardContent } from '@/components/ui/card';
@@ -174,9 +174,9 @@ export default function Products() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {products.map((product) => (
-              <EnhancedProductCard key={product.id} product={product} />
+              <AdvancedProductCard key={product.id} product={product} />
             ))}
           </div>
         )}

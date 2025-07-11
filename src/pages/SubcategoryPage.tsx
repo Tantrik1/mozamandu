@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft } from 'lucide-react';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { EnhancedProductCard } from '@/components/customer/EnhancedProductCard';
+import { AdvancedProductCard } from '@/components/customer/AdvancedProductCard';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
-import { toast } from '@/hooks/use-toast';
+import { Card, CardContent } from '@/components/ui/card';
+
+interface ProductVariant {
+  id: string;
+  color_name: string;
+  image_url?: string;
+  has_sizes: boolean;
+  size_variants: {
+    id: string;
+    size_name: string;
+    size_code?: string;
+  }[];
+}
 
 interface Product {
   id: string;
@@ -25,17 +35,7 @@ interface Product {
     selling_price: number;
     minimum_quantity: number;
   };
-  color_variants?: {
-    id: string;
-    color_name: string;
-    image_url?: string;
-    has_sizes: boolean;
-    size_variants: {
-      id: string;
-      size_name: string;
-      size_code?: string;
-    }[];
-  }[];
+  color_variants?: ProductVariant[];
 }
 
 interface Subcategory {
@@ -43,9 +43,6 @@ interface Subcategory {
   name: string;
   description?: string;
   image_url?: string;
-  selling_price: number;
-  minimum_quantity: number;
-  status: string;
 }
 
 export default function SubcategoryPage() {
@@ -56,36 +53,34 @@ export default function SubcategoryPage() {
 
   useEffect(() => {
     if (subcategoryId) {
-      fetchData();
+      fetchSubcategoryAndProducts();
     }
   }, [subcategoryId]);
 
-  const fetchData = async () => {
-    if (!subcategoryId) return;
-    
-    setLoading(true);
+  const fetchSubcategoryAndProducts = async () => {
     try {
-      console.log('Fetching data for subcategory:', subcategoryId);
+      setLoading(true);
 
       // Fetch subcategory details
       const { data: subcategoryData, error: subcategoryError } = await supabase
         .from('subcategories')
         .select('*')
         .eq('id', subcategoryId)
-        .eq('status', 'on')
         .single();
 
       if (subcategoryError) {
         console.error('Error fetching subcategory:', subcategoryError);
-        toast({
-          title: "Error",
-          description: "Subcategory not found",
-          variant: "destructive",
-        });
+        throw subcategoryError;
+      }
+
+      if (!subcategoryData) {
+        console.log('Subcategory not found');
+        setSubcategory(null);
+        setProducts([]);
+        setLoading(false);
         return;
       }
 
-      console.log('Subcategory found:', subcategoryData);
       setSubcategory(subcategoryData);
 
       // Fetch products for the subcategory
@@ -115,24 +110,17 @@ export default function SubcategoryPage() {
 
       if (productsError) {
         console.error('Error fetching products:', productsError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch products",
-          variant: "destructive",
-        });
-        setProducts([]);
-        return;
+        throw productsError;
       }
 
       if (!productsData || productsData.length === 0) {
-        console.log('No products found for subcategory');
+        console.log('No products found in this subcategory');
         setProducts([]);
+        setLoading(false);
         return;
       }
 
-      console.log('Products found:', productsData.length);
-
-      // Get variants for products that have them
+      // Get variants for products
       const productsWithVariants = [];
       
       for (const product of productsData) {
@@ -183,12 +171,7 @@ export default function SubcategoryPage() {
       console.log('Products with variants processed:', productsWithVariants.length);
       setProducts(productsWithVariants);
     } catch (error) {
-      console.error('Error fetching data:', error);
-      toast({
-        title: "Error",
-        description: "Something went wrong",
-        variant: "destructive",
-      });
+      console.error('Error fetching subcategory and products:', error);
     } finally {
       setLoading(false);
     }
@@ -211,101 +194,45 @@ export default function SubcategoryPage() {
     );
   }
 
-  if (!subcategory) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <CustomerHeader />
-        <div className="container mx-auto px-4 py-8">
-          <Card>
-            <CardContent className="text-center py-8">
-              <p className="text-gray-500 mb-4">Subcategory not found</p>
-              <Link to="/categories" className="inline-flex items-center text-primary hover:text-primary/80">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Categories
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <Link to="/categories" className="inline-flex items-center mb-4 text-primary hover:text-primary/80">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Categories
-          </Link>
-          <div className="flex flex-col md:flex-row gap-6 items-start">
-            {subcategory?.image_url && (
-              <img
-                src={subcategory.image_url}
-                alt={subcategory.name}
-                className="w-full md:w-48 h-48 object-cover rounded-lg"
-              />
-            )}
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold mb-2">{subcategory?.name}</h1>
-              {subcategory?.description && (
-                <p className="text-gray-600 mb-4">{subcategory.description}</p>
+      
+      {/* Subcategory Header */}
+      {subcategory && (
+        <div className="bg-white border-b">
+          <div className="container mx-auto px-4 py-8">
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">
+                {subcategory.name}
+              </h1>
+              {subcategory.description && (
+                <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                  {subcategory.description}
+                </p>
               )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="bg-white p-4 rounded-lg shadow-sm">
-                  <p className="font-semibold text-primary">Base Price</p>
-                  <p className="text-lg">Rs. {subcategory?.selling_price.toFixed(2)}</p>
-                </div>
-                <div className="bg-white p-4 rounded-lg shadow-sm">
-                  <p className="font-semibold text-primary">Minimum Order</p>
-                  <p className="text-lg">{subcategory?.minimum_quantity} pieces</p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
+      )}
 
-        {loading ? (
-          <div className="flex justify-center items-center min-h-[400px]">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-              <p>Loading products...</p>
-            </div>
-          </div>
-        ) : !subcategory ? (
-          <Card>
-            <CardContent className="text-center py-8">
-              <p className="text-gray-500 mb-4">Subcategory not found</p>
-              <Link to="/categories" className="inline-flex items-center text-primary hover:text-primary/80">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Categories
-              </Link>
-            </CardContent>
-          </Card>
-        ) : products.length === 0 ? (
+      <div className="container mx-auto px-4 py-8">
+        {products.length === 0 ? (
           <Card>
             <CardContent className="text-center py-12">
-              <p className="text-gray-500 text-lg mb-2">No products found in this subcategory</p>
-              <p className="text-sm text-gray-400">Products will appear here once they are added to this subcategory.</p>
+              <p className="text-gray-500 text-lg mb-2">No products found in this category</p>
+              <p className="text-sm text-gray-400">Check back later for new arrivals!</p>
             </CardContent>
           </Card>
         ) : (
-          <>
-            <div className="mb-6">
-              <p className="text-gray-600">
-                Showing {products.length} product{products.length !== 1 ? 's' : ''} in {subcategory.name}
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {products.map((product) => (
-                <EnhancedProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          </>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {products.map((product) => (
+              <AdvancedProductCard key={product.id} product={product} />
+            ))}
+          </div>
         )}
       </div>
+      
       <Footer />
     </div>
   );

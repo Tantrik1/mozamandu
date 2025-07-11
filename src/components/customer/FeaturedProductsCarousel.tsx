@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { EnhancedProductCard } from './EnhancedProductCard';
+import { AdvancedProductCard } from './AdvancedProductCard';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 interface Product {
   id: string;
@@ -143,13 +142,13 @@ export function FeaturedProductsCarousel() {
 
   const nextSlide = () => {
     setCurrentIndex((prevIndex) => 
-      prevIndex + 4 >= products.length ? 0 : prevIndex + 4
+      prevIndex >= products.length - 1 ? 0 : prevIndex + 1
     );
   };
 
   const prevSlide = () => {
     setCurrentIndex((prevIndex) => 
-      prevIndex === 0 ? Math.max(0, products.length - 4) : Math.max(0, prevIndex - 4)
+      prevIndex <= 0 ? products.length - 1 : prevIndex - 1
     );
   };
 
@@ -159,12 +158,12 @@ export function FeaturedProductsCarousel() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products</h2>
-            <p className="text-lg text-gray-600">Our handpicked bestsellers</p>
+            <p className="text-lg text-gray-600">Our most popular items</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
-                <div className="w-full h-48 bg-gray-200"></div>
+              <div key={i} className="bg-white rounded-2xl shadow-md overflow-hidden animate-pulse">
+                <div className="w-full h-64 bg-gray-200"></div>
                 <div className="p-4 space-y-3">
                   <div className="h-4 bg-gray-200 rounded"></div>
                   <div className="h-3 bg-gray-200 rounded w-3/4"></div>
@@ -179,28 +178,19 @@ export function FeaturedProductsCarousel() {
   }
 
   if (products.length === 0) {
-    return (
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products</h2>
-            <p className="text-lg text-gray-600">No featured products available at the moment</p>
-          </div>
-        </div>
-      </section>
-    );
+    return null;
   }
 
-  const visibleProducts = products.slice(currentIndex, currentIndex + 4);
-  const canGoNext = currentIndex + 4 < products.length;
-  const canGoPrev = currentIndex > 0;
+  const visibleProducts = products.slice(currentIndex, currentIndex + 4).concat(
+    products.slice(0, Math.max(0, (currentIndex + 4) - products.length))
+  );
 
   return (
     <section className="py-16 bg-white">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products</h2>
-          <p className="text-lg text-gray-600">Our handpicked bestsellers</p>
+          <p className="text-lg text-gray-600">Our most popular items</p>
         </div>
 
         <div className="relative">
@@ -208,19 +198,17 @@ export function FeaturedProductsCarousel() {
             <>
               <Button
                 variant="outline"
-                size="icon"
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white shadow-lg"
+                size="sm"
                 onClick={prevSlide}
-                disabled={!canGoPrev}
+                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 rounded-full w-10 h-10 p-0 bg-white shadow-lg border-gray-200"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button
                 variant="outline"
-                size="icon"
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white shadow-lg"
+                size="sm"
                 onClick={nextSlide}
-                disabled={!canGoNext}
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 rounded-full w-10 h-10 p-0 bg-white shadow-lg border-gray-200"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -228,34 +216,10 @@ export function FeaturedProductsCarousel() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {visibleProducts.map((product) => (
-              <EnhancedProductCard key={product.id} product={product} />
+            {visibleProducts.map((product, index) => (
+              <AdvancedProductCard key={`${product.id}-${index}`} product={product} />
             ))}
           </div>
-        </div>
-
-        {/* Dots indicator */}
-        {products.length > 4 && (
-          <div className="flex justify-center mt-8 space-x-2">
-            {Array.from({ length: Math.ceil(products.length / 4) }).map((_, index) => (
-              <button
-                key={index}
-                className={`w-3 h-3 rounded-full transition-colors ${
-                  Math.floor(currentIndex / 4) === index ? 'bg-primary' : 'bg-gray-300'
-                }`}
-                onClick={() => setCurrentIndex(index * 4)}
-              />
-            ))}
-          </div>
-        )}
-
-        <div className="text-center mt-12">
-          <Link to="/products">
-            <Button variant="outline" size="lg">
-              View All Products
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
         </div>
       </div>
     </section>

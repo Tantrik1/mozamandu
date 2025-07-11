@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { EnhancedProductCard } from './EnhancedProductCard';
+import { AdvancedProductCard } from './AdvancedProductCard';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -150,8 +151,8 @@ export function LatestProducts() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
-                <div className="w-full h-48 bg-gray-200"></div>
+              <div key={i} className="bg-white rounded-2xl shadow-md overflow-hidden animate-pulse">
+                <div className="w-full h-64 bg-gray-200"></div>
                 <div className="p-4 space-y-3">
                   <div className="h-4 bg-gray-200 rounded"></div>
                   <div className="h-3 bg-gray-200 rounded w-3/4"></div>
@@ -177,12 +178,12 @@ export function LatestProducts() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {products.map((product) => (
-                <EnhancedProductCard key={product.id} product={product} />
+                <AdvancedProductCard key={product.id} product={product} />
               ))}
             </div>
             <div className="text-center mt-12">
               <Link to="/products">
-                <Button variant="outline" size="lg">
+                <Button variant="outline" size="lg" className="rounded-xl">
                   View All Products
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -193,7 +194,7 @@ export function LatestProducts() {
           <div className="text-center py-8">
             <p className="text-gray-500 mb-4">No products available at the moment</p>
             <Link to="/categories">
-              <Button variant="outline">
+              <Button variant="outline" className="rounded-xl">
                 Browse Categories
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
