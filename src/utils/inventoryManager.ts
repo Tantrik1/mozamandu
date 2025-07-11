@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -234,8 +233,40 @@ export const calculateTotalProductStock = async (productId: string): Promise<num
   }
 };
 
-export const getRealTimeStock = async (productId: string): Promise<number> => {
-  return calculateTotalProductStock(productId);
+export const getRealTimeStock = async (productId: string, colorVariantId?: string, sizeVariantId?: string): Promise<number> => {
+  try {
+    let query = supabase
+      .from('product_inventory')
+      .select('available_stock')
+      .eq('product_id', productId)
+      .eq('is_active', true);
+
+    // Add color variant filter if provided
+    if (colorVariantId) {
+      query = query.eq('color_variant_id', colorVariantId);
+    } else {
+      query = query.is('color_variant_id', null);
+    }
+
+    // Add size variant filter if provided
+    if (sizeVariantId) {
+      query = query.eq('size_variant_id', sizeVariantId);
+    } else {
+      query = query.is('size_variant_id', null);
+    }
+
+    const { data: inventoryItems, error } = await query;
+
+    if (error) {
+      console.error('Error calculating real-time stock:', error);
+      return 0;
+    }
+
+    return inventoryItems?.reduce((sum, item) => sum + (item.available_stock || 0), 0) || 0;
+  } catch (error) {
+    console.error('Error calculating real-time stock:', error);
+    return 0;
+  }
 };
 
 // Core inventory management functions using Supabase functions

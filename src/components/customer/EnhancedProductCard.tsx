@@ -6,11 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Star, ShoppingCart, Info } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { getRealTimeStock } from '@/utils/inventoryManager';
+import { supabase } from '@/integrations/supabase/client';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useCartPricing } from '@/hooks/useCartPricing';
 import { useComboManager } from '@/hooks/useComboManager';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 interface ProductVariant {
@@ -85,7 +84,7 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
 
   useEffect(() => {
     fetchStock();
-  }, [selectedColor, selectedSize]);
+  }, [selectedColor, selectedSize, product.id]);
 
   const fetchDiscountTiers = async () => {
     try {
@@ -105,17 +104,47 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
     try {
       setLoading(true);
       
-      // Create the product inventory ID based on variant selection
-      let productInventoryId = product.id;
+      // Build query to get inventory based on selected variants
+      let query = supabase
+        .from('product_inventory')
+        .select('available_stock')
+        .eq('product_id', product.id)
+        .eq('is_active', true);
+
+      // Add color variant filter if product has color variants
       if (product.has_color_variants && selectedColor) {
-        if (selectedVariant?.has_sizes && selectedSize) {
-          productInventoryId = `${product.id}-${selectedColor}-${selectedSize}`;
-        } else {
-          productInventoryId = `${product.id}-${selectedColor}`;
-        }
+        query = query.eq('color_variant_id', selectedColor);
+      } else if (product.has_color_variants) {
+        // If product has color variants but none selected, set stock to 0
+        setStock(0);
+        return;
+      } else {
+        // If product doesn't have color variants, ensure we get records without color variants
+        query = query.is('color_variant_id', null);
       }
 
-      const totalStock = await getRealTimeStock(productInventoryId);
+      // Add size variant filter if selected variant has sizes
+      if (selectedVariant?.has_sizes && selectedSize) {
+        query = query.eq('size_variant_id', selectedSize);
+      } else if (selectedVariant?.has_sizes) {
+        // If variant has sizes but none selected, set stock to 0
+        setStock(0);
+        return;
+      } else {
+        // If variant doesn't have sizes, ensure we get records without size variants
+        query = query.is('size_variant_id', null);
+      }
+
+      const { data: inventoryData, error } = await query;
+
+      if (error) {
+        console.error('Error fetching inventory:', error);
+        setStock(0);
+        return;
+      }
+
+      // Sum up available stock from all matching inventory records
+      const totalStock = inventoryData?.reduce((sum, item) => sum + (item.available_stock || 0), 0) || 0;
       setStock(totalStock);
     } catch (error) {
       console.error('Error fetching stock:', error);
@@ -175,12 +204,13 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
       return;
     }
 
+    // Find the actual inventory ID for the selected variant combination
+    let productInventoryId = null;
+    
     const cartItem = {
       productId: product.id,
       productName: product.name,
-      productInventoryId: product.has_color_variants ? 
-        (selectedVariant?.has_sizes ? `${product.id}-${selectedColor}-${selectedSize}` : `${product.id}-${selectedColor}`) 
-        : null,
+      productInventoryId,
       colorName: selectedVariant?.color_name,
       sizeName: availableSizes.find(s => s.id === selectedSize)?.size_name,
       quantity,
