@@ -1,72 +1,45 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { getLowStockAlerts, type LowStockAlert } from '@/utils/inventoryManager';
+import { toast } from '@/hooks/use-toast';
 
-export function useStockMonitoring(productId?: string) {
-  const [stockAlerts, setStockAlerts] = useState<LowStockAlert[]>([]);
-  const [loading, setLoading] = useState(true);
+interface StockAlert {
+  id: string;
+  product_name: string;
+  available_stock: number;
+  low_stock_threshold: number;
+  category_name: string;
+  subcategory_name: string;
+}
 
-  useEffect(() => {
-    fetchStockAlerts();
-    
-    // Set up real-time monitoring
-    const channel = supabase
-      .channel('inventory-monitoring')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'product_inventory'
-      }, () => {
-        fetchStockAlerts();
-      })
-      .subscribe();
+export function useStockMonitoring() {
+  const [lowStockAlerts, setLowStockAlerts] = useState<StockAlert[]>([]);
+  const [loading, setLoading] = useState(false);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [productId]);
-
-  const fetchStockAlerts = async () => {
+  const checkLowStock = async () => {
     try {
       setLoading(true);
-      const alerts = await getLowStockAlerts();
-      
-      // Filter by product if specified
-      const filteredAlerts = productId 
-        ? alerts.filter(alert => alert.product_id === productId)
-        : alerts;
-      
-      setStockAlerts(filteredAlerts);
+      // Mock data since inventory system is removed
+      setLowStockAlerts([]);
     } catch (error) {
-      console.error('Error fetching stock alerts:', error);
+      console.error('Error checking low stock:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to check stock levels',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const getStockStatus = (alert: LowStockAlert) => {
-    if (alert.available_stock === 0) return 'out_of_stock';
-    if (alert.available_stock <= alert.low_stock_threshold) return 'low_stock';
-    return 'in_stock';
-  };
-
-  const getCriticalAlerts = () => {
-    return stockAlerts.filter(alert => alert.available_stock === 0);
-  };
-
-  const getLowStockItems = () => {
-    return stockAlerts.filter(alert => 
-      alert.available_stock > 0 && alert.available_stock <= alert.low_stock_threshold
-    );
-  };
+  useEffect(() => {
+    checkLowStock();
+  }, []);
 
   return {
-    stockAlerts,
+    lowStockAlerts,
     loading,
-    refresh: fetchStockAlerts,
-    getStockStatus,
-    getCriticalAlerts,
-    getLowStockItems
+    checkLowStock,
   };
 }

@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Edit, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { getProductStockSummary } from '@/utils/inventoryManager';
 
 interface ProductDetailViewProps {
   productId: string;
@@ -50,7 +49,6 @@ interface SizeVariant {
 export function ProductDetailView({ productId, onEdit, onBack }: ProductDetailViewProps) {
   const [product, setProduct] = useState<Product | null>(null);
   const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
-  const [stockSummary, setStockSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -106,10 +104,6 @@ export function ProductDetailView({ productId, onEdit, onBack }: ProductDetailVi
 
         setColorVariants(variants);
       }
-
-      // Fetch stock summary
-      const summary = await getProductStockSummary(productId);
-      setStockSummary(summary);
 
     } catch (error) {
       console.error('Error fetching product details:', error);
@@ -207,27 +201,13 @@ export function ProductDetailView({ productId, onEdit, onBack }: ProductDetailVi
 
         <Card>
           <CardHeader>
-            <CardTitle>Stock Information</CardTitle>
+            <CardTitle>Product Details</CardTitle>
           </CardHeader>
           <CardContent>
-            {stockSummary ? (
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <strong>Total Stock:</strong>
-                  <p className="text-2xl font-bold">{stockSummary.totalStock}</p>
-                </div>
-                <div>
-                  <strong>Available:</strong>
-                  <p className="text-2xl font-bold text-green-600">{stockSummary.availableStock}</p>
-                </div>
-                <div>
-                  <strong>Reserved:</strong>
-                  <p className="text-2xl font-bold text-orange-600">{stockSummary.reservedStock}</p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-gray-500">No inventory data available</p>
-            )}
+            <div className="space-y-2">
+              <p><strong>Created:</strong> {new Date(product.created_at).toLocaleDateString()}</p>
+              <p><strong>Updated:</strong> {new Date(product.updated_at).toLocaleDateString()}</p>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Eye, RefreshCw } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { useOrderStockManagement } from '@/hooks/useOrderStockManagement';
 
 type OrderStatus = 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled';
 
@@ -29,7 +28,6 @@ export function OrderManagement() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
-  const { handleOrderStatusChange, processing: stockProcessing } = useOrderStockManagement();
 
   const fetchOrders = async () => {
     try {
@@ -63,13 +61,6 @@ export function OrderManagement() {
     try {
       setUpdatingOrder(orderId);
       
-      // Get current order to know old status
-      const currentOrder = orders.find(order => order.id === orderId);
-      const oldStatus = currentOrder?.status || 'pending_payment';
-      
-      console.log('Updating order status:', { orderId, oldStatus, newStatus });
-      
-      // Update order status in database
       const { error } = await supabase
         .from('orders')
         .update({ status: newStatus })
@@ -79,14 +70,6 @@ export function OrderManagement() {
         throw error;
       }
 
-      // Handle stock changes based on status change
-      const stockSuccess = await handleOrderStatusChange(orderId, newStatus, oldStatus, false);
-      
-      if (!stockSuccess) {
-        console.warn('Stock operation had issues, but order status was updated');
-      }
-
-      // Refresh orders list
       await fetchOrders();
       
       toast({
@@ -213,7 +196,7 @@ export function OrderManagement() {
                       <Select
                         value={order.status}
                         onValueChange={(value: OrderStatus) => updateOrderStatus(order.id, value)}
-                        disabled={updatingOrder === order.id || stockProcessing}
+                        disabled={updatingOrder === order.id}
                       >
                         <SelectTrigger className="w-40">
                           <SelectValue />
@@ -226,7 +209,7 @@ export function OrderManagement() {
                           <SelectItem value="cancelled">Cancelled</SelectItem>
                         </SelectContent>
                       </Select>
-                      {(updatingOrder === order.id || stockProcessing) && (
+                      {updatingOrder === order.id && (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       )}
                     </div>

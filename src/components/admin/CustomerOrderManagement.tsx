@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -5,11 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Eye, RefreshCw } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { useOrderStockManagement } from '@/hooks/useOrderStockManagement';
 
 type OrderStatus = 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled';
 
-interface CustomerOrder {
+interface Order {
   id: string;
   order_number: string;
   customer_name: string;
@@ -25,12 +25,11 @@ interface CustomerOrder {
 }
 
 export function CustomerOrderManagement() {
-  const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
-  const { handleOrderStatusChange, processing: stockProcessing } = useOrderStockManagement();
 
-  const fetchCustomerOrders = async () => {
+  const fetchOrders = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -47,10 +46,10 @@ export function CustomerOrderManagement() {
 
       setOrders(data || []);
     } catch (error) {
-      console.error('Error fetching customer orders:', error);
+      console.error('Error fetching orders:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch customer orders",
+        description: "Failed to fetch orders",
         variant: "destructive",
       });
     } finally {
@@ -62,13 +61,6 @@ export function CustomerOrderManagement() {
     try {
       setUpdatingOrder(orderId);
       
-      // Get current order to know old status
-      const currentOrder = orders.find(order => order.id === orderId);
-      const oldStatus = currentOrder?.status || 'pending_payment';
-      
-      console.log('Updating customer order status:', { orderId, oldStatus, newStatus });
-      
-      // Update order status in database
       const { error } = await supabase
         .from('customer_orders')
         .update({ status: newStatus })
@@ -78,25 +70,17 @@ export function CustomerOrderManagement() {
         throw error;
       }
 
-      // Handle stock changes based on status change
-      const stockSuccess = await handleOrderStatusChange(orderId, newStatus, oldStatus, true);
-      
-      if (!stockSuccess) {
-        console.warn('Stock operation had issues, but order status was updated');
-      }
-
-      // Refresh orders list
-      await fetchCustomerOrders();
+      await fetchOrders();
       
       toast({
         title: "Order Updated",
-        description: "Customer order status has been updated successfully",
+        description: "Order status has been updated successfully",
       });
     } catch (error) {
-      console.error('Error updating customer order:', error);
+      console.error('Error updating order:', error);
       toast({
         title: "Error",
-        description: "Failed to update customer order status",
+        description: "Failed to update order status",
         variant: "destructive",
       });
     } finally {
@@ -119,14 +103,14 @@ export function CustomerOrderManagement() {
   };
 
   useEffect(() => {
-    fetchCustomerOrders();
+    fetchOrders();
   }, []);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin mr-2" />
-        Loading customer orders...
+        Loading orders...
       </div>
     );
   }
@@ -136,10 +120,10 @@ export function CustomerOrderManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Customer Orders</h1>
-          <p className="text-gray-600">Manage orders from registered customers</p>
+          <p className="text-gray-600">Manage customer orders placed through the system</p>
         </div>
         <Button 
-          onClick={fetchCustomerOrders} 
+          onClick={fetchOrders} 
           variant="outline"
           disabled={loading}
         >
@@ -212,7 +196,7 @@ export function CustomerOrderManagement() {
                       <Select
                         value={order.status}
                         onValueChange={(value: OrderStatus) => updateOrderStatus(order.id, value)}
-                        disabled={updatingOrder === order.id || stockProcessing}
+                        disabled={updatingOrder === order.id}
                       >
                         <SelectTrigger className="w-40">
                           <SelectValue />
@@ -225,7 +209,7 @@ export function CustomerOrderManagement() {
                           <SelectItem value="cancelled">Cancelled</SelectItem>
                         </SelectContent>
                       </Select>
-                      {(updatingOrder === order.id || stockProcessing) && (
+                      {updatingOrder === order.id && (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       )}
                     </div>
@@ -257,7 +241,7 @@ export function CustomerOrderManagement() {
 
       {orders.length === 0 && (
         <div className="text-center py-8">
-          <p className="text-gray-500">No customer orders found</p>
+          <p className="text-gray-500">No orders found</p>
         </div>
       )}
     </div>

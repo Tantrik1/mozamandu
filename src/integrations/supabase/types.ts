@@ -208,7 +208,6 @@ export type Database = {
           id: string
           order_id: string
           product_id: string
-          product_inventory_id: string | null
           quantity: number
         }
         Insert: {
@@ -216,7 +215,6 @@ export type Database = {
           id?: string
           order_id: string
           product_id: string
-          product_inventory_id?: string | null
           quantity: number
         }
         Update: {
@@ -224,7 +222,6 @@ export type Database = {
           id?: string
           order_id?: string
           product_id?: string
-          product_inventory_id?: string | null
           quantity?: number
         }
         Relationships: [
@@ -240,27 +237,6 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "customer_order_items_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_overview"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "customer_order_items_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
-            referencedRelation: "low_stock_alerts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "customer_order_items_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
-            referencedRelation: "product_inventory"
             referencedColumns: ["id"]
           },
         ]
@@ -486,138 +462,6 @@ export type Database = {
         }
         Relationships: []
       }
-      inventory_audit_log: {
-        Row: {
-          action_type: string
-          cart_id: string | null
-          category_id: string | null
-          change_amount: number | null
-          color_variant_id: string | null
-          created_at: string | null
-          id: string
-          ip_address: unknown | null
-          new_available_stock: number | null
-          new_reserved_stock: number | null
-          new_stock_quantity: number | null
-          old_available_stock: number | null
-          old_reserved_stock: number | null
-          old_stock_quantity: number | null
-          order_id: string | null
-          product_id: string | null
-          product_inventory_id: string | null
-          reason: string | null
-          size_variant_id: string | null
-          subcategory_id: string | null
-          user_agent: string | null
-          user_id: string | null
-        }
-        Insert: {
-          action_type: string
-          cart_id?: string | null
-          category_id?: string | null
-          change_amount?: number | null
-          color_variant_id?: string | null
-          created_at?: string | null
-          id?: string
-          ip_address?: unknown | null
-          new_available_stock?: number | null
-          new_reserved_stock?: number | null
-          new_stock_quantity?: number | null
-          old_available_stock?: number | null
-          old_reserved_stock?: number | null
-          old_stock_quantity?: number | null
-          order_id?: string | null
-          product_id?: string | null
-          product_inventory_id?: string | null
-          reason?: string | null
-          size_variant_id?: string | null
-          subcategory_id?: string | null
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          action_type?: string
-          cart_id?: string | null
-          category_id?: string | null
-          change_amount?: number | null
-          color_variant_id?: string | null
-          created_at?: string | null
-          id?: string
-          ip_address?: unknown | null
-          new_available_stock?: number | null
-          new_reserved_stock?: number | null
-          new_stock_quantity?: number | null
-          old_available_stock?: number | null
-          old_reserved_stock?: number | null
-          old_stock_quantity?: number | null
-          order_id?: string | null
-          product_id?: string | null
-          product_inventory_id?: string | null
-          reason?: string | null
-          size_variant_id?: string | null
-          subcategory_id?: string | null
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_audit_log_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_audit_log_color_variant_id_fkey"
-            columns: ["color_variant_id"]
-            isOneToOne: false
-            referencedRelation: "color_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_audit_log_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_audit_log_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_overview"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_audit_log_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
-            referencedRelation: "low_stock_alerts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_audit_log_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
-            referencedRelation: "product_inventory"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_audit_log_size_variant_id_fkey"
-            columns: ["size_variant_id"]
-            isOneToOne: false
-            referencedRelation: "size_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_audit_log_subcategory_id_fkey"
-            columns: ["subcategory_id"]
-            isOneToOne: false
-            referencedRelation: "subcategories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       navbar_items: {
         Row: {
           category_id: string | null
@@ -742,7 +586,6 @@ export type Database = {
           id: string
           order_id: string
           product_id: string
-          product_inventory_id: string | null
           quantity: number
         }
         Insert: {
@@ -750,7 +593,6 @@ export type Database = {
           id?: string
           order_id: string
           product_id: string
-          product_inventory_id?: string | null
           quantity: number
         }
         Update: {
@@ -758,7 +600,6 @@ export type Database = {
           id?: string
           order_id?: string
           product_id?: string
-          product_inventory_id?: string | null
           quantity?: number
         }
         Relationships: [
@@ -774,27 +615,6 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_overview"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
-            referencedRelation: "low_stock_alerts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_product_inventory_id_fkey"
-            columns: ["product_inventory_id"]
-            isOneToOne: false
-            referencedRelation: "product_inventory"
             referencedColumns: ["id"]
           },
         ]
@@ -980,117 +800,6 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      product_inventory: {
-        Row: {
-          available_stock: number | null
-          category_id: string | null
-          category_name: string | null
-          color_name: string | null
-          color_variant_id: string | null
-          cost_price: number | null
-          created_at: string | null
-          id: string
-          is_active: boolean | null
-          low_stock_threshold: number | null
-          product_id: string
-          product_name: string
-          reserved_stock: number
-          selling_price: number | null
-          size_code: string | null
-          size_name: string | null
-          size_variant_id: string | null
-          sku: string
-          stock_quantity: number
-          subcategory_id: string | null
-          subcategory_name: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          available_stock?: number | null
-          category_id?: string | null
-          category_name?: string | null
-          color_name?: string | null
-          color_variant_id?: string | null
-          cost_price?: number | null
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          low_stock_threshold?: number | null
-          product_id: string
-          product_name: string
-          reserved_stock?: number
-          selling_price?: number | null
-          size_code?: string | null
-          size_name?: string | null
-          size_variant_id?: string | null
-          sku: string
-          stock_quantity?: number
-          subcategory_id?: string | null
-          subcategory_name?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          available_stock?: number | null
-          category_id?: string | null
-          category_name?: string | null
-          color_name?: string | null
-          color_variant_id?: string | null
-          cost_price?: number | null
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          low_stock_threshold?: number | null
-          product_id?: string
-          product_name?: string
-          reserved_stock?: number
-          selling_price?: number | null
-          size_code?: string | null
-          size_name?: string | null
-          size_variant_id?: string | null
-          sku?: string
-          stock_quantity?: number
-          subcategory_id?: string | null
-          subcategory_name?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "product_inventory_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_inventory_color_variant_id_fkey"
-            columns: ["color_variant_id"]
-            isOneToOne: false
-            referencedRelation: "color_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_inventory_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_inventory_size_variant_id_fkey"
-            columns: ["size_variant_id"]
-            isOneToOne: false
-            referencedRelation: "size_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_inventory_subcategory_id_fkey"
-            columns: ["subcategory_id"]
-            isOneToOne: false
-            referencedRelation: "subcategories"
             referencedColumns: ["id"]
           },
         ]
@@ -1348,43 +1057,7 @@ export type Database = {
       }
     }
     Views: {
-      inventory_overview: {
-        Row: {
-          available_stock: number | null
-          category_name: string | null
-          created_at: string | null
-          id: string | null
-          low_stock_threshold: number | null
-          product_name: string | null
-          product_sku: string | null
-          reserved_stock: number | null
-          size_name: string | null
-          stock_quantity: number | null
-          stock_status: string | null
-          subcategory_name: string | null
-          updated_at: string | null
-          variant_name: string | null
-        }
-        Relationships: []
-      }
-      low_stock_alerts: {
-        Row: {
-          available_stock: number | null
-          category_name: string | null
-          id: string | null
-          low_stock_threshold: number | null
-          product_name: string | null
-          product_sku: string | null
-          reserved_stock: number | null
-          size_name: string | null
-          stock_needed: number | null
-          stock_quantity: number | null
-          subcategory_name: string | null
-          updated_at: string | null
-          variant_name: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       bulk_update_inventory: {

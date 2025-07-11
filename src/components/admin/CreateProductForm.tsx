@@ -12,9 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Upload, X } from 'lucide-react';
+import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { CreateProductVariantForm } from './CreateProductVariantForm';
-import { InventorySetupModal } from './InventorySetupModal';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -25,7 +24,7 @@ const productSchema = z.object({
   subcategory_id: z.string().min(1, 'Subcategory is required'),
   is_featured: z.boolean().default(false),
   has_color_variants: z.boolean().default(false),
-  has_size_variants: z.boolean().default(false),
+  color_has_size_variants: z.boolean().default(false),
   status: z.enum(['active', 'inactive']).default('active'),
 });
 
@@ -40,16 +39,18 @@ interface Subcategory {
   category_id: string;
 }
 
+interface SizeVariant {
+  id?: string;
+  size_name: string;
+  size_code?: string;
+}
+
 interface ColorVariant {
+  id?: string;
   color_name: string;
   image_url?: string;
   has_sizes: boolean;
   size_variants: SizeVariant[];
-}
-
-interface SizeVariant {
-  size_name: string;
-  size_code?: string;
 }
 
 interface CreateProductFormProps {
@@ -66,8 +67,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [inventoryModalOpen, setInventoryModalOpen] = useState(false);
-  const [createdProductData, setCreatedProductData] = useState<any>(null);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -81,14 +81,14 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       subcategory_id: '',
       is_featured: false,
       has_color_variants: false,
-      has_size_variants: false,
+      color_has_size_variants: false,
       status: 'active',
     },
   });
 
   const watchedCategoryId = form.watch('category_id');
   const watchedHasColorVariants = form.watch('has_color_variants');
-  const watchedHasSizeVariants = form.watch('has_size_variants');
+  const watchedColorHasSizeVariants = form.watch('color_has_size_variants');
 
   useEffect(() => {
     fetchCategories();
@@ -99,7 +99,11 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     if (watchedCategoryId) {
       const filtered = subcategories.filter(sub => sub.category_id === watchedCategoryId);
       setFilteredSubcategories(filtered);
-      form.setValue('subcategory_id', '');
+      
+      const currentSubcategoryId = form.getValues('subcategory_id');
+      if (currentSubcategoryId && !filtered.find(sub => sub.id === currentSubcategoryId)) {
+        form.setValue('subcategory_id', '');
+      }
     } else {
       setFilteredSubcategories([]);
     }
@@ -147,17 +151,33 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
         setImagePreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `product-${Date.now()}.${fileExt}`;
+      
+      const { data, error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      const newImageUrl = urlData.publicUrl;
+      setCurrentImageUrl(newImageUrl);
       setImageFile(file);
       
       toast({
         title: 'Success',
-        description: 'Image ready for upload',
+        description: 'Image uploaded successfully',
       });
     } catch (error) {
-      console.error('Error processing image:', error);
+      console.error('Error uploading image:', error);
       toast({
         title: 'Error',
-        description: 'Failed to process image',
+        description: 'Failed to upload image',
         variant: 'destructive',
       });
     } finally {
@@ -168,127 +188,44 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
-  };
-
-  const uploadImageAndGetUrl = async (): Promise<string | null> => {
-    if (!imageFile) return null;
-
-    try {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `product-${Date.now()}.${fileExt}`;
-
-      const { data, error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, imageFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(fileName);
-
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      return null;
-    }
-  };
-
-  const saveColorVariants = async (productId: string, hasSizeVariants: boolean) => {
-    try {
-      for (const cv of colorVariants) {
-        const { data: insertedColor, error: colorError } = await supabase
-          .from('color_variants')
-          .insert({
-            product_id: productId,
-            color_name: cv.color_name,
-            image_url: cv.image_url,
-            has_sizes: hasSizeVariants,
-          })
-          .select()
-          .single();
-
-        if (colorError) throw colorError;
-
-        if (hasSizeVariants && cv.size_variants.length > 0) {
-          for (const sv of cv.size_variants) {
-            const { error: sizeError } = await supabase
-              .from('size_variants')
-              .insert({
-                color_variant_id: insertedColor.id,
-                size_name: sv.size_name,
-                size_code: sv.size_code,
-              });
-
-            if (sizeError) throw sizeError;
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error saving variants:', error);
-      throw error;
-    }
+    setCurrentImageUrl(null);
   };
 
   const onSubmit = async (data: z.infer<typeof productSchema>) => {
+    setLoading(true);
     try {
-      setLoading(true);
+      const productData = {
+        name: data.name,
+        description: data.description || null,
+        cost_price: data.cost_price,
+        selling_price: data.selling_price || null,
+        category_id: data.category_id,
+        subcategory_id: data.subcategory_id,
+        is_featured: data.is_featured,
+        has_color_variants: data.has_color_variants,
+        color_has_size_variants: data.color_has_size_variants,
+        status: data.status,
+        image_url: currentImageUrl,
+      };
 
-      const imageUrl = await uploadImageAndGetUrl();
-
-      let fallbackSellingPrice = null;
-      if (!data.selling_price) {
-        const { data: subcat, error: subcatError } = await supabase
-          .from('subcategories')
-          .select('selling_price')
-          .eq('id', data.subcategory_id)
-          .single();
-        if (!subcatError && subcat && subcat.selling_price) {
-          fallbackSellingPrice = subcat.selling_price;
-        }
-      }
-
-      const { data: product, error: productError } = await supabase
+      const { data: newProduct, error } = await supabase
         .from('products')
-        .insert({
-          name: data.name,
-          description: data.description,
-          cost_price: data.cost_price,
-          selling_price: data.selling_price || fallbackSellingPrice || null,
-          category_id: data.category_id,
-          subcategory_id: data.subcategory_id,
-          is_featured: data.is_featured,
-          has_color_variants: data.has_color_variants,
-          color_has_size_variants: data.has_size_variants,
-          status: data.status,
-          image_url: imageUrl,
-        })
+        .insert(productData)
         .select()
         .single();
 
-      if (productError) throw productError;
+      if (error) throw error;
 
       if (data.has_color_variants && colorVariants.length > 0) {
-        await saveColorVariants(product.id, data.has_size_variants);
+        await saveColorVariants(newProduct.id);
       }
-
-      // Store product data for inventory setup
-      setCreatedProductData({
-        id: product.id,
-        name: product.name,
-        cost_price: product.cost_price,
-        selling_price: product.selling_price,
-        has_color_variants: data.has_color_variants,
-        has_size_variants: data.has_size_variants
-      });
 
       toast({
         title: 'Success',
-        description: 'Product created successfully! Now setup inventory.',
+        description: 'Product created successfully',
       });
 
-      // Open inventory setup modal
-      setInventoryModalOpen(true);
+      onSave();
     } catch (error) {
       console.error('Error creating product:', error);
       toast({
@@ -301,240 +238,265 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     }
   };
 
-  const handleInventoryComplete = () => {
-    setInventoryModalOpen(false);
-    setCreatedProductData(null);
-    onSave();
+  const saveColorVariants = async (productId: string) => {
+    for (const variant of colorVariants) {
+      if (!variant.color_name) continue;
+
+      const { data: colorVariant, error: colorError } = await supabase
+        .from('color_variants')
+        .insert({
+          product_id: productId,
+          color_name: variant.color_name,
+          image_url: variant.image_url,
+          has_sizes: variant.has_sizes,
+        })
+        .select()
+        .single();
+
+      if (colorError) throw colorError;
+
+      if (variant.has_sizes && variant.size_variants.length > 0) {
+        const sizeVariantsData = variant.size_variants
+          .filter(size => size.size_name)
+          .map(size => ({
+            color_variant_id: colorVariant.id,
+            size_name: size.size_name,
+            size_code: size.size_code || null,
+          }));
+
+        if (sizeVariantsData.length > 0) {
+          const { error: sizeError } = await supabase
+            .from('size_variants')
+            .insert(sizeVariantsData);
+
+          if (sizeError) throw sizeError;
+        }
+      }
+    }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Create New Product</h2>
-        <Button variant="outline" onClick={onCancel}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
+    <div className="p-6 max-w-5xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-4">
+          <Button variant="outline" onClick={onCancel}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <h2 className="text-2xl font-bold">Create New Product</h2>
+        </div>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Basic Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="name">Product Name *</Label>
-                <Input
-                  id="name"
-                  {...form.register('name')}
-                  placeholder="Enter product name"
-                />
-                {form.formState.errors.name && (
-                  <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  {...form.register('description')}
-                  placeholder="Enter product description"
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="cost_price">Cost Price *</Label>
-                  <Input
-                    id="cost_price"
-                    type="number"
-                    step="0.01"
-                    {...form.register('cost_price', { valueAsNumber: true })}
-                    placeholder="0.00"
-                  />
-                  {form.formState.errors.cost_price && (
-                    <p className="text-sm text-red-500">{form.formState.errors.cost_price.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="selling_price">Selling Price</Label>
-                  <Input
-                    id="selling_price"
-                    type="number"
-                    step="0.01"
-                    {...form.register('selling_price', { valueAsNumber: true })}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="category_id">Category *</Label>
-                  <Select
-                    value={form.watch('category_id')}
-                    onValueChange={(value) => form.setValue('category_id', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {form.formState.errors.category_id && (
-                    <p className="text-sm text-red-500">{form.formState.errors.category_id.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="subcategory_id">Subcategory *</Label>
-                  <Select
-                    value={form.watch('subcategory_id')}
-                    onValueChange={(value) => form.setValue('subcategory_id', value)}
-                    disabled={!watchedCategoryId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select subcategory" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredSubcategories.map((subcategory) => (
-                        <SelectItem key={subcategory.id} value={subcategory.id}>
-                          {subcategory.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {form.formState.errors.subcategory_id && (
-                    <p className="text-sm text-red-500">{form.formState.errors.subcategory_id.message}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="is_featured"
-                  checked={form.watch('is_featured')}
-                  onCheckedChange={(checked) => form.setValue('is_featured', checked)}
-                />
-                <Label htmlFor="is_featured">Featured Product</Label>
-              </div>
-
-              <div>
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={form.watch('status')}
-                  onValueChange={(value) => form.setValue('status', value as 'active' | 'inactive')}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Image</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                {imagePreview ? (
-                  <div className="space-y-4">
-                    <div className="relative inline-block">
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-32 h-32 object-cover rounded-lg"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="absolute -top-2 -right-2"
-                        onClick={removeImage}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <p className="text-sm text-gray-500">Image ready for upload</p>
-                  </div>
-                ) : (
-                  <div>
-                    <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                    <Label htmlFor="image-upload" className="cursor-pointer">
-                      <span className="text-blue-600 hover:text-blue-700">Click to upload</span> or drag and drop
-                    </Label>
-                    <Input
-                      id="image-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImageUpload}
-                      disabled={uploadingImage}
-                    />
-                    <p className="text-sm text-gray-500 mt-2">PNG, JPG, GIF up to 10MB</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         <Card>
           <CardHeader>
-            <CardTitle>Variants Configuration</CardTitle>
+            <CardTitle>Product Information</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="has_color_variants"
-                checked={form.watch('has_color_variants')}
-                onCheckedChange={(checked) => {
-                  form.setValue('has_color_variants', checked);
-                  if (!checked) {
-                    form.setValue('has_size_variants', false);
-                    setColorVariants([]);
-                  }
-                }}
-              />
-              <Label htmlFor="has_color_variants">Has Color Variants</Label>
-            </div>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Product Name *</Label>
+                  <Input
+                    id="name"
+                    {...form.register('name')}
+                    placeholder="Enter product name"
+                  />
+                  {form.formState.errors.name && (
+                    <p className="text-red-500 text-sm mt-1">{form.formState.errors.name.message}</p>
+                  )}
+                </div>
 
-            {watchedHasColorVariants && (
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="has_size_variants"
-                  checked={form.watch('has_size_variants')}
-                  onCheckedChange={(checked) => form.setValue('has_size_variants', checked)}
-                />
-                <Label htmlFor="has_size_variants">Color Variants Have Sizes</Label>
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    {...form.register('description')}
+                    placeholder="Enter product description"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="cost_price">Cost Price (Rs) *</Label>
+                    <Input
+                      id="cost_price"
+                      type="number"
+                      step="0.01"
+                      {...form.register('cost_price', { valueAsNumber: true })}
+                      placeholder="0.00"
+                    />
+                    {form.formState.errors.cost_price && (
+                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.cost_price.message}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="selling_price">Selling Price (Rs)</Label>
+                    <Input
+                      id="selling_price"
+                      type="number"
+                      step="0.01"
+                      {...form.register('selling_price', { valueAsNumber: true })}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="category">Category *</Label>
+                    <Select
+                      value={form.watch('category_id')}
+                      onValueChange={(value) => form.setValue('category_id', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.formState.errors.category_id && (
+                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.category_id.message}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="subcategory">Subcategory *</Label>
+                    <Select
+                      value={form.watch('subcategory_id')}
+                      onValueChange={(value) => form.setValue('subcategory_id', value)}
+                      disabled={!watchedCategoryId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select subcategory" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredSubcategories.map((subcategory) => (
+                          <SelectItem key={subcategory.id} value={subcategory.id}>
+                            {subcategory.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.formState.errors.subcategory_id && (
+                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.subcategory_id.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={form.watch('status')}
+                    onValueChange={(value: 'active' | 'inactive') => form.setValue('status', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center space-x-6">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="is_featured"
+                      checked={form.watch('is_featured')}
+                      onCheckedChange={(checked) => form.setValue('is_featured', checked)}
+                    />
+                    <Label htmlFor="is_featured">Featured</Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="has_color_variants"
+                      checked={form.watch('has_color_variants')}
+                      onCheckedChange={(checked) => {
+                        form.setValue('has_color_variants', checked);
+                        if (!checked) {
+                          form.setValue('color_has_size_variants', false);
+                          setColorVariants([]);
+                        }
+                      }}
+                    />
+                    <Label htmlFor="has_color_variants">Has Color Variants</Label>
+                  </div>
+
+                  {watchedHasColorVariants && (
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="color_has_size_variants"
+                        checked={form.watch('color_has_size_variants')}
+                        onCheckedChange={(checked) => form.setValue('color_has_size_variants', checked)}
+                      />
+                      <Label htmlFor="color_has_size_variants">Colors Have Sizes</Label>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
 
-            {watchedHasColorVariants && (
-              <CreateProductVariantForm
-                colorVariants={colorVariants}
-                setColorVariants={setColorVariants}
-                hasSizeVariants={watchedHasSizeVariants}
-              />
-            )}
+              <div className="space-y-4">
+                <div>
+                  <Label>Product Image</Label>
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-4">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={uploadingImage}
+                        className="flex-1"
+                      />
+                      {uploadingImage && (
+                        <div className="flex items-center space-x-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                          <span className="text-sm">Uploading...</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {imagePreview && (
+                      <div className="relative">
+                        <img
+                          src={imagePreview}
+                          alt="Product preview"
+                          className="w-full max-w-sm h-48 object-cover rounded-lg border"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute top-2 right-2"
+                          onClick={removeImage}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
+
+        {watchedHasColorVariants && (
+          <CreateProductVariantForm
+            colorVariants={colorVariants}
+            setColorVariants={setColorVariants}
+            hasSizeVariants={watchedColorHasSizeVariants}
+          />
+        )}
 
         <div className="flex justify-end space-x-4">
           <Button type="button" variant="outline" onClick={onCancel}>
@@ -545,20 +507,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
           </Button>
         </div>
       </form>
-
-      {createdProductData && (
-        <InventorySetupModal
-          isOpen={inventoryModalOpen}
-          onClose={() => setInventoryModalOpen(false)}
-          productId={createdProductData.id}
-          productName={createdProductData.name}
-          costPrice={createdProductData.cost_price}
-          sellingPrice={createdProductData.selling_price}
-          hasColorVariants={createdProductData.has_color_variants}
-          hasSizeVariants={createdProductData.has_size_variants}
-          onComplete={handleInventoryComplete}
-        />
-      )}
     </div>
   );
 }

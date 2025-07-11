@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Product, Category, Subcategory } from '@/types/product';
-import { EditProductVariantForm } from './EditProductVariantForm';
 
 interface EditProductFormProps {
   product: Product;
@@ -284,15 +283,6 @@ export function EditProductForm({ product, onSave, onCancel }: EditProductFormPr
           </form>
         </CardContent>
       </Card>
-
-      {(formData.has_color_variants) && (
-        <EditProductVariantForm
-          productId={product.id}
-          hasColorVariants={formData.has_color_variants}
-          hasSizeVariants={formData.color_has_size_variants}
-          onVariantsChange={() => {}}
-        />
-      )}
     </div>
   );
 }

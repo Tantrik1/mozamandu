@@ -1,585 +1,292 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Info, ShoppingCart, CreditCard, Truck, User } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, DollarSign, MapPin, User } from 'lucide-react';
 import { useRobustCart } from '@/hooks/useRobustCart';
-import { usePromoCode } from '@/hooks/usePromoCode';
-import { useCheckoutData } from '@/hooks/useCheckoutData';
-import { useCartPricing } from '@/hooks/useCartPricing';
 import { useComboManager } from '@/hooks/useComboManager';
-import { PaymentScreenshotUpload } from './PaymentScreenshotUpload';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useCartPricing } from '@/hooks/useCartPricing';
+import { EnhancedCheckoutInfo } from './EnhancedCheckoutInfo';
+import { EnhancedCheckoutPayment } from './EnhancedCheckoutPayment';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { getVariantStockInfo } from '@/utils/inventoryManager';
-import { reserveStockForOrder, getOrderItemsForStockOperation } from '@/utils/stockReservationManager';
+import { toast } from '@/hooks/use-toast';
+
+type CheckoutStep = 'cart' | 'info' | 'payment' | 'confirmation';
+
+interface CheckoutData {
+  customerName: string;
+  customerEmail: string;
+  contactNumber: string;
+  whatsappNumber: string;
+  deliveryLocationId: string;
+  deliveryAddress: string;
+  paymentMethodId: string;
+  paymentPercentage: number;
+  paymentScreenshot?: string;
+}
 
 export function EnhancedCheckout() {
-  const { cartItems, getTotalPrice, clearCart } = useRobustCart();
+  const [currentStep, setCurrentStep] = useState<CheckoutStep>('cart');
+  const [checkoutData, setCheckoutData] = useState<Partial<CheckoutData>>({});
+  const [isGuest, setIsGuest] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [orderNumber, setOrderNumber] = useState<string>('');
+
+  const { cartItems, removeFromCart, clearCart } = useRobustCart();
   const { activeCombo } = useComboManager({ cartItems });
-  const [discountTiers, setDiscountTiers] = useState<{[key: string]: any[]}>({});
-  const { getItemPricing, getTotalPrice: getCartTotalPrice } = useCartPricing({
-    cartItems,
-    activeCombo,
-    discountTiers
-  });
   const { 
-    promoCode, 
-    setPromoCode, 
-    appliedPromo, 
-    isPromoApplied, 
-    applyPromoCode, 
-    removePromoCode 
-  } = usePromoCode();
-  
-  const { 
-    deliveryCharges, 
-    paymentMethods, 
-    loading: dataLoading 
-  } = useCheckoutData();
+    getTotalPrice, 
+    getDeliveryCharge, 
+    getPromoDiscount, 
+    getDiscountTiers,
+    subcategoryQuantities
+  } = useCartPricing({ cartItems, activeCombo, discountTiers: {} });
 
-  const [customerInfo, setCustomerInfo] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    whatsapp: '',
-    address: ''
-  });
+  const totalPrice = getTotalPrice();
+  const deliveryCharge = getDeliveryCharge();
+  const promoDiscount = getPromoDiscount();
+  const finalTotal = totalPrice + deliveryCharge - promoDiscount;
 
-  const [selectedDeliveryLocation, setSelectedDeliveryLocation] = useState('');
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
-  const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
-  const [isValidCart, setIsValidCart] = useState(true);
-  const [validationError, setValidationError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const { toast } = useToast();
-
-  // Fetch discount tiers
   useEffect(() => {
-    const fetchDiscountTiers = async () => {
-      const subcategoryIds = [...new Set(cartItems.map(item => item.subcategoryId))];
-      const allTiers: {[key: string]: any[]} = {};
+    checkAuthStatus();
+  }, []);
 
-      for (const subcategoryId of subcategoryIds) {
-        try {
-          const { data } = await supabase
-            .from('discount_tiers')
-            .select('*')
-            .eq('subcategory_id', subcategoryId)
-            .order('min_quantity');
-          
-          allTiers[subcategoryId] = data || [];
-        } catch (error) {
-          console.error('Error fetching discount tiers:', error);
-        }
-      }
+  const checkAuthStatus = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    setIsGuest(!session);
+  };
 
-      setDiscountTiers(allTiers);
-    };
+  const handleBackToCart = () => {
+    setCurrentStep('cart');
+  };
 
-    if (cartItems.length > 0) {
-      fetchDiscountTiers();
+  const handleInfoComplete = () => {
+    const savedData = sessionStorage.getItem('checkoutInfo');
+    if (savedData) {
+      const parsedData = JSON.parse(savedData);
+      setCheckoutData(parsedData);
     }
-  }, [cartItems]);
+    setCurrentStep('payment');
+  };
 
-  const subtotal = getCartTotalPrice();
-  const deliveryCharge = deliveryCharges.find(d => d.id === selectedDeliveryLocation)?.delivery_price || 0;
-  const promoDiscount = isPromoApplied ? (appliedPromo?.discount_percentage || 0) * (subtotal + deliveryCharge) / 100 : 0;
-  const finalTotal = subtotal + deliveryCharge - promoDiscount;
-
-  // Stock validation during checkout
-  useEffect(() => {
-    const validateStockOnCheckout = async () => {
-      if (cartItems.length === 0) {
-        setIsValidCart(true);
-        return;
-      }
-
-      try {
-        for (const item of cartItems) {
-          if (item.productInventoryId) {
-            const stockInfo = await getVariantStockInfo(item.productId, item.productInventoryId);
-            if (!stockInfo.isValid || (stockInfo.stockAmount || 0) < item.quantity) {
-              setIsValidCart(false);
-              setValidationError(`Insufficient stock for ${item.productName}. Available: ${stockInfo.stockAmount || 0}, Required: ${item.quantity}`);
-              return;
-            }
-          }
-        }
-        setIsValidCart(true);
-        setValidationError('');
-      } catch (error) {
-        console.error('Stock validation error:', error);
-        setIsValidCart(false);
-        setValidationError('Error validating stock availability');
-      }
-    };
-
-    validateStockOnCheckout();
-  }, [cartItems]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!isValidCart) {
-      toast({
-        title: 'Validation Error',
-        description: validationError || 'Please fix cart issues before proceeding',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
+  const handlePaymentComplete = async (paymentData: any) => {
+    setLoading(true);
     try {
-      // Upload payment screenshot if provided
-      let screenshotUrl = null;
-      if (paymentScreenshot) {
-        const fileExt = paymentScreenshot.name.split('.').pop();
-        const fileName = `payment-${Date.now()}.${fileExt}`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('customer-payments')
-          .upload(fileName, paymentScreenshot);
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from('customer-payments')
-          .getPublicUrl(fileName);
-
-        screenshotUrl = urlData.publicUrl;
-      }
-
-      // Create order with user_id (required field)
       const orderData = {
-        user_id: 'guest-user', // For guest checkout
-        customer_name: customerInfo.name,
-        customer_email: customerInfo.email,
-        contact_number: customerInfo.phone,
-        whatsapp_number: customerInfo.whatsapp,
-        delivery_address: customerInfo.address,
-        delivery_location_id: selectedDeliveryLocation || null,
-        payment_method_id: selectedPaymentMethod || null,
-        subtotal: subtotal,
-        delivery_charge: deliveryCharge,
-        promocode_used: isPromoApplied ? appliedPromo?.code : null,
-        promocode_discount: promoDiscount,
-        total_amount: finalTotal,
-        paid_amount: finalTotal,
-        remaining_amount: 0,
-        payment_screenshot_url: screenshotUrl,
-        status: 'pending_payment' as const,
-        combo_applied: !!activeCombo
+        ...checkoutData,
+        ...paymentData,
+        cartItems,
+        totalAmount: finalTotal,
+        deliveryCharge,
+        promoDiscount,
+        activeCombo,
+        subcategoryQuantities
       };
 
-      const { data: order, error: orderError } = await supabase
-        .from('customer_orders')
-        .insert(orderData)
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      // Create order items and detailed pricing information
-      for (const item of cartItems) {
-        const pricing = getItemPricing(item);
-        
-        await supabase
-          .from('customer_order_items')
-          .insert({
-            order_id: order.id,
-            product_id: item.productId,
-            product_inventory_id: item.productInventoryId,
-            quantity: item.quantity
-          });
-
-        // Create detailed order item with enhanced pricing details
-        await supabase
-          .from('customer_order_item_details')
-          .insert({
-            order_id: order.id,
-            product_name: item.productName,
-            color_name: item.colorName,
-            size_name: item.sizeName,
-            quantity: item.quantity,
-            unit_price: pricing.finalPrice,
-            total_price: pricing.finalPrice * item.quantity,
-            pricing_mode: pricing.mode,
-            pricing_details: {
-              basePrice: item.basePrice,
-              finalPrice: pricing.finalPrice,
-              description: pricing.description,
-              breakdown: pricing.breakdown || [],
-              mode: pricing.mode,
-              savings: item.basePrice - pricing.finalPrice,
-              product_inventory_id: item.productInventoryId
-            }
-          });
-      }
-
-      // Reserve stock after order creation using Supabase functions
-      try {
-        const orderItems = await getOrderItemsForStockOperation(order.id, true);
-        await reserveStockForOrder(orderItems, order.id);
-      } catch (stockError) {
-        console.error('Stock reservation error:', stockError);
-        // Continue with order creation even if stock reservation fails
-      }
-
-      // Send order confirmation email
-      try {
-        await supabase.functions.invoke('send-order-email', {
-          body: {
-            type: 'order_created',
-            orderId: order.id,
-            isCustomerOrder: true
-          }
-        });
-      } catch (emailError) {
-        console.error('Email sending error:', emailError);
-        // Continue even if email fails
-      }
-
-      toast({
-        title: 'Success',
-        description: 'Order placed successfully!',
+      const { data, error } = await supabase.functions.invoke('create-order', {
+        body: orderData
       });
 
+      if (error) throw error;
+
+      setOrderNumber(data.orderNumber);
+      setCurrentStep('confirmation');
       clearCart();
+      sessionStorage.removeItem('checkoutInfo');
       
-      // Reset form
-      setCustomerInfo({
-        name: '',
-        email: '',
-        phone: '',
-        whatsapp: '',
-        address: ''
+      toast({
+        title: 'Order Placed Successfully!',
+        description: `Your order ${data.orderNumber} has been created.`,
       });
-      setSelectedDeliveryLocation('');
-      setSelectedPaymentMethod('');
-      setPaymentScreenshot(null);
-
     } catch (error) {
-      console.error('Order submission error:', error);
+      console.error('Error creating order:', error);
       toast({
         title: 'Error',
-        description: 'Failed to place order. Please try again.',
+        description: 'Failed to create order. Please try again.',
         variant: 'destructive',
       });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
-  if (cartItems.length === 0) {
+  if (currentStep === 'info') {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card className="max-w-md mx-auto">
-          <CardContent className="text-center py-12">
-            <ShoppingCart className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Your cart is empty</h2>
-            <p className="text-gray-500 mb-4">Add some products to get started</p>
-            <Button asChild>
-              <a href="/">Continue Shopping</a>
-            </Button>
-          </CardContent>
-        </Card>
+      <EnhancedCheckoutInfo
+        isGuest={isGuest}
+        onComplete={handleInfoComplete}
+        onBack={handleBackToCart}
+      />
+    );
+  }
+
+  if (currentStep === 'payment') {
+    return (
+      <EnhancedCheckoutPayment
+        totalAmount={finalTotal}
+        onComplete={handlePaymentComplete}
+        onBack={() => setCurrentStep('info')}
+        loading={loading}
+      />
+    );
+  }
+
+  if (currentStep === 'confirmation') {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-12">
+        <div className="mb-8">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Order Confirmed!</h2>
+          <p className="text-gray-600 mb-4">Thank you for your order.</p>
+          <div className="bg-gray-50 rounded-lg p-4 mb-6">
+            <p className="text-sm text-gray-600">Order Number</p>
+            <p className="text-xl font-bold text-gray-900">{orderNumber}</p>
+          </div>
+        </div>
+        
+        <div className="space-y-4">
+          <Button 
+            onClick={() => window.open(`/order-summary/${orderNumber}`, '_blank')}
+            className="w-full"
+          >
+            View Order Details
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => window.location.href = '/'}
+            className="w-full"
+          >
+            Continue Shopping
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Checkout</h1>
-          <p className="text-gray-600">Complete your order in just a few steps</p>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="space-y-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Customer Information and Delivery */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Customer Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Customer Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="name">Full Name *</Label>
-                    <Input
-                      id="name"
-                      value={customerInfo.name}
-                      onChange={(e) => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))}
-                      required
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={customerInfo.email}
-                      onChange={(e) => setCustomerInfo(prev => ({ ...prev, email: e.target.value }))}
-                      required
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Phone Number *</Label>
-                    <Input
-                      id="phone"
-                      value={customerInfo.phone}
-                      onChange={(e) => setCustomerInfo(prev => ({ ...prev, phone: e.target.value }))}
-                      required
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="whatsapp">WhatsApp Number</Label>
-                    <Input
-                      id="whatsapp"
-                      value={customerInfo.whatsapp}
-                      onChange={(e) => setCustomerInfo(prev => ({ ...prev, whatsapp: e.target.value }))}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label htmlFor="address">Delivery Address *</Label>
-                    <Textarea
-                      id="address"
-                      value={customerInfo.address}
-                      onChange={(e) => setCustomerInfo(prev => ({ ...prev, address: e.target.value }))}
-                      required
-                      rows={3}
-                      className="mt-1"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-6">
+        <Button variant="ghost" onClick={() => window.history.back()}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back
+        </Button>
+      </div>
 
-              {/* Delivery & Payment */}
-              <div className="grid md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Truck className="h-5 w-5" />
-                      Delivery
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Label htmlFor="delivery">Delivery Location</Label>
-                    <Select value={selectedDeliveryLocation} onValueChange={setSelectedDeliveryLocation}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select delivery location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {deliveryCharges.map((location) => (
-                          <SelectItem key={location.id} value={location.id}>
-                            {location.place_name} - Rs. {location.delivery_price}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <CreditCard className="h-5 w-5" />
-                      Payment
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <Label htmlFor="payment">Payment Method</Label>
-                      <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select payment method" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {paymentMethods.map((method) => (
-                            <SelectItem key={method.id} value={method.id}>
-                              {method.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {selectedPaymentMethod && (
-                      <PaymentScreenshotUpload
-                        onFileSelect={setPaymentScreenshot}
-                        selectedFile={paymentScreenshot}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <ShoppingCart className="w-5 h-5 mr-2" />
+                Order Summary ({cartItems.length} items)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {cartItems.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center space-x-4">
+                      <img
+                        src={item.image_url || '/placeholder.svg'}
+                        alt={item.productName}
+                        className="w-16 h-16 object-cover rounded"
                       />
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
-            {/* Order Summary */}
-            <div>
-              <Card className="sticky top-4">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <ShoppingCart className="h-5 w-5" />
-                    Order Summary
-                    {activeCombo && (
-                      <Badge className="bg-green-600">Combo Active</Badge>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Enhanced item breakdown with detailed pricing like the image */}
-                  <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {cartItems.map((item) => {
-                      const pricing = getItemPricing(item);
-                      return (
-                        <div key={item.id} className="border rounded-lg p-3 space-y-2">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-sm">{item.productName}</h4>
-                              {item.colorName && (
-                                <p className="text-xs text-gray-500">Color: {item.colorName}</p>
-                              )}
-                              {item.sizeName && (
-                                <p className="text-xs text-gray-500">Size: {item.sizeName}</p>
-                              )}
-                            </div>
-                            <div className="text-right">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-red-500">Rs. {pricing.finalPrice.toFixed(2)}</span>
-                                {pricing.mode !== 'normal' && (
-                                  <Badge 
-                                    variant="secondary" 
-                                    className={`text-xs ${pricing.mode === 'combo' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}
-                                  >
-                                    {pricing.mode === 'combo' ? 'Combo' : 'MOQ Discount'}
-                                  </Badge>
-                                )}
-                              </div>
-                              {pricing.finalPrice !== item.basePrice && (
-                                <p className="text-xs text-gray-500 line-through">
-                                  Rs. {item.basePrice.toFixed(2)}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Detailed pricing breakdown like in the image */}
-                          {pricing.mode !== 'normal' && (
-                            <div className="bg-blue-50 p-2 rounded text-xs">
-                              <p className="font-medium text-blue-800">
-                                {pricing.mode === 'combo' ? 'Combo' : 'MOQ'} Discount: 
-                                Tiered: {item.quantity} × Rs. {pricing.finalPrice.toFixed(2)}
-                              </p>
-                              <div className="mt-1 space-y-1 text-blue-700">
-                                <p>• {item.quantity} × Rs. {pricing.finalPrice.toFixed(2)}</p>
-                                {pricing.finalPrice < item.basePrice && (
-                                  <p>• You save: Rs. {((item.basePrice - pricing.finalPrice) * item.quantity).toFixed(2)}</p>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          
-                          <div className="flex justify-between items-center pt-2 border-t">
-                            <span className="text-sm text-gray-600">Qty: {item.quantity}</span>
-                            <span className="font-bold">Rs. {(pricing.finalPrice * item.quantity).toFixed(2)}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <hr />
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>Rs. {subtotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Delivery:</span>
-                      <span>Rs. {deliveryCharge.toFixed(2)}</span>
-                    </div>
-                    {isPromoApplied && (
-                      <div className="flex justify-between text-green-600">
-                        <span>Discount ({appliedPromo?.code}):</span>
-                        <span>-Rs. {promoDiscount.toFixed(2)}</span>
+                      <div>
+                        <h4 className="font-medium">{item.productName}</h4>
+                        {item.colorName && (
+                          <p className="text-sm text-gray-500">Color: {item.colorName}</p>
+                        )}
+                        {item.sizeName && (
+                          <p className="text-sm text-gray-500">Size: {item.sizeName}</p>
+                        )}
+                        <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
                       </div>
-                    )}
-                    <div className="flex justify-between font-bold text-lg border-t pt-2">
-                      <span>Total:</span>
-                      <span className="text-green-600">Rs. {finalTotal.toFixed(2)}</span>
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex space-x-2">
-                      <Input
-                        placeholder="Promo code"
-                        value={promoCode}
-                        onChange={(e) => setPromoCode(e.target.value)}
-                      />
-                      <Button 
-                        type="button" 
-                        variant="outline"
-                        onClick={() => applyPromoCode(subtotal + deliveryCharge)}
-                      >
-                        Apply
-                      </Button>
-                    </div>
-                    {isPromoApplied && (
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+                    <div className="text-right">
+                      <p className="font-medium">Rs. {(item.basePrice * item.quantity).toFixed(2)}</p>
+                      <Button
+                        variant="ghost"
                         size="sm"
-                        onClick={removePromoCode}
+                        onClick={() => removeFromCart(index)}
+                        className="text-red-600 hover:text-red-700"
                       >
-                        Remove Promo Code
+                        Remove
                       </Button>
-                    )}
+                    </div>
                   </div>
+                ))}
+              </div>
 
+              {cartItems.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Your cart is empty</p>
                   <Button 
-                    type="submit" 
-                    className="w-full h-12 text-lg font-semibold" 
-                    disabled={!isValidCart || isSubmitting || dataLoading}
+                    className="mt-4" 
+                    onClick={() => window.location.href = '/'}
                   >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Placing Order...
-                      </>
-                    ) : (
-                      'Place Order'
-                    )}
+                    Continue Shopping
                   </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-                  {!isValidCart && validationError && (
-                    <p className="text-red-500 text-sm">{validationError}</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </form>
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <DollarSign className="w-5 h-5 mr-2" />
+                Price Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {activeCombo && (
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <Badge className="mb-2">Active Combo</Badge>
+                  <p className="text-sm">{activeCombo.name}</p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>Rs. {totalPrice.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Delivery:</span>
+                  <span>Rs. {deliveryCharge.toFixed(2)}</span>
+                </div>
+                {promoDiscount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Promo Discount:</span>
+                    <span>-Rs. {promoDiscount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="border-t pt-2">
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Total:</span>
+                    <span>Rs. {finalTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {cartItems.length > 0 && (
+                <Button 
+                  className="w-full" 
+                  onClick={() => setCurrentStep('info')}
+                >
+                  Proceed to Checkout
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
