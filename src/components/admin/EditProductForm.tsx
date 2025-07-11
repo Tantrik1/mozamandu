@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -39,20 +40,6 @@ interface Subcategory {
   category_id: string;
 }
 
-interface ColorVariant {
-  id?: string;
-  color_name: string;
-  image_url?: string;
-  has_sizes: boolean;
-  size_variants: SizeVariant[];
-}
-
-interface SizeVariant {
-  id?: string;
-  size_name: string;
-  size_code?: string;
-}
-
 interface EditProductFormProps {
   productId: string;
   onSave: () => void;
@@ -63,8 +50,8 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [filteredSubcategories, setFilteredSubcategories] = useState<Subcategory[]>([]);
-  const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -92,15 +79,29 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const watchedHasSizeVariants = form.watch('has_size_variants');
 
   useEffect(() => {
-    fetchCategories();
-    fetchSubcategories();
-    fetchProduct();
+    const initializeData = async () => {
+      setLoadingData(true);
+      try {
+        await Promise.all([
+          fetchCategories(),
+          fetchSubcategories(),
+          fetchProduct()
+        ]);
+      } catch (error) {
+        console.error('Error initializing data:', error);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    initializeData();
   }, [productId]);
 
   useEffect(() => {
-    if (watchedCategoryId) {
+    if (watchedCategoryId && subcategories.length > 0) {
       const filtered = subcategories.filter(sub => sub.category_id === watchedCategoryId);
       setFilteredSubcategories(filtered);
+      console.log('Filtered subcategories:', filtered);
     } else {
       setFilteredSubcategories([]);
     }
@@ -122,9 +123,15 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         .order('name');
 
       if (error) throw error;
+      console.log('Fetched categories:', data);
       setCategories(data || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch categories',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -137,9 +144,15 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         .order('name');
 
       if (error) throw error;
+      console.log('Fetched subcategories:', data);
       setSubcategories(data || []);
     } catch (error) {
       console.error('Error fetching subcategories:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch subcategories',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -152,6 +165,8 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         .single();
 
       if (error) throw error;
+
+      console.log('Fetched product:', product);
 
       form.reset({
         name: product.name,
@@ -299,6 +314,17 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     onSave(); // Navigate back after inventory management is complete
   };
 
+  if (loadingData) {
+    return (
+      <div className="flex justify-center items-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p>Loading product data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -380,7 +406,11 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                     <Label htmlFor="category">Category *</Label>
                     <Select
                       value={form.watch('category_id')}
-                      onValueChange={(value) => form.setValue('category_id', value)}
+                      onValueChange={(value) => {
+                        console.log('Category selected:', value);
+                        form.setValue('category_id', value);
+                        form.setValue('subcategory_id', ''); // Reset subcategory when category changes
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select category" />
@@ -402,11 +432,20 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                     <Label htmlFor="subcategory">Subcategory *</Label>
                     <Select
                       value={form.watch('subcategory_id')}
-                      onValueChange={(value) => form.setValue('subcategory_id', value)}
-                      disabled={!watchedCategoryId}
+                      onValueChange={(value) => {
+                        console.log('Subcategory selected:', value);
+                        form.setValue('subcategory_id', value);
+                      }}
+                      disabled={!watchedCategoryId || filteredSubcategories.length === 0}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select subcategory" />
+                        <SelectValue placeholder={
+                          !watchedCategoryId 
+                            ? "Select category first" 
+                            : filteredSubcategories.length === 0 
+                              ? "No subcategories available"
+                              : "Select subcategory"
+                        } />
                       </SelectTrigger>
                       <SelectContent>
                         {filteredSubcategories.map((subcategory) => (
@@ -439,7 +478,6 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                       onCheckedChange={(checked) => {
                         form.setValue('has_color_variants', checked);
                         if (!checked) {
-                          setColorVariants([]);
                           form.setValue('has_size_variants', false);
                         }
                       }}
@@ -456,7 +494,10 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                       }}
                       disabled={!watchedHasColorVariants}
                     />
-                    <Label htmlFor="has_size_variants" className={!watchedHasColorVariants ? 'text-gray-400' : ''}>
+                    <Label 
+                      htmlFor="has_size_variants" 
+                      className={!watchedHasColorVariants ? 'text-gray-400' : ''}
+                    >
                       Sizes {!watchedHasColorVariants && '(Enable Colors first)'}
                     </Label>
                   </div>
@@ -538,7 +579,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             productId={productId}
             hasColorVariants={watchedHasColorVariants}
             hasSizeVariants={watchedHasSizeVariants}
-            onVariantsChange={setColorVariants}
+            onVariantsChange={() => {}}
             hideStockFields={true}
           />
         )}

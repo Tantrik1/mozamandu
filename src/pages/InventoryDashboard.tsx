@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { InventoryManagement } from '@/components/inventory/InventoryManagement';
+import { EnhancedInventoryManagement } from '@/components/inventory/EnhancedInventoryManagement';
 import { ProductListWithVariants } from '@/components/inventory/ProductListWithVariants';
 import { ColorManagement } from '@/components/inventory/ColorManagement';
 import { Package, Palette, List, BarChart3 } from 'lucide-react';
@@ -15,15 +15,15 @@ export default function InventoryDashboard() {
           <p className="text-gray-600 mt-2">Manage products, variants, and stock levels</p>
         </div>
 
-        <Tabs defaultValue="products" className="space-y-6">
+        <Tabs defaultValue="inventory" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="products" className="flex items-center space-x-2">
-              <List className="h-4 w-4" />
-              <span>Products & Variants</span>
-            </TabsTrigger>
             <TabsTrigger value="inventory" className="flex items-center space-x-2">
               <Package className="h-4 w-4" />
               <span>Stock Management</span>
+            </TabsTrigger>
+            <TabsTrigger value="products" className="flex items-center space-x-2">
+              <List className="h-4 w-4" />
+              <span>Products & Variants</span>
             </TabsTrigger>
             <TabsTrigger value="colors" className="flex items-center space-x-2">
               <Palette className="h-4 w-4" />
@@ -35,12 +35,12 @@ export default function InventoryDashboard() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="products" className="space-y-6">
-            <ProductListWithVariants />
+          <TabsContent value="inventory" className="space-y-6">
+            <EnhancedInventoryManagement />
           </TabsContent>
 
-          <TabsContent value="inventory" className="space-y-6">
-            <InventoryManagement />
+          <TabsContent value="products" className="space-y-6">
+            <ProductListWithVariants />
           </TabsContent>
 
           <TabsContent value="colors" className="space-y-6">
