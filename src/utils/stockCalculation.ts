@@ -172,25 +172,27 @@ export async function getVariantStock(
       query = query.is('size_variant_id', null);
     }
 
-    const { data, error } = await query.single();
+    const { data, error } = await query.limit(1);
 
     if (error) throw error;
 
-    if (!data) return null;
+    if (!data || data.length === 0) return null;
+
+    const item = data[0];
 
     return {
-      id: data.id,
-      sku: data.sku,
-      colorName: data.color_name,
-      sizeName: data.size_name,
-      stockQuantity: data.stock_quantity,
-      availableStock: data.available_stock || 0,
-      reservedStock: data.reserved_stock || 0,
-      lowStockThreshold: data.low_stock_threshold || 10,
-      isLowStock: (data.available_stock || 0) <= (data.low_stock_threshold || 10),
-      isOutOfStock: (data.available_stock || 0) === 0,
-      costPrice: data.cost_price,
-      sellingPrice: data.selling_price || 0,
+      id: item.id,
+      sku: item.sku,
+      colorName: item.color_name,
+      sizeName: item.size_name,
+      stockQuantity: item.stock_quantity,
+      availableStock: item.available_stock || 0,
+      reservedStock: item.reserved_stock || 0,
+      lowStockThreshold: item.low_stock_threshold || 10,
+      isLowStock: (item.available_stock || 0) <= (item.low_stock_threshold || 10),
+      isOutOfStock: (item.available_stock || 0) === 0,
+      costPrice: item.cost_price,
+      sellingPrice: item.selling_price || 0,
     };
   } catch (error) {
     console.error('Error fetching variant stock:', error);
