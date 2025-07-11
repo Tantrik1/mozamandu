@@ -4,7 +4,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Star, ShoppingCart, Minus, Plus, Heart } from 'lucide-react';
+import { Star, ShoppingCart, Minus, Plus, Heart, Info } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { getRealTimeStock } from '@/utils/inventoryManager';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useCartPricing } from '@/hooks/useCartPricing';
@@ -55,6 +56,7 @@ export function AdvancedProductCard({ product }: AdvancedProductCardProps) {
   const [stock, setStock] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
+  const [showPricingDetails, setShowPricingDetails] = useState(false);
   const [discountTiers, setDiscountTiers] = useState<any[]>([]);
 
   const { cartItems, addToCart } = useRobustCart();
@@ -203,24 +205,12 @@ export function AdvancedProductCard({ product }: AdvancedProductCardProps) {
     setQuantity(1);
   };
 
-  const getColorDisplay = (colorName: string) => {
-    const colorMap: { [key: string]: string } = {
-      'white': 'bg-white border-2 border-gray-300',
-      'black': 'bg-black',
-      'red': 'bg-red-500',
-      'blue': 'bg-blue-500',
-      'green': 'bg-green-500',
-      'yellow': 'bg-yellow-400',
-      'gray': 'bg-gray-400',
-      'grey': 'bg-gray-400',
-      'pink': 'bg-pink-400',
-      'purple': 'bg-purple-500',
-      'orange': 'bg-orange-500',
-      'brown': 'bg-amber-600',
-    };
-
-    const colorKey = colorName.toLowerCase();
-    return colorMap[colorKey] || 'bg-gray-300';
+  const showMinimumWarning = () => {
+    const currentQuantityInCart = subcategoryQuantities[product.subcategory_id] || 0;
+    const totalQuantityWithNew = currentQuantityInCart + quantity;
+    const minimumRequired = product.subcategories?.minimum_quantity || 1;
+    
+    return !activeCombo && totalQuantityWithNew < minimumRequired;
   };
 
   return (
@@ -263,41 +253,80 @@ export function AdvancedProductCard({ product }: AdvancedProductCardProps) {
         {/* Product Info */}
         <div className="space-y-2">
           <h3 className="font-semibold text-lg text-gray-900 line-clamp-1">{product.name}</h3>
-          <p className="text-sm text-gray-500 line-clamp-1">Choose any color</p>
-        </div>
-
-        {/* Price */}
-        <div className="flex items-center justify-between">
-          <span className="text-2xl font-bold text-red-500">
-            Rs. {pricing.finalPrice.toFixed(0)}
-          </span>
-          {pricing.mode !== 'normal' && (
-            <Badge variant="secondary" className="text-xs">
-              {pricing.mode === 'combo' ? 'Combo' : 'Bulk'}
-            </Badge>
+          {product.description && (
+            <p className="text-sm text-gray-500 line-clamp-2">{product.description}</p>
           )}
         </div>
 
-        {/* Color Selection */}
-        {product.has_color_variants && product.color_variants && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              {product.color_variants.slice(0, 4).map((variant) => (
-                <button
-                  key={variant.id}
-                  onClick={() => setSelectedColor(variant.id)}
-                  className={`w-8 h-8 rounded-full ${getColorDisplay(variant.color_name)} ${
-                    selectedColor === variant.id 
-                      ? 'ring-2 ring-red-500 ring-offset-2' 
-                      : 'hover:ring-2 hover:ring-gray-300 hover:ring-offset-1'
-                  } transition-all duration-200`}
-                  title={variant.color_name}
-                />
-              ))}
-              {product.color_variants.length > 4 && (
-                <span className="text-xs text-gray-500">+{product.color_variants.length - 4} more</span>
+        {/* Price Display */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-2xl font-bold text-red-500">
+                Rs. {pricing.finalPrice.toFixed(0)}
+              </span>
+              {pricing.mode !== 'normal' && (
+                <span className="text-sm text-gray-500 line-through">
+                  Rs. {basePrice.toFixed(0)}
+                </span>
               )}
             </div>
+            <div className="flex items-center gap-2">
+              {pricing.mode !== 'normal' && (
+                <Badge variant={pricing.mode === 'combo' ? 'default' : 'secondary'} className="text-xs">
+                  {pricing.mode === 'combo' ? 'Combo' : 'Bulk'}
+                </Badge>
+              )}
+              <Dialog open={showPricingDetails} onOpenChange={setShowPricingDetails}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                    <Info className="h-3 w-3" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Pricing Details</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="font-medium">Mode:</span>
+                      <span className="capitalize">{pricing.mode}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Price per item:</span>
+                      <span>Rs. {pricing.finalPrice.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Total for {quantity}:</span>
+                      <span className="font-bold">Rs. {(pricing.finalPrice * quantity).toFixed(2)}</span>
+                    </div>
+                    <div className="border-t pt-2">
+                      <p className="text-sm text-gray-600">{pricing.description}</p>
+                      {pricing.breakdown && (
+                        <div className="mt-2 space-y-1">
+                          {pricing.breakdown.map((item, index) => (
+                            <p key={index} className="text-xs text-gray-500">{item}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {showMinimumWarning() && (
+            <p className="text-xs text-orange-600">
+              Minimum {product.subcategories?.minimum_quantity} required for this subcategory
+            </p>
+          )}
+        </div>
+
+        {/* Color Selection - Dropdown Only */}
+        {product.has_color_variants && product.color_variants && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Color:</label>
             <Select value={selectedColor} onValueChange={setSelectedColor}>
               <SelectTrigger className="h-10 rounded-lg border-gray-200">
                 <SelectValue placeholder="Select color" />
@@ -361,7 +390,9 @@ export function AdvancedProductCard({ product }: AdvancedProductCardProps) {
             {loading ? (
               <span>Loading...</span>
             ) : (
-              <span>{stock} in stock</span>
+              <Badge variant={stock > 0 ? 'default' : 'destructive'}>
+                {stock > 0 ? `${stock} in stock` : 'Out of Stock'}
+              </Badge>
             )}
           </div>
         </div>
@@ -373,7 +404,7 @@ export function AdvancedProductCard({ product }: AdvancedProductCardProps) {
           onClick={handleAddToCart}
         >
           <ShoppingCart className="h-4 w-4 mr-2" />
-          Add to Cart
+          Add to Cart - Rs. {(pricing.finalPrice * quantity).toFixed(0)}
         </Button>
       </CardContent>
     </Card>

@@ -1,38 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { AdvancedProductCard } from './AdvancedProductCard';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
-interface Product {
-  id: string;
-  name: string;
-  description?: string;
-  cost_price: number;
-  selling_price?: number;
-  image_url?: string;
-  status: string;
-  subcategory_id: string;
-  is_featured?: boolean;
-  has_color_variants?: boolean;
-  color_has_size_variants?: boolean;
-  subcategories: {
-    name: string;
-    selling_price: number;
-    minimum_quantity: number;
-  };
-  color_variants?: {
-    id: string;
-    color_name: string;
-    image_url?: string;
-    has_sizes: boolean;
-    size_variants: {
-      id: string;
-      size_name: string;
-      size_code?: string;
-    }[];
-  }[];
-}
+import { fetchFeaturedProducts, type Product } from '@/utils/productFetcher';
 
 export function FeaturedProductsCarousel() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -40,101 +11,16 @@ export function FeaturedProductsCarousel() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    fetchFeaturedProducts();
+    loadFeaturedProducts();
   }, []);
 
-  const fetchFeaturedProducts = async () => {
+  const loadFeaturedProducts = async () => {
     try {
-      console.log('Fetching featured products for carousel...');
-      
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          description,
-          cost_price,
-          selling_price,
-          image_url,
-          status,
-          subcategory_id,
-          is_featured,
-          has_color_variants,
-          color_has_size_variants,
-          subcategories!products_subcategory_id_fkey (
-            name,
-            selling_price,
-            minimum_quantity
-          )
-        `)
-        .eq('status', 'active')
-        .eq('is_featured', true)
-        .order('created_at', { ascending: false });
-
-      if (productsError) {
-        console.error('Error fetching featured products:', productsError);
-        throw productsError;
-      }
-
-      if (!productsData || productsData.length === 0) {
-        console.log('No featured products found');
-        setProducts([]);
-        setLoading(false);
-        return;
-      }
-
-      // Get variants for featured products
-      const productsWithVariants = [];
-      
-      for (const product of productsData) {
-        let productWithVariants = { ...product, color_variants: [] };
-
-        if (product.has_color_variants) {
-          const { data: colorVariants, error: colorError } = await supabase
-            .from('color_variants')
-            .select(`
-              id,
-              color_name,
-              image_url,
-              has_sizes
-            `)
-            .eq('product_id', product.id);
-
-          if (colorError) {
-            console.error('Error fetching color variants:', colorError);
-          } else if (colorVariants) {
-            for (const colorVariant of colorVariants) {
-              let colorWithSizes = { ...colorVariant, size_variants: [] };
-
-              if (colorVariant.has_sizes) {
-                const { data: sizeVariants, error: sizeError } = await supabase
-                  .from('size_variants')
-                  .select(`
-                    id,
-                    size_name,
-                    size_code
-                  `)
-                  .eq('color_variant_id', colorVariant.id);
-
-                if (sizeError) {
-                  console.error('Error fetching size variants:', sizeError);
-                } else if (sizeVariants) {
-                  colorWithSizes.size_variants = sizeVariants;
-                }
-              }
-
-              productWithVariants.color_variants.push(colorWithSizes);
-            }
-          }
-        }
-
-        productsWithVariants.push(productWithVariants);
-      }
-
-      console.log('Featured products with variants processed:', productsWithVariants.length);
-      setProducts(productsWithVariants);
+      setLoading(true);
+      const productsData = await fetchFeaturedProducts();
+      setProducts(productsData);
     } catch (error) {
-      console.error('Error fetching featured products:', error);
+      console.error('Error loading featured products:', error);
     } finally {
       setLoading(false);
     }
