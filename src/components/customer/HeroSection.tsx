@@ -1,69 +1,183 @@
-import { useState, useEffect } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { ArrowRight, Star, Truck, Shield, Phone } from 'lucide-react';
 import { Link } from 'react-router-dom';
-const sockImages = ['/lovable-uploads/51654152-d02f-443b-bb60-fd75dace40ee.png', '/lovable-uploads/30eed4ab-ddd8-442c-aeae-041fd7ae3be3.png', '/lovable-uploads/e02f8f14-3960-44fa-87db-499a23b30f02.png', '/lovable-uploads/9e1dcca9-44bc-44a8-aa02-56cef600abbb.png', '/lovable-uploads/1f8de054-b4a8-4e66-9281-8ae01c64eca1.png', '/lovable-uploads/e4515907-f434-4c37-8328-ea5930a9c2e6.png'];
+import { supabase } from '@/integrations/supabase/client';
+import { EnhancedProductCard } from './EnhancedProductCard';
+
+interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  cost_price: number;
+  selling_price?: number;
+  image_url?: string;
+  status: string;
+  subcategory_id: string;
+  is_featured?: boolean;
+  has_color_variants?: boolean;
+  color_has_size_variants?: boolean;
+  subcategories: {
+    name: string;
+    selling_price: number;
+    minimum_quantity: number;
+  };
+  color_variants?: any[];
+}
+
 export function HeroSection() {
-  const [currentImage, setCurrentImage] = useState(0);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentImage(prev => (prev + 1) % sockImages.length);
-    }, 3000);
-    return () => clearInterval(interval);
+    fetchFeaturedProducts();
   }, []);
-  return <section className="bg-gradient-to-br from-gray-900 via-black to-gray-800 relative overflow-hidden py-12 lg:py-16">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,0,0,0.1),transparent_50%)]"></div>
+
+  const fetchFeaturedProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          subcategories (
+            name,
+            selling_price,
+            minimum_quantity
+          ),
+          color_variants (
+            id,
+            color_name,
+            image_url,
+            has_sizes,
+            size_variants (
+              id,
+              size_name,
+              size_code
+            )
+          )
+        `)
+        .eq('status', 'active')
+        .eq('is_featured', true)
+        .limit(4)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setFeaturedProducts(data || []);
+    } catch (error) {
+      console.error('Error fetching featured products:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5">
+      {/* Hero Banner */}
+      <div className="container mx-auto px-4 py-16">
+        <div className="text-center max-w-4xl mx-auto">
+          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+            Premium Fashion at
+            <span className="text-primary block">Unbeatable Prices</span>
+          </h1>
+          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            Discover our exclusive collection of high-quality clothing with bulk discounts and combo offers. Perfect for retailers and fashion enthusiasts.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link to="/products">
+              <Button size="lg" className="text-lg px-8 py-3">
+                Shop Now
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+            <Link to="/categories">
+              <Button variant="outline" size="lg" className="text-lg px-8 py-3">
+                Browse Categories
+              </Button>
+            </Link>
+          </div>
+        </div>
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
-          
-          {/* Left Side Content - Order 1 for all devices */}
-          <div className="text-center lg:text-left order-1">
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold text-white mb-8 leading-tight">
-              Premium
-              <span className="block text-red-500">Sock Collection</span>
-            </h1>
-            
-            <p className="text-gray-300 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal text-xl md:text-2xl mb-6">
-              Discover our exclusive range of comfortable, stylish socks crafted with premium materials for everyday luxury.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-6 justify-center lg:justify-start">
-              <Link to="/categories">
-                <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white px-10 py-5 text-xl font-semibold rounded-lg transition-all duration-300 hover:scale-105">
-                  Shop Now
-                </Button>
-              </Link>
-              
-              <Link to="/about">
-                <Button variant="outline" size="lg" className="border-white hover:bg-white px-10 py-5 text-xl font-semibold rounded-lg transition-all duration-300 text-zinc-950">
-                  Learn More
-                </Button>
-              </Link>
-            </div>
+      {/* Features Section */}
+      <div className="container mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+          <div className="text-center p-6 bg-white rounded-lg shadow-sm">
+            <Star className="h-12 w-12 text-primary mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Premium Quality</h3>
+            <p className="text-gray-600">Hand-picked products with guaranteed quality and style</p>
+          </div>
+          <div className="text-center p-6 bg-white rounded-lg shadow-sm">
+            <Truck className="h-12 w-12 text-primary mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Fast Delivery</h3>
+            <p className="text-gray-600">Quick and reliable shipping across all locations</p>
+          </div>
+          <div className="text-center p-6 bg-white rounded-lg shadow-sm">
+            <Shield className="h-12 w-12 text-primary mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Secure Shopping</h3>
+            <p className="text-gray-600">Safe and secure payment processing</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Featured Products */}
+      {featuredProducts.length > 0 && (
+        <div className="container mx-auto px-4 py-12">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products</h2>
+            <p className="text-lg text-gray-600">Check out our most popular items</p>
           </div>
 
-          {/* Right Side - Sock Images - Order 2 for all devices */}
-          <div className="relative w-full max-w-2xl mx-auto h-96 sm:h-[450px] lg:h-[550px] xl:h-[650px] flex items-center justify-center order-2">
-            <div className="relative w-full h-full overflow-hidden">
-              {sockImages.map((image, index) => <div key={index} className={`absolute inset-0 transition-all duration-1000 transform ${index === currentImage ? 'opacity-100 scale-100 z-20' : 'opacity-0 scale-95 z-0'}`}>
-                  <div className="w-full h-full flex items-center justify-center">
-                    <img src={image} alt={`Premium Sock ${index + 1}`} className="w-80 h-80 sm:w-96 sm:h-96 lg:w-[450px] lg:h-[450px] xl:w-[550px] xl:h-[550px] object-contain drop-shadow-2xl filter brightness-110 transition-transform duration-300 hover:scale-105" />
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
+                  <div className="w-full h-48 bg-gray-200"></div>
+                  <div className="p-4 space-y-3">
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-8 bg-gray-200 rounded"></div>
                   </div>
-                </div>)}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {featuredProducts.map((product) => (
+                <EnhancedProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
+
+          <div className="text-center mt-12">
+            <Link to="/products">
+              <Button variant="outline" size="lg">
+                View All Products
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* CTA Section */}
+      <div className="bg-primary text-white">
+        <div className="container mx-auto px-4 py-16 text-center">
+          <h2 className="text-3xl font-bold mb-4">Ready to Start Shopping?</h2>
+          <p className="text-xl mb-8 opacity-90">Join thousands of satisfied customers</p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Link to="/products">
+              <Button size="lg" variant="secondary" className="text-lg px-8 py-3">
+                Shop Now
+              </Button>
+            </Link>
+            <div className="flex items-center gap-2 text-lg">
+              <Phone className="h-5 w-5" />
+              <span>Need help? Call us anytime</span>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Scroll Indicator */}
-      <div className="absolute bottom-4 lg:bottom-8 left-4 lg:left-8 hidden sm:block">
-        <div className="flex flex-col items-center text-white/60">
-          <span className="text-xs lg:text-sm mb-2 rotate-90 origin-center">Scroll</span>
-          <div className="w-px h-12 lg:h-16 bg-gradient-to-b from-white/60 to-transparent"></div>
-        </div>
-      </div>
-    </section>;
+    </div>
+  );
 }
