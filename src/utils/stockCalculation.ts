@@ -19,8 +19,23 @@ export interface VariantStock {
   reservedStock: number;
   lowStockThreshold: number;
   isLowStock: boolean;
+  isOutOfStock: boolean;
   costPrice: number;
   sellingPrice: number;
+}
+
+export interface StockCalculationResult {
+  totalStock: number;
+  availableStock?: number;
+  reservedStock?: number;
+  colorBreakdown?: Array<{
+    colorName: string;
+    stock: number;
+    sizeBreakdown?: Array<{
+      sizeName: string;
+      stock: number;
+    }>;
+  }>;
 }
 
 export async function getProductStockSummary(productId: string): Promise<number> {
@@ -37,6 +52,51 @@ export async function getProductStockSummary(productId: string): Promise<number>
   } catch (error) {
     console.error('Error calculating product stock:', error);
     return 0;
+  }
+}
+
+export async function calculateProductStock(productId: string): Promise<StockCalculationResult> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('is_active', true);
+
+    if (error) throw error;
+
+    const totalStock = (data || []).reduce((sum, item) => sum + (item.stock_quantity || 0), 0);
+    const availableStock = (data || []).reduce((sum, item) => sum + (item.available_stock || 0), 0);
+    const reservedStock = (data || []).reduce((sum, item) => sum + (item.reserved_stock || 0), 0);
+
+    // Group by color
+    const colorGroups = (data || []).reduce((groups, item) => {
+      const colorName = item.color_name || 'Default';
+      if (!groups[colorName]) {
+        groups[colorName] = [];
+      }
+      groups[colorName].push(item);
+      return groups;
+    }, {} as Record<string, any[]>);
+
+    const colorBreakdown = Object.entries(colorGroups).map(([colorName, items]) => ({
+      colorName,
+      stock: items.reduce((sum, item) => sum + (item.available_stock || 0), 0),
+      sizeBreakdown: items.map(item => ({
+        sizeName: item.size_name || 'One Size',
+        stock: item.available_stock || 0
+      }))
+    }));
+
+    return {
+      totalStock,
+      availableStock,
+      reservedStock,
+      colorBreakdown
+    };
+  } catch (error) {
+    console.error('Error calculating product stock:', error);
+    return { totalStock: 0 };
   }
 }
 
@@ -60,6 +120,7 @@ export async function getDetailedProductStock(productId: string): Promise<Produc
       reservedStock: item.reserved_stock || 0,
       lowStockThreshold: item.low_stock_threshold || 10,
       isLowStock: (item.available_stock || 0) <= (item.low_stock_threshold || 10),
+      isOutOfStock: (item.available_stock || 0) === 0,
       costPrice: item.cost_price,
       sellingPrice: item.selling_price || 0,
     }));
@@ -127,6 +188,7 @@ export async function getVariantStock(
       reservedStock: data.reserved_stock || 0,
       lowStockThreshold: data.low_stock_threshold || 10,
       isLowStock: (data.available_stock || 0) <= (data.low_stock_threshold || 10),
+      isOutOfStock: (data.available_stock || 0) === 0,
       costPrice: data.cost_price,
       sellingPrice: data.selling_price || 0,
     };
