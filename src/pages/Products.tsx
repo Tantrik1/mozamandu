@@ -44,7 +44,7 @@ export default function Products() {
         .from('products')
         .select(`
           *,
-          subcategories (
+          subcategories!inner (
             name,
             selling_price,
             minimum_quantity

@@ -36,11 +36,12 @@ export function HeroSection() {
 
   const fetchFeaturedProducts = async () => {
     try {
+      console.log('Fetching featured products...');
       const { data, error } = await supabase
         .from('products')
         .select(`
           *,
-          subcategories (
+          subcategories!inner (
             name,
             selling_price,
             minimum_quantity
@@ -62,7 +63,12 @@ export function HeroSection() {
         .limit(4)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching featured products:', error);
+        throw error;
+      }
+
+      console.log('Featured products fetched:', data?.length || 0);
       setFeaturedProducts(data || []);
     } catch (error) {
       console.error('Error fetching featured products:', error);
@@ -121,44 +127,53 @@ export function HeroSection() {
       </div>
 
       {/* Featured Products */}
-      {featuredProducts.length > 0 && (
-        <div className="container mx-auto px-4 py-12">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products</h2>
-            <p className="text-lg text-gray-600">Check out our most popular items</p>
-          </div>
+      <div className="container mx-auto px-4 py-12">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products</h2>
+          <p className="text-lg text-gray-600">Check out our most popular items</p>
+        </div>
 
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
-                  <div className="w-full h-48 bg-gray-200"></div>
-                  <div className="p-4 space-y-3">
-                    <div className="h-4 bg-gray-200 rounded"></div>
-                    <div className="h-3 bg-gray-200 rounded w-3/4"></div>
-                    <div className="h-8 bg-gray-200 rounded"></div>
-                  </div>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
+                <div className="w-full h-48 bg-gray-200"></div>
+                <div className="p-4 space-y-3">
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                  <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                  <div className="h-8 bg-gray-200 rounded"></div>
                 </div>
-              ))}
-            </div>
-          ) : (
+              </div>
+            ))}
+          </div>
+        ) : featuredProducts.length > 0 ? (
+          <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {featuredProducts.map((product) => (
                 <EnhancedProductCard key={product.id} product={product} />
               ))}
             </div>
-          )}
-
-          <div className="text-center mt-12">
+            <div className="text-center mt-12">
+              <Link to="/products">
+                <Button variant="outline" size="lg">
+                  View All Products
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-500 mb-4">No featured products available at the moment</p>
             <Link to="/products">
-              <Button variant="outline" size="lg">
-                View All Products
+              <Button variant="outline">
+                Browse All Products
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* CTA Section */}
       <div className="bg-primary text-white">
