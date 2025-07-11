@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { Star, ShoppingCart, Plus, Minus, TrendingUp, Zap } from 'lucide-react';
-import { getProductStockSummary } from '@/utils/stockCalculation';
+import { getProductStockSummary, getExactVariantData } from '@/utils/stockCalculation';
 
 interface ColorVariant {
   id: string;
@@ -56,6 +56,14 @@ export function AnimatedProductCard({ product, subcategorySellingPrice, discount
   const [quantity, setQuantity] = useState<number>(1);
   const [loading, setLoading] = useState(false);
   const [productStock, setProductStock] = useState<number>(0);
+  const [currentVariantData, setCurrentVariantData] = useState<{
+    id: string;
+    sku: string;
+    stock: number;
+    availableStock: number;
+    isOutOfStock: boolean;
+    isLowStock: boolean;
+  } | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   
   const { addToCart } = useRobustCart();
@@ -72,6 +80,34 @@ export function AnimatedProductCard({ product, subcategorySellingPrice, discount
       fetchSizeVariants(selectedColor);
     }
   }, [selectedColor, product.color_has_size_variants]);
+
+  // Fetch exact variant data when color or size changes
+  useEffect(() => {
+    fetchCurrentVariantData();
+  }, [selectedColor, selectedSize, product.id]);
+
+  const fetchCurrentVariantData = async () => {
+    try {
+      const variantData = await getExactVariantData(
+        product.id,
+        selectedColor || undefined,
+        selectedSize || undefined
+      );
+      setCurrentVariantData(variantData);
+      
+      // Update the product stock to reflect the exact variant stock
+      if (variantData) {
+        setProductStock(variantData.availableStock);
+      } else {
+        // Fallback to total product stock if no specific variant found
+        const totalStock = await getProductStockSummary(product.id);
+        setProductStock(totalStock);
+      }
+    } catch (error) {
+      console.error('Error fetching current variant data:', error);
+      setCurrentVariantData(null);
+    }
+  };
 
   const fetchProductStock = async () => {
     try {
@@ -309,6 +345,23 @@ export function AnimatedProductCard({ product, subcategorySellingPrice, discount
           <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">
             {product.description}
           </p>
+        )}
+
+        {/* Current Variant Info */}
+        {currentVariantData && (
+          <div className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between">
+              <span className="font-medium">SKU: {currentVariantData.sku}</span>
+              <span className={`font-semibold ${
+                currentVariantData.isOutOfStock ? 'text-red-600' : 
+                currentVariantData.isLowStock ? 'text-orange-600' : 'text-green-600'
+              }`}>
+                {currentVariantData.isOutOfStock ? 'Out of Stock' : 
+                 currentVariantData.isLowStock ? `Low Stock (${currentVariantData.availableStock})` : 
+                 `In Stock (${currentVariantData.availableStock})`}
+              </span>
+            </div>
+          </div>
         )}
 
         {/* Color Selection with Enhanced UI */}

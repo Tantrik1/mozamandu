@@ -214,3 +214,60 @@ export async function checkProductAvailability(
     return false;
   }
 }
+
+export async function getExactVariantData(
+  productId: string,
+  colorVariantId?: string,
+  sizeVariantId?: string
+): Promise<{
+  id: string;
+  sku: string;
+  stock: number;
+  availableStock: number;
+  reservedStock: number;
+  isOutOfStock: boolean;
+  isLowStock: boolean;
+  costPrice: number;
+  sellingPrice: number;
+} | null> {
+  try {
+    let query = supabase
+      .from('product_inventory')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('is_active', true);
+
+    // Build the exact query based on variant IDs
+    if (colorVariantId) {
+      query = query.eq('color_variant_id', colorVariantId);
+    } else {
+      query = query.is('color_variant_id', null);
+    }
+
+    if (sizeVariantId) {
+      query = query.eq('size_variant_id', sizeVariantId);
+    } else {
+      query = query.is('size_variant_id', null);
+    }
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    return {
+      id: data.id,
+      sku: data.sku,
+      stock: data.stock_quantity,
+      availableStock: data.available_stock || 0,
+      reservedStock: data.reserved_stock || 0,
+      isOutOfStock: (data.available_stock || 0) === 0,
+      isLowStock: (data.available_stock || 0) <= (data.low_stock_threshold || 10),
+      costPrice: data.cost_price,
+      sellingPrice: data.selling_price || 0,
+    };
+  } catch (error) {
+    console.error('Error fetching exact variant data:', error);
+    return null;
+  }
+}
