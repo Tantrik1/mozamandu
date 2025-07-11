@@ -16,14 +16,15 @@ import OrderSummary from "./pages/OrderSummary";
 import CustomerOrderSummary from "./pages/CustomerOrderSummary";
 import FAQ from "./pages/FAQ";
 import Contact from "./pages/Contact";
+import InventoryDashboard from "./pages/InventoryDashboard";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <RobustCartProvider>
+    <AuthProvider>
+      <RobustCartProvider>
+        <TooltipProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -33,6 +34,7 @@ const App = () => (
               <Route path="/categories/:categoryId" element={<CategoryPage />} />
               <Route path="/subcategories/:subcategoryId" element={<SubcategoryPage />} />
               <Route path="/products" element={<Products />} />
+              <Route path="/inventory" element={<InventoryDashboard />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/order-summary/:orderId" element={<OrderSummary />} />
               <Route path="/customer-order-summary/:orderId" element={<CustomerOrderSummary />} />
@@ -40,9 +42,9 @@ const App = () => (
               <Route path="/contact" element={<Contact />} />
             </Routes>
           </BrowserRouter>
-        </RobustCartProvider>
-      </AuthProvider>
-    </TooltipProvider>
+        </TooltipProvider>
+      </RobustCartProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

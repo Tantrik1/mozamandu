@@ -43,6 +43,7 @@ export type Database = {
       }
       color_variants: {
         Row: {
+          color_id: string | null
           color_name: string
           created_at: string | null
           has_sizes: boolean | null
@@ -51,6 +52,7 @@ export type Database = {
           product_id: string
         }
         Insert: {
+          color_id?: string | null
           color_name: string
           created_at?: string | null
           has_sizes?: boolean | null
@@ -59,6 +61,7 @@ export type Database = {
           product_id: string
         }
         Update: {
+          color_id?: string | null
           color_name?: string
           created_at?: string | null
           has_sizes?: boolean | null
@@ -67,6 +70,13 @@ export type Database = {
           product_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "color_variants_color_id_fkey"
+            columns: ["color_id"]
+            isOneToOne: false
+            referencedRelation: "colors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "color_variants_product_id_fkey"
             columns: ["product_id"]
@@ -82,6 +92,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      colors: {
+        Row: {
+          created_at: string | null
+          hex_code: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          hex_code?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          hex_code?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       combo_subcategories: {
         Row: {
@@ -517,6 +554,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventory_transactions_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inventory_transactions_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -845,6 +889,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fk_product_images_color_variant_id"
+            columns: ["color_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["color_variant_id"]
+          },
+          {
             foreignKeyName: "fk_product_images_product_id"
             columns: ["product_id"]
             isOneToOne: false
@@ -857,6 +908,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "color_variants"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_images_color_variant_id_fkey"
+            columns: ["color_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["color_variant_id"]
           },
           {
             foreignKeyName: "product_images_product_id_fkey"
@@ -940,11 +998,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "product_inventory_color_variant_id_fkey"
+            columns: ["color_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["color_variant_id"]
+          },
+          {
             foreignKeyName: "product_inventory_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_inventory_size_variant_id_fkey"
+            columns: ["size_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["size_variant_id"]
           },
           {
             foreignKeyName: "product_inventory_size_variant_id_fkey"
@@ -1102,6 +1174,7 @@ export type Database = {
           created_at: string | null
           id: string
           size_code: string | null
+          size_id: string | null
           size_name: string
         }
         Insert: {
@@ -1109,6 +1182,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           size_code?: string | null
+          size_id?: string | null
           size_name: string
         }
         Update: {
@@ -1116,6 +1190,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           size_code?: string | null
+          size_id?: string | null
           size_name?: string
         }
         Relationships: [
@@ -1127,13 +1202,64 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fk_size_variants_color_variant_id"
+            columns: ["color_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["color_variant_id"]
+          },
+          {
             foreignKeyName: "size_variants_color_variant_id_fkey"
             columns: ["color_variant_id"]
             isOneToOne: false
             referencedRelation: "color_variants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "size_variants_color_variant_id_fkey"
+            columns: ["color_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["color_variant_id"]
+          },
+          {
+            foreignKeyName: "size_variants_size_id_fkey"
+            columns: ["size_id"]
+            isOneToOne: false
+            referencedRelation: "sizes"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      sizes: {
+        Row: {
+          code: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       subcategories: {
         Row: {
@@ -1208,7 +1334,38 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      product_variants: {
+        Row: {
+          available_stock: number | null
+          color_image_url: string | null
+          color_name: string | null
+          color_variant_id: string | null
+          cost_price: number | null
+          created_at: string | null
+          id: string | null
+          is_active: boolean | null
+          low_stock_threshold: number | null
+          product_id: string | null
+          product_image_url: string | null
+          product_name: string | null
+          reserved_stock: number | null
+          selling_price: number | null
+          size_name: string | null
+          size_variant_id: string | null
+          sku: string | null
+          stock_quantity: number | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_inventory_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       bulk_update_inventory: {
@@ -1265,6 +1422,43 @@ export type Database = {
           metric_name: string
           metric_value: number
           description: string
+        }[]
+      }
+      get_product_colors: {
+        Args: { p_product_id: string }
+        Returns: {
+          color_id: string
+          color_name: string
+          hex_code: string
+          image_url: string
+          total_stock: number
+        }[]
+      }
+      get_product_sizes: {
+        Args: { p_product_id: string; p_color_name: string }
+        Returns: {
+          size_id: string
+          size_name: string
+          size_code: string
+          stock_quantity: number
+          available_stock: number
+          variant_id: string
+          sku: string
+        }[]
+      }
+      get_product_variants: {
+        Args: { p_product_id: string }
+        Returns: {
+          variant_id: string
+          sku: string
+          product_name: string
+          color_name: string
+          size_name: string
+          stock_quantity: number
+          available_stock: number
+          price: number
+          color_image_url: string
+          color_hex: string
         }[]
       }
       is_admin: {
