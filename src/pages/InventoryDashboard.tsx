@@ -1,10 +1,9 @@
 
-import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { EnhancedInventoryManagement } from '@/components/inventory/EnhancedInventoryManagement';
+import { ModernInventoryManagement } from '@/components/inventory/ModernInventoryManagement';
 import { ProductListWithVariants } from '@/components/inventory/ProductListWithVariants';
 import { ColorManagement } from '@/components/inventory/ColorManagement';
-import { Package, Palette, List, BarChart3 } from 'lucide-react';
+import { Package, List, Palette, BarChart3 } from 'lucide-react';
 
 export default function InventoryDashboard() {
   return (
@@ -36,7 +35,7 @@ export default function InventoryDashboard() {
           </TabsList>
 
           <TabsContent value="inventory" className="space-y-6">
-            <EnhancedInventoryManagement />
+            <ModernInventoryManagement />
           </TabsContent>
 
           <TabsContent value="products" className="space-y-6">

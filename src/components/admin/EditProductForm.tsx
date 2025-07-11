@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -101,13 +100,12 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     if (watchedCategoryId && subcategories.length > 0) {
       const filtered = subcategories.filter(sub => sub.category_id === watchedCategoryId);
       setFilteredSubcategories(filtered);
-      console.log('Filtered subcategories:', filtered);
+      console.log('Filtered subcategories for category', watchedCategoryId, ':', filtered);
     } else {
       setFilteredSubcategories([]);
     }
   }, [watchedCategoryId, subcategories]);
 
-  // Disable sizes when colors are disabled
   useEffect(() => {
     if (!watchedHasColorVariants && watchedHasSizeVariants) {
       form.setValue('has_size_variants', false);
@@ -137,14 +135,19 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   const fetchSubcategories = async () => {
     try {
+      // Enhanced query with better error handling
       const { data, error } = await supabase
         .from('subcategories')
         .select('id, name, category_id')
         .eq('status', 'on')
         .order('name');
 
-      if (error) throw error;
-      console.log('Fetched subcategories:', data);
+      if (error) {
+        console.error('Supabase error fetching subcategories:', error);
+        throw error;
+      }
+      
+      console.log('Raw subcategories data:', data);
       setSubcategories(data || []);
     } catch (error) {
       console.error('Error fetching subcategories:', error);
@@ -295,7 +298,6 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         description: 'Product updated successfully',
       });
 
-      // Show inventory popup after successful update
       setShowInventoryPopup(true);
     } catch (error) {
       console.error('Error updating product:', error);
@@ -311,7 +313,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   const handleInventoryClose = () => {
     setShowInventoryPopup(false);
-    onSave(); // Navigate back after inventory management is complete
+    onSave();
   };
 
   if (loadingData) {
@@ -409,7 +411,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                       onValueChange={(value) => {
                         console.log('Category selected:', value);
                         form.setValue('category_id', value);
-                        form.setValue('subcategory_id', ''); // Reset subcategory when category changes
+                        form.setValue('subcategory_id', '');
                       }}
                     >
                       <SelectTrigger>
