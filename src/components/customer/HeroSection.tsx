@@ -23,7 +23,17 @@ interface Product {
     selling_price: number;
     minimum_quantity: number;
   };
-  color_variants?: any[];
+  color_variants?: {
+    id: string;
+    color_name: string;
+    image_url?: string;
+    has_sizes: boolean;
+    size_variants: {
+      id: string;
+      size_name: string;
+      size_code?: string;
+    }[];
+  }[];
 }
 
 export function HeroSection() {
@@ -40,7 +50,17 @@ export function HeroSection() {
       const { data, error } = await supabase
         .from('products')
         .select(`
-          *,
+          id,
+          name,
+          description,
+          cost_price,
+          selling_price,
+          image_url,
+          status,
+          subcategory_id,
+          is_featured,
+          has_color_variants,
+          color_has_size_variants,
           subcategories!inner (
             name,
             selling_price,

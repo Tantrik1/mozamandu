@@ -26,7 +26,17 @@ interface Product {
     selling_price: number;
     minimum_quantity: number;
   };
-  color_variants?: any[];
+  color_variants?: {
+    id: string;
+    color_name: string;
+    image_url?: string;
+    has_sizes: boolean;
+    size_variants: {
+      id: string;
+      size_name: string;
+      size_code?: string;
+    }[];
+  }[];
 }
 
 interface Subcategory {
@@ -79,17 +89,27 @@ export default function SubcategoryPage() {
       console.log('Subcategory found:', subcategoryData);
       setSubcategory(subcategoryData);
 
-      // Fetch products for the subcategory with explicit relationship specification
+      // Fetch products for the subcategory with all variant information
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select(`
-          *,
+          id,
+          name,
+          description,
+          cost_price,
+          selling_price,
+          image_url,
+          status,
+          subcategory_id,
+          is_featured,
+          has_color_variants,
+          color_has_size_variants,
           subcategories!inner (
             name,
             selling_price,
             minimum_quantity
           ),
-          color_variants!color_variants_product_id_fkey (
+          color_variants (
             id,
             color_name,
             image_url,
@@ -114,6 +134,7 @@ export default function SubcategoryPage() {
         });
       } else {
         console.log('Products found:', productsData?.length || 0);
+        console.log('Sample product data:', productsData?.[0]);
         setProducts(productsData || []);
       }
     } catch (error) {
@@ -175,7 +196,7 @@ export default function SubcategoryPage() {
             Back to Categories
           </Link>
           <div className="flex flex-col md:flex-row gap-6 items-start">
-            {subcategory.image_url && (
+            {subcategory?.image_url && (
               <img
                 src={subcategory.image_url}
                 alt={subcategory.name}
@@ -183,25 +204,42 @@ export default function SubcategoryPage() {
               />
             )}
             <div className="flex-1">
-              <h1 className="text-3xl font-bold mb-2">{subcategory.name}</h1>
-              {subcategory.description && (
+              <h1 className="text-3xl font-bold mb-2">{subcategory?.name}</h1>
+              {subcategory?.description && (
                 <p className="text-gray-600 mb-4">{subcategory.description}</p>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div className="bg-white p-4 rounded-lg shadow-sm">
                   <p className="font-semibold text-primary">Base Price</p>
-                  <p className="text-lg">Rs. {subcategory.selling_price.toFixed(2)}</p>
+                  <p className="text-lg">Rs. {subcategory?.selling_price.toFixed(2)}</p>
                 </div>
                 <div className="bg-white p-4 rounded-lg shadow-sm">
                   <p className="font-semibold text-primary">Minimum Order</p>
-                  <p className="text-lg">{subcategory.minimum_quantity} pieces</p>
+                  <p className="text-lg">{subcategory?.minimum_quantity} pieces</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {products.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center items-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p>Loading products...</p>
+            </div>
+          </div>
+        ) : !subcategory ? (
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-gray-500 mb-4">Subcategory not found</p>
+              <Link to="/categories" className="inline-flex items-center text-primary hover:text-primary/80">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Categories
+              </Link>
+            </CardContent>
+          </Card>
+        ) : products.length === 0 ? (
           <Card>
             <CardContent className="text-center py-12">
               <p className="text-gray-500 text-lg mb-2">No products found in this subcategory</p>
