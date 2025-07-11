@@ -37,7 +37,7 @@ export async function fetchProductsWithVariants(options: {
   subcategoryId?: string;
   featuredOnly?: boolean;
   limit?: number;
-  status?: string;
+  status?: 'active' | 'inactive';
 } = {}): Promise<Product[]> {
   try {
     console.log('Fetching products with options:', options);
