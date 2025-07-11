@@ -12,6 +12,8 @@ import Checkout from '@/pages/Checkout';
 import ShippingPolicy from '@/pages/ShippingPolicy';
 import TermsConditions from '@/pages/TermsConditions';
 import Home from '@/pages/Home';
+import SubcategoryPage from '@/pages/SubcategoryPage';
+import Products from '@/pages/Products';
 
 const queryClient = new QueryClient();
 
@@ -25,6 +27,8 @@ function App() {
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/home" element={<Home />} />
+              <Route path="/products" element={<Products />} />
+              <Route path="/subcategory/:subcategoryId" element={<SubcategoryPage />} />
               <Route path="/admin/*" element={<AdminPage />} />
               <Route path="/inventory" element={<InventoryDashboard />} />
               <Route path="/checkout" element={<Checkout />} />

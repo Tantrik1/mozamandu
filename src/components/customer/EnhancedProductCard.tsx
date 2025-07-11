@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,10 +34,6 @@ interface Product {
   has_color_variants: boolean;
   color_has_size_variants: boolean;
   stock_quantity: number;
-  subcategories?: {
-    name: string;
-    selling_price: number;
-  } | null;
 }
 
 interface DiscountTier {
@@ -46,13 +43,13 @@ interface DiscountTier {
   discount_amount: number;
 }
 
-interface ProductCardProps {
+interface EnhancedProductCardProps {
   product: Product;
   subcategorySellingPrice: number;
   discountTiers?: DiscountTier[];
 }
 
-export function ProductCard({ product, subcategorySellingPrice, discountTiers = [] }: ProductCardProps) {
+export function EnhancedProductCard({ product, subcategorySellingPrice, discountTiers = [] }: EnhancedProductCardProps) {
   const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
   const [sizeVariants, setSizeVariants] = useState<SizeVariant[]>([]);
   const [selectedColor, setSelectedColor] = useState<string>('');
