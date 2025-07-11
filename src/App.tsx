@@ -25,7 +25,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/home" element={<Home />} />
-              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/admin/*" element={<AdminPage />} />
               <Route path="/inventory" element={<InventoryDashboard />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/shipping-policy" element={<ShippingPolicy />} />

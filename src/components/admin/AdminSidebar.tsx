@@ -24,7 +24,8 @@ import {
   ShoppingCart,
   UserCheck,
   LogOut,
-  HelpCircle
+  HelpCircle,
+  Warehouse
 } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
@@ -49,6 +50,11 @@ const menuItems = [
     title: "Products",
     url: "/admin/products",
     icon: Package,
+  },
+  {
+    title: "Inventory",
+    url: "/admin/inventory",
+    icon: Warehouse,
   },
   {
     title: "Orders",
@@ -115,6 +121,10 @@ export function AdminSidebar() {
     signOut()
   }
 
+  const handleNavClick = (url: string) => {
+    console.log(`🔗 AdminSidebar: Navigating to ${url}`)
+  }
+
   return (
     <Sidebar>
       <SidebarContent>
@@ -122,16 +132,24 @@ export function AdminSidebar() {
           <SidebarGroupLabel>Admin Panel</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                    <Link to={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {menuItems.map((item) => {
+                const isActive = location.pathname === item.url || 
+                  (item.url === "/admin" && location.pathname === "/admin");
+                
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={isActive}>
+                      <Link 
+                        to={item.url}
+                        onClick={() => handleNavClick(item.url)}
+                      >
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
