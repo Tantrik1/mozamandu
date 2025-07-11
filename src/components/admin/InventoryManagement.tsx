@@ -208,7 +208,7 @@ export function InventoryManagement() {
                     <tr key={item.id} className="border-b">
                       <td className="p-2 font-mono text-sm">{item.sku}</td>
                       <td className="p-2">{item.product_name}</td>
-                      <td className="p-2">{item.category_name} > {item.subcategory_name}</td>
+                      <td className="p-2">{item.category_name} &gt; {item.subcategory_name}</td>
                       <td className="p-2">
                         {item.color_name && (
                           <Badge variant="outline" className="mr-1">{item.color_name}</Badge>
