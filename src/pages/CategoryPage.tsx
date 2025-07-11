@@ -4,7 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {TopBar} from '@/components/customer/TopBar' ;
+import { Footer } from '@/components/layout/Footer';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Package } from 'lucide-react';
@@ -39,6 +39,8 @@ export default function CategoryPage() {
 
   const fetchCategoryData = async () => {
     try {
+      console.log('Fetching category data for:', categoryId);
+
       // Fetch category details
       const { data: categoryData, error: categoryError } = await supabase
         .from('categories')
@@ -57,6 +59,7 @@ export default function CategoryPage() {
         return;
       }
 
+      console.log('Category found:', categoryData);
       setCategory(categoryData);
 
       // Fetch subcategories with image_url
@@ -75,6 +78,7 @@ export default function CategoryPage() {
           variant: "destructive",
         });
       } else {
+        console.log('Subcategories found:', subcategoriesData?.length || 0);
         setSubcategories(subcategoriesData || []);
       }
     } catch (error) {
@@ -93,10 +97,15 @@ export default function CategoryPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <CustomerHeader />
-        
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-          <div className="text-center">Loading...</div>
+          <div className="flex justify-center items-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p>Loading category...</p>
+            </div>
+          </div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -106,10 +115,16 @@ export default function CategoryPage() {
       <div className="min-h-screen bg-gray-50">
         <CustomerHeader />
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900">Category not found</h1>
-          </div>
+          <Card>
+            <CardContent className="text-center py-8">
+              <h1 className="text-2xl font-bold text-gray-900">Category not found</h1>
+              <Link to="/" className="text-primary hover:text-primary/80 mt-4 inline-block">
+                Return to Home
+              </Link>
+            </CardContent>
+          </Card>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -128,10 +143,12 @@ export default function CategoryPage() {
 
         {/* Subcategories Grid */}
         {subcategories.length === 0 ? (
-          <div className="text-center py-12">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No subcategories available</h3>
-            <p className="text-gray-500">Subcategories will appear here once they are added.</p>
-          </div>
+          <Card>
+            <CardContent className="text-center py-12">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No subcategories available</h3>
+              <p className="text-gray-500">Subcategories will appear here once they are added.</p>
+            </CardContent>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {subcategories.map((subcategory) => (
@@ -185,6 +202,7 @@ export default function CategoryPage() {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }

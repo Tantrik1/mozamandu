@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { EnhancedProductCard } from '@/components/customer/EnhancedProductCard';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
+import { toast } from '@/hooks/use-toast';
 
 export default function SubcategoryPage() {
   const { subcategoryId } = useParams<{ subcategoryId: string }>();
@@ -21,22 +22,35 @@ export default function SubcategoryPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      console.log('Fetching data for subcategory:', subcategoryId);
+
       // Fetch subcategory details
       const { data: subcategoryData, error: subcategoryError } = await supabase
         .from('subcategories')
         .select('*')
         .eq('id', subcategoryId)
+        .eq('status', 'on')
         .single();
 
-      if (subcategoryError) throw subcategoryError;
+      if (subcategoryError) {
+        console.error('Error fetching subcategory:', subcategoryError);
+        toast({
+          title: "Error",
+          description: "Subcategory not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Subcategory found:', subcategoryData);
       setSubcategory(subcategoryData);
 
-      // Fetch products for the subcategory
+      // Fetch products for the subcategory with all necessary joins
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select(`
           *,
-          subcategories (
+          subcategories!inner (
             name,
             selling_price,
             minimum_quantity
@@ -57,10 +71,24 @@ export default function SubcategoryPage() {
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
-      if (productsError) throw productsError;
-      setProducts(productsData || []);
+      if (productsError) {
+        console.error('Error fetching products:', productsError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch products",
+          variant: "destructive",
+        });
+      } else {
+        console.log('Products found:', productsData?.length || 0);
+        setProducts(productsData || []);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
+      toast({
+        title: "Error",
+        description: "Something went wrong",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -91,6 +119,10 @@ export default function SubcategoryPage() {
           <Card>
             <CardContent className="text-center py-8">
               <p className="text-gray-500">Subcategory not found</p>
+              <Link to="/products" className="inline-flex items-center mt-4 text-primary hover:text-primary/80">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Products
+              </Link>
             </CardContent>
           </Card>
         </div>
@@ -118,6 +150,7 @@ export default function SubcategoryPage() {
           <Card>
             <CardContent className="text-center py-8">
               <p className="text-gray-500">No products found in this subcategory</p>
+              <p className="text-sm text-gray-400 mt-2">Products will appear here once they are added to this subcategory.</p>
             </CardContent>
           </Card>
         ) : (

@@ -62,6 +62,8 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
           price: item.price || item.basePrice * item.quantity
         }));
         
+        console.log('Loading cart with items:', itemsWithPrice);
+        
         // Only validate if products exist, no stock checking
         const { validItems, removedItems, errors } = await validateCartItems(itemsWithPrice);
         
@@ -90,9 +92,12 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
 
   const saveCart = (items: CartItem[]) => {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    console.log('Cart saved with items:', items.length);
   };
 
   const addToCart = (item: Omit<CartItem, 'id' | 'price'>) => {
+    console.log('Adding to cart:', item);
+    
     const newItem: CartItem = {
       ...item,
       id: `${item.productId}-${item.productInventoryId || 'default'}-${Date.now()}`,
@@ -119,12 +124,14 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
   };
 
   const removeFromCart = (itemId: string) => {
+    console.log('Removing from cart:', itemId);
     const newItems = cartItems.filter(item => item.id !== itemId);
     setCartItems(newItems);
     saveCart(newItems);
   };
 
   const updateQuantity = (itemId: string, quantity: number) => {
+    console.log('Updating quantity:', itemId, quantity);
     if (quantity <= 0) {
       removeFromCart(itemId);
       return;
@@ -140,6 +147,7 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
   };
 
   const clearCart = () => {
+    console.log('Clearing cart');
     setCartItems([]);
     localStorage.removeItem(CART_STORAGE_KEY);
   };
