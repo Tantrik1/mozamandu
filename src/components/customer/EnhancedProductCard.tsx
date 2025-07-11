@@ -56,6 +56,7 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
   const [loading, setLoading] = useState(true);
   const [showPricingDetails, setShowPricingDetails] = useState(false);
   const [discountTiers, setDiscountTiers] = useState<any[]>([]);
+  const [stockError, setStockError] = useState<string>('');
 
   const { cartItems, addToCart } = useRobustCart();
   const { activeCombo } = useComboManager({ cartItems });
@@ -103,11 +104,12 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
   const fetchStock = async () => {
     try {
       setLoading(true);
+      setStockError('');
       
       // Build query to get inventory based on selected variants
       let query = supabase
         .from('product_inventory')
-        .select('available_stock')
+        .select('available_stock, is_active')
         .eq('product_id', product.id)
         .eq('is_active', true);
 
@@ -139,6 +141,7 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
 
       if (error) {
         console.error('Error fetching inventory:', error);
+        setStockError('Failed to load stock information');
         setStock(0);
         return;
       }
@@ -146,8 +149,18 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
       // Sum up available stock from all matching inventory records
       const totalStock = inventoryData?.reduce((sum, item) => sum + (item.available_stock || 0), 0) || 0;
       setStock(totalStock);
+      
+      console.log('Stock fetched for product:', {
+        productId: product.id,
+        productName: product.name,
+        colorVariantId: selectedColor,
+        sizeVariantId: selectedSize,
+        totalStock,
+        inventoryRecords: inventoryData?.length || 0
+      });
     } catch (error) {
       console.error('Error fetching stock:', error);
+      setStockError('Error loading stock');
       setStock(0);
     } finally {
       setLoading(false);
@@ -158,7 +171,7 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
     const currentQuantityInCart = subcategoryQuantities[product.subcategory_id] || 0;
     const totalQuantityWithNew = currentQuantityInCart + quantity;
 
-    // Create a mock cart item to get pricing
+    // Create a mock cart item to get accurate pricing
     const mockCartItem = {
       id: 'mock',
       productId: product.id,
@@ -204,13 +217,10 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
       return;
     }
 
-    // Find the actual inventory ID for the selected variant combination
-    let productInventoryId = null;
-    
     const cartItem = {
       productId: product.id,
       productName: product.name,
-      productInventoryId,
+      productInventoryId: null, // Will be resolved by cart system
       colorName: selectedVariant?.color_name,
       sizeName: availableSizes.find(s => s.id === selectedSize)?.size_name,
       quantity,
@@ -229,6 +239,31 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
     setQuantity(1);
   };
 
+  const getComboEligibilityStatus = () => {
+    if (!activeCombo) return null;
+    
+    const comboSubcategory = activeCombo.combo_subcategories.find(
+      cs => cs.subcategory_id === product.subcategory_id
+    );
+    
+    if (!comboSubcategory) {
+      return { eligible: false, reason: 'Not part of active combo' };
+    }
+    
+    const currentQuantityInCart = subcategoryQuantities[product.subcategory_id] || 0;
+    const totalQuantityWithNew = currentQuantityInCart + quantity;
+    
+    if (totalQuantityWithNew < comboSubcategory.min_units) {
+      return { 
+        eligible: false, 
+        reason: `Need ${comboSubcategory.min_units - totalQuantityWithNew} more items for combo pricing`,
+        needed: comboSubcategory.min_units - totalQuantityWithNew
+      };
+    }
+    
+    return { eligible: true, reason: 'Combo pricing active' };
+  };
+
   const isMinimumQuantityMet = () => {
     const currentQuantityInCart = subcategoryQuantities[product.subcategory_id] || 0;
     const totalQuantityWithNew = currentQuantityInCart + quantity;
@@ -244,6 +279,8 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
     
     return !activeCombo && totalQuantityWithNew < minimumRequired;
   };
+
+  const comboStatus = getComboEligibilityStatus();
 
   return (
     <Card className="bg-white shadow-md rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300">
@@ -327,7 +364,7 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
           </Select>
         </div>
 
-        {/* Pricing Display */}
+        {/* Enhanced Pricing Display */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -346,19 +383,70 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
                   <Info className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Pricing Details</DialogTitle>
+                  <DialogTitle className="flex items-center gap-2">
+                    Pricing Details
+                    {pricing.mode !== 'normal' && (
+                      <Badge variant={pricing.mode === 'combo' ? 'default' : 'secondary'}>
+                        {pricing.mode === 'combo' ? 'COMBO' : 'DISCOUNT'}
+                      </Badge>
+                    )}
+                  </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-2">
-                  <p className="text-sm">{pricing.description}</p>
-                  {pricing.breakdown && (
-                    <div className="space-y-1">
-                      {pricing.breakdown.map((item, index) => (
-                        <p key={index} className="text-xs text-gray-600">{item}</p>
-                      ))}
+                <div className="space-y-3">
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-sm font-medium">{pricing.description}</p>
+                  </div>
+                  
+                  {/* Combo Status */}
+                  {activeCombo && comboStatus && (
+                    <div className={`p-3 rounded-lg ${comboStatus.eligible ? 'bg-green-50 border border-green-200' : 'bg-orange-50 border border-orange-200'}`}>
+                      <h4 className="text-sm font-medium text-gray-700">Combo Status:</h4>
+                      <p className={`text-sm ${comboStatus.eligible ? 'text-green-700' : 'text-orange-700'}`}>
+                        {comboStatus.reason}
+                      </p>
+                      {!comboStatus.eligible && comboStatus.needed && (
+                        <p className="text-xs text-orange-600 mt-1">
+                          Add {comboStatus.needed} more items to get combo price of Rs. {activeCombo.combo_subcategories.find(cs => cs.subcategory_id === product.subcategory_id)?.price.toFixed(2)}
+                        </p>
+                      )}
                     </div>
                   )}
+                  
+                  {pricing.breakdown && pricing.breakdown.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium text-gray-700">Breakdown:</h4>
+                      <div className="space-y-1">
+                        {pricing.breakdown.map((line, index) => (
+                          <p key={index} className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="border-t pt-3 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Base Price:</span>
+                      <span>Rs. {basePrice.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-medium">
+                      <span>Final Price:</span>
+                      <span className="text-green-600">Rs. {pricing.finalPrice.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Total for {quantity}:</span>
+                      <span className="font-bold">Rs. {(pricing.finalPrice * quantity).toFixed(2)}</span>
+                    </div>
+                    {pricing.finalPrice < basePrice && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>You Save:</span>
+                        <span>Rs. {(basePrice - pricing.finalPrice).toFixed(2)} per item</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>
@@ -371,10 +459,15 @@ export function EnhancedProductCard({ product }: EnhancedProductCardProps) {
           )}
         </div>
 
-        {/* Stock Status */}
+        {/* Enhanced Stock Status */}
         <div className="flex items-center justify-between">
           {loading ? (
             <span className="text-gray-500 text-sm">Loading stock...</span>
+          ) : stockError ? (
+            <div className="flex flex-col">
+              <Badge variant="destructive">Stock Error</Badge>
+              <span className="text-xs text-red-600 mt-1">{stockError}</span>
+            </div>
           ) : (
             <Badge variant={stock > 0 ? 'default' : 'destructive'}>
               {stock > 0 ? `${stock} In Stock` : 'Out of Stock'}

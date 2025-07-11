@@ -262,7 +262,17 @@ export const getRealTimeStock = async (productId: string, colorVariantId?: strin
       return 0;
     }
 
-    return inventoryItems?.reduce((sum, item) => sum + (item.available_stock || 0), 0) || 0;
+    const totalStock = inventoryItems?.reduce((sum, item) => sum + (item.available_stock || 0), 0) || 0;
+    
+    console.log('getRealTimeStock result:', {
+      productId,
+      colorVariantId,
+      sizeVariantId,
+      totalStock,
+      inventoryRecords: inventoryItems?.length || 0
+    });
+    
+    return totalStock;
   } catch (error) {
     console.error('Error calculating real-time stock:', error);
     return 0;
