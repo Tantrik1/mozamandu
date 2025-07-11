@@ -1,282 +1,212 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { Eye, EyeOff, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from '@/hooks/use-toast';
+import { Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-export function SignUpForm() {
-  const [formData, setFormData] = useState({
+interface SignUpFormProps {
+  onSuccess: () => void;
+}
+
+export function SignUpForm({ onSuccess }: SignUpFormProps) {
+  const { signUp } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
+  
+  const [signUpData, setSignUpData] = useState({
     fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
-    contactNumber: '',
-    whatsappNumber: ''
   });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const { toast } = useToast();
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = 'Full name is required';
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-
-    if (!formData.contactNumber.trim()) {
-      newErrors.contactNumber = 'Contact number is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
+  // Check if password meets all criteria
+  const isPasswordStrong = (password: string) => {
+    const requirements = [
+      password.length >= 8,
+      /[A-Z]/.test(password),
+      /[a-z]/.test(password),
+      /\d/.test(password),
+      /[!@#$%^&*(),.?":{}|<>]/.test(password)
+    ];
+    return requirements.every(req => req);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
+
+    // Validate form
+    const newErrors: Record<string, string> = {};
+
+    if (!signUpData.fullName.trim()) {
+      newErrors.fullName = 'Full name is required';
+    }
+
+    if (!signUpData.email || !/\S+@\S+\.\S+/.test(signUpData.email)) {
+      newErrors.email = 'Valid email is required';
+    }
+
+    if (!signUpData.password || signUpData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    }
+
+    if (signUpData.password !== signUpData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    if (!agreeToTerms) {
+      newErrors.terms = 'You must agree to the terms and conditions';
+    }
+
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) {
       return;
     }
 
-    setLoading(true);
+    setIsLoading(true);
+    setErrors({});
 
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-            contact_number: formData.contactNumber,
-            whatsapp_number: formData.whatsappNumber
-          }
-        }
-      });
+    const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
 
-      if (error) throw error;
-
-      if (data.user && !data.user.email_confirmed_at) {
-        toast({
-          title: 'Check your email',
-          description: 'We sent you a confirmation link. Please check your email and click the link to activate your account.',
-        });
-      } else {
-        toast({
-          title: 'Success',
-          description: 'Account created successfully!',
-        });
-      }
-
-      // Reset form
-      setFormData({
-        fullName: '',
-        email: '',
-        password: '',
-        confirmPassword: '',
-        contactNumber: '',
-        whatsappNumber: ''
-      });
-
-    } catch (error: any) {
-      console.error('Sign up error:', error);
+    if (error) {
+      setErrors({ form: error.message });
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to create account',
-        variant: 'destructive',
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
       });
-    } finally {
-      setLoading(false);
+    } else {
+      toast({
+        title: "Account Created!",
+        description: "We've sent you a verification email. Please check your inbox and verify your account before signing in.",
+      });
+      onSuccess();
     }
-  };
 
-  const getPasswordStrength = (password: string) => {
-    let strength = 0;
-    if (password.length >= 8) strength++;
-    if (/[A-Z]/.test(password)) strength++;
-    if (/[a-z]/.test(password)) strength++;
-    if (/[0-9]/.test(password)) strength++;
-    if (/[^A-Za-z0-9]/.test(password)) strength++;
-    return strength;
+    setIsLoading(false);
   };
-
-  const passwordStrength = getPasswordStrength(formData.password);
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="text-2xl text-center">Create Account</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="fullName">Full Name *</Label>
+    <TooltipProvider>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {errors.form && (
+          <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
+            {errors.form}
+          </div>
+        )}
+
+        <div>
+          <Label htmlFor="signup-name">Full Name</Label>
+          <Input
+            id="signup-name"
+            type="text"
+            value={signUpData.fullName}
+            onChange={(e) => setSignUpData({ ...signUpData, fullName: e.target.value })}
+            placeholder="Enter your full name"
+            disabled={isLoading}
+          />
+          {errors.fullName && <p className="text-sm text-red-600 mt-1">{errors.fullName}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="signup-email">Email Address</Label>
+          <Input
+            id="signup-email"
+            type="email"
+            value={signUpData.email}
+            onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
+            placeholder="Enter your email"
+            disabled={isLoading}
+          />
+          {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
+        </div>
+
+        <div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="signup-password">Password</Label>
+            {signUpData.password && !isPasswordStrong(signUpData.password) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertTriangle className="h-4 w-4 text-orange-500 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-xs">
+                  <PasswordStrengthIndicator password={signUpData.password} />
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+          <div className="relative">
             <Input
-              id="fullName"
-              type="text"
-              value={formData.fullName}
-              onChange={(e) => handleInputChange('fullName', e.target.value)}
-              placeholder="Enter your full name"
-              className={errors.fullName ? 'border-red-500' : ''}
+              id="signup-password"
+              type={showPassword ? "text" : "password"}
+              value={signUpData.password}
+              onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
+              placeholder="Create a password"
+              className="pr-10"
+              disabled={isLoading}
             />
-            {errors.fullName && (
-              <p className="text-red-500 text-sm mt-1">{errors.fullName}</p>
-            )}
+            <button
+              type="button"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
+          {errors.password && <p className="text-sm text-red-600 mt-1">{errors.password}</p>}
+        </div>
 
-          <div>
-            <Label htmlFor="email">Email *</Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              placeholder="Enter your email"
-              className={errors.email ? 'border-red-500' : ''}
-            />
-            {errors.email && (
-              <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-            )}
-          </div>
+        <div>
+          <Label htmlFor="signup-confirm">Confirm Password</Label>
+          <Input
+            id="signup-confirm"
+            type="password"
+            value={signUpData.confirmPassword}
+            onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
+            placeholder="Confirm your password"
+            disabled={isLoading}
+          />
+          {errors.confirmPassword && <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>}
+        </div>
 
-          <div>
-            <Label htmlFor="password">Password *</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={(e) => handleInputChange('password', e.target.value)}
-                placeholder="Enter your password"
-                className={errors.password ? 'border-red-500' : ''}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
-            </div>
-            {formData.password && (
-              <PasswordStrengthIndicator password={formData.password} />
-            )}
-            {errors.password && (
-              <p className="text-red-500 text-sm mt-1">{errors.password}</p>
-            )}
-          </div>
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="terms"
+            checked={agreeToTerms}
+            onCheckedChange={(checked) => setAgreeToTerms(checked as boolean)}
+            disabled={isLoading}
+          />
+          <Label htmlFor="terms" className="text-sm">
+            I agree to the{' '}
+            <a href="/terms" target="_blank" className="text-red-600 hover:underline">
+              Terms and Conditions
+            </a>{' '}
+            and{' '}
+            <a href="/privacy" target="_blank" className="text-red-600 hover:underline">
+              Privacy Policy
+            </a>
+          </Label>
+        </div>
+        {errors.terms && <p className="text-sm text-red-600">{errors.terms}</p>}
 
-          <div>
-            <Label htmlFor="confirmPassword">Confirm Password *</Label>
-            <div className="relative">
-              <Input
-                id="confirmPassword"
-                type={showConfirmPassword ? 'text' : 'password'}
-                value={formData.confirmPassword}
-                onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                placeholder="Confirm your password"
-                className={errors.confirmPassword ? 'border-red-500' : ''}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              >
-                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
-            </div>
-            {formData.confirmPassword && (
-              <div className="flex items-center mt-1">
-                {formData.password === formData.confirmPassword ? (
-                  <div className="flex items-center text-green-600 text-sm">
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                    Passwords match
-                  </div>
-                ) : (
-                  <div className="flex items-center text-red-500 text-sm">
-                    <XCircle className="h-4 w-4 mr-1" />
-                    Passwords do not match
-                  </div>
-                )}
-              </div>
-            )}
-            {errors.confirmPassword && (
-              <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="contactNumber">Contact Number *</Label>
-            <Input
-              id="contactNumber"
-              type="tel"
-              value={formData.contactNumber}
-              onChange={(e) => handleInputChange('contactNumber', e.target.value)}
-              placeholder="Enter your contact number"
-              className={errors.contactNumber ? 'border-red-500' : ''}
-            />
-            {errors.contactNumber && (
-              <p className="text-red-500 text-sm mt-1">{errors.contactNumber}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="whatsappNumber">WhatsApp Number (Optional)</Label>
-            <Input
-              id="whatsappNumber"
-              type="tel"
-              value={formData.whatsappNumber}
-              onChange={(e) => handleInputChange('whatsappNumber', e.target.value)}
-              placeholder="Enter your WhatsApp number"
-            />
-          </div>
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating Account...
-              </>
-            ) : (
-              'Create Account'
-            )}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        <Button 
+          type="submit" 
+          className="w-full bg-red-600 hover:bg-red-700" 
+          disabled={isLoading}
+        >
+          {isLoading ? 'Creating Account...' : 'Create Account'}
+        </Button>
+      </form>
+    </TooltipProvider>
   );
 }

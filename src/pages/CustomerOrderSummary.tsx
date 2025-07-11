@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +8,7 @@ import { ArrowLeft, Package, Phone, Mail, MapPin, Calendar, CreditCard } from 'l
 import { supabase } from '@/integrations/supabase/client';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
-import FullScreenImageModal from '@/components/admin/FullScreenImageModal';
+import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
 
 interface CustomerOrderDetails {
   id: string;
@@ -38,7 +39,6 @@ interface CustomerOrderDetails {
 
 interface OrderItem {
   id: string;
-  product_id: string;
   product_name: string;
   color_name?: string;
   size_name?: string;
@@ -46,25 +46,14 @@ interface OrderItem {
   unit_price: number;
   total_price: number;
   pricing_mode: string;
-  pricing_details?: {
-    breakdown?: string[];
-    description?: string;
-    basePrice?: number;
-  };
-  product?: {
-    name: string;
-    category?: { name: string };
-    subcategory?: { name: string };
-  };
 }
 
 export default function CustomerOrderSummary() {
-  const { orderId } = useParams<{ orderId: string }>();
+  const { orderId } = useParams();
   const [orderDetails, setOrderDetails] = useState<CustomerOrderDetails | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isScreenshotOpen, setIsScreenshotOpen] = useState(false);
 
   useEffect(() => {
     if (orderId) {
@@ -90,94 +79,31 @@ export default function CustomerOrderSummary() {
       if (orderError) {
         console.error('❌ Error fetching customer order:', orderError);
         setError('Order not found');
-        setLoading(false);
+        setIsLoading(false);
         return;
       }
 
-      // Step 1: Fetch all customer order item details for the order
-      const { data: itemDetails, error: detailsError } = await supabase
+      // Fetch order items
+      const { data: itemsData, error: itemsError } = await supabase
         .from('customer_order_item_details')
         .select('*')
-        .eq('order_id', orderId);
-      if (detailsError) {
-        console.error('❌ Error fetching order item details:', detailsError);
+        .eq('order_id', orderId)
+        .order('created_at');
+
+      if (itemsError) {
+        console.error('❌ Error fetching order items:', itemsError);
       }
-      // Step 2: Extract unique product_inventory_ids from pricing_details
-      const inventoryIds = Array.from(new Set(
-        (itemDetails || [])
-          .map(item => {
-            let details = item.pricing_details;
-            if (typeof details === 'string') {
-              try {
-                details = JSON.parse(details);
-              } catch {
-                details = {};
-              }
-            }
-            if (typeof details === 'object' && details !== null && !Array.isArray(details)) {
-              const rawId = (details as any).product_inventory_id;
-              return typeof rawId === 'string' ? rawId : undefined;
-            }
-            return undefined;
-          })
-          .filter((id): id is string => typeof id === 'string' && !!id)
-      ));
-      // Step 3: Fetch all product inventory with product/category/subcategory info
-      let inventoryMap: Record<string, any> = {};
-      if (inventoryIds.length > 0) {
-        const { data: inventory, error: inventoryError } = await supabase
-          .from('product_inventory')
-          .select(`
-            id,
-            product:products(
-              name,
-              category:categories(name),
-              subcategory:subcategories(name)
-            )
-          `)
-          .in('id', inventoryIds);
-        if (!inventoryError && inventory) {
-          inventoryMap = Object.fromEntries(inventory.map(inv => [inv.id, inv]));
-        }
-      }
-      // Step 4: Merge product info into each order item detail
-      let mergedItems = (itemDetails || []).map(item => {
-        let details = item.pricing_details;
-        if (typeof details === 'string') {
-          try {
-            details = JSON.parse(details);
-          } catch {
-            details = {};
-          }
-        }
-        if (typeof details !== 'object' || details === null || Array.isArray(details)) details = {};
-        let inventoryId: string | undefined = undefined;
-        if (typeof details === 'object' && details !== null && !Array.isArray(details)) {
-          const rawId = (details as any).product_inventory_id;
-          inventoryId = typeof rawId === 'string' ? rawId : undefined;
-        }
-        const inventoryData = inventoryId ? inventoryMap[inventoryId] : undefined;
-        return {
-          id: item.id,
-          product_id: inventoryId || '',
-          product_name: inventoryData?.product?.name || '',
-          color_name: item.color_name ?? '',
-          size_name: item.size_name ?? '',
-          quantity: item.quantity ?? 0,
-          unit_price: item.unit_price ?? 0,
-          total_price: item.total_price ?? 0,
-          pricing_mode: item.pricing_mode ?? '',
-          pricing_details: details,
-          product: inventoryData?.product || undefined
-        } as OrderItem;
-      });
-      setOrderItems(mergedItems);
+
+      console.log('✅ Customer order data fetched:', orderData);
+      console.log('✅ Order items fetched:', itemsData);
+
       setOrderDetails(orderData);
+      setOrderItems(itemsData || []);
     } catch (error) {
       console.error('💥 Error fetching customer order details:', error);
       setError('Failed to load order details');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -196,7 +122,7 @@ export default function CustomerOrderSummary() {
     return status.replace('_', ' ').toUpperCase();
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <CustomerHeader />
@@ -235,7 +161,7 @@ export default function CustomerOrderSummary() {
   return (
     <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
-
+      
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-6">
           <Button asChild variant="outline" className="mb-4">
@@ -244,7 +170,7 @@ export default function CustomerOrderSummary() {
               Back to Dashboard
             </Link>
           </Button>
-
+          
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Order Details</h1>
@@ -269,74 +195,29 @@ export default function CustomerOrderSummary() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {orderItems.map((item) => {
-                    const basePrice = item.pricing_details?.basePrice ?? item.unit_price;
-                    const saved = basePrice > item.unit_price;
-                    return (
-                      <div key={item.id} className="flex flex-col md:flex-row md:justify-between md:items-center p-4 bg-white rounded border mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            {item.pricing_mode === 'combo' && (
-                              <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                                Combo
-                              </Badge>
-                            )}
-                            {item.pricing_mode === 'discount' && (
-                              <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
-                                MOQ
-                              </Badge>
-                            )}
-                            <span className="text-sm">Qty: {item.quantity}</span>
-                          </div>
-                          {item.product_name && <h4 className="font-medium">{item.product_name}</h4>}
-                          {/* Category and Subcategory */}
-                          {item.product && (
-                            <p className="text-sm text-gray-600 mb-1">
-                              {item.product.category?.name} → {item.product.subcategory?.name}
-                            </p>
-                          )}
-                          {item.color_name && (
-                            <p className="text-sm text-gray-600">Color: {item.color_name}</p>
-                          )}
-                          {item.size_name && (
-                            <p className="text-sm text-gray-600">Size: {item.size_name}</p>
-                          )}
-                          {/* --- Advanced Pricing Breakdown --- */}
-                          {item.pricing_details && (
-                            <div className="mt-2 space-y-1">
-                              {item.pricing_details.description && (
-                                <p className="text-xs text-gray-700 font-semibold mb-1">{item.pricing_details.description}</p>
-                              )}
-                              {Array.isArray(item.pricing_details.breakdown) && item.pricing_details.breakdown.length > 0 && (
-                                <ul className="text-xs text-gray-600 list-disc list-inside mb-1">
-                                  {item.pricing_details.breakdown.map((line: string, idx: number) => (
-                                    <li key={idx}>{line}</li>
-                                  ))}
-                                </ul>
-                              )}
-                              {typeof item.pricing_details.basePrice === 'number' && (
-                                <p className="text-xs text-gray-500 mt-1">Base Price: Rs. {item.pricing_details.basePrice.toFixed(2)}</p>
-                              )}
-                              {saved && (
-                                <p className="text-xs text-green-600 mt-1">
-                                  Saved: Rs. {(basePrice - item.unit_price).toFixed(2)} each
-                                </p>
-                              )}
-                            </div>
-                          )}
-                          <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
-                        </div>
-                        <div className="text-right mt-2 md:mt-0">
-                          <p className="font-medium">Rs. {item.total_price.toFixed(2)}</p>
-                          {saved && (
-                            <p className="text-xs text-green-600">
-                              Total Saved: Rs. {((basePrice - item.unit_price) * item.quantity).toFixed(2)}
-                            </p>
-                          )}
-                        </div>
+                  {orderItems.map((item) => (
+                    <div key={item.id} className="flex justify-between items-start py-4 border-b last:border-b-0">
+                      <div className="flex-1">
+                        <h4 className="font-medium">{item.product_name}</h4>
+                        {item.color_name && (
+                          <p className="text-sm text-gray-600">Color: {item.color_name}</p>
+                        )}
+                        {item.size_name && (
+                          <p className="text-sm text-gray-600">Size: {item.size_name}</p>
+                        )}
+                        <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                        {item.pricing_mode !== 'normal' && (
+                          <Badge variant="secondary" className="mt-1">
+                            {item.pricing_mode === 'combo' ? 'Combo Price' : 'Discount Applied'}
+                          </Badge>
+                        )}
                       </div>
-                    );
-                  })}
+                      <div className="text-right">
+                        <p className="font-semibold">Rs. {item.total_price.toFixed(2)}</p>
+                        <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -352,14 +233,11 @@ export default function CustomerOrderSummary() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex justify-center">
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsScreenshotOpen(true)}
-                      className="flex items-center gap-2"
-                    >
-                      <CreditCard className="h-4 w-4" />
-                      View Payment Screenshot
-                    </Button>
+                    <PaymentScreenshotViewer
+                      imageUrl={orderDetails.payment_screenshot_url}
+                      orderNumber={orderDetails.order_number}
+                      customerName={orderDetails.customer_name}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -484,14 +362,6 @@ export default function CustomerOrderSummary() {
       </div>
 
       <Footer />
-
-      {/* Payment Screenshot Viewer */}
-      <FullScreenImageModal
-        isOpen={isScreenshotOpen}
-        onClose={() => setIsScreenshotOpen(false)}
-        imageUrl={orderDetails?.payment_screenshot_url || null}
-        orderId={orderDetails?.order_number}
-      />
     </div>
   );
 }

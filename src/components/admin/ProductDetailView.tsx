@@ -1,54 +1,41 @@
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Edit, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-
-interface ProductDetailViewProps {
-  productId: string;
-  onEdit: () => void;
-  onBack: () => void;
-}
+import { ArrowLeft, Edit, Trash2, Package, Palette, Ruler } from 'lucide-react';
+import { calculateProductStock, StockCalculationResult } from '@/utils/stockCalculation';
 
 interface Product {
   id: string;
   name: string;
-  description?: string;
+  description: string | null;
   cost_price: number;
-  selling_price?: number;
+  selling_price: number | null;
   category_id: string;
   subcategory_id: string;
+  image_url: string | null;
   is_featured: boolean;
   has_color_variants: boolean;
-  color_has_size_variants: boolean;
+  has_size_variants: boolean;
+  stock_quantity: number | null;
   status: 'active' | 'inactive';
-  image_url?: string;
-  created_at: string;
-  updated_at: string;
-  categories: { name: string };
-  subcategories: { name: string };
+  categories: { name: string } | null;
+  subcategories: { name: string } | null;
 }
 
-interface ColorVariant {
-  id: string;
-  color_name: string;
-  image_url?: string;
-  has_sizes: boolean;
-  size_variants: SizeVariant[];
+interface ProductDetailViewProps {
+  productId: string;
+  onEdit: () => void;
+  onDelete: () => void;
+  onBack: () => void;
 }
 
-interface SizeVariant {
-  id: string;
-  size_name: string;
-  size_code?: string;
-}
-
-export function ProductDetailView({ productId, onEdit, onBack }: ProductDetailViewProps) {
+export function ProductDetailView({ productId, onEdit, onDelete, onBack }: ProductDetailViewProps) {
   const [product, setProduct] = useState<Product | null>(null);
-  const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
+  const [stockDetails, setStockDetails] = useState<StockCalculationResult>({ totalStock: 0 });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -59,14 +46,14 @@ export function ProductDetailView({ productId, onEdit, onBack }: ProductDetailVi
   const fetchProductDetails = async () => {
     try {
       setLoading(true);
-
-      // Fetch product details
+      
+      // Fetch product data
       const { data: productData, error: productError } = await supabase
         .from('products')
         .select(`
           *,
-          categories!inner(name),
-          subcategories!inner(name)
+          categories(name),
+          subcategories(name)
         `)
         .eq('id', productId)
         .single();
@@ -74,37 +61,10 @@ export function ProductDetailView({ productId, onEdit, onBack }: ProductDetailVi
       if (productError) throw productError;
       setProduct(productData);
 
-      // Fetch color variants if product has them
-      if (productData.has_color_variants) {
-        const { data: colors, error: colorError } = await supabase
-          .from('color_variants')
-          .select('*')
-          .eq('product_id', productId);
-
-        if (colorError) throw colorError;
-
-        const variants: ColorVariant[] = [];
-        
-        for (const color of colors || []) {
-          const { data: sizes, error: sizeError } = await supabase
-            .from('size_variants')
-            .select('*')
-            .eq('color_variant_id', color.id);
-
-          if (sizeError) throw sizeError;
-
-          variants.push({
-            id: color.id,
-            color_name: color.color_name,
-            image_url: color.image_url,
-            has_sizes: color.has_sizes || false,
-            size_variants: sizes || []
-          });
-        }
-
-        setColorVariants(variants);
-      }
-
+      // Calculate detailed stock information
+      const stockResult = await calculateProductStock(productId);
+      setStockDetails(stockResult);
+      
     } catch (error) {
       console.error('Error fetching product details:', error);
       toast({
@@ -117,139 +77,233 @@ export function ProductDetailView({ productId, onEdit, onBack }: ProductDetailVi
     }
   };
 
+  const handleDelete = async () => {
+    if (!product) return;
+    
+    if (!confirm(`Are you sure you want to delete "${product.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      if (error) throw error;
+      
+      toast({
+        title: 'Success',
+        description: 'Product deleted successfully',
+      });
+      
+      onDelete();
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete product',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (loading) {
     return <div className="flex justify-center p-8">Loading product details...</div>;
   }
 
   if (!product) {
-    return <div className="text-center p-8">Product not found</div>;
+    return <div className="text-center py-8">Product not found</div>;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Button variant="outline" onClick={onBack}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            Back to Products
           </Button>
-          <h2 className="text-2xl font-bold">{product.name}</h2>
+          <div>
+            <h1 className="text-3xl font-bold">{product.name}</h1>
+            <div className="flex items-center space-x-2 mt-2">
+              <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>
+                {product.status}
+              </Badge>
+              {product.is_featured && (
+                <Badge variant="outline">Featured</Badge>
+              )}
+            </div>
+          </div>
         </div>
-        <Button onClick={onEdit}>
-          <Edit className="h-4 w-4 mr-2" />
-          Edit Product
-        </Button>
+        
+        <div className="flex space-x-2">
+          <Button onClick={onEdit} variant="outline">
+            <Edit className="h-4 w-4 mr-2" />
+            Edit Product
+          </Button>
+          <Button onClick={handleDelete} variant="destructive">
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Product
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {product.image_url && (
-              <div className="mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Product Image */}
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Product Image</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {product.image_url ? (
                 <img
                   src={product.image_url}
                   alt={product.name}
-                  className="w-full max-w-sm h-48 object-cover rounded-lg border"
+                  className="w-full h-64 object-cover rounded-lg border"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
                 />
-              </div>
-            )}
+              ) : (
+                <div className="w-full h-64 bg-gray-100 rounded-lg border flex items-center justify-center">
+                  <Package className="h-16 w-16 text-gray-400" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <strong>Name:</strong> {product.name}
+        {/* Product Information */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Basic Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium text-gray-600">Category</h4>
+                  <p className="text-lg">{product.categories?.name}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-600">Subcategory</h4>
+                  <p className="text-lg">{product.subcategories?.name}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-600">Cost Price</h4>
+                  <p className="text-lg font-semibold">Rs {product.cost_price}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-600">Selling Price</h4>
+                  <p className="text-lg font-semibold">
+                    {product.selling_price ? `Rs ${product.selling_price}` : 'Not set'}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-600">Total Stock</h4>
+                  <p className="text-lg font-semibold text-green-600">{stockDetails.totalStock}</p>
+                </div>
               </div>
-              <div>
-                <strong>Status:</strong>{' '}
-                <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>
-                  {product.status}
-                </Badge>
-              </div>
-              <div>
-                <strong>Category:</strong> {product.categories.name}
-              </div>
-              <div>
-                <strong>Subcategory:</strong> {product.subcategories.name}
-              </div>
-              <div>
-                <strong>Cost Price:</strong> Rs. {product.cost_price}
-              </div>
-              <div>
-                <strong>Selling Price:</strong> Rs. {product.selling_price || 'Not set'}
-              </div>
-              <div>
-                <strong>Featured:</strong> {product.is_featured ? 'Yes' : 'No'}
-              </div>
-              <div>
-                <strong>Has Colors:</strong> {product.has_color_variants ? 'Yes' : 'No'}
-              </div>
-              <div>
-                <strong>Has Sizes:</strong> {product.color_has_size_variants ? 'Yes' : 'No'}
-              </div>
-            </div>
+              
+              {product.description && (
+                <div>
+                  <h4 className="font-medium text-gray-600 mb-2">Description</h4>
+                  <p className="text-gray-800">{product.description}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-            {product.description && (
-              <div>
-                <strong>Description:</strong>
-                <p className="mt-1 text-gray-600">{product.description}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <p><strong>Created:</strong> {new Date(product.created_at).toLocaleDateString()}</p>
-              <p><strong>Updated:</strong> {new Date(product.updated_at).toLocaleDateString()}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {product.has_color_variants && colorVariants.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Color Variants</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {colorVariants.map((variant) => (
-                <div key={variant.id} className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium">{variant.color_name}</h4>
-                    {variant.image_url && (
-                      <img
-                        src={variant.image_url}
-                        alt={variant.color_name}
-                        className="w-12 h-12 object-cover rounded"
-                      />
-                    )}
-                  </div>
-
-                  {variant.has_sizes && variant.size_variants.length > 0 && (
-                    <div>
-                      <strong>Sizes:</strong>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {variant.size_variants.map((size) => (
-                          <Badge key={size.id} variant="secondary">
-                            {size.size_name} {size.size_code && `(${size.size_code})`}
+          {/* Stock Details */}
+          {stockDetails.colorBreakdown && stockDetails.colorBreakdown.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Palette className="h-5 w-5" />
+                  <span>Stock Breakdown</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {stockDetails.colorBreakdown.map((color, index) => (
+                    <div key={index} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <h4 className="font-medium text-lg">{color.colorName}</h4>
+                          <Badge variant="secondary">
+                            Total: {color.stock}
                           </Badge>
-                        ))}
+                        </div>
                       </div>
+
+                      {color.sizeBreakdown && color.sizeBreakdown.length > 0 && (
+                        <div>
+                          <div className="flex items-center space-x-2 mb-2">
+                            <Ruler className="h-4 w-4" />
+                            <h5 className="font-medium text-gray-600">Size Breakdown:</h5>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                            {color.sizeBreakdown.map((size, sizeIndex) => (
+                              <div key={sizeIndex} className="bg-gray-50 p-2 rounded border">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">{size.sizeName}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {size.stock}
+                                  </Badge>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Variant Information */}
+          {(product.has_color_variants || product.has_size_variants) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Palette className="h-5 w-5" />
+                  <span>Variant Configuration</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-4 mb-4">
+                  {product.has_color_variants && (
+                    <Badge variant="outline" className="flex items-center space-x-1">
+                      <Palette className="h-3 w-3" />
+                      <span>Color Variants Enabled</span>
+                    </Badge>
+                  )}
+                  {product.has_size_variants && (
+                    <Badge variant="outline" className="flex items-center space-x-1">
+                      <Ruler className="h-3 w-3" />
+                      <span>Size Variants Enabled</span>
+                    </Badge>
                   )}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                <p className="text-sm text-gray-600">
+                  {product.has_color_variants && product.has_size_variants 
+                    ? "This product supports both color and size variations."
+                    : product.has_color_variants
+                    ? "This product supports color variations only."
+                    : product.has_size_variants
+                    ? "This product supports size variations only."
+                    : "This product has no variants."
+                  }
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { TopBar } from '@/components/customer/TopBar';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,7 +40,6 @@ export function CustomerHeader() {
   const [navbarItems, setNavbarItems] = useState<NavbarItem[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openMegaMenu, setOpenMegaMenu] = useState<string | null>(null);
-  const [megaMenuCloseTimeout, setMegaMenuCloseTimeout] = useState<NodeJS.Timeout | null>(null);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [isTopBarVisible, setIsTopBarVisible] = useState(true);
 
@@ -50,25 +48,29 @@ export function CustomerHeader() {
     checkTopBarVisibility();
   }, []);
 
+  // Check if top bar is visible by looking for the top bar element
   const checkTopBarVisibility = () => {
     const topBar = document.querySelector('[data-testid="top-bar"]') || document.querySelector('.bg-red-600');
     setIsTopBarVisible(!!topBar);
-
+    
+    // Set up a mutation observer to watch for top bar changes
     const observer = new MutationObserver(() => {
       const topBar = document.querySelector('[data-testid="top-bar"]') || document.querySelector('.bg-red-600');
       setIsTopBarVisible(!!topBar);
     });
-
+    
     observer.observe(document.body, { childList: true, subtree: true });
-
+    
     return () => observer.disconnect();
   };
 
+  // Close mobile menu on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
     setExpandedCategory(null);
   }, [location.pathname]);
 
+  // Handle body scroll lock
   useEffect(() => {
     if (isMobileMenuOpen) {
       document.body.style.overflow = 'hidden';
@@ -76,6 +78,7 @@ export function CustomerHeader() {
       document.body.style.overflow = '';
     }
 
+    // Cleanup on unmount
     return () => {
       document.body.style.overflow = '';
     };
@@ -142,9 +145,9 @@ export function CustomerHeader() {
     switch (item.item_type) {
       case 'home':
         return (
-          <Link
+          <Link 
             key={item.id}
-            to="/"
+            to="/" 
             className="relative text-gray-700 hover:text-red-600 font-medium transition-all duration-300 py-2 px-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-red-600 after:transition-all after:duration-300 hover:after:w-full"
           >
             Home
@@ -152,9 +155,9 @@ export function CustomerHeader() {
         );
       case 'faq':
         return (
-          <Link
+          <Link 
             key={item.id}
-            to="/faq"
+            to="/faq" 
             className="relative text-gray-700 hover:text-red-600 font-medium transition-all duration-300 py-2 px-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-red-600 after:transition-all after:duration-300 hover:after:w-full"
           >
             FAQs
@@ -165,47 +168,35 @@ export function CustomerHeader() {
     }
   };
 
-  const handleMegaMenuMouseEnter = (categoryId: string) => {
-    if (megaMenuCloseTimeout) {
-      clearTimeout(megaMenuCloseTimeout);
-      setMegaMenuCloseTimeout(null);
-    }
-    setOpenMegaMenu(categoryId);
-  };
-
-  const handleMegaMenuMouseLeave = () => {
-    const timeout = setTimeout(() => {
-      setOpenMegaMenu(null);
-    }, 150);
-    setMegaMenuCloseTimeout(timeout);
-  };
-
   const renderCategoryItem = (item: NavbarItem) => {
     const category = item.category;
     if (!category) return null;
+
+    // Dynamic positioning based on top bar visibility
     const megaMenuTopPosition = isTopBarVisible ? 'top-20' : 'top-16';
+
     return (
       <div
         key={item.id}
         className="relative group"
-        onMouseEnter={() => handleMegaMenuMouseEnter(category.id)}
-        onMouseLeave={handleMegaMenuMouseLeave}
+        onMouseEnter={() => setOpenMegaMenu(category.id)}
+        onMouseLeave={() => setOpenMegaMenu(null)}
       >
         <button className="flex items-center gap-1 text-gray-700 hover:text-red-600 font-medium transition-all duration-300 py-2 px-1 relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-red-600 after:transition-all after:duration-300 group-hover:after:w-full">
           {category.name}
           <ChevronDown className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" />
         </button>
+        
         {openMegaMenu === category.id && (
-          <div
-            className={`fixed left-1/2 transform -translate-x-1/2 ${megaMenuTopPosition} w-full max-w-4xl bg-white shadow-2xl border-t-4 border-red-500 z-50 transition-all duration-300 ${openMegaMenu === category.id ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'}`}
-            onMouseEnter={() => handleMegaMenuMouseEnter(category.id)}
-            onMouseLeave={handleMegaMenuMouseLeave}
-          >
+          <div className={`fixed left-1/2 transform -translate-x-1/2 ${megaMenuTopPosition} w-full max-w-4xl bg-white shadow-2xl border-t-4 border-red-500 z-50 transition-all duration-300 ${
+            openMegaMenu === category.id ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'
+          }`}>
             <div className="p-8">
               <div className="mb-6">
                 <h3 className="text-2xl font-bold text-gray-800 mb-2">{category.name}</h3>
                 <div className="w-20 h-1 bg-gradient-to-r from-red-500 to-red-600 rounded-full"></div>
               </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
                 {category.subcategories?.map((subcategory) => (
                   <Link
@@ -216,8 +207,8 @@ export function CustomerHeader() {
                   >
                     <div className="relative overflow-hidden rounded-lg">
                       {subcategory.image_url ? (
-                        <img
-                          src={subcategory.image_url}
+                        <img 
+                          src={subcategory.image_url} 
                           alt={subcategory.name}
                           className="w-16 h-16 object-cover group-hover/item:scale-110 transition-transform duration-300"
                         />
@@ -247,18 +238,17 @@ export function CustomerHeader() {
 
   return (
     <header className="bg-white shadow-lg sticky top-0 z-50 border-b border-gray-100">
-      <TopBar />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2 group">
-            <img
-              src="/lovable-uploads/mozamandu-logo.png"
-              alt="Mozamandu"
+            <img 
+              src="/lovable-uploads/fd4fd25e-ccf5-42d0-a176-49b63583881b.png" 
+              alt="Mozamandu" 
               className="h-10 w-auto group-hover:scale-105 transition-transform duration-300"
             />
           </Link>
-
+          
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-8">
             {otherItems.map(renderNavItem)}
@@ -317,21 +307,22 @@ export function CustomerHeader() {
         {isMobileMenuOpen && (
           <>
             {/* Overlay */}
-            <div
+            <div 
               className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden transition-opacity duration-300"
               onClick={closeMobileMenu}
             />
-
+            
             {/* Mobile Menu Panel */}
-            <div className={`fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl z-50 lg:hidden transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
-              }`}>
-
+            <div className={`fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl z-50 lg:hidden transform transition-transform duration-300 ease-in-out ${
+              isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+            }`}>
+              
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-100">
                 <h2 className="text-lg font-semibold text-gray-800">Menu</h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
                   onClick={closeMobileMenu}
                   className="p-2 hover:bg-gray-100 rounded-full"
                 >
@@ -342,22 +333,22 @@ export function CustomerHeader() {
               {/* Menu Content */}
               <div className="overflow-y-auto h-full pb-20">
                 <div className="p-6 space-y-6">
-
+                  
                   {/* Regular Navigation Items */}
                   <div className="space-y-4">
                     {otherItems.map((item) => (
                       <div key={item.id} onClick={closeMobileMenu}>
                         {item.item_type === 'home' && (
-                          <Link
-                            to="/"
+                          <Link 
+                            to="/" 
                             className="block text-gray-800 hover:text-red-600 font-medium py-3 px-4 rounded-lg hover:bg-red-50 transition-all duration-200"
                           >
                             Home
                           </Link>
                         )}
                         {item.item_type === 'faq' && (
-                          <Link
-                            to="/faq"
+                          <Link 
+                            to="/faq" 
                             className="block text-gray-800 hover:text-red-600 font-medium py-3 px-4 rounded-lg hover:bg-red-50 transition-all duration-200"
                           >
                             FAQs
@@ -373,9 +364,9 @@ export function CustomerHeader() {
                     {categoryItems.map((item) => {
                       const category = item.category;
                       if (!category) return null;
-
+                      
                       const isExpanded = expandedCategory === category.id;
-
+                      
                       return (
                         <div key={item.id} className="border border-gray-100 rounded-lg overflow-hidden">
                           {/* Category Button */}
@@ -384,29 +375,90 @@ export function CustomerHeader() {
                             className="w-full flex items-center justify-between p-4 text-left font-medium text-gray-800 hover:bg-gray-50 transition-colors duration-200"
                           >
                             <span>{category.name}</span>
-                            <ChevronDown
-                              className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                            <ChevronDown 
+                              className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${
+                                isExpanded ? 'rotate-180' : ''
+                              }`} 
                             />
                           </button>
-
-                          {/* Subcategories with proper scrolling */}
-                          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'}`}
-                          >
-                            {isExpanded && category.subcategories.map((subcategory) => (
-                              <Link
-                                key={subcategory.id}
-                                to={`/subcategories/${subcategory.id}`}
-                                className="block py-2 px-6 text-gray-700 hover:text-red-600 hover:bg-red-50 transition-all duration-200"
-                                onClick={closeMobileMenu}
-                              >
-                                {subcategory.name}
-                              </Link>
-                            ))}
+                          
+                          {/* Subcategories */}
+                          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                            isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                          }`}>
+                            <div className="bg-gray-50 border-t border-gray-100">
+                              {category.subcategories?.map((subcategory) => (
+                                <Link
+                                  key={subcategory.id}
+                                  to={`/subcategories/${subcategory.id}`}
+                                  className="flex items-center space-x-3 p-4 hover:bg-white transition-colors duration-200"
+                                  onClick={closeMobileMenu}
+                                >
+                                  <div className="flex-shrink-0">
+                                    {subcategory.image_url ? (
+                                      <img 
+                                        src={subcategory.image_url} 
+                                        alt={subcategory.name}
+                                        className="w-10 h-10 object-cover rounded-lg"
+                                      />
+                                    ) : (
+                                      <div className="w-10 h-10 bg-gradient-to-br from-red-100 to-red-200 rounded-lg flex items-center justify-center">
+                                        <Package className="w-5 h-5 text-red-500" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-gray-800 text-sm">
+                                      {subcategory.name}
+                                    </h4>
+                                    <p className="text-xs text-gray-500">
+                                      View products
+                                    </p>
+                                  </div>
+                                </Link>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       );
                     })}
                   </div>
+
+                  {/* User Actions */}
+                  {user && (
+                    <div className="pt-6 border-t border-gray-100 space-y-4">
+                      <button
+                        onClick={() => {
+                          handleDashboardClick();
+                          closeMobileMenu();
+                        }}
+                        className="block w-full text-left text-gray-800 hover:text-red-600 font-medium py-3 px-4 rounded-lg hover:bg-red-50 transition-all duration-200"
+                      >
+                        {userProfile?.role === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleSignOut();
+                          closeMobileMenu();
+                        }}
+                        className="block w-full text-left text-gray-800 hover:text-red-600 font-medium py-3 px-4 rounded-lg hover:bg-red-50 transition-all duration-200"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  )}
+
+                  {!user && (
+                    <div className="pt-6 border-t border-gray-100">
+                      <Link 
+                        to="/auth" 
+                        onClick={closeMobileMenu}
+                        className="block w-full text-center bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-medium py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+                      >
+                        Login
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

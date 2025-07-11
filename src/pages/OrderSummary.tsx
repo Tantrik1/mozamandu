@@ -1,17 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle, Package, Phone, Mail, Download, ArrowLeft, Printer, Gift, Tag, CreditCard } from 'lucide-react';
+import { CheckCircle, Package, Phone, Mail, Download, ArrowLeft, Printer, Gift, Tag } from 'lucide-react';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
-import FullScreenImageModal from '@/components/admin/FullScreenImageModal';
+import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { uniq } from 'lodash';
 
 interface OrderDetails {
   id: string;
@@ -36,7 +35,6 @@ interface OrderDetails {
 
 interface OrderItem {
   id: string;
-  product_id: string;
   product_name: string;
   color_name: string | null;
   size_name: string | null;
@@ -45,24 +43,18 @@ interface OrderItem {
   total_price: number;
   pricing_mode: string;
   pricing_details: any;
-  product?: {
-    name: string;
-    category?: { name: string };
-    subcategory?: { name: string };
-  };
 }
 
 export default function OrderSummary() {
   const { orderId } = useParams<{ orderId: string }>();
+  const navigate = useNavigate();
+  const { userProfile } = useAuth();
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isScreenshotOpen, setIsScreenshotOpen] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const isAdminView = location.pathname.includes('/admin');
-  const { userProfile } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check if user came from admin panel
+  const isAdminView = userProfile?.role === 'admin';
 
   useEffect(() => {
     if (!orderId) {
@@ -74,13 +66,16 @@ export default function OrderSummary() {
 
   const fetchOrderDetails = async () => {
     if (!orderId) return;
+
     try {
-      // Fetch order details
+      console.log('Fetching order details for:', orderId);
+
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .select('*')
         .eq('id', orderId)
         .single();
+
       if (orderError) {
         console.error('Error fetching order:', orderError);
         toast({
@@ -91,92 +86,23 @@ export default function OrderSummary() {
         navigate('/');
         return;
       }
-      // Step 1: Fetch all order item details for the order
-      const { data: itemDetails, error: detailsError } = await supabase
+
+      const { data: items, error: itemsError } = await supabase
         .from('order_item_details')
         .select('*')
         .eq('order_id', orderId);
-      if (detailsError) {
-        console.error('Error fetching order item details:', detailsError);
+
+      if (itemsError) {
+        console.error('Error fetching order items:', itemsError);
         toast({
           title: "Error",
           description: "Failed to load order items",
           variant: "destructive",
         });
       }
-      // Step 2: Extract unique product_inventory_ids from pricing_details
-      const inventoryIds = Array.from(new Set(
-        (itemDetails || [])
-          .map(item => {
-            let details = item.pricing_details;
-            if (typeof details === 'string') {
-              try {
-                details = JSON.parse(details);
-              } catch {
-                details = {};
-              }
-            }
-            if (typeof details === 'object' && details !== null && !Array.isArray(details)) {
-              const rawId = (details as any).product_inventory_id;
-              return typeof rawId === 'string' ? rawId : undefined;
-            }
-            return undefined;
-          })
-          .filter((id): id is string => typeof id === 'string' && !!id)
-      ));
-      // Step 3: Fetch all product inventory with product/category/subcategory info
-      let inventoryMap: Record<string, any> = {};
-      if (inventoryIds.length > 0) {
-        const { data: inventory, error: inventoryError } = await supabase
-          .from('product_inventory')
-          .select(`
-            id,
-            product:products(
-              name,
-              category:categories(name),
-              subcategory:subcategories(name)
-            )
-          `)
-          .in('id', inventoryIds);
-        if (!inventoryError && inventory) {
-          inventoryMap = Object.fromEntries(inventory.map(inv => [inv.id, inv]));
-        }
-      }
-      // Step 4: Merge product info into each order item detail
-      const mergedItems = (itemDetails || []).map(item => {
-        let details = item.pricing_details;
-        if (typeof details === 'string') {
-          try {
-            details = JSON.parse(details);
-          } catch {
-            details = {};
-          }
-        }
-        if (typeof details !== 'object' || details === null || Array.isArray(details)) {
-          details = {};
-        }
-        let inventoryId: string | undefined = undefined;
-        if (typeof details === 'object' && details !== null && !Array.isArray(details)) {
-          const rawId = (details as any).product_inventory_id;
-          inventoryId = typeof rawId === 'string' ? rawId : undefined;
-        }
-        const inventoryData = inventoryId ? inventoryMap[inventoryId] : undefined;
-        return {
-          id: item.id,
-          product_id: inventoryId || '',
-          product_name: inventoryData?.product?.name || '',
-          color_name: item.color_name ?? '',
-          size_name: item.size_name ?? '',
-          quantity: item.quantity ?? 0,
-          unit_price: item.unit_price ?? 0,
-          total_price: item.total_price ?? 0,
-          pricing_mode: item.pricing_mode ?? '',
-          pricing_details: details,
-          product: inventoryData?.product || undefined
-        } as OrderItem;
-      });
+
       setOrderDetails(order);
-      setOrderItems(mergedItems);
+      setOrderItems(items || []);
     } catch (error) {
       console.error('Unexpected error fetching order:', error);
       toast({
@@ -186,7 +112,7 @@ export default function OrderSummary() {
       });
       navigate('/');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -203,49 +129,34 @@ export default function OrderSummary() {
     }
   };
 
-  // Group items by product for detailed breakdown (sum quantities/totals)
+  // Group items by product for detailed breakdown
   const getGroupedItems = () => {
-    const grouped: { [key: string]: OrderItem } = {};
+    const grouped: { [key: string]: OrderItem[] } = {};
     orderItems.forEach(item => {
       const key = `${item.product_name}-${item.color_name || 'no-color'}-${item.size_name || 'no-size'}`;
       if (!grouped[key]) {
-        grouped[key] = { ...item };
-      } else {
-        grouped[key].quantity += item.quantity;
-        grouped[key].total_price += item.total_price;
-        // Optionally merge breakdowns if needed
-        if (Array.isArray(grouped[key].pricing_details.breakdown) && Array.isArray(item.pricing_details.breakdown)) {
-          grouped[key].pricing_details.breakdown = [
-            ...grouped[key].pricing_details.breakdown,
-            ...item.pricing_details.breakdown,
-          ];
-        }
+        grouped[key] = [];
       }
+      grouped[key].push(item);
     });
-    return Object.values(grouped);
+    return grouped;
   };
 
   const renderDetailedPricingBreakdown = (items: OrderItem[]) => {
     const firstItem = items[0];
     const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
     const totalPrice = items.reduce((sum, item) => sum + item.total_price, 0);
-    const basePrice = firstItem.pricing_details?.basePrice ?? firstItem.unit_price;
+    const basePrice = firstItem.pricing_details?.base_price || firstItem.unit_price;
     const totalSavings = items.reduce((sum, item) => {
-      const basePriceForItem = item.pricing_details?.basePrice ?? item.unit_price;
+      const basePriceForItem = item.pricing_details?.base_price || item.unit_price;
       return sum + ((basePriceForItem - item.unit_price) * item.quantity);
     }, 0);
-    const saved = basePrice > firstItem.unit_price;
+
     return (
       <div className="p-4 bg-gray-50 rounded-lg border space-y-3">
         <div className="flex justify-between items-start">
           <div className="flex-1">
             <p className="font-medium text-lg">{firstItem.product_name}</p>
-            {/* Category and Subcategory */}
-            {firstItem.product && (
-              <p className="text-sm text-gray-600 mb-1">
-                {firstItem.product.category?.name} → {firstItem.product.subcategory?.name}
-              </p>
-            )}
             <div className="mt-1 space-y-1">
               {firstItem.color_name && (
                 <p className="text-sm text-gray-600">Color: <span className="font-medium">{firstItem.color_name}</span></p>
@@ -254,73 +165,51 @@ export default function OrderSummary() {
                 <p className="text-sm text-gray-600">Size: <span className="font-medium">{firstItem.size_name}</span></p>
               )}
             </div>
-            {/* Pricing breakdown removed from summary block */}
           </div>
           <div className="text-right">
             <p className="font-bold text-xl">Rs. {totalPrice.toFixed(2)}</p>
             {totalSavings > 0 && (
-              <p className="text-xs text-green-600">
-                Total Saved: Rs. {totalSavings.toFixed(2)}
+              <p className="text-sm text-gray-500 line-through">
+                Was: Rs. {(basePrice * totalQuantity).toFixed(2)}
               </p>
             )}
           </div>
         </div>
+
         {/* Detailed Item Breakdown */}
         <div className="space-y-2">
-          {items.map((item, index) => {
-            const basePrice = item.pricing_details?.basePrice ?? item.unit_price;
-            const saved = basePrice > item.unit_price;
-            return (
-              <div key={index} className="flex flex-col md:flex-row md:justify-between md:items-center p-2 bg-white rounded border mb-2">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    {item.pricing_mode === 'combo' && (
-                      <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                        <Gift className="w-2 h-2 mr-1" />
-                        Combo
-                      </Badge>
-                    )}
-                    {item.pricing_mode === 'discount' && (
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
-                        <Tag className="w-2 h-2 mr-1" />
-                        MOQ
-                      </Badge>
-                    )}
-                    <span className="text-sm">Qty: {item.quantity}</span>
-                  </div>
-                  {/* Pricing breakdown details */}
-                  {item.pricing_details && item.pricing_details.description && (
-                    <p className="text-xs text-gray-700 font-semibold mb-1">{item.pricing_details.description}</p>
+          {items.map((item, index) => (
+            <div key={index} className="flex justify-between items-center p-2 bg-white rounded border">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  {item.pricing_mode === 'combo' && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                      <Gift className="w-2 h-2 mr-1" />
+                      Combo
+                    </Badge>
                   )}
-                  {Array.isArray(item.pricing_details.breakdown) && item.pricing_details.breakdown.length > 0 && (
-                    <ul className="text-xs text-gray-600 list-disc list-inside mb-1">
-                      {item.pricing_details.breakdown.map((line: string, idx: number) => (
-                        <li key={idx}>{line}</li>
-                      ))}
-                    </ul>
+                  {item.pricing_mode === 'discount' && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+                      <Tag className="w-2 h-2 mr-1" />
+                      MOQ
+                    </Badge>
                   )}
-                  {typeof item.pricing_details.basePrice === 'number' && (
-                    <p className="text-xs text-gray-500 mt-1">Base Price: Rs. {item.pricing_details.basePrice.toFixed(2)}</p>
-                  )}
-                  {saved && (
-                    <p className="text-xs text-green-600 mt-1">
-                      Saved: Rs. {(basePrice - item.unit_price).toFixed(2)} each
-                    </p>
-                  )}
-                  <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
+                  <span className="text-sm">Qty: {item.quantity}</span>
                 </div>
-                <div className="text-right mt-2 md:mt-0">
-                  <p className="font-medium">Rs. {item.total_price.toFixed(2)}</p>
-                  {saved && (
-                    <p className="text-xs text-green-600">
-                      Total Saved: Rs. {((basePrice - item.unit_price) * item.quantity).toFixed(2)}
-                    </p>
-                  )}
-                </div>
+                <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
               </div>
-            );
-          })}
+              <div className="text-right">
+                <p className="font-medium">Rs. {item.total_price.toFixed(2)}</p>
+                {item.unit_price < (item.pricing_details?.base_price || item.unit_price) && (
+                  <p className="text-xs text-green-600">
+                    Saved: Rs. {((item.pricing_details?.base_price || item.unit_price) - item.unit_price).toFixed(2)} each
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
+
         {/* Total Savings Summary */}
         {totalSavings > 0 && (
           <div className="bg-green-50 p-3 rounded border border-green-200">
@@ -340,7 +229,7 @@ export default function OrderSummary() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <CustomerHeader />
@@ -368,10 +257,12 @@ export default function OrderSummary() {
     );
   }
 
+  const groupedItems = getGroupedItems();
+
   return (
     <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
-
+      
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header Section */}
         <div className="flex items-center justify-between mb-8 no-print">
@@ -450,9 +341,9 @@ export default function OrderSummary() {
             <div>
               <h3 className="font-semibold mb-4">Order Items - Detailed Pricing Breakdown</h3>
               <div className="space-y-4">
-                {getGroupedItems().map((item, idx) => (
-                  <div key={idx}>
-                    {renderDetailedPricingBreakdown([item])}
+                {Object.entries(groupedItems).map(([itemKey, items]) => (
+                  <div key={itemKey}>
+                    {renderDetailedPricingBreakdown(items)}
                   </div>
                 ))}
               </div>
@@ -503,14 +394,12 @@ export default function OrderSummary() {
               <div>
                 <h3 className="font-semibold mb-3">Payment Screenshot</h3>
                 <div className="flex justify-center">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsScreenshotOpen(true)}
-                    className="flex items-center gap-2"
-                  >
-                    <CreditCard className="h-4 w-4" />
-                    View Payment Screenshot
-                  </Button>
+                  <PaymentScreenshotViewer
+                    imageUrl={orderDetails.payment_screenshot_url}
+                    orderNumber={orderDetails.order_number}
+                    customerName={orderDetails.customer_name}
+                    uploadedAt={orderDetails.created_at}
+                  />
                 </div>
               </div>
             )}
@@ -568,14 +457,6 @@ export default function OrderSummary() {
       </div>
 
       <Footer />
-
-      {/* Payment Screenshot Viewer */}
-      <FullScreenImageModal
-        isOpen={isScreenshotOpen}
-        onClose={() => setIsScreenshotOpen(false)}
-        imageUrl={orderDetails?.payment_screenshot_url || null}
-        orderId={orderDetails?.order_number}
-      />
     </div>
   );
 }

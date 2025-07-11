@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,24 +25,6 @@ interface Promocode {
   created_at: string;
 }
 
-async function getPromoCodeUsageCount(code: string): Promise<number> {
-  const upperCode = code.toUpperCase();
-
-  // Count in orders table
-  const { count: ordersCount } = await supabase
-    .from('orders')
-    .select('id', { count: 'exact', head: true })
-    .ilike('promocode_used', upperCode);
-
-  // Count in customer_orders table
-  const { count: customerOrdersCount } = await supabase
-    .from('customer_orders')
-    .select('id', { count: 'exact', head: true })
-    .ilike('promocode_used', upperCode);
-
-  return (ordersCount || 0) + (customerOrdersCount || 0);
-}
-
 export function PromocodeManagement() {
   const [promocodes, setPromocodes] = useState<Promocode[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,29 +39,17 @@ export function PromocodeManagement() {
     valid_from: '',
     valid_until: '',
   });
-  const [promoUsage, setPromoUsage] = useState<{ [code: string]: number }>({});
 
   // Stats
   const activePromocodes = promocodes.filter(p => p.is_active).length;
-  const totalUsage = Object.values(promoUsage).reduce((sum, count) => sum + count, 0);
-  const averageDiscount = promocodes.length > 0
-    ? promocodes.reduce((sum, p) => sum + p.discount_percentage, 0) / promocodes.length
+  const totalUsage = promocodes.reduce((sum, p) => sum + (p.used_count || 0), 0);
+  const averageDiscount = promocodes.length > 0 
+    ? promocodes.reduce((sum, p) => sum + p.discount_percentage, 0) / promocodes.length 
     : 0;
 
   useEffect(() => {
     fetchPromocodes();
   }, []);
-
-  useEffect(() => {
-    async function fetchUsage() {
-      const usage: { [code: string]: number } = {};
-      for (const promo of promocodes) {
-        usage[promo.code] = await getPromoCodeUsageCount(promo.code);
-      }
-      setPromoUsage(usage);
-    }
-    if (promocodes.length) fetchUsage();
-  }, [promocodes]);
 
   const fetchPromocodes = async () => {
     const { data, error } = await supabase
@@ -99,7 +70,7 @@ export function PromocodeManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     const promocodeData = {
       code: formData.code.toUpperCase(),
       description: formData.description,
@@ -111,7 +82,7 @@ export function PromocodeManagement() {
     };
 
     let error;
-
+    
     if (editingPromocode) {
       ({ error } = await supabase
         .from('promocodes')
@@ -136,7 +107,7 @@ export function PromocodeManagement() {
       title: "Success",
       description: `Promocode ${editingPromocode ? 'updated' : 'created'} successfully`,
     });
-
+    
     resetForm();
     setIsCreateModalOpen(false);
     fetchPromocodes();
@@ -235,7 +206,7 @@ export function PromocodeManagement() {
                     className="uppercase"
                   />
                 </div>
-
+                
                 <div>
                   <Label htmlFor="discount_percentage">Discount Percentage (%) *</Label>
                   <Input
@@ -262,7 +233,7 @@ export function PromocodeManagement() {
                   rows={3}
                 />
               </div>
-
+              
               <div>
                 <Label htmlFor="minimum_order_amount">Minimum Order Amount</Label>
                 <Input
@@ -286,7 +257,7 @@ export function PromocodeManagement() {
                     onChange={(e) => setFormData({ ...formData, valid_from: e.target.value })}
                   />
                 </div>
-
+                
                 <div>
                   <Label htmlFor="valid_until">Valid Until</Label>
                   <Input
@@ -297,7 +268,7 @@ export function PromocodeManagement() {
                   />
                 </div>
               </div>
-
+              
               <div className="flex items-center space-x-2">
                 <Switch
                   id="is_active"
@@ -306,7 +277,7 @@ export function PromocodeManagement() {
                 />
                 <Label htmlFor="is_active">Active</Label>
               </div>
-
+              
               <div className="flex justify-end space-x-3 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
                   Cancel
@@ -413,7 +384,7 @@ export function PromocodeManagement() {
                   <div className="flex-1">
                     <CardTitle className="text-lg font-bold text-blue-600">{promocode.code}</CardTitle>
                     <div className="flex items-center gap-2 mt-2">
-                      <Badge
+                      <Badge 
                         variant={promocode.is_active ? 'default' : 'secondary'}
                         className={promocode.is_active ? 'bg-green-100 text-green-800' : ''}
                       >
@@ -453,7 +424,7 @@ export function PromocodeManagement() {
                     </div>
                   )}
                 </div>
-
+                
                 {promocode.description && (
                   <p className="text-gray-600 text-sm">{promocode.description}</p>
                 )}
@@ -473,7 +444,7 @@ export function PromocodeManagement() {
                   )}
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
-                    <span>Used: {promoUsage[promocode.code] || 0} times</span>
+                    <span>Used: {promocode.used_count || 0} times</span>
                   </div>
                 </div>
 

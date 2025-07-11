@@ -1,77 +1,131 @@
 
 import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { SignUpForm } from '@/components/auth/SignUpForm';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
-export function CheckoutLogin() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
+interface CheckoutLoginProps {
+  onSuccess: () => void;
+  onBack: () => void;
+}
 
-  const handleLogin = async (e: React.FormEvent) => {
+export function CheckoutLogin({ onSuccess, onBack }: CheckoutLoginProps) {
+  const { signIn } = useAuth();
+  const [activeTab, setActiveTab] = useState('signin');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const [signInData, setSignInData] = useState({
+    email: '',
+    password: '',
+  });
+  
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: 'Logged in successfully',
-      });
-
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+    
+    if (!signInData.email || !signInData.password) {
+      setErrors({ form: 'Please fill in all fields' });
+      return;
     }
+    
+    setIsLoading(true);
+    setErrors({});
+    
+    const { error } = await signIn(signInData.email, signInData.password);
+    if (error) {
+      setErrors({ form: error.message });
+    } else {
+      onSuccess();
+    }
+    
+    setIsLoading(false);
   };
 
   return (
-    <Card>
+    <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>Login to Continue</CardTitle>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="p-1"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <CardTitle>Sign In to Continue</CardTitle>
+        </div>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Logging in...' : 'Login'}
-          </Button>
-        </form>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="signin">Sign In</TabsTrigger>
+            <TabsTrigger value="signup">Sign Up</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="signin">
+            <form onSubmit={handleSignIn} className="space-y-4">
+              {errors.form && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
+                  {errors.form}
+                </div>
+              )}
+              
+              <div>
+                <Label htmlFor="signin-email">Email Address</Label>
+                <Input
+                  id="signin-email"
+                  type="email"
+                  value={signInData.email}
+                  onChange={(e) => setSignInData({ ...signInData, email: e.target.value })}
+                  placeholder="Enter your email"
+                  disabled={isLoading}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="signin-password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="signin-password"
+                    type={showPassword ? "text" : "password"}
+                    value={signInData.password}
+                    onChange={(e) => setSignInData({ ...signInData, password: e.target.value })}
+                    placeholder="Enter your password"
+                    className="pr-10"
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              
+              <Button 
+                type="submit" 
+                className="w-full bg-red-600 hover:bg-red-700" 
+                disabled={isLoading}
+              >
+                {isLoading ? 'Signing In...' : 'Sign In'}
+              </Button>
+            </form>
+          </TabsContent>
+          
+          <TabsContent value="signup">
+            <SignUpForm onSuccess={onSuccess} />
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

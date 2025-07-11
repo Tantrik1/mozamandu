@@ -1,29 +1,27 @@
 
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
-import { Footer } from '@/components/layout/Footer';
-import { SubcategoryCard } from '@/components/customer/SubcategoryCard';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { Package } from 'lucide-react';
 
 interface Category {
   id: string;
   name: string;
-  description?: string;
-  status: string;
+  description: string;
 }
 
 interface Subcategory {
   id: string;
   name: string;
-  description?: string;
-  image_url?: string;
+  description: string;
   selling_price: number;
   minimum_quantity: number;
   status: string;
-  category_id: string;
+  image_url?: string;
 }
 
 export default function CategoryPage() {
@@ -34,48 +32,57 @@ export default function CategoryPage() {
 
   useEffect(() => {
     if (categoryId) {
-      fetchData();
+      fetchCategoryData();
     }
   }, [categoryId]);
 
-  const fetchData = async () => {
-    if (!categoryId) return;
-
+  const fetchCategoryData = async () => {
     try {
-      console.log('Fetching category data for:', categoryId);
-
       // Fetch category details
       const { data: categoryData, error: categoryError } = await supabase
         .from('categories')
-        .select('*')
+        .select('id, name, description')
         .eq('id', categoryId)
         .eq('status', 'on')
         .single();
 
       if (categoryError) {
         console.error('Error fetching category:', categoryError);
+        toast({
+          title: "Error",
+          description: "Category not found",
+          variant: "destructive",
+        });
         return;
       }
 
-      console.log('Category found:', categoryData);
       setCategory(categoryData);
 
-      // Fetch subcategories for this category
+      // Fetch subcategories with image_url
       const { data: subcategoriesData, error: subcategoriesError } = await supabase
         .from('subcategories')
-        .select('*')
+        .select('id, name, description, selling_price, minimum_quantity, status, image_url')
         .eq('category_id', categoryId)
         .eq('status', 'on')
         .order('name');
 
       if (subcategoriesError) {
         console.error('Error fetching subcategories:', subcategoriesError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch subcategories",
+          variant: "destructive",
+        });
       } else {
-        console.log('Subcategories found:', subcategoriesData?.length || 0);
         setSubcategories(subcategoriesData || []);
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: "Something went wrong",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -85,15 +92,9 @@ export default function CategoryPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <CustomerHeader />
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex justify-center items-center min-h-[400px]">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-              <p>Loading category...</p>
-            </div>
-          </div>
+        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+          <div className="text-center">Loading...</div>
         </div>
-        <Footer />
       </div>
     );
   }
@@ -102,18 +103,11 @@ export default function CategoryPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <CustomerHeader />
-        <div className="container mx-auto px-4 py-8">
-          <Card>
-            <CardContent className="text-center py-8">
-              <p className="text-gray-500 mb-4">Category not found</p>
-              <Link to="/categories" className="inline-flex items-center text-primary hover:text-primary/80">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Categories
-              </Link>
-            </CardContent>
-          </Card>
+        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900">Category not found</h1>
+          </div>
         </div>
-        <Footer />
       </div>
     );
   }
@@ -121,41 +115,74 @@ export default function CategoryPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
-      <div className="container mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        {/* Category Header */}
         <div className="mb-8">
-          <Link to="/categories" className="inline-flex items-center mb-4 text-primary hover:text-primary/80">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Categories
-          </Link>
-          <h1 className="text-3xl font-bold mb-2">{category.name}</h1>
+          <h1 className="text-4xl font-bold text-gray-900">{category.name}</h1>
           {category.description && (
-            <p className="text-gray-600">{category.description}</p>
+            <p className="text-gray-600 mt-2 text-lg">{category.description}</p>
           )}
         </div>
 
+        {/* Subcategories Grid */}
         {subcategories.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <p className="text-gray-500 text-lg mb-2">No subcategories found</p>
-              <p className="text-sm text-gray-400">Subcategories will appear here once they are added to this category.</p>
-            </CardContent>
-          </Card>
+          <div className="text-center py-12">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No subcategories available</h3>
+            <p className="text-gray-500">Subcategories will appear here once they are added.</p>
+          </div>
         ) : (
-          <>
-            <div className="mb-6">
-              <p className="text-gray-600">
-                Browse {subcategories.length} subcategor{subcategories.length !== 1 ? 'ies' : 'y'} in {category.name}
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {subcategories.map((subcategory) => (
-                <SubcategoryCard key={subcategory.id} subcategory={subcategory} />
-              ))}
-            </div>
-          </>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {subcategories.map((subcategory) => (
+              <Link key={subcategory.id} to={`/subcategories/${subcategory.id}`}>
+                <Card className="hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer h-full">
+                  <CardHeader className="text-center">
+                    <div className="w-full h-48 bg-gradient-to-br from-red-500 to-red-700 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                      {subcategory.image_url ? (
+                        <img 
+                          src={subcategory.image_url} 
+                          alt={subcategory.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              const placeholder = document.createElement('div');
+                              placeholder.className = 'w-full h-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center';
+                              placeholder.innerHTML = '<div class="w-16 h-16 bg-red-100 rounded-lg flex items-center justify-center"><svg class="w-8 h-8 text-red-300" fill="currentColor" viewBox="0 0 24 24"><path d="M20 6h-2.18l-1.41-1.41C16.05 4.23 15.55 4 15 4H9c-.55 0-1.05.23-1.41.59L6.18 6H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg></div>';
+                              parent.appendChild(placeholder);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-red-100 rounded-lg flex items-center justify-center">
+                          <Package className="w-8 h-8 text-red-300" />
+                        </div>
+                      )}
+                    </div>
+                    <CardTitle className="text-xl text-gray-900">{subcategory.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-center">
+                    {subcategory.description && (
+                      <p className="text-gray-600 mb-4 text-sm">{subcategory.description}</p>
+                    )}
+                    <div className="space-y-2">
+                      <Badge variant="secondary" className="bg-red-100 text-red-700 text-lg font-semibold">
+                        Rs. {subcategory.selling_price}
+                      </Badge>
+                      {subcategory.minimum_quantity > 1 && (
+                        <Badge variant="outline" className="block text-xs text-blue-600 border-blue-300">
+                          Min. {subcategory.minimum_quantity} items required
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
         )}
       </div>
-      <Footer />
     </div>
   );
 }

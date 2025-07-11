@@ -1,113 +1,168 @@
-
-import React, { useState, useEffect } from 'react';
-import { UnifiedProductCard } from '@/components/products/UnifiedProductCard';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { ProductCard } from './ProductCard';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { fetchFeaturedProducts, type Product } from '@/utils/productFetcher';
-
+interface Product {
+  id: string;
+  name: string;
+  selling_price: number;
+  image_url: string | null;
+  description: string | null;
+  cost_price: number;
+  is_featured: boolean | null;
+  has_color_variants: boolean | null;
+  has_size_variants: boolean | null;
+  status: string | null;
+  stock_quantity: number | null;
+  category_id: string;
+  subcategory_id: string;
+  subcategory: {
+    id: string;
+    name: string;
+  };
+}
 export function FeaturedProductsCarousel() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
-
   useEffect(() => {
-    loadFeaturedProducts();
+    let isMounted = true;
+    const fetchFeaturedProducts = async () => {
+      try {
+        console.log('🔄 FeaturedProductsCarousel: Starting data fetch');
+        const {
+          data,
+          error
+        } = await supabase.from('products').select(`
+            id,
+            name,
+            selling_price,
+            image_url,
+            description,
+            cost_price,
+            is_featured,
+            has_color_variants,
+            has_size_variants,
+            status,
+            stock_quantity,
+            category_id,
+            subcategory_id,
+            subcategory:subcategories!inner(id, name)
+          `).eq('status', 'active').eq('is_featured', true).order('created_at', {
+          ascending: false
+        }).limit(8);
+        if (!isMounted) return;
+        if (error) {
+          console.error('❌ FeaturedProductsCarousel: Fetch error:', error);
+          setProducts([]);
+        } else {
+          console.log('✅ FeaturedProductsCarousel: Raw data received:', data);
+
+          // Transform the data to ensure proper structure
+          const transformedProducts = (data || []).map(product => ({
+            ...product,
+            selling_price: product.selling_price || 0,
+            cost_price: product.cost_price || 0,
+            is_featured: product.is_featured || false,
+            has_color_variants: product.has_color_variants || false,
+            has_size_variants: product.has_size_variants || false,
+            stock_quantity: product.stock_quantity || 0,
+            subcategory: product.subcategory || {
+              id: '',
+              name: 'Unknown'
+            }
+          }));
+          console.log('✅ FeaturedProductsCarousel: Transformed products:', transformedProducts.length);
+          setProducts(transformedProducts);
+        }
+      } catch (error) {
+        console.error('❌ FeaturedProductsCarousel: Unexpected error:', error);
+        if (isMounted) {
+          setProducts([]);
+        }
+      } finally {
+        if (isMounted) {
+          console.log('✅ FeaturedProductsCarousel: Data fetch complete');
+          setLoading(false);
+        }
+      }
+    };
+    fetchFeaturedProducts();
+    return () => {
+      isMounted = false;
+    };
   }, []);
-
-  const loadFeaturedProducts = async () => {
-    try {
-      setLoading(true);
-      const productsData = await fetchFeaturedProducts();
-      setProducts(productsData);
-    } catch (error) {
-      console.error('Error loading featured products:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const nextSlide = () => {
-    setCurrentIndex((prevIndex) => 
-      prevIndex >= products.length - 1 ? 0 : prevIndex + 1
-    );
+    setCurrentIndex(prev => (prev + 1) % Math.max(1, products.length - 3));
   };
-
   const prevSlide = () => {
-    setCurrentIndex((prevIndex) => 
-      prevIndex <= 0 ? products.length - 1 : prevIndex - 1
-    );
+    setCurrentIndex(prev => (prev - 1 + Math.max(1, products.length - 3)) % Math.max(1, products.length - 3));
   };
-
   if (loading) {
-    return (
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products</h2>
-            <p className="text-lg text-gray-600">Our most popular items</p>
+    return <section className="py-8 sm:py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8 sm:mb-12">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Featured Products</h2>
+            <p className="mt-2 sm:mt-4 text-base sm:text-lg text-gray-600">
+              Discover our handpicked selection of premium products
+            </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl shadow-md overflow-hidden animate-pulse">
-                <div className="w-full h-64 bg-gray-200"></div>
-                <div className="p-4 space-y-3">
-                  <div className="h-4 bg-gray-200 rounded"></div>
-                  <div className="h-3 bg-gray-200 rounded w-3/4"></div>
-                  <div className="h-8 bg-gray-200 rounded"></div>
-                </div>
-              </div>
-            ))}
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+            {[1, 2, 3, 4].map(i => <div key={i} className="animate-pulse">
+                <div className="bg-gray-200 h-40 sm:h-64 rounded-lg mb-4"></div>
+                <div className="h-4 sm:h-6 bg-gray-200 rounded mb-2"></div>
+                <div className="h-3 sm:h-4 bg-gray-200 rounded w-3/4"></div>
+              </div>)}
           </div>
         </div>
-      </section>
-    );
+      </section>;
   }
-
   if (products.length === 0) {
-    return null;
-  }
-
-  const visibleProducts = products.slice(currentIndex, currentIndex + 4).concat(
-    products.slice(0, Math.max(0, (currentIndex + 4) - products.length))
-  );
-
-  return (
-    <section className="py-16 bg-white">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products</h2>
-          <p className="text-lg text-gray-600">Our most popular items</p>
-        </div>
-
-        <div className="relative">
-          {products.length > 4 && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={prevSlide}
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 rounded-full w-10 h-10 p-0 bg-white shadow-lg border-gray-200"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={nextSlide}
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 rounded-full w-10 h-10 p-0 bg-white shadow-lg border-gray-200"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {visibleProducts.map((product, index) => (
-              <UnifiedProductCard key={`${product.id}-${index}`} product={product} />
-            ))}
+    return <section className="py-8 sm:py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8 sm:mb-12">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Featured Products</h2>
+            <p className="mt-2 sm:mt-4 text-base sm:text-lg text-gray-600">
+              Discover our handpicked selection of premium products
+            </p>
           </div>
+          <div className="text-center py-12">
+            <p className="text-gray-500">No featured products available at the moment.</p>
+            <p className="text-sm text-gray-400 mt-2">Please check back later or contact support if this issue persists.</p>
+          </div>
+        </div>
+      </section>;
+  }
+  return <section className="py-8 sm:py-16 bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-8 sm:mb-12">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Featured Products</h2>
+          <p className="mt-2 sm:mt-4 text-base sm:text-lg text-gray-600">
+            Discover our handpicked selection of premium products
+          </p>
+        </div>
+        
+        <div className="relative">
+          <div className="overflow-hidden">
+            <div className="flex transition-transform duration-300 ease-in-out" style={{
+            transform: `translateX(-${currentIndex * 25}%)`
+          }}>
+              {products.map(product => <div key={product.id} className="w-1/2 sm:w-1/2 lg:w-1/4 flex-shrink-0 px-1.5 sm:px-3">
+                  <ProductCard product={product} subcategoryPrice={product.selling_price || 0} />
+                </div>)}
+            </div>
+          </div>
+          
+          {products.length > 4 && <>
+              <Button variant="outline" size="icon" className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 sm:-translate-x-4 bg-white shadow-lg hover:bg-gray-50 h-8 w-8 sm:h-10 sm:w-10" onClick={prevSlide}>
+                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 sm:translate-x-4 bg-white shadow-lg hover:bg-gray-50 h-8 w-8 sm:h-10 sm:w-10" onClick={nextSlide}>
+                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Button>
+            </>}
         </div>
       </div>
-    </section>
-  );
+    </section>;
 }

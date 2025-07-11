@@ -1,3 +1,4 @@
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -7,8 +8,6 @@ interface PromoCode {
   code: string;
   discount_percentage: number;
   minimum_order_amount: number;
-  valid_from?: string;
-  valid_until?: string;
 }
 
 interface PromoCodeSectionProps {

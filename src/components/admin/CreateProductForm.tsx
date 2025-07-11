@@ -24,7 +24,8 @@ const productSchema = z.object({
   subcategory_id: z.string().min(1, 'Subcategory is required'),
   is_featured: z.boolean().default(false),
   has_color_variants: z.boolean().default(false),
-  color_has_size_variants: z.boolean().default(false),
+  has_size_variants: z.boolean().default(false),
+  stock_quantity: z.number().min(0, 'Stock quantity must be positive').optional(),
   status: z.enum(['active', 'inactive']).default('active'),
 });
 
@@ -39,18 +40,18 @@ interface Subcategory {
   category_id: string;
 }
 
-interface SizeVariant {
-  id?: string;
-  size_name: string;
-  size_code?: string;
-}
-
 interface ColorVariant {
-  id?: string;
   color_name: string;
   image_url?: string;
   has_sizes: boolean;
+  stock_quantity?: number;
   size_variants: SizeVariant[];
+}
+
+interface SizeVariant {
+  size_name: string;
+  size_code?: string;
+  stock_quantity: number;
 }
 
 interface CreateProductFormProps {
@@ -67,7 +68,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -81,14 +81,15 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       subcategory_id: '',
       is_featured: false,
       has_color_variants: false,
-      color_has_size_variants: false,
+      has_size_variants: false,
+      stock_quantity: 0,
       status: 'active',
     },
   });
 
   const watchedCategoryId = form.watch('category_id');
   const watchedHasColorVariants = form.watch('has_color_variants');
-  const watchedColorHasSizeVariants = form.watch('color_has_size_variants');
+  const watchedHasSizeVariants = form.watch('has_size_variants');
 
   useEffect(() => {
     fetchCategories();
@@ -99,11 +100,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     if (watchedCategoryId) {
       const filtered = subcategories.filter(sub => sub.category_id === watchedCategoryId);
       setFilteredSubcategories(filtered);
-      
-      const currentSubcategoryId = form.getValues('subcategory_id');
-      if (currentSubcategoryId && !filtered.find(sub => sub.id === currentSubcategoryId)) {
-        form.setValue('subcategory_id', '');
-      }
+      form.setValue('subcategory_id', '');
     } else {
       setFilteredSubcategories([]);
     }
@@ -143,15 +140,18 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log('Starting image upload for file:', file.name);
     setUploadingImage(true);
     
     try {
+      // Create preview immediately
       const reader = new FileReader();
       reader.onload = (e) => {
         setImagePreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
 
+      // Upload to Supabase storage
       const fileExt = file.name.split('.').pop();
       const fileName = `product-${Date.now()}.${fileExt}`;
       
@@ -165,10 +165,9 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
         .from('product-images')
         .getPublicUrl(fileName);
 
-      const newImageUrl = urlData.publicUrl;
-      setCurrentImageUrl(newImageUrl);
       setImageFile(file);
       
+      console.log('Image uploaded successfully:', urlData.publicUrl);
       toast({
         title: 'Success',
         description: 'Image uploaded successfully',
@@ -188,12 +187,48 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
-    setCurrentImageUrl(null);
+  };
+
+  const uploadImageAndGetUrl = async (): Promise<string | null> => {
+    if (!imageFile) return null;
+
+    try {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `product-${Date.now()}.${fileExt}`;
+
+      const { data, error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, imageFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to upload image',
+        variant: 'destructive',
+      });
+      return null;
+    }
   };
 
   const onSubmit = async (data: z.infer<typeof productSchema>) => {
     setLoading(true);
     try {
+      console.log('Creating product with data:', data);
+      console.log('Color variants:', colorVariants);
+
+      let imageUrl = null;
+      if (imageFile) {
+        imageUrl = await uploadImageAndGetUrl();
+      }
+
       const productData = {
         name: data.name,
         description: data.description || null,
@@ -203,10 +238,13 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
         subcategory_id: data.subcategory_id,
         is_featured: data.is_featured,
         has_color_variants: data.has_color_variants,
-        color_has_size_variants: data.color_has_size_variants,
+        has_size_variants: data.has_size_variants,
+        stock_quantity: (!data.has_color_variants && !data.has_size_variants) ? data.stock_quantity || 0 : null,
         status: data.status,
-        image_url: currentImageUrl,
+        image_url: imageUrl,
       };
+
+      console.log('Product data to insert:', productData);
 
       const { data: newProduct, error } = await supabase
         .from('products')
@@ -216,8 +254,11 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
 
       if (error) throw error;
 
+      console.log('Created product:', newProduct);
+
+      // Save color variants if enabled
       if (data.has_color_variants && colorVariants.length > 0) {
-        await saveColorVariants(newProduct.id);
+        await saveColorVariants(newProduct.id, data.has_size_variants);
       }
 
       toast({
@@ -238,40 +279,59 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     }
   };
 
-  const saveColorVariants = async (productId: string) => {
-    for (const variant of colorVariants) {
-      if (!variant.color_name) continue;
+  const saveColorVariants = async (productId: string, hasSizeVariants: boolean) => {
+    try {
+      console.log('Saving color variants for product:', productId);
+      
+      const validVariants = colorVariants.filter(cv => cv.color_name.trim());
+      if (validVariants.length === 0) return;
 
-      const { data: colorVariant, error: colorError } = await supabase
+      const { data: insertedColors, error: colorError } = await supabase
         .from('color_variants')
-        .insert({
-          product_id: productId,
-          color_name: variant.color_name,
-          image_url: variant.image_url,
-          has_sizes: variant.has_sizes,
-        })
-        .select()
-        .single();
+        .insert(
+          validVariants.map(cv => ({
+            product_id: productId,
+            color_name: cv.color_name,
+            stock_quantity: hasSizeVariants ? 0 : (cv.stock_quantity || 0),
+            image_url: cv.image_url || null,
+            has_sizes: hasSizeVariants,
+          }))
+        )
+        .select('id, color_name');
 
       if (colorError) throw colorError;
 
-      if (variant.has_sizes && variant.size_variants.length > 0) {
-        const sizeVariantsData = variant.size_variants
-          .filter(size => size.size_name)
-          .map(size => ({
-            color_variant_id: colorVariant.id,
-            size_name: size.size_name,
-            size_code: size.size_code || null,
-          }));
+      console.log('Inserted color variants:', insertedColors);
 
-        if (sizeVariantsData.length > 0) {
-          const { error: sizeError } = await supabase
-            .from('size_variants')
-            .insert(sizeVariantsData);
+      // Insert size variants if applicable
+      if (hasSizeVariants && insertedColors) {
+        for (let i = 0; i < validVariants.length; i++) {
+          const variant = validVariants[i];
+          const insertedColor = insertedColors[i];
+          
+          if (variant.size_variants && variant.size_variants.length > 0) {
+            const validSizes = variant.size_variants.filter(sv => sv.size_name.trim());
+            if (validSizes.length > 0) {
+              const { error: sizeError } = await supabase
+                .from('size_variants')
+                .insert(
+                  validSizes.map(sv => ({
+                    color_variant_id: insertedColor.id,
+                    size_name: sv.size_name,
+                    size_code: sv.size_code || null,
+                    stock_quantity: sv.stock_quantity,
+                  }))
+                );
 
-          if (sizeError) throw sizeError;
+              if (sizeError) throw sizeError;
+              console.log('Inserted size variants for color:', insertedColor.color_name);
+            }
+          }
         }
       }
+    } catch (error) {
+      console.error('Error saving color variants:', error);
+      throw error;
     }
   };
 
@@ -391,23 +451,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={form.watch('status')}
-                    onValueChange={(value: 'active' | 'inactive') => form.setValue('status', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center space-x-6">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="is_featured"
@@ -424,77 +468,113 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                       onCheckedChange={(checked) => {
                         form.setValue('has_color_variants', checked);
                         if (!checked) {
-                          form.setValue('color_has_size_variants', false);
                           setColorVariants([]);
                         }
                       }}
                     />
-                    <Label htmlFor="has_color_variants">Has Color Variants</Label>
+                    <Label htmlFor="has_color_variants">Colors</Label>
                   </div>
 
-                  {watchedHasColorVariants && (
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="color_has_size_variants"
-                        checked={form.watch('color_has_size_variants')}
-                        onCheckedChange={(checked) => form.setValue('color_has_size_variants', checked)}
-                      />
-                      <Label htmlFor="color_has_size_variants">Colors Have Sizes</Label>
-                    </div>
-                  )}
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="has_size_variants"
+                      checked={form.watch('has_size_variants')}
+                      onCheckedChange={(checked) => {
+                        form.setValue('has_size_variants', checked);
+                      }}
+                    />
+                    <Label htmlFor="has_size_variants">Sizes</Label>
+                  </div>
+                </div>
+
+                {!watchedHasColorVariants && !watchedHasSizeVariants && (
+                  <div>
+                    <Label htmlFor="stock_quantity">Stock Quantity *</Label>
+                    <Input
+                      id="stock_quantity"
+                      type="number"
+                      {...form.register('stock_quantity', { valueAsNumber: true })}
+                      placeholder="0"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={form.watch('status')}
+                    onValueChange={(value: 'active' | 'inactive') => form.setValue('status', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <Label>Product Image</Label>
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-4">
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        disabled={uploadingImage}
-                        className="flex-1"
-                      />
-                      {uploadingImage && (
-                        <div className="flex items-center space-x-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                          <span className="text-sm">Uploading...</span>
-                        </div>
-                      )}
-                    </div>
+              <div>
+                <Label>Product Image</Label>
+                <div className="mt-2 space-y-4">
+                  <div>
+                    <input
+                      id="image-upload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      disabled={uploadingImage}
+                    />
+                    <label
+                      htmlFor="image-upload"
+                      className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                    </label>
+                  </div>
 
-                    {imagePreview && (
-                      <div className="relative">
-                        <img
-                          src={imagePreview}
-                          alt="Product preview"
-                          className="w-full max-w-sm h-48 object-cover rounded-lg border"
-                        />
+                  {imagePreview && (
+                    <div className="relative">
+                      <img
+                        src={imagePreview}
+                        alt="Product preview"
+                        className="w-full max-w-sm h-48 object-cover rounded-lg border"
+                      />
+                      <div className="absolute top-2 right-2 space-x-1">
                         <Button
                           type="button"
-                          variant="destructive"
                           size="sm"
-                          className="absolute top-2 right-2"
+                          variant="secondary"
+                          onClick={() => window.open(imagePreview, '_blank')}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
                           onClick={removeImage}
                         >
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {watchedHasColorVariants && (
+        {(watchedHasColorVariants || watchedHasSizeVariants) && (
           <CreateProductVariantForm
-            colorVariants={colorVariants}
-            setColorVariants={setColorVariants}
-            hasSizeVariants={watchedColorHasSizeVariants}
+            hasColorVariants={watchedHasColorVariants}
+            hasSizeVariants={watchedHasSizeVariants}
+            onVariantsChange={setColorVariants}
           />
         )}
 

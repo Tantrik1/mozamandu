@@ -104,12 +104,7 @@ export function SmartProductVariantForm({
             if (sizeError) {
               console.error('Error fetching size variants:', sizeError);
             } else {
-              sizeVariants = (sizeData || []).map(size => ({
-                id: size.id,
-                size_name: size.size_name,
-                size_code: size.size_code,
-                stock_quantity: 0 // Default stock quantity since size_variants table doesn't have this field
-              }));
+              sizeVariants = sizeData || [];
             }
           }
 
@@ -118,7 +113,7 @@ export function SmartProductVariantForm({
             color_name: colorVariant.color_name,
             image_url: colorVariant.image_url,
             has_sizes: Boolean(colorVariant.has_sizes),
-            stock_quantity: 0, // Default stock quantity
+            stock_quantity: colorVariant.stock_quantity || 0,
             size_variants: sizeVariants
           };
         })

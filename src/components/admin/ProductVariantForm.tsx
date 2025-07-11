@@ -1,17 +1,19 @@
 
 import { useState, useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Trash2, Plus, Upload, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Upload, X } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 interface SizeVariant {
   id?: string;
   size_name: string;
   size_code?: string;
+  stock_quantity: number;
 }
 
 interface ColorVariant {
@@ -19,349 +21,419 @@ interface ColorVariant {
   color_name: string;
   image_url?: string;
   has_sizes: boolean;
+  stock_quantity?: number;
   size_variants: SizeVariant[];
 }
 
 interface ProductVariantFormProps {
-  productId: string;
-  onVariantsChange: () => void;
+  productId?: string;
+  hasColorVariants: boolean;
+  hasSizeVariants: boolean;
+  onVariantsChange: (variants: ColorVariant[]) => void;
+  initialVariants?: ColorVariant[];
 }
 
-export function ProductVariantForm({ productId, onVariantsChange }: ProductVariantFormProps) {
+export function ProductVariantForm({
+  productId,
+  hasColorVariants,
+  hasSizeVariants,
+  onVariantsChange,
+  initialVariants = []
+}: ProductVariantFormProps) {
   const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
+  const [uploadingImages, setUploadingImages] = useState<{[key: number]: boolean}>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    fetchVariants();
-  }, [productId]);
+    console.log('ProductVariantForm useEffect triggered', {
+      productId,
+      hasColorVariants,
+      hasSizeVariants,
+      initialVariants: initialVariants.length
+    });
 
-  const fetchVariants = async () => {
+    if (initialVariants && initialVariants.length > 0) {
+      console.log('Using provided initial variants:', initialVariants);
+      setColorVariants(initialVariants);
+    } else if (productId && (hasColorVariants || hasSizeVariants)) {
+      console.log('Fetching variants for productId:', productId);
+      fetchExistingVariants();
+    } else {
+      console.log('Clearing variants - no conditions met');
+      setColorVariants([]);
+    }
+  }, [productId, hasColorVariants, hasSizeVariants]);
+
+  useEffect(() => {
+    console.log('Color variants changed, notifying parent:', colorVariants);
+    onVariantsChange(colorVariants);
+  }, [colorVariants, onVariantsChange]);
+
+  const fetchExistingVariants = async () => {
+    if (!productId) {
+      console.log('No productId provided, skipping fetch');
+      return;
+    }
+
     try {
-      const { data: colors, error: colorError } = await supabase
+      setIsLoading(true);
+      console.log('Fetching variants for product:', productId);
+      
+      // Fetch color variants
+      const { data: colorData, error: colorError } = await supabase
         .from('color_variants')
         .select('*')
-        .eq('product_id', productId);
+        .eq('product_id', productId)
+        .order('color_name');
 
-      if (colorError) throw colorError;
-
-      const variants: ColorVariant[] = [];
-      
-      for (const color of colors || []) {
-        const { data: sizes, error: sizeError } = await supabase
-          .from('size_variants')
-          .select('*')
-          .eq('color_variant_id', color.id);
-
-        if (sizeError) throw sizeError;
-
-        variants.push({
-          id: color.id,
-          color_name: color.color_name,
-          image_url: color.image_url,
-          has_sizes: color.has_sizes || false,
-          size_variants: sizes?.map(size => ({
-            id: size.id,
-            size_name: size.size_name,
-            size_code: size.size_code || undefined
-          })) || []
-        });
+      if (colorError) {
+        console.error('Error fetching color variants:', colorError);
+        setColorVariants([]);
+        return;
       }
 
-      setColorVariants(variants);
+      console.log('Fetched color variants:', colorData);
+
+      if (!colorData || colorData.length === 0) {
+        console.log('No color variants found');
+        setColorVariants([]);
+        return;
+      }
+
+      // For each color variant, fetch its size variants
+      const variantsWithSizes = await Promise.all(
+        colorData.map(async (colorVariant) => {
+          let sizeVariants: SizeVariant[] = [];
+          
+          if (hasSizeVariants && colorVariant.has_sizes) {
+            console.log('Fetching size variants for color variant:', colorVariant.id);
+            const { data: sizeData, error: sizeError } = await supabase
+              .from('size_variants')
+              .select('*')
+              .eq('color_variant_id', colorVariant.id)
+              .order('size_name');
+
+            if (sizeError) {
+              console.error('Error fetching size variants:', sizeError);
+            } else {
+              sizeVariants = sizeData || [];
+              console.log('Fetched size variants for color', colorVariant.color_name, ':', sizeVariants);
+            }
+          }
+
+          return {
+            id: colorVariant.id,
+            color_name: colorVariant.color_name,
+            image_url: colorVariant.image_url,
+            has_sizes: Boolean(colorVariant.has_sizes),
+            stock_quantity: colorVariant.stock_quantity || 0,
+            size_variants: sizeVariants
+          };
+        })
+      );
+
+      console.log('Final variants with sizes:', variantsWithSizes);
+      setColorVariants(variantsWithSizes);
     } catch (error) {
-      console.error('Error fetching variants:', error);
+      console.error('Error in fetchExistingVariants:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch product variants',
+        description: 'Failed to load existing variants',
         variant: 'destructive',
       });
+      setColorVariants([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const addColorVariant = () => {
-    setColorVariants(prev => [...prev, {
+    const newVariant: ColorVariant = {
       color_name: '',
-      has_sizes: false,
+      has_sizes: hasSizeVariants,
+      stock_quantity: hasSizeVariants ? 0 : 0,
       size_variants: []
-    }]);
+    };
+    setColorVariants([...colorVariants, newVariant]);
   };
 
-  const updateColorVariant = (index: number, field: string, value: any) => {
-    setColorVariants(prev => prev.map((variant, i) => 
-      i === index ? { ...variant, [field]: value } : variant
-    ));
+  const updateColorVariant = (index: number, field: keyof ColorVariant, value: any) => {
+    const updated = [...colorVariants];
+    updated[index] = { ...updated[index], [field]: value };
+    setColorVariants(updated);
   };
 
-  const removeColorVariant = async (index: number) => {
-    const variant = colorVariants[index];
-    if (variant.id) {
-      try {
-        setLoading(true);
-        
-        // Delete size variants first
-        for (const size of variant.size_variants) {
-          if (size.id) {
-            await supabase.from('size_variants').delete().eq('id', size.id);
-          }
-        }
-        
-        // Delete color variant
-        await supabase.from('color_variants').delete().eq('id', variant.id);
-        
-        toast({
-          title: 'Success',
-          description: 'Color variant deleted successfully',
-        });
-        
-        onVariantsChange();
-      } catch (error) {
-        console.error('Error deleting variant:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to delete variant',
-          variant: 'destructive',
-        });
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    setColorVariants(prev => prev.filter((_, i) => i !== index));
+  const removeColorVariant = (index: number) => {
+    const updated = colorVariants.filter((_, i) => i !== index);
+    setColorVariants(updated);
   };
 
   const addSizeVariant = (colorIndex: number) => {
-    setColorVariants(prev => prev.map((variant, i) => 
-      i === colorIndex 
-        ? { ...variant, size_variants: [...variant.size_variants, { size_name: '', size_code: '' }] }
-        : variant
-    ));
+    const updated = [...colorVariants];
+    const newSizeVariant: SizeVariant = {
+      size_name: '',
+      size_code: '',
+      stock_quantity: 0
+    };
+    updated[colorIndex].size_variants.push(newSizeVariant);
+    setColorVariants(updated);
   };
 
-  const updateSizeVariant = (colorIndex: number, sizeIndex: number, field: string, value: string) => {
-    setColorVariants(prev => prev.map((variant, i) => 
-      i === colorIndex 
-        ? {
-            ...variant,
-            size_variants: variant.size_variants.map((size, j) => 
-              j === sizeIndex ? { ...size, [field]: value } : size
-            )
-          }
-        : variant
-    ));
+  const updateSizeVariant = (colorIndex: number, sizeIndex: number, field: keyof SizeVariant, value: any) => {
+    const updated = [...colorVariants];
+    updated[colorIndex].size_variants[sizeIndex] = {
+      ...updated[colorIndex].size_variants[sizeIndex],
+      [field]: value
+    };
+    setColorVariants(updated);
   };
 
-  const removeSizeVariant = async (colorIndex: number, sizeIndex: number) => {
-    const sizeVariant = colorVariants[colorIndex].size_variants[sizeIndex];
-    
-    if (sizeVariant.id) {
-      try {
-        await supabase.from('size_variants').delete().eq('id', sizeVariant.id);
-        toast({
-          title: 'Success',
-          description: 'Size variant deleted successfully',
-        });
-        onVariantsChange();
-      } catch (error) {
-        console.error('Error deleting size variant:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to delete size variant',
-          variant: 'destructive',
-        });
-      }
-    }
-    
-    setColorVariants(prev => prev.map((variant, i) => 
-      i === colorIndex 
-        ? { ...variant, size_variants: variant.size_variants.filter((_, j) => j !== sizeIndex) }
-        : variant
-    ));
+  const removeSizeVariant = (colorIndex: number, sizeIndex: number) => {
+    const updated = [...colorVariants];
+    updated[colorIndex].size_variants = updated[colorIndex].size_variants.filter((_, i) => i !== sizeIndex);
+    setColorVariants(updated);
   };
 
-  const saveVariants = async () => {
+  const handleImageUpload = async (file: File, colorIndex: number) => {
+    if (!file) return;
+
+    setUploadingImages(prev => ({ ...prev, [colorIndex]: true }));
+
     try {
-      setLoading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `color-variant-${Date.now()}-${colorIndex}.${fileExt}`;
+      
+      const { data, error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file);
 
-      for (const variant of colorVariants) {
-        if (!variant.color_name.trim()) continue;
-
-        let colorId = variant.id;
-        
-        if (colorId) {
-          // Update existing color variant
-          await supabase
-            .from('color_variants')
-            .update({
-              color_name: variant.color_name,
-              image_url: variant.image_url,
-              has_sizes: variant.has_sizes
-            })
-            .eq('id', colorId);
-        } else {
-          // Create new color variant
-          const { data: newColor, error: colorError } = await supabase
-            .from('color_variants')
-            .insert({
-              product_id: productId,
-              color_name: variant.color_name,
-              image_url: variant.image_url,
-              has_sizes: variant.has_sizes
-            })
-            .select()
-            .single();
-
-          if (colorError) throw colorError;
-          colorId = newColor.id;
-        }
-
-        // Handle size variants
-        if (variant.has_sizes) {
-          for (const size of variant.size_variants) {
-            if (!size.size_name.trim()) continue;
-
-            if (size.id) {
-              // Update existing size variant
-              await supabase
-                .from('size_variants')
-                .update({
-                  size_name: size.size_name,
-                  size_code: size.size_code
-                })
-                .eq('id', size.id);
-            } else {
-              // Create new size variant
-              await supabase
-                .from('size_variants')
-                .insert({
-                  color_variant_id: colorId,
-                  size_name: size.size_name,
-                  size_code: size.size_code
-                });
-            }
-          }
-        }
+      if (uploadError) {
+        throw uploadError;
       }
 
-      toast({
-        title: 'Success',
-        description: 'Product variants saved successfully',
-      });
+      const { data: urlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
 
-      onVariantsChange();
-      fetchVariants();
-    } catch (error) {
-      console.error('Error saving variants:', error);
+      updateColorVariant(colorIndex, 'image_url', urlData.publicUrl);
+
       toast({
-        title: 'Error',
-        description: 'Failed to save variants',
-        variant: 'destructive',
+        title: "Success",
+        description: "Image uploaded successfully",
+      });
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload image",
+        variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setUploadingImages(prev => ({ ...prev, [colorIndex]: false }));
     }
   };
 
+  const calculateTotalStock = () => {
+    return colorVariants.reduce((total, variant) => {
+      if (hasSizeVariants && variant.size_variants.length > 0) {
+        // Sum all size variant stocks within this color
+        return total + variant.size_variants.reduce((sum, size) => sum + size.stock_quantity, 0);
+      }
+      // Use color variant stock if no size variants
+      return total + (variant.stock_quantity || 0);
+    }, 0);
+  };
+
+  const calculateColorStock = (variant: ColorVariant) => {
+    if (hasSizeVariants && variant.size_variants.length > 0) {
+      return variant.size_variants.reduce((sum, size) => sum + size.stock_quantity, 0);
+    }
+    return variant.stock_quantity || 0;
+  };
+
+  if (!hasColorVariants && !hasSizeVariants) {
+    return null;
+  }
+
+  if (isLoading) {
+    return <div className="text-center py-4">Loading variants...</div>;
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Product Variants</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-semibold">Product Variants</h3>
+          <p className="text-sm text-gray-600">
+            Total Stock: <Badge variant="outline">{calculateTotalStock()}</Badge>
+          </p>
+        </div>
+        {hasColorVariants && (
+          <Button type="button" onClick={addColorVariant} variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Color
+          </Button>
+        )}
+      </div>
+
+      <div className="space-y-4">
         {colorVariants.map((variant, colorIndex) => (
-          <div key={colorIndex} className="border rounded-lg p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium">Color Variant {colorIndex + 1}</h4>
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={() => removeColorVariant(colorIndex)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Color Name</Label>
-                <Input
-                  value={variant.color_name}
-                  onChange={(e) => updateColorVariant(colorIndex, 'color_name', e.target.value)}
-                  placeholder="Enter color name"
-                />
-              </div>
-              <div>
-                <Label>Image URL</Label>
-                <Input
-                  value={variant.image_url || ''}
-                  onChange={(e) => updateColorVariant(colorIndex, 'image_url', e.target.value)}
-                  placeholder="Enter image URL"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={variant.has_sizes}
-                onChange={(e) => updateColorVariant(colorIndex, 'has_sizes', e.target.checked)}
-              />
-              <Label>Has Size Variants</Label>
-            </div>
-
-            {variant.has_sizes && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Size Variants</Label>
+          <Card key={colorIndex} className="p-4">
+            <CardHeader className="pb-3">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center space-x-2">
+                  <CardTitle className="text-base">
+                    {hasColorVariants ? `${variant.color_name || `Color ${colorIndex + 1}`}` : 'Sizes'}
+                  </CardTitle>
+                  <Badge variant="secondary">
+                    Stock: {calculateColorStock(variant)}
+                  </Badge>
+                </div>
+                {hasColorVariants && (
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    onClick={() => addSizeVariant(colorIndex)}
+                    onClick={() => removeColorVariant(colorIndex)}
+                    className="text-red-600 hover:text-red-700"
                   >
-                    Add Size
+                    <Trash2 className="h-4 w-4" />
                   </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {hasColorVariants && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Color Name *</Label>
+                    <Input
+                      value={variant.color_name}
+                      onChange={(e) => updateColorVariant(colorIndex, 'color_name', e.target.value)}
+                      placeholder="e.g., Red, Blue, Black"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label>Color Image</Label>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(file, colorIndex);
+                        }}
+                        disabled={uploadingImages[colorIndex]}
+                      />
+                      {uploadingImages[colorIndex] && (
+                        <div className="text-sm text-gray-500">Uploading...</div>
+                      )}
+                    </div>
+                    {variant.image_url && (
+                      <div className="mt-2">
+                        <img 
+                          src={variant.image_url} 
+                          alt={variant.color_name}
+                          className="w-16 h-16 object-cover rounded border"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
+              )}
 
-                {variant.size_variants.map((size, sizeIndex) => (
-                  <div key={sizeIndex} className="flex items-center space-x-2">
-                    <Input
-                      value={size.size_name}
-                      onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_name', e.target.value)}
-                      placeholder="Size name (e.g., Small)"
-                      className="flex-1"
-                    />
-                    <Input
-                      value={size.size_code || ''}
-                      onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_code', e.target.value)}
-                      placeholder="Size code (e.g., S)"
-                      className="w-24"
-                    />
+              {!hasSizeVariants && hasColorVariants && (
+                <div>
+                  <Label>Stock Quantity</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={variant.stock_quantity || 0}
+                    onChange={(e) => updateColorVariant(colorIndex, 'stock_quantity', parseInt(e.target.value) || 0)}
+                  />
+                </div>
+              )}
+
+              {hasSizeVariants && (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-sm font-medium">Size Variants</Label>
                     <Button
                       type="button"
-                      variant="destructive"
+                      onClick={() => addSizeVariant(colorIndex)}
+                      variant="outline"
                       size="sm"
-                      onClick={() => removeSizeVariant(colorIndex, sizeIndex)}
                     >
-                      <X className="h-4 w-4" />
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Size
                     </Button>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
 
-        <div className="flex justify-between">
-          <Button type="button" variant="outline" onClick={addColorVariant}>
-            Add Color Variant
+                  <div className="space-y-2">
+                    {variant.size_variants && variant.size_variants.length > 0 ? (
+                      variant.size_variants.map((sizeVariant, sizeIndex) => (
+                        <div key={sizeIndex} className="grid grid-cols-12 gap-2 items-center p-3 border rounded">
+                          <div className="col-span-3">
+                            <Input
+                              placeholder="Size name (S, M, L)"
+                              value={sizeVariant.size_name}
+                              onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_name', e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Input
+                              placeholder="Code"
+                              value={sizeVariant.size_code || ''}
+                              onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_code', e.target.value)}
+                            />
+                          </div>
+                          <div className="col-span-3">
+                            <Input
+                              type="number"
+                              min="0"
+                              placeholder="Stock"
+                              value={sizeVariant.stock_quantity}
+                              onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'stock_quantity', parseInt(e.target.value) || 0)}
+                            />
+                          </div>
+                          <div className="col-span-4 flex justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeSizeVariant(colorIndex, sizeIndex)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500 text-center py-4">
+                        No sizes added yet. Click "Add Size" to get started.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {hasColorVariants && colorVariants.length === 0 && (
+        <Card className="p-8 text-center">
+          <p className="text-gray-500 mb-4">No color variants added yet.</p>
+          <Button type="button" onClick={addColorVariant} variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            Add First Color Variant
           </Button>
-          <Button onClick={saveVariants} disabled={loading}>
-            {loading ? 'Saving...' : 'Save Variants'}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </Card>
+      )}
+    </div>
   );
 }
