@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,13 +7,14 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { RobustCartProvider } from "@/hooks/useRobustCart";
 import Index from "./pages/Index";
-import Category from "./pages/Category";
-import Product from "./pages/Product";
+import Categories from "./pages/Categories";
+import CategoryPage from "./pages/CategoryPage";
+import SubcategoryPage from "./pages/SubcategoryPage";
+import Products from "./pages/Products";
 import Checkout from "./pages/Checkout";
 import OrderSummary from "./pages/OrderSummary";
 import CustomerOrderSummary from "./pages/CustomerOrderSummary";
-import CustomerOrders from "./pages/CustomerOrders";
-import Faq from "./pages/Faq";
+import FAQ from "./pages/FAQ";
 import Contact from "./pages/Contact";
 
 const queryClient = new QueryClient();
@@ -27,13 +29,14 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/category/:categoryId" element={<Category />} />
-              <Route path="/product/:productId" element={<Product />} />
+              <Route path="/categories" element={<Categories />} />
+              <Route path="/categories/:categoryId" element={<CategoryPage />} />
+              <Route path="/subcategories/:subcategoryId" element={<SubcategoryPage />} />
+              <Route path="/products" element={<Products />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/order-summary/:orderId" element={<OrderSummary />} />
               <Route path="/customer-order-summary/:orderId" element={<CustomerOrderSummary />} />
-              <Route path="/customer-orders" element={<CustomerOrders />} />
-              <Route path="/faq" element={<Faq />} />
+              <Route path="/faq" element={<FAQ />} />
               <Route path="/contact" element={<Contact />} />
             </Routes>
           </BrowserRouter>
