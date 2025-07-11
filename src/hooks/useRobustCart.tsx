@@ -23,9 +23,11 @@ export interface CartItem {
 
 export interface PricingInfo {
   finalPrice: number;
+  currentItemPrice: number;
   mode: 'normal' | 'combo' | 'discount';
   description: string;
   breakdown?: string[];
+  savings?: number;
 }
 
 interface RobustCartContextType {
@@ -346,9 +348,11 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
   const getItemPricing = (item: CartItem): PricingInfo => {
     return {
       finalPrice: item.unitPrice,
+      currentItemPrice: item.unitPrice,
       mode: 'normal' as const,
-      description: `Rs.${item.unitPrice} per item`,
-      breakdown: []
+      description: `Rs. ${item.unitPrice.toFixed(2)} per item`,
+      breakdown: [],
+      savings: 0
     };
   };
 

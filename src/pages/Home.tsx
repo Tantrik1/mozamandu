@@ -1,8 +1,8 @@
 
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { TopBar } from '@/components/customer/TopBar';
-import { HeroSection } from '@/components/customer/HeroSection';
-import { FeaturedProductsCarousel } from '@/components/customer/FeaturedProductsCarousel';
+import { EnhancedHeroSection } from '@/components/customer/EnhancedHeroSection';
+import { EnhancedFeaturedProducts } from '@/components/customer/EnhancedFeaturedProducts';
 import { BrowseSubcategories } from '@/components/customer/BrowseSubcategories';
 import { SubcategoryProductTabs } from '@/components/customer/SubcategoryProductTabs';
 import { LatestProducts } from '@/components/customer/LatestProducts';
@@ -20,13 +20,13 @@ export default function Home() {
       <NoticePopup />
       
       {/* Hero Section - Full Viewport */}
-      <HeroSection />
+      <EnhancedHeroSection />
 
       {/* Browse Subcategories */}
       <BrowseSubcategories />
 
       {/* Featured Products Carousel */}
-      <FeaturedProductsCarousel />
+      <EnhancedFeaturedProducts />
 
       {/* Subcategory Product Tabs */}
       <SubcategoryProductTabs />
