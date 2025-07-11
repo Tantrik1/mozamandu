@@ -13,7 +13,8 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
-import { CreateProductVariantForm } from './CreateProductVariantForm';
+import { SmartProductVariantForm } from './SmartProductVariantForm';
+import { InventoryManagementPopup } from './InventoryManagementPopup';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -41,6 +42,7 @@ interface Subcategory {
 }
 
 interface ColorVariant {
+  id?: string;
   color_name: string;
   image_url?: string;
   has_sizes: boolean;
@@ -49,6 +51,7 @@ interface ColorVariant {
 }
 
 interface SizeVariant {
+  id?: string;
   size_name: string;
   size_code?: string;
   stock_quantity: number;
@@ -68,6 +71,8 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [showInventoryPopup, setShowInventoryPopup] = useState(false);
+  const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -106,6 +111,13 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     }
   }, [watchedCategoryId, subcategories, form]);
 
+  // Disable sizes when colors are disabled
+  useEffect(() => {
+    if (!watchedHasColorVariants && watchedHasSizeVariants) {
+      form.setValue('has_size_variants', false);
+    }
+  }, [watchedHasColorVariants, watchedHasSizeVariants, form]);
+
   const fetchCategories = async () => {
     try {
       const { data, error } = await supabase
@@ -140,11 +152,9 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     const file = e.target.files?.[0];
     if (!file) return;
 
-    console.log('Starting image upload for file:', file.name);
     setUploadingImage(true);
     
     try {
-      // Create preview immediately
       const reader = new FileReader();
       reader.onload = (e) => {
         setImagePreview(e.target?.result as string);
@@ -153,7 +163,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
 
       setImageFile(file);
       
-      console.log('Image prepared for upload');
       toast({
         title: 'Success',
         description: 'Image ready for upload',
@@ -208,7 +217,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     setLoading(true);
     try {
       console.log('Creating product with data:', data);
-      console.log('Color variants:', colorVariants);
 
       let imageUrl = null;
       if (imageFile) {
@@ -240,41 +248,21 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       if (error) throw error;
 
       console.log('Created product:', newProduct);
+      setCreatedProductId(newProduct.id);
 
-      // Create inventory record for simple products
-      if (!data.has_color_variants && !data.has_size_variants) {
-        const inventoryData = {
-          product_id: newProduct.id,
-          sku: `${data.name.toUpperCase().replace(/\s+/g, '')}-001`,
-          product_name: data.name,
-          stock_quantity: data.stock_quantity || 0,
-          cost_price: data.cost_price,
-          selling_price: data.selling_price || data.cost_price,
-          low_stock_threshold: 10,
-          is_active: true,
-        };
-
-        const { error: inventoryError } = await supabase
-          .from('product_inventory')
-          .insert(inventoryData);
-
-        if (inventoryError) {
-          console.error('Error creating inventory record:', inventoryError);
-          throw inventoryError;
-        }
-      }
-
-      // Save color variants if enabled
+      // Create color variants and size variants first
       if (data.has_color_variants && colorVariants.length > 0) {
         await saveColorVariants(newProduct.id, data.has_size_variants);
       }
 
+      // Show inventory management popup
+      setShowInventoryPopup(true);
+
       toast({
         title: 'Success',
-        description: 'Product created successfully',
+        description: 'Product created successfully. Please configure inventory.',
       });
 
-      onSave();
     } catch (error) {
       console.error('Error creating product:', error);
       toast({
@@ -339,6 +327,11 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       console.error('Error saving color variants:', error);
       throw error;
     }
+  };
+
+  const handleInventoryComplete = () => {
+    setShowInventoryPopup(false);
+    onSave();
   };
 
   return (
@@ -475,6 +468,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                         form.setValue('has_color_variants', checked);
                         if (!checked) {
                           setColorVariants([]);
+                          form.setValue('has_size_variants', false);
                         }
                       }}
                     />
@@ -488,20 +482,24 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                       onCheckedChange={(checked) => {
                         form.setValue('has_size_variants', checked);
                       }}
+                      disabled={!watchedHasColorVariants}
                     />
-                    <Label htmlFor="has_size_variants">Sizes</Label>
+                    <Label htmlFor="has_size_variants" className={!watchedHasColorVariants ? 'text-gray-400' : ''}>
+                      Sizes {!watchedHasColorVariants && '(Enable Colors first)'}
+                    </Label>
                   </div>
                 </div>
 
                 {!watchedHasColorVariants && !watchedHasSizeVariants && (
                   <div>
-                    <Label htmlFor="stock_quantity">Stock Quantity *</Label>
+                    <Label htmlFor="stock_quantity">Initial Stock Quantity</Label>
                     <Input
                       id="stock_quantity"
                       type="number"
                       {...form.register('stock_quantity', { valueAsNumber: true })}
                       placeholder="0"
                     />
+                    <p className="text-sm text-gray-500 mt-1">You can adjust this in the inventory popup after creation</p>
                   </div>
                 )}
 
@@ -577,7 +575,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
         </Card>
 
         {(watchedHasColorVariants || watchedHasSizeVariants) && (
-          <CreateProductVariantForm
+          <SmartProductVariantForm
             hasColorVariants={watchedHasColorVariants}
             hasSizeVariants={watchedHasSizeVariants}
             onVariantsChange={setColorVariants}
@@ -593,6 +591,14 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
           </Button>
         </div>
       </form>
+
+      {showInventoryPopup && createdProductId && (
+        <InventoryManagementPopup
+          productId={createdProductId}
+          onClose={handleInventoryComplete}
+          isOpen={showInventoryPopup}
+        />
+      )}
     </div>
   );
 }

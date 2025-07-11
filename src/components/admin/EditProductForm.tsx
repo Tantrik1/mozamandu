@@ -11,7 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
+import { ArrowLeft, Upload, Eye, X, Settings } from 'lucide-react';
+import { SmartProductVariantForm } from './SmartProductVariantForm';
+import { InventoryManagementPopup } from './InventoryManagementPopup';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -22,7 +24,7 @@ const productSchema = z.object({
   subcategory_id: z.string().min(1, 'Subcategory is required'),
   is_featured: z.boolean().default(false),
   has_color_variants: z.boolean().default(false),
-  color_has_size_variants: z.boolean().default(false),
+  has_size_variants: z.boolean().default(false),
   status: z.enum(['active', 'inactive']).default('active'),
 });
 
@@ -37,21 +39,20 @@ interface Subcategory {
   category_id: string;
 }
 
-interface Product {
-  id: string;
-  name: string;
-  description: string | null;
-  cost_price: number;
-  selling_price: number | null;
-  category_id: string;
-  subcategory_id: string;
-  image_url: string | null;
-  is_featured: boolean;
-  has_color_variants: boolean;
-  color_has_size_variants: boolean;
-  status: 'active' | 'inactive';
-  created_at: string;
-  updated_at: string;
+interface ColorVariant {
+  id?: string;
+  color_name: string;
+  image_url?: string;
+  has_sizes: boolean;
+  stock_quantity?: number;
+  size_variants: SizeVariant[];
+}
+
+interface SizeVariant {
+  id?: string;
+  size_name: string;
+  size_code?: string;
+  stock_quantity: number;
 }
 
 interface EditProductFormProps {
@@ -64,11 +65,12 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [filteredSubcategories, setFilteredSubcategories] = useState<Subcategory[]>([]);
-  const [product, setProduct] = useState<Product | null>(null);
+  const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [showInventoryPopup, setShowInventoryPopup] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -82,17 +84,19 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       subcategory_id: '',
       is_featured: false,
       has_color_variants: false,
-      color_has_size_variants: false,
+      has_size_variants: false,
       status: 'active',
     },
   });
 
   const watchedCategoryId = form.watch('category_id');
+  const watchedHasColorVariants = form.watch('has_color_variants');
+  const watchedHasSizeVariants = form.watch('has_size_variants');
 
   useEffect(() => {
-    fetchProduct();
     fetchCategories();
     fetchSubcategories();
+    fetchProduct();
   }, [productId]);
 
   useEffect(() => {
@@ -104,41 +108,12 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     }
   }, [watchedCategoryId, subcategories]);
 
-  const fetchProduct = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', productId)
-        .single();
-
-      if (error) throw error;
-      
-      setProduct(data);
-      setImagePreview(data.image_url);
-      
-      // Set form values
-      form.reset({
-        name: data.name,
-        description: data.description || '',
-        cost_price: data.cost_price,
-        selling_price: data.selling_price || 0,
-        category_id: data.category_id,
-        subcategory_id: data.subcategory_id,
-        is_featured: data.is_featured,
-        has_color_variants: data.has_color_variants,
-        color_has_size_variants: data.color_has_size_variants || false,
-        status: data.status,
-      });
-    } catch (error) {
-      console.error('Error fetching product:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch product details',
-        variant: 'destructive',
-      });
+  // Disable sizes when colors are disabled
+  useEffect(() => {
+    if (!watchedHasColorVariants && watchedHasSizeVariants) {
+      form.setValue('has_size_variants', false);
     }
-  };
+  }, [watchedHasColorVariants, watchedHasSizeVariants, form]);
 
   const fetchCategories = async () => {
     try {
@@ -167,7 +142,41 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       setSubcategories(data || []);
     } catch (error) {
       console.error('Error fetching subcategories:', error);
-    }  
+    }
+  };
+
+  const fetchProduct = async () => {
+    try {
+      const { data: product, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+
+      if (error) throw error;
+
+      form.reset({
+        name: product.name,
+        description: product.description || '',
+        cost_price: product.cost_price,
+        selling_price: product.selling_price || 0,
+        category_id: product.category_id,
+        subcategory_id: product.subcategory_id,
+        is_featured: product.is_featured,
+        has_color_variants: product.has_color_variants,
+        has_size_variants: product.color_has_size_variants || false,
+        status: product.status,
+      });
+
+      setImagePreview(product.image_url);
+    } catch (error) {
+      console.error('Error fetching product:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load product',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -187,13 +196,13 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       
       toast({
         title: 'Success',
-        description: 'Image selected successfully',
+        description: 'Image ready for upload',
       });
     } catch (error) {
-      console.error('Error handling image:', error);
+      console.error('Error preparing image:', error);
       toast({
         title: 'Error',
-        description: 'Failed to handle image',
+        description: 'Failed to prepare image',
         variant: 'destructive',
       });
     } finally {
@@ -203,7 +212,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   const removeImage = () => {
     setImageFile(null);
-    setImagePreview(product?.image_url || null);
+    setImagePreview(null);
   };
 
   const uploadImageAndGetUrl = async (): Promise<string | null> => {
@@ -238,7 +247,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const onSubmit = async (data: z.infer<typeof productSchema>) => {
     setLoading(true);
     try {
-      let imageUrl = product?.image_url;
+      let imageUrl = imagePreview;
       if (imageFile) {
         const newImageUrl = await uploadImageAndGetUrl();
         if (newImageUrl) {
@@ -246,7 +255,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         }
       }
 
-      const updateData = {
+      const productData = {
         name: data.name,
         description: data.description || null,
         cost_price: data.cost_price,
@@ -255,7 +264,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         subcategory_id: data.subcategory_id,
         is_featured: data.is_featured,
         has_color_variants: data.has_color_variants,
-        color_has_size_variants: data.color_has_size_variants,
+        color_has_size_variants: data.has_size_variants,
         status: data.status,
         image_url: imageUrl,
         updated_at: new Date().toISOString(),
@@ -263,7 +272,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
       const { error } = await supabase
         .from('products')
-        .update(updateData)
+        .update(productData)
         .eq('id', productId);
 
       if (error) throw error;
@@ -286,10 +295,6 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     }
   };
 
-  if (!product) {
-    return <div className="flex justify-center p-8">Loading product...</div>;
-  }
-
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -300,6 +305,13 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
           </Button>
           <h2 className="text-2xl font-bold">Edit Product</h2>
         </div>
+        <Button
+          variant="outline"
+          onClick={() => setShowInventoryPopup(true)}
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          Manage Inventory
+        </Button>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -420,18 +432,29 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                     <Switch
                       id="has_color_variants"
                       checked={form.watch('has_color_variants')}
-                      onCheckedChange={(checked) => form.setValue('has_color_variants', checked)}
+                      onCheckedChange={(checked) => {
+                        form.setValue('has_color_variants', checked);
+                        if (!checked) {
+                          setColorVariants([]);
+                          form.setValue('has_size_variants', false);
+                        }
+                      }}
                     />
                     <Label htmlFor="has_color_variants">Colors</Label>
                   </div>
 
                   <div className="flex items-center space-x-2">
                     <Switch
-                      id="color_has_size_variants"
-                      checked={form.watch('color_has_size_variants')}
-                      onCheckedChange={(checked) => form.setValue('color_has_size_variants', checked)}
+                      id="has_size_variants"
+                      checked={form.watch('has_size_variants')}
+                      onCheckedChange={(checked) => {
+                        form.setValue('has_size_variants', checked);
+                      }}
+                      disabled={!watchedHasColorVariants}
                     />
-                    <Label htmlFor="color_has_size_variants">Sizes</Label>
+                    <Label htmlFor="has_size_variants" className={!watchedHasColorVariants ? 'text-gray-400' : ''}>
+                      Sizes {!watchedHasColorVariants && '(Enable Colors first)'}
+                    </Label>
                   </div>
                 </div>
 
@@ -469,7 +492,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                       className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      {uploadingImage ? 'Processing...' : 'Change Image'}
+                      {uploadingImage ? 'Preparing...' : 'Change Image'}
                     </label>
                   </div>
 
@@ -489,16 +512,14 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {imageFile && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            onClick={removeImage}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={removeImage}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -507,6 +528,15 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             </div>
           </CardContent>
         </Card>
+
+        {(watchedHasColorVariants || watchedHasSizeVariants) && (
+          <SmartProductVariantForm
+            productId={productId}
+            hasColorVariants={watchedHasColorVariants}
+            hasSizeVariants={watchedHasSizeVariants}
+            onVariantsChange={setColorVariants}
+          />
+        )}
 
         <div className="flex justify-end space-x-4">
           <Button type="button" variant="outline" onClick={onCancel}>
@@ -517,6 +547,14 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
           </Button>
         </div>
       </form>
+
+      {showInventoryPopup && (
+        <InventoryManagementPopup
+          productId={productId}
+          onClose={() => setShowInventoryPopup(false)}
+          isOpen={showInventoryPopup}
+        />
+      )}
     </div>
   );
 }
