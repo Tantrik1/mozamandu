@@ -21,6 +21,13 @@ export interface CartItem {
   subcategoryId: string;
 }
 
+export interface PricingInfo {
+  finalPrice: number;
+  mode: 'normal' | 'combo' | 'discount';
+  description: string;
+  breakdown?: string[];
+}
+
 interface RobustCartContextType {
   cartItems: CartItem[];
   loading: boolean;
@@ -39,12 +46,7 @@ interface RobustCartContextType {
   getCartTotal: () => number;
   getTotalItems: () => number;
   getCartCount: () => number;
-  getItemPricing: (item: CartItem) => {
-    finalPrice: number;
-    mode: string;
-    description: string;
-    breakdown?: string[];
-  };
+  getItemPricing: (item: CartItem) => PricingInfo;
   activeCombo: any;
 }
 
@@ -341,10 +343,10 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
     return getTotalItems();
   };
 
-  const getItemPricing = (item: CartItem) => {
+  const getItemPricing = (item: CartItem): PricingInfo => {
     return {
       finalPrice: item.unitPrice,
-      mode: 'normal',
+      mode: 'normal' as const,
       description: `Rs.${item.unitPrice} per item`,
       breakdown: []
     };
