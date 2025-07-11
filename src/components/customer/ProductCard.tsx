@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
-import { useCart } from '@/hooks/useCart';
+import { useRobustCart } from '@/hooks/useRobustCart';
 import { StockDisplay } from './StockDisplay';
 import { getProductStockSummary } from '@/utils/stockCalculation';
 
@@ -53,7 +53,7 @@ export function ProductCard({ product, subcategorySellingPrice }: ProductCardPro
   const [loading, setLoading] = useState(false);
   const [productStock, setProductStock] = useState<number>(0);
   
-  const { addToCart } = useCart();
+  const { addToCart } = useRobustCart();
 
   useEffect(() => {
     if (product.has_color_variants) {
@@ -87,10 +87,9 @@ export function ProductCard({ product, subcategorySellingPrice }: ProductCardPro
 
       if (error) throw error;
 
-      // Map the data to include stock_quantity (will be managed via inventory)
       const variantsWithStock = (data || []).map(variant => ({
         ...variant,
-        stock_quantity: 0, // Will be calculated from inventory
+        stock_quantity: 0,
       }));
 
       setColorVariants(variantsWithStock);
@@ -111,10 +110,9 @@ export function ProductCard({ product, subcategorySellingPrice }: ProductCardPro
 
       if (error) throw error;
 
-      // Map the data to include stock_quantity (will be managed via inventory)
       const sizeVariantsWithStock = (data || []).map(variant => ({
         ...variant,
-        stock_quantity: 0, // Will be calculated from inventory
+        stock_quantity: 0,
       }));
 
       setSizeVariants(sizeVariantsWithStock);

@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getVariantStock } from '@/utils/stockCalculation';
@@ -10,6 +10,7 @@ export interface CartItem {
   productName: string;
   quantity: number;
   unitPrice: number;
+  basePrice: number;
   totalPrice: number;
   colorVariantId?: string;
   colorName?: string;
@@ -17,9 +18,39 @@ export interface CartItem {
   sizeName?: string;
   imageUrl?: string;
   maxStock: number;
+  subcategoryId: string;
 }
 
-export function useRobustCart() {
+interface RobustCartContextType {
+  cartItems: CartItem[];
+  loading: boolean;
+  addToCart: (params: {
+    productId: string;
+    productName: string;
+    quantity?: number;
+    unitPrice: number;
+    colorVariantId?: string;
+    sizeVariantId?: string;
+  }) => Promise<boolean>;
+  updateQuantity: (itemId: string, newQuantity: number) => Promise<void>;
+  removeFromCart: (itemId: string) => void;
+  clearCart: () => void;
+  getTotalPrice: () => number;
+  getCartTotal: () => number;
+  getTotalItems: () => number;
+  getCartCount: () => number;
+  getItemPricing: (item: CartItem) => {
+    finalPrice: number;
+    mode: string;
+    description: string;
+    breakdown?: string[];
+  };
+  activeCombo: any;
+}
+
+const RobustCartContext = createContext<RobustCartContextType | undefined>(undefined);
+
+export function RobustCartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -59,7 +90,7 @@ export function useRobustCart() {
   const getProductDetails = async (productId: string) => {
     const { data, error } = await supabase
       .from('products')
-      .select('name, image_url')
+      .select('name, image_url, subcategory_id')
       .eq('id', productId)
       .single();
 
@@ -107,7 +138,6 @@ export function useRobustCart() {
     requestedQuantity: number = 1
   ): Promise<{ available: boolean; maxStock: number }> => {
     try {
-      // Use the inventory system to check stock
       const stockData = await getVariantStock(productId, colorVariantId, sizeVariantId);
       
       if (!stockData) {
@@ -142,7 +172,6 @@ export function useRobustCart() {
     try {
       setLoading(true);
 
-      // Check stock availability
       const stockCheck = await checkStockAvailability(productId, colorVariantId, sizeVariantId, quantity);
       
       if (!stockCheck.available) {
@@ -154,7 +183,6 @@ export function useRobustCart() {
         return false;
       }
 
-      // Check if item already exists in cart
       const existingItemIndex = cartItems.findIndex(
         item =>
           item.productId === productId &&
@@ -163,11 +191,9 @@ export function useRobustCart() {
       );
 
       if (existingItemIndex !== -1) {
-        // Update existing item
         const existingItem = cartItems[existingItemIndex];
         const newQuantity = existingItem.quantity + quantity;
 
-        // Check if new quantity exceeds stock
         const newStockCheck = await checkStockAvailability(productId, colorVariantId, sizeVariantId, newQuantity);
         
         if (!newStockCheck.available) {
@@ -188,7 +214,6 @@ export function useRobustCart() {
         };
         setCartItems(updatedItems);
       } else {
-        // Add new item
         const productDetails = await getProductDetails(productId);
         const variantDetails = await getVariantDetails(colorVariantId, sizeVariantId);
 
@@ -198,6 +223,7 @@ export function useRobustCart() {
           productName: productName || productDetails.name,
           quantity,
           unitPrice,
+          basePrice: unitPrice,
           totalPrice: quantity * unitPrice,
           colorVariantId,
           colorName: variantDetails.colorName,
@@ -205,6 +231,7 @@ export function useRobustCart() {
           sizeName: variantDetails.sizeName,
           imageUrl: variantDetails.imageUrl || productDetails.image_url,
           maxStock: stockCheck.maxStock,
+          subcategoryId: productDetails.subcategory_id,
         };
 
         setCartItems(prev => [...prev, newItem]);
@@ -241,7 +268,6 @@ export function useRobustCart() {
     try {
       setLoading(true);
 
-      // Check stock availability for new quantity
       const stockCheck = await checkStockAvailability(
         item.productId,
         item.colorVariantId,
@@ -299,22 +325,57 @@ export function useRobustCart() {
     });
   };
 
-  const getCartTotal = () => {
+  const getTotalPrice = () => {
     return cartItems.reduce((total, item) => total + item.totalPrice, 0);
   };
 
-  const getCartCount = () => {
+  const getCartTotal = () => {
+    return getTotalPrice();
+  };
+
+  const getTotalItems = () => {
     return cartItems.reduce((count, item) => count + item.quantity, 0);
   };
 
-  return {
+  const getCartCount = () => {
+    return getTotalItems();
+  };
+
+  const getItemPricing = (item: CartItem) => {
+    return {
+      finalPrice: item.unitPrice,
+      mode: 'normal',
+      description: `Rs.${item.unitPrice} per item`,
+      breakdown: []
+    };
+  };
+
+  const contextValue: RobustCartContextType = {
     cartItems,
     loading,
     addToCart,
     updateQuantity,
     removeFromCart,
     clearCart,
+    getTotalPrice,
     getCartTotal,
+    getTotalItems,
     getCartCount,
+    getItemPricing,
+    activeCombo: null,
   };
+
+  return (
+    <RobustCartContext.Provider value={contextValue}>
+      {children}
+    </RobustCartContext.Provider>
+  );
+}
+
+export function useRobustCart() {
+  const context = useContext(RobustCartContext);
+  if (context === undefined) {
+    throw new Error('useRobustCart must be used within a RobustCartProvider');
+  }
+  return context;
 }

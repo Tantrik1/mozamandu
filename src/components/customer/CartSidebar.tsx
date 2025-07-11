@@ -145,9 +145,9 @@ export function CartSidebar() {
 
                     return (
                       <div key={item.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                        {item.image_url && (
+                        {item.imageUrl && (
                           <img 
-                            src={item.image_url} 
+                            src={item.imageUrl} 
                             alt={item.productName}
                             className="w-12 h-12 object-cover rounded-md flex-shrink-0"
                           />
