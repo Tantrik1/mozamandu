@@ -14,7 +14,6 @@ import { DeliveryLocationSelector } from './DeliveryLocationSelector';
 import { PromoCodeSection } from './PromoCodeSection';
 import { PaymentMethodSection } from './PaymentMethodSection';
 import { OrderSummaryCard } from './OrderSummaryCard';
-import { reduceStockForOrder } from '@/utils/stockManagement';
 
 interface FormErrors {
   [key: string]: string;
@@ -206,21 +205,6 @@ export function UniversalCheckout() {
         if (!paymentScreenshotUrl) {
           console.warn('Payment screenshot upload failed, but continuing with order');
         }
-      }
-
-      // Reduce stock before creating order
-      console.log('Reducing stock for order items...');
-      try {
-        await reduceStockForOrder(cartItems);
-        console.log('Stock reduced successfully');
-      } catch (stockError) {
-        console.error('Stock reduction failed:', stockError);
-        toast({
-          title: "Stock Error",
-          description: "There was an error updating stock. Please try again.",
-          variant: "destructive",
-        });
-        return;
       }
 
       // Prepare base order data
@@ -439,7 +423,7 @@ export function UniversalCheckout() {
       
       toast({
         title: "Order Placed Successfully!",
-        description: `Your order #${orderResult.order_number} has been placed successfully. Stock has been updated and a confirmation email has been sent.`,
+        description: `Your order #${orderResult.order_number} has been placed successfully. A confirmation email has been sent.`,
       });
 
       // Redirect to appropriate order summary page
@@ -448,18 +432,6 @@ export function UniversalCheckout() {
       
     } catch (error) {
       console.error('Error creating order:', error);
-      
-      // If order creation fails after stock reduction, we should restore stock
-      try {
-        console.log('Restoring stock due to order creation failure...');
-        await reduceStockForOrder(cartItems.map(item => ({
-          ...item,
-          quantity: -item.quantity // Reverse the reduction
-        })));
-      } catch (restoreError) {
-        console.error('Failed to restore stock:', restoreError);
-      }
-      
       toast({
         title: "Order Failed",
         description: error instanceof Error ? error.message : "There was an error placing your order. Please try again.",
