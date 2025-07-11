@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, Upload, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useInventoryManager } from '@/hooks/useInventoryManager';
 
 interface SizeVariant {
   id?: string;
@@ -43,6 +43,7 @@ export function SmartProductVariantForm({
   const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
   const [uploadingImages, setUploadingImages] = useState<{[key: number]: boolean}>({});
   const [isLoading, setIsLoading] = useState(false);
+  const { createInventoryRecord } = useInventoryManager();
 
   useEffect(() => {
     console.log('SmartProductVariantForm initialized:', {
@@ -57,7 +58,6 @@ export function SmartProductVariantForm({
     } else if (productId && hasColorVariants) {
       fetchExistingVariants();
     } else {
-      // Reset variants when switching variant types
       setColorVariants([]);
     }
   }, [productId, hasColorVariants, hasSizeVariants]);
@@ -104,7 +104,12 @@ export function SmartProductVariantForm({
             if (sizeError) {
               console.error('Error fetching size variants:', sizeError);
             } else {
-              sizeVariants = sizeData || [];
+              sizeVariants = (sizeData || []).map(sv => ({
+                id: sv.id,
+                size_name: sv.size_name,
+                size_code: sv.size_code || '',
+                stock_quantity: 0, // Will be managed through inventory
+              }));
             }
           }
 
@@ -113,7 +118,7 @@ export function SmartProductVariantForm({
             color_name: colorVariant.color_name,
             image_url: colorVariant.image_url,
             has_sizes: Boolean(colorVariant.has_sizes),
-            stock_quantity: colorVariant.stock_quantity || 0,
+            stock_quantity: 0, // Will be managed through inventory
             size_variants: sizeVariants
           };
         })
@@ -237,7 +242,7 @@ export function SmartProductVariantForm({
   if (isLoading) {
     return <div className="text-center py-4">Loading variants...</div>;
   }
-
+  
   // Case 1: No variants at all
   if (!hasColorVariants && !hasSizeVariants) {
     return (

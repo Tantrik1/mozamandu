@@ -1,367 +1,281 @@
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-import { useCartPricing } from './useCartPricing';
-import { useComboManager } from './useComboManager';
+import { useToast } from '@/hooks/use-toast';
+import { getVariantStock } from '@/utils/stockCalculation';
 
-interface CartItem {
+export interface CartItem {
   id: string;
   productId: string;
   productName: string;
-  colorVariantId?: string | null;
-  sizeVariantId?: string | null;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  colorVariantId?: string;
   colorName?: string;
+  sizeVariantId?: string;
   sizeName?: string;
-  quantity: number;
-  basePrice: number;
-  subcategoryId: string;
-  image_url?: string;
+  imageUrl?: string;
+  maxStock: number;
 }
 
-interface AddToCartParams {
-  productId: string;
-  colorVariantId?: string | null;
-  sizeVariantId?: string | null;
-  quantity: number;
-}
-
-interface SubcategoryData {
-  id: string;
-  name: string;
-  selling_price: number;  
-  minimum_quantity: number;
-}
-
-interface ComboData {
-  id: string;
-  name: string;
-  description: string;
-  combo_subcategories: {
-    subcategory_id: string;
-    min_units: number;
-    price: number;
-  }[];
-}
-
-interface DiscountTier {
-  min_quantity: number;
-  max_quantity: number | null;
-  discount_amount: number;
-}
-
-interface PricingInfo {
-  finalPrice: number;
-  description: string;
-  mode: 'normal' | 'discount' | 'combo';
-  isCombo?: boolean;
-  breakdown?: string[];
-}
-
-interface CartContextType {
-  cartItems: CartItem[];
-  addToCart: (params: AddToCartParams) => Promise<void>;
-  removeFromCart: (itemId: string) => void;
-  updateQuantity: (itemId: string, quantity: number) => void;
-  clearCart: () => void;
-  getTotalPrice: () => number;
-  getTotalItems: () => number;
-  getItemPricing: (item: CartItem) => PricingInfo;
-  activeCombo: ComboData | null;
-  loading: boolean;
-  error: string | null;
-}
-
-const CartContext = createContext<CartContextType | undefined>(undefined);
-
-export function RobustCartProvider({ children }: { children: ReactNode }) {
+export function useRobustCart() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [subcategoriesData, setSubcategoriesData] = useState<{ [key: string]: SubcategoryData }>({});
-  const [discountTiers, setDiscountTiers] = useState<{ [key: string]: DiscountTier[] }>({});
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const { activeCombo } = useComboManager({ cartItems });
-
-  const { getItemPricing, getTotalPrice: calculateTotalPrice } = useCartPricing({
-    cartItems,
-    activeCombo,
-    discountTiers
-  });
+  const { toast } = useToast();
 
   useEffect(() => {
     loadCartFromStorage();
-    fetchSubcategoriesData();
-    fetchDiscountTiers();
   }, []);
 
   useEffect(() => {
     saveCartToStorage();
   }, [cartItems]);
 
-  const setErrorWithTimeout = (message: string) => {
-    setError(message);
-    setTimeout(() => setError(null), 5000);
-  };
-
-  const fetchSubcategoriesData = async () => {
-    try {
-      console.log('Fetching subcategories data...');
-      const { data, error } = await supabase
-        .from('subcategories')
-        .select('id, name, selling_price, minimum_quantity')
-        .eq('status', 'on');
-
-      if (error) {
-        console.error('Error fetching subcategories:', error);
-        setErrorWithTimeout('Failed to load pricing data');
-        return;
-      }
-
-      const subcategoriesMap = data?.reduce((acc, sub) => {
-        acc[sub.id] = sub;
-        return acc;
-      }, {} as { [key: string]: SubcategoryData }) || {};
-      
-      console.log('Loaded subcategories:', Object.keys(subcategoriesMap).length);
-      setSubcategoriesData(subcategoriesMap);
-    } catch (error) {
-      console.error('Unexpected error fetching subcategories:', error);
-      setErrorWithTimeout('Failed to load pricing data');
-    }
-  };
-
-  const fetchDiscountTiers = async () => {
-    try {
-      console.log('Fetching discount tiers...');
-      const { data, error } = await supabase
-        .from('discount_tiers')
-        .select('*')
-        .order('subcategory_id')
-        .order('min_quantity');
-
-      if (error) {
-        console.error('Error fetching discount tiers:', error);
-        return;
-      }
-
-      const tiersMap = data?.reduce((acc, tier) => {
-        if (!acc[tier.subcategory_id]) {
-          acc[tier.subcategory_id] = [];
-        }
-        acc[tier.subcategory_id].push(tier);
-        return acc;
-      }, {} as { [key: string]: DiscountTier[] }) || {};
-      
-      console.log('Loaded discount tiers for subcategories:', Object.keys(tiersMap).length);
-      setDiscountTiers(tiersMap);
-    } catch (error) {
-      console.error('Unexpected error fetching discount tiers:', error);
-    }
-  };
-
   const loadCartFromStorage = () => {
     try {
       const savedCart = localStorage.getItem('cart');
       if (savedCart) {
         const parsedCart = JSON.parse(savedCart);
-        console.log('Loaded cart from storage:', parsedCart.length, 'items');
         setCartItems(parsedCart);
       }
     } catch (error) {
       console.error('Error loading cart from storage:', error);
-      localStorage.removeItem('cart');
     }
   };
 
   const saveCartToStorage = () => {
     try {
       localStorage.setItem('cart', JSON.stringify(cartItems));
-      console.log('Saved cart to storage:', cartItems.length, 'items');
     } catch (error) {
       console.error('Error saving cart to storage:', error);
     }
   };
 
-  const validateStock = async (productId: string, colorVariantId: string | null = null, sizeVariantId: string | null = null, requestedQuantity: number): Promise<boolean> => {
-    try {
-      console.log('Validating stock for:', { productId, colorVariantId, sizeVariantId, requestedQuantity });
-      
-      if (sizeVariantId) {
-        const { data, error } = await supabase
-          .from('size_variants')
-          .select('stock_quantity')
-          .eq('id', sizeVariantId)
-          .single();
+  const generateCartId = () => {
+    return Date.now() + Math.random().toString(36).substr(2, 9);
+  };
 
-        if (error || !data) {
-          console.error('Error checking size variant stock:', error);
-          return false;
-        }
+  const getProductDetails = async (productId: string) => {
+    const { data, error } = await supabase
+      .from('products')
+      .select('name, image_url')
+      .eq('id', productId)
+      .single();
 
-        console.log('Size variant stock:', data.stock_quantity);
-        return data.stock_quantity >= requestedQuantity;
-      }
-      
-      if (colorVariantId) {
-        const { data, error } = await supabase
-          .from('color_variants')
-          .select('stock_quantity')
-          .eq('id', colorVariantId)
-          .single();
+    if (error) throw error;
+    return data;
+  };
 
-        if (error || !data) {
-          console.error('Error checking color variant stock:', error);
-          return false;
-        }
+  const getVariantDetails = async (colorVariantId?: string, sizeVariantId?: string) => {
+    let colorName = '';
+    let sizeName = '';
+    let imageUrl = '';
 
-        console.log('Color variant stock:', data.stock_quantity);
-        return data.stock_quantity >= requestedQuantity;
-      }
-      
-      const { data, error } = await supabase
-        .from('products')
-        .select('stock_quantity')
-        .eq('id', productId)
+    if (colorVariantId) {
+      const { data: colorData } = await supabase
+        .from('color_variants')
+        .select('color_name, image_url')
+        .eq('id', colorVariantId)
         .single();
 
-      if (error || !data) {
-        console.error('Error checking product stock:', error);
-        return false;
+      if (colorData) {
+        colorName = colorData.color_name;
+        imageUrl = colorData.image_url || '';
+      }
+    }
+
+    if (sizeVariantId) {
+      const { data: sizeData } = await supabase
+        .from('size_variants')
+        .select('size_name')
+        .eq('id', sizeVariantId)
+        .single();
+
+      if (sizeData) {
+        sizeName = sizeData.size_name;
+      }
+    }
+
+    return { colorName, sizeName, imageUrl };
+  };
+
+  const checkStockAvailability = async (
+    productId: string,
+    colorVariantId?: string,
+    sizeVariantId?: string,
+    requestedQuantity: number = 1
+  ): Promise<{ available: boolean; maxStock: number }> => {
+    try {
+      // Use the inventory system to check stock
+      const stockData = await getVariantStock(productId, colorVariantId, sizeVariantId);
+      
+      if (!stockData) {
+        return { available: false, maxStock: 0 };
       }
 
-      console.log('Product stock:', data.stock_quantity);
-      return data.stock_quantity >= requestedQuantity;
+      return {
+        available: stockData.availableStock >= requestedQuantity,
+        maxStock: stockData.availableStock
+      };
     } catch (error) {
-      console.error('Unexpected error validating stock:', error);
-      return false;
+      console.error('Error checking stock:', error);
+      return { available: false, maxStock: 0 };
     }
   };
 
-  const addToCart = async (params: AddToCartParams) => {
-    setLoading(true);
-    setError(null);
-    
+  const addToCart = async ({
+    productId,
+    productName,
+    quantity = 1,
+    unitPrice,
+    colorVariantId,
+    sizeVariantId,
+  }: {
+    productId: string;
+    productName: string;
+    quantity?: number;
+    unitPrice: number;
+    colorVariantId?: string;
+    sizeVariantId?: string;
+  }) => {
     try {
-      console.log('Adding to cart:', params);
+      setLoading(true);
+
+      // Check stock availability
+      const stockCheck = await checkStockAvailability(productId, colorVariantId, sizeVariantId, quantity);
       
-      const hasStock = await validateStock(
-        params.productId, 
-        params.colorVariantId, 
-        params.sizeVariantId, 
-        params.quantity
+      if (!stockCheck.available) {
+        toast({
+          title: 'Out of Stock',
+          description: `Only ${stockCheck.maxStock} units available`,
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      // Check if item already exists in cart
+      const existingItemIndex = cartItems.findIndex(
+        item =>
+          item.productId === productId &&
+          item.colorVariantId === colorVariantId &&
+          item.sizeVariantId === sizeVariantId
       );
 
-      if (!hasStock) {
-        setErrorWithTimeout('Insufficient stock for this item');
+      if (existingItemIndex !== -1) {
+        // Update existing item
+        const existingItem = cartItems[existingItemIndex];
+        const newQuantity = existingItem.quantity + quantity;
+
+        // Check if new quantity exceeds stock
+        const newStockCheck = await checkStockAvailability(productId, colorVariantId, sizeVariantId, newQuantity);
+        
+        if (!newStockCheck.available) {
+          toast({
+            title: 'Insufficient Stock',
+            description: `Cannot add ${quantity} more items. Only ${newStockCheck.maxStock} units available in total.`,
+            variant: 'destructive',
+          });
+          return false;
+        }
+
+        const updatedItems = [...cartItems];
+        updatedItems[existingItemIndex] = {
+          ...existingItem,
+          quantity: newQuantity,
+          totalPrice: newQuantity * unitPrice,
+          maxStock: newStockCheck.maxStock,
+        };
+        setCartItems(updatedItems);
+      } else {
+        // Add new item
+        const productDetails = await getProductDetails(productId);
+        const variantDetails = await getVariantDetails(colorVariantId, sizeVariantId);
+
+        const newItem: CartItem = {
+          id: generateCartId(),
+          productId,
+          productName: productName || productDetails.name,
+          quantity,
+          unitPrice,
+          totalPrice: quantity * unitPrice,
+          colorVariantId,
+          colorName: variantDetails.colorName,
+          sizeVariantId,
+          sizeName: variantDetails.sizeName,
+          imageUrl: variantDetails.imageUrl || productDetails.image_url,
+          maxStock: stockCheck.maxStock,
+        };
+
+        setCartItems(prev => [...prev, newItem]);
+      }
+
+      toast({
+        title: 'Added to Cart',
+        description: `${quantity} ${productName} added to cart`,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add item to cart',
+        variant: 'destructive',
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateQuantity = async (itemId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      removeFromCart(itemId);
+      return;
+    }
+
+    const item = cartItems.find(item => item.id === itemId);
+    if (!item) return;
+
+    try {
+      setLoading(true);
+
+      // Check stock availability for new quantity
+      const stockCheck = await checkStockAvailability(
+        item.productId,
+        item.colorVariantId,
+        item.sizeVariantId,
+        newQuantity
+      );
+
+      if (!stockCheck.available) {
         toast({
-          title: "Out of Stock",
-          description: "Sorry, we don't have enough stock for this item",
-          variant: "destructive",
+          title: 'Insufficient Stock',
+          description: `Only ${stockCheck.maxStock} units available`,
+          variant: 'destructive',
         });
         return;
       }
 
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .select('name, image_url, subcategory_id, selling_price')
-        .eq('id', params.productId)
-        .single();
-
-      if (productError) {
-        console.error('Error fetching product:', productError);
-        throw new Error('Product not found');
-      }
-
-      let basePrice = product.selling_price;
-      if (!basePrice) {
-        const subcategory = subcategoriesData[product.subcategory_id];
-        basePrice = subcategory?.selling_price || 0;
-      }
-
-      let colorName = '';
-      let sizeName = '';
-
-      if (params.colorVariantId) {
-        const { data: colorVariant } = await supabase
-          .from('color_variants')
-          .select('color_name')
-          .eq('id', params.colorVariantId)
-          .single();
-        colorName = colorVariant?.color_name || '';
-      }
-
-      if (params.sizeVariantId) {
-        const { data: sizeVariant } = await supabase
-          .from('size_variants')
-          .select('size_name')
-          .eq('id', params.sizeVariantId)
-          .single();
-        sizeName = sizeVariant?.size_name || '';
-      }
-
-      const existingItemIndex = cartItems.findIndex(item => 
-        item.productId === params.productId &&
-        item.colorVariantId === params.colorVariantId &&
-        item.sizeVariantId === params.sizeVariantId
+      const updatedItems = cartItems.map(cartItem =>
+        cartItem.id === itemId
+          ? {
+              ...cartItem,
+              quantity: newQuantity,
+              totalPrice: newQuantity * cartItem.unitPrice,
+              maxStock: stockCheck.maxStock,
+            }
+          : cartItem
       );
 
-      if (existingItemIndex >= 0) {
-        const existingItem = cartItems[existingItemIndex];
-        const newQuantity = existingItem.quantity + params.quantity;
-        
-        const hasStockForUpdate = await validateStock(
-          params.productId, 
-          params.colorVariantId, 
-          params.sizeVariantId, 
-          newQuantity
-        );
-
-        if (!hasStockForUpdate) {
-          setErrorWithTimeout('Not enough stock to add more of this item');
-          toast({
-            title: "Insufficient Stock",
-            description: `Only ${existingItem.quantity} items available`,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const updatedItems = [...cartItems];
-        updatedItems[existingItemIndex].quantity = newQuantity;
-        setCartItems(updatedItems);
-        
-        console.log('Updated existing cart item quantity:', newQuantity);
-      } else {
-        const newItem: CartItem = {
-          id: `${params.productId}-${params.colorVariantId || 'no-color'}-${params.sizeVariantId || 'no-size'}`,
-          productId: params.productId,
-          productName: product.name,
-          colorVariantId: params.colorVariantId,
-          sizeVariantId: params.sizeVariantId,
-          colorName,
-          sizeName,
-          quantity: params.quantity,
-          basePrice,
-          subcategoryId: product.subcategory_id,
-          image_url: product.image_url
-        };
-
-        setCartItems(prev => [...prev, newItem]);
-        console.log('Added new cart item:', newItem);
-      }
-
-      toast({
-        title: "Added to Cart",
-        description: `${product.name} has been added to your cart`,
-      });
+      setCartItems(updatedItems);
     } catch (error) {
-      console.error('Error adding to cart:', error);
-      setErrorWithTimeout('Failed to add item to cart');
+      console.error('Error updating quantity:', error);
       toast({
-        title: "Error",
-        description: "Failed to add item to cart",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to update quantity',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -369,89 +283,38 @@ export function RobustCartProvider({ children }: { children: ReactNode }) {
   };
 
   const removeFromCart = (itemId: string) => {
-    console.log('Removing item from cart:', itemId);
     setCartItems(prev => prev.filter(item => item.id !== itemId));
-    
     toast({
-      title: "Removed from Cart",
-      description: "Item has been removed from your cart",
+      title: 'Removed from Cart',
+      description: 'Item removed from cart',
     });
-  };
-
-  const updateQuantity = async (itemId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(itemId);
-      return;
-    }
-
-    const item = cartItems.find(i => i.id === itemId);
-    if (!item) return;
-
-    const hasStock = await validateStock(
-      item.productId,
-      item.colorVariantId,
-      item.sizeVariantId,
-      quantity
-    );
-
-    if (!hasStock) {
-      setErrorWithTimeout('Not enough stock for this quantity');
-      toast({
-        title: "Insufficient Stock",
-        description: "Not enough items in stock for this quantity",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    console.log('Updating cart item quantity:', itemId, 'to', quantity);
-    setCartItems(prev => prev.map(item => 
-      item.id === itemId ? { ...item, quantity } : item
-    ));
   };
 
   const clearCart = () => {
-    console.log('Clearing cart');
     setCartItems([]);
+    localStorage.removeItem('cart');
     toast({
-      title: "Cart Cleared",
-      description: "All items have been removed from your cart",
+      title: 'Cart Cleared',
+      description: 'All items removed from cart',
     });
   };
 
-  const getTotalPrice = (): number => {
-    return calculateTotalPrice();
+  const getCartTotal = () => {
+    return cartItems.reduce((total, item) => total + item.totalPrice, 0);
   };
 
-  const getTotalItems = () => {
-    return cartItems.reduce((total, item) => total + item.quantity, 0);
+  const getCartCount = () => {
+    return cartItems.reduce((count, item) => count + item.quantity, 0);
   };
 
-  const value: CartContextType = {
+  return {
     cartItems,
-    addToCart,
-    removeFromCart,
-    updateQuantity,
-    clearCart,
-    getTotalPrice,
-    getTotalItems,
-    getItemPricing,
-    activeCombo,
     loading,
-    error
+    addToCart,
+    updateQuantity,
+    removeFromCart,
+    clearCart,
+    getCartTotal,
+    getCartCount,
   };
-
-  return (
-    <CartContext.Provider value={value}>
-      {children}
-    </CartContext.Provider>
-  );
-}
-
-export function useRobustCart() {
-  const context = useContext(CartContext);
-  if (context === undefined) {
-    throw new Error('useRobustCart must be used within a RobustCartProvider');
-  }
-  return context;
 }
