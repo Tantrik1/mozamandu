@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, X } from 'lucide-react';
 import { SmartProductVariantForm } from './SmartProductVariantForm';
+import { useInventoryManager } from '@/hooks/useInventoryManager';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -74,6 +74,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
   const { toast } = useToast();
+  const { createInventoryRecord } = useInventoryManager();
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -336,6 +337,11 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
         currentProductId = newProduct.id;
       }
 
+      // Handle inventory creation
+      if (currentProductId) {
+        await createInventoryForProduct(currentProductId, data);
+      }
+
       if (data.has_color_variants && colorVariants.length > 0 && currentProductId) {
         await saveColorVariants(currentProductId, data.has_size_variants);
       }
@@ -355,6 +361,80 @@ export function EnhancedProductForm({ productId, onSave, onCancel }: ProductForm
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createInventoryForProduct = async (currentProductId: string, data: z.infer<typeof productSchema>) => {
+    try {
+      // Get category and subcategory names
+      const [categoryResponse, subcategoryResponse] = await Promise.all([
+        supabase.from('categories').select('name').eq('id', data.category_id).single(),
+        supabase.from('subcategories').select('name').eq('id', data.subcategory_id).single()
+      ]);
+
+      const categoryName = categoryResponse.data?.name || '';
+      const subcategoryName = subcategoryResponse.data?.name || '';
+
+      if (!data.has_color_variants && !data.has_size_variants) {
+        // Simple product - create single inventory record
+        await createInventoryRecord(
+          currentProductId,
+          data.name,
+          categoryName,
+          subcategoryName,
+          data.cost_price,
+          data.selling_price,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          data.stock_quantity || 0
+        );
+      } else if (data.has_color_variants && colorVariants.length > 0) {
+        // Product with variants - create inventory records for each variant
+        for (const colorVariant of colorVariants) {
+          if (!colorVariant.color_name.trim()) continue;
+
+          if (data.has_size_variants && colorVariant.size_variants.length > 0) {
+            // Color + Size variants
+            for (const sizeVariant of colorVariant.size_variants) {
+              if (!sizeVariant.size_name.trim()) continue;
+
+              await createInventoryRecord(
+                currentProductId,
+                data.name,
+                categoryName,
+                subcategoryName,
+                data.cost_price,
+                data.selling_price,
+                undefined, // Will be set after color variant is created
+                undefined, // Will be set after size variant is created
+                colorVariant.color_name,
+                sizeVariant.size_name,
+                sizeVariant.stock_quantity || 0
+              );
+            }
+          } else {
+            // Color variants only
+            await createInventoryRecord(
+              currentProductId,
+              data.name,
+              categoryName,
+              subcategoryName,
+              data.cost_price,
+              data.selling_price,
+              undefined, // Will be set after color variant is created
+              undefined,
+              colorVariant.color_name,
+              undefined,
+              colorVariant.stock_quantity || 0
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error creating inventory records:', error);
+      throw error;
     }
   };
 
