@@ -197,9 +197,11 @@ export type Database = {
           order_id: string
           pricing_details: Json | null
           pricing_mode: string
+          product_inventory_id: string | null
           product_name: string
           quantity: number
           size_name: string | null
+          sku: string | null
           total_price: number
           unit_price: number
         }
@@ -210,9 +212,11 @@ export type Database = {
           order_id: string
           pricing_details?: Json | null
           pricing_mode?: string
+          product_inventory_id?: string | null
           product_name: string
           quantity: number
           size_name?: string | null
+          sku?: string | null
           total_price: number
           unit_price: number
         }
@@ -223,9 +227,11 @@ export type Database = {
           order_id?: string
           pricing_details?: Json | null
           pricing_mode?: string
+          product_inventory_id?: string | null
           product_name?: string
           quantity?: number
           size_name?: string | null
+          sku?: string | null
           total_price?: number
           unit_price?: number
         }
@@ -235,6 +241,20 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "customer_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_order_item_details_product_inventory_id_fkey"
+            columns: ["product_inventory_id"]
+            isOneToOne: false
+            referencedRelation: "product_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_order_item_details_product_inventory_id_fkey"
+            columns: ["product_inventory_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
             referencedColumns: ["id"]
           },
         ]
@@ -645,9 +665,11 @@ export type Database = {
           order_id: string
           pricing_details: Json | null
           pricing_mode: string
+          product_inventory_id: string | null
           product_name: string
           quantity: number
           size_name: string | null
+          sku: string | null
           total_price: number
           unit_price: number
         }
@@ -658,9 +680,11 @@ export type Database = {
           order_id: string
           pricing_details?: Json | null
           pricing_mode?: string
+          product_inventory_id?: string | null
           product_name: string
           quantity: number
           size_name?: string | null
+          sku?: string | null
           total_price: number
           unit_price: number
         }
@@ -671,9 +695,11 @@ export type Database = {
           order_id?: string
           pricing_details?: Json | null
           pricing_mode?: string
+          product_inventory_id?: string | null
           product_name?: string
           quantity?: number
           size_name?: string | null
+          sku?: string | null
           total_price?: number
           unit_price?: number
         }
@@ -683,6 +709,20 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_details_product_inventory_id_fkey"
+            columns: ["product_inventory_id"]
+            isOneToOne: false
+            referencedRelation: "product_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_details_product_inventory_id_fkey"
+            columns: ["product_inventory_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
             referencedColumns: ["id"]
           },
         ]
@@ -1469,7 +1509,15 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: boolean
       }
+      release_order_stock_enhanced: {
+        Args: { p_order_id: string }
+        Returns: boolean
+      }
       reserve_order_stock: {
+        Args: { p_order_id: string }
+        Returns: boolean
+      }
+      reserve_order_stock_enhanced: {
         Args: { p_order_id: string }
         Returns: boolean
       }

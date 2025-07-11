@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getDetailedProductStock, ProductStockSummary, getVariantStock, VariantStock } from '@/utils/stockCalculation';
@@ -106,7 +105,7 @@ export function useInventoryManager() {
 
   const reserveStock = async (orderId: string) => {
     try {
-      const { data, error } = await supabase.rpc('reserve_order_stock', {
+      const { data, error } = await supabase.rpc('reserve_order_stock_enhanced', {
         p_order_id: orderId
       });
 
@@ -125,7 +124,7 @@ export function useInventoryManager() {
 
   const releaseStock = async (orderId: string) => {
     try {
-      const { data, error } = await supabase.rpc('release_order_stock', {
+      const { data, error } = await supabase.rpc('release_order_stock_enhanced', {
         p_order_id: orderId
       });
 
@@ -153,12 +152,36 @@ export function useInventoryManager() {
     }
   };
 
+  // New function to get inventory record for cart items
+  const getInventoryRecord = async (
+    productId: string,
+    colorVariantId?: string,
+    sizeVariantId?: string
+  ) => {
+    try {
+      const { data, error } = await supabase
+        .from('product_inventory')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('color_variant_id', colorVariantId || null)
+        .eq('size_variant_id', sizeVariantId || null)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error getting inventory record:', error);
+      return null;
+    }
+  };
+
   return {
     createInventoryRecord,
     updateStock,
     reserveStock,
     releaseStock,
     fulfillStock,
+    getInventoryRecord,
   };
 }
 
