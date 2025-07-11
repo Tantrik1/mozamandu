@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -59,7 +58,15 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
         .single();
 
       if (productError) throw productError;
-      setProduct(productData);
+      
+      // Add missing properties with defaults
+      const productWithDefaults = {
+        ...productData,
+        has_size_variants: productData.color_has_size_variants || false,
+        stock_quantity: null
+      };
+      
+      setProduct(productWithDefaults);
 
       // Calculate detailed stock information
       const stockResult = await calculateProductStock(productId);

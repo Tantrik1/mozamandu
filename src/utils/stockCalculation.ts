@@ -22,6 +22,18 @@ export interface VariantStock {
   isOutOfStock: boolean;
 }
 
+export interface StockCalculationResult {
+  totalStock: number;
+  colorBreakdown?: {
+    colorName: string;
+    stock: number;
+    sizeBreakdown?: {
+      sizeName: string;
+      stock: number;
+    }[];
+  }[];
+}
+
 export async function getProductStockSummary(productId: string): Promise<number> {
   try {
     const { data, error } = await supabase
@@ -87,6 +99,61 @@ export async function getDetailedProductStock(productId: string): Promise<Produc
       hasVariants: false,
       variants: [],
     };
+  }
+}
+
+export async function calculateProductStock(productId: string): Promise<StockCalculationResult> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('is_active', true)
+      .order('color_name, size_name');
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      return { totalStock: 0 };
+    }
+
+    const totalStock = data.reduce((sum, item) => sum + (item.available_stock || 0), 0);
+
+    // Group by color if there are color variants
+    const colorGroups = data.reduce((groups, item) => {
+      if (!item.color_name) return groups;
+      
+      if (!groups[item.color_name]) {
+        groups[item.color_name] = [];
+      }
+      groups[item.color_name].push(item);
+      return groups;
+    }, {} as Record<string, any[]>);
+
+    const colorBreakdown = Object.entries(colorGroups).map(([colorName, items]) => {
+      const colorStock = items.reduce((sum, item) => sum + (item.available_stock || 0), 0);
+      
+      const sizeBreakdown = items
+        .filter(item => item.size_name)
+        .map(item => ({
+          sizeName: item.size_name,
+          stock: item.available_stock || 0
+        }));
+
+      return {
+        colorName,
+        stock: colorStock,
+        sizeBreakdown: sizeBreakdown.length > 0 ? sizeBreakdown : undefined
+      };
+    });
+
+    return {
+      totalStock,
+      colorBreakdown: colorBreakdown.length > 0 ? colorBreakdown : undefined
+    };
+  } catch (error) {
+    console.error('Error calculating product stock:', error);
+    return { totalStock: 0 };
   }
 }
 
