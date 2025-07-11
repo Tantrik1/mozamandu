@@ -2,8 +2,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { useToast } from '@/hooks/use-toast';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { AdminDashboard } from '@/components/admin/AdminDashboard';
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -20,7 +22,7 @@ export default function AdminPage() {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        navigate('/auth');
+        navigate('/');
         return;
       }
 
@@ -69,5 +71,14 @@ export default function AdminPage() {
     return null;
   }
 
-  return <AdminDashboard />;
+  return (
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <AdminSidebar />
+        <main className="flex-1">
+          <AdminDashboard />
+        </main>
+      </div>
+    </SidebarProvider>
+  );
 }

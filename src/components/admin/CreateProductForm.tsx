@@ -151,32 +151,18 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       };
       reader.readAsDataURL(file);
 
-      // Upload to Supabase storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `product-${Date.now()}.${fileExt}`;
-      
-      const { data, error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(fileName);
-
       setImageFile(file);
       
-      console.log('Image uploaded successfully:', urlData.publicUrl);
+      console.log('Image prepared for upload');
       toast({
         title: 'Success',
-        description: 'Image uploaded successfully',
+        description: 'Image ready for upload',
       });
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.error('Error preparing image:', error);
       toast({
         title: 'Error',
-        description: 'Failed to upload image',
+        description: 'Failed to prepare image',
         variant: 'destructive',
       });
     } finally {
@@ -238,8 +224,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
         subcategory_id: data.subcategory_id,
         is_featured: data.is_featured,
         has_color_variants: data.has_color_variants,
-        has_size_variants: data.has_size_variants,
-        stock_quantity: (!data.has_color_variants && !data.has_size_variants) ? data.stock_quantity || 0 : null,
+        color_has_size_variants: data.has_size_variants,
         status: data.status,
         image_url: imageUrl,
       };
@@ -255,6 +240,29 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       if (error) throw error;
 
       console.log('Created product:', newProduct);
+
+      // Create inventory record for simple products
+      if (!data.has_color_variants && !data.has_size_variants) {
+        const inventoryData = {
+          product_id: newProduct.id,
+          sku: `${data.name.toUpperCase().replace(/\s+/g, '')}-001`,
+          product_name: data.name,
+          stock_quantity: data.stock_quantity || 0,
+          cost_price: data.cost_price,
+          selling_price: data.selling_price || data.cost_price,
+          low_stock_threshold: 10,
+          is_active: true,
+        };
+
+        const { error: inventoryError } = await supabase
+          .from('product_inventory')
+          .insert(inventoryData);
+
+        if (inventoryError) {
+          console.error('Error creating inventory record:', inventoryError);
+          throw inventoryError;
+        }
+      }
 
       // Save color variants if enabled
       if (data.has_color_variants && colorVariants.length > 0) {
@@ -292,7 +300,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
           validVariants.map(cv => ({
             product_id: productId,
             color_name: cv.color_name,
-            stock_quantity: hasSizeVariants ? 0 : (cv.stock_quantity || 0),
             image_url: cv.image_url || null,
             has_sizes: hasSizeVariants,
           }))
@@ -319,7 +326,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                     color_variant_id: insertedColor.id,
                     size_name: sv.size_name,
                     size_code: sv.size_code || null,
-                    stock_quantity: sv.stock_quantity,
                   }))
                 );
 
@@ -533,7 +539,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                       className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                      {uploadingImage ? 'Preparing...' : 'Upload Image'}
                     </label>
                   </div>
 
