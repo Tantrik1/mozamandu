@@ -29,6 +29,7 @@ function App() {
               <Route path="/home" element={<Home />} />
               <Route path="/products" element={<Products />} />
               <Route path="/subcategory/:subcategoryId" element={<SubcategoryPage />} />
+              <Route path="/subcategories/:subcategoryId" element={<SubcategoryPage />} />
               <Route path="/admin/*" element={<AdminPage />} />
               <Route path="/inventory" element={<InventoryDashboard />} />
               <Route path="/checkout" element={<Checkout />} />

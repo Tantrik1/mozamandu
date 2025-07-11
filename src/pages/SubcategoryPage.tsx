@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { ProductCard } from '@/components/customer/ProductCard';
+import { EnhancedProductCard } from '@/components/customer/EnhancedProductCard';
 import { Badge } from '@/components/ui/badge';
 import { 
   Breadcrumb,
@@ -13,7 +13,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { getProductStockSummary } from '@/utils/stockCalculation';
-import { ChevronRight, Home } from 'lucide-react';
+import { ChevronRight, Home, Info } from 'lucide-react';
 
 interface Product {
   id: string;
@@ -131,22 +131,27 @@ export default function SubcategoryPage() {
     if (discountTiers.length === 0) return null;
 
     return (
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <h3 className="font-semibold text-blue-900 mb-2">Volume Discounts Available</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
-          {discountTiers.map((tier, index) => (
-            <div key={tier.id} className="flex items-center justify-between bg-white p-2 rounded border">
-              <span className="text-gray-600">
-                {tier.min_quantity}+ units
-              </span>
-              <span className="font-medium text-green-600">
-                Save Rs {tier.discount_amount}
-              </span>
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mb-8 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <Info className="h-5 w-5 text-blue-600" />
+          <h3 className="text-lg font-semibold text-blue-900">Volume Discounts Available</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {discountTiers.map((tier) => (
+            <div key={tier.id} className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">
+                  {tier.min_quantity}+ units
+                </span>
+                <span className="text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                  Save Rs {tier.discount_amount}
+                </span>
+              </div>
             </div>
           ))}
         </div>
-        <p className="text-xs text-blue-700 mt-2">
-          *Discounts apply automatically when minimum quantities are met
+        <p className="text-xs text-blue-600 mt-4 bg-blue-50 p-2 rounded-lg">
+          💡 <strong>Tip:</strong> Discounts apply automatically when minimum quantities are met
         </p>
       </div>
     );
@@ -154,9 +159,14 @@ export default function SubcategoryPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center min-h-64">
-          <div className="text-lg">Loading...</div>
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex justify-center items-center min-h-64">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-lg text-gray-600">Loading products...</span>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -164,114 +174,135 @@ export default function SubcategoryPage() {
 
   if (!subcategory) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">Subcategory not found.</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <div className="bg-white rounded-xl p-8 shadow-sm max-w-md mx-auto">
+              <p className="text-gray-500 text-lg mb-2">Subcategory not found</p>
+              <p className="text-gray-400 text-sm">The subcategory you're looking for doesn't exist or has been removed.</p>
+              <Link to="/" className="mt-4 inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                Go to Home
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      {/* Breadcrumb Navigation */}
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/" className="flex items-center gap-1">
-                <Home className="h-4 w-4" />
-                Home
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator>
-            <ChevronRight className="h-4 w-4" />
-          </BreadcrumbSeparator>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to={`/category/${subcategory.categories?.id}`}>
-                {subcategory.categories?.name}
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator>
-            <ChevronRight className="h-4 w-4" />
-          </BreadcrumbSeparator>
-          <BreadcrumbItem>
-            <BreadcrumbPage>{subcategory.name}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-6">
+        {/* Breadcrumb Navigation */}
+        <Breadcrumb className="mb-6">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/" className="flex items-center gap-1 text-gray-600 hover:text-blue-600 transition-colors">
+                  <Home className="h-4 w-4" />
+                  Home
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator>
+              <ChevronRight className="h-4 w-4 text-gray-400" />
+            </BreadcrumbSeparator>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link 
+                  to={`/category/${subcategory.categories?.id}`}
+                  className="text-gray-600 hover:text-blue-600 transition-colors"
+                >
+                  {subcategory.categories?.name}
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator>
+              <ChevronRight className="h-4 w-4 text-gray-400" />
+            </BreadcrumbSeparator>
+            <BreadcrumbItem>
+              <BreadcrumbPage className="text-blue-600 font-medium">{subcategory.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
-      {/* Subcategory Header */}
-      <div className="mb-8">
-        <div className="mb-4">
-          <Badge variant="outline" className="mb-3">
-            {subcategory.categories?.name}
-          </Badge>
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">{subcategory.name}</h1>
-          {subcategory.description && (
-            <p className="text-gray-600 text-lg leading-relaxed mb-4">{subcategory.description}</p>
-          )}
-          
-          {/* Pricing Information */}
-          <div className="flex items-center gap-4 mb-4">
-            <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-              <span className="text-sm text-green-700 font-medium">Base Price: </span>
-              <span className="text-lg font-bold text-green-800">Rs {subcategory.selling_price}</span>
-            </div>
-            {subcategory.minimum_quantity > 1 && (
-              <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2">
-                <span className="text-sm text-orange-700 font-medium">Min Qty: </span>
-                <span className="text-lg font-bold text-orange-800">{subcategory.minimum_quantity}</span>
+        {/* Subcategory Header */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Subcategory Image */}
+            {subcategory.image_url && (
+              <div className="lg:w-1/3">
+                <img
+                  src={subcategory.image_url}
+                  alt={subcategory.name}
+                  className="w-full h-64 lg:h-48 object-cover rounded-lg shadow-sm"
+                />
               </div>
             )}
+            
+            {/* Subcategory Info */}
+            <div className="flex-1">
+              <div className="mb-4">
+                <Badge variant="outline" className="mb-3 text-blue-600 border-blue-200 bg-blue-50">
+                  {subcategory.categories?.name}
+                </Badge>
+                <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-3">{subcategory.name}</h1>
+                {subcategory.description && (
+                  <p className="text-gray-600 text-lg leading-relaxed mb-6">{subcategory.description}</p>
+                )}
+              </div>
+              
+              {/* Pricing Information */}
+              <div className="flex flex-wrap items-center gap-4 mb-6">
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg px-6 py-3 shadow-sm">
+                  <span className="text-sm text-green-700 font-medium block">Base Price</span>
+                  <span className="text-2xl font-bold text-green-800">Rs {subcategory.selling_price}</span>
+                </div>
+                {subcategory.minimum_quantity > 1 && (
+                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg px-6 py-3 shadow-sm">
+                    <span className="text-sm text-orange-700 font-medium block">Min Quantity</span>
+                    <span className="text-2xl font-bold text-orange-800">{subcategory.minimum_quantity}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Product Count Badge */}
+              {products.length > 0 && (
+                <Badge variant="outline" className="text-sm bg-blue-50 text-blue-700 border-blue-200">
+                  {products.length} product{products.length !== 1 ? 's' : ''} available
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Subcategory Image */}
-        {subcategory.image_url && (
-          <div className="mb-6">
-            <img
-              src={subcategory.image_url}
-              alt={subcategory.name}
-              className="w-full h-48 md:h-64 object-cover rounded-lg shadow-md"
-            />
-          </div>
-        )}
 
         {/* Volume Discount Information */}
         {renderVolumeDiscountInfo()}
 
-        {/* Product Count Badge */}
-        {products.length > 0 && (
-          <Badge variant="outline" className="text-sm">
-            {products.length} product{products.length !== 1 ? 's' : ''} available
-          </Badge>
+        {/* Products Grid */}
+        {products.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="bg-white rounded-xl p-8 shadow-sm max-w-md mx-auto">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl">📦</span>
+              </div>
+              <p className="text-gray-500 text-lg mb-2">No products available</p>
+              <p className="text-gray-400 text-sm">Check back later for new arrivals in this category!</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {products.map((product) => (
+              <EnhancedProductCard
+                key={product.id}
+                product={product}
+                subcategorySellingPrice={subcategory.selling_price}
+                discountTiers={discountTiers}
+              />
+            ))}
+          </div>
         )}
       </div>
-
-      {/* Products Grid */}
-      {products.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="bg-gray-50 rounded-lg p-8">
-            <p className="text-gray-500 text-lg mb-2">No products available in this category.</p>
-            <p className="text-gray-400 text-sm">Check back later for new arrivals!</p>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              subcategorySellingPrice={subcategory.selling_price}
-              discountTiers={discountTiers}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
