@@ -5,10 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, RefreshCw, Download, Filter } from 'lucide-react';
+import { Search, RefreshCw, Download, Filter, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { InventoryStats } from './InventoryStats';
-import { InventoryTable } from './InventoryTable';
+import { InventoryItemCard } from './InventoryItemCard';
 
 interface InventoryItem {
   id: string;
@@ -56,6 +56,7 @@ export function ModernInventoryManagement() {
   }, [inventory, searchTerm, statusFilter, activeTab]);
 
   const fetchInventory = async () => {
+    console.log('Fetching inventory...');
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -63,7 +64,11 @@ export function ModernInventoryManagement() {
         .select('*')
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      console.log('Inventory data:', data);
+      if (error) {
+        console.error('Inventory fetch error:', error);
+        throw error;
+      }
       setInventory(data || []);
     } catch (error) {
       console.error('Error fetching inventory:', error);
@@ -174,31 +179,39 @@ export function ModernInventoryManagement() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center p-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p>Loading inventory...</p>
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-center items-center p-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+              <p>Loading inventory...</p>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <InventoryStats {...stats} />
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Inventory Management</h1>
+            <p className="text-gray-600 mt-2">Manage your product inventory and stock levels</p>
+          </div>
+          <Button onClick={fetchInventory} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
 
-      {/* Navigation Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="low-stock">Low Stock</TabsTrigger>
-          <TabsTrigger value="manual-updates">Manual Updates</TabsTrigger>
-          <TabsTrigger value="audit-trail">Audit Trail</TabsTrigger>
-        </TabsList>
+        {/* Stats Cards */}
+        <InventoryStats {...stats} />
 
         {/* Search and Filter Bar */}
-        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white p-4 rounded-lg border">
           <div className="flex flex-1 gap-4 items-center">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -226,55 +239,105 @@ export function ModernInventoryManagement() {
             </Select>
           </div>
 
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={exportInventory}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            <Button variant="outline" onClick={fetchInventory}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
+          <Button variant="outline" onClick={exportInventory}>
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
         </div>
 
-        {/* Tab Content */}
-        <TabsContent value="overview" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">
-              Inventory Overview ({filteredInventory.length} items)
-            </h3>
-          </div>
-          <InventoryTable items={filteredInventory} onRefresh={fetchInventory} />
-        </TabsContent>
+        {/* Navigation Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="low-stock">Low Stock</TabsTrigger>
+            <TabsTrigger value="manual-updates">Manual Updates</TabsTrigger>
+            <TabsTrigger value="audit-trail">Audit Trail</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="low-stock" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-yellow-600">
-              Low Stock Items ({filteredInventory.length} items)
-            </h3>
-          </div>
-          <InventoryTable items={filteredInventory} onRefresh={fetchInventory} />
-        </TabsContent>
+          {/* Tab Content */}
+          <TabsContent value="overview" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">
+                Inventory Overview ({filteredInventory.length} items)
+              </h3>
+            </div>
+            {filteredInventory.length === 0 ? (
+              <div className="bg-white rounded-lg border p-8 text-center">
+                <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-500">
+                  {inventory.length === 0 ? 'No inventory items found' : 'No items match your filters'}
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {filteredInventory.map((item) => (
+                  <InventoryItemCard key={item.id} item={item} onRefresh={fetchInventory} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
-        <TabsContent value="manual-updates" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-blue-600">
-              Manual Updates ({filteredInventory.length} items)
-            </h3>
-          </div>
-          <InventoryTable items={filteredInventory} onRefresh={fetchInventory} />
-        </TabsContent>
+          <TabsContent value="low-stock" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-yellow-600">
+                Low Stock Items ({filteredInventory.length} items)
+              </h3>
+            </div>
+            {filteredInventory.length === 0 ? (
+              <div className="bg-white rounded-lg border p-8 text-center">
+                <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-500">No low stock items found</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {filteredInventory.map((item) => (
+                  <InventoryItemCard key={item.id} item={item} onRefresh={fetchInventory} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
-        <TabsContent value="audit-trail" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-purple-600">
-              Recent Activity ({filteredInventory.length} items)
-            </h3>
-          </div>
-          <InventoryTable items={filteredInventory} onRefresh={fetchInventory} />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="manual-updates" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-blue-600">
+                Manual Updates ({filteredInventory.length} items)
+              </h3>  
+            </div>
+            {filteredInventory.length === 0 ? (
+              <div className="bg-white rounded-lg border p-8 text-center">
+                <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-500">No items requiring manual attention</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {filteredInventory.map((item) => (
+                  <InventoryItemCard key={item.id} item={item} onRefresh={fetchInventory} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="audit-trail" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-purple-600">
+                Recent Activity ({filteredInventory.length} items)
+              </h3>
+            </div>
+            {filteredInventory.length === 0 ? (
+              <div className="bg-white rounded-lg border p-8 text-center">
+                <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-500">No recent activity found</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {filteredInventory.map((item) => (
+                  <InventoryItemCard key={item.id} item={item} onRefresh={fetchInventory} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }

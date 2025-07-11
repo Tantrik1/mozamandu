@@ -21,7 +21,7 @@ import { TopBarTextManagement } from '@/components/admin/TopBarTextManagement';
 import { NavbarManagement } from '@/components/admin/NavbarManagement';
 import { PromocodeManagement } from '@/components/admin/PromocodeManagement';
 import { AdminSettings } from '@/components/admin/AdminSettings';
-import { InventoryManagement } from '@/components/inventory/InventoryManagement';
+import { ModernInventoryManagement } from '@/components/inventory/ModernInventoryManagement';
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -95,7 +95,7 @@ export default function AdminPage() {
           <Routes>
             <Route index element={<DashboardStats />} />
             <Route path="products" element={<ProductManagement />} />
-            <Route path="inventory" element={<InventoryManagement />} />
+            <Route path="inventory" element={<ModernInventoryManagement />} />
             <Route path="orders" element={<EnhancedOrderManagement />} />
             <Route path="customers" element={<CustomerManagement />} />
             <Route path="categories" element={<CategoryManagement />} />
