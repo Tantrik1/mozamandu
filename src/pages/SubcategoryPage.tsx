@@ -79,7 +79,7 @@ export default function SubcategoryPage() {
       console.log('Subcategory found:', subcategoryData);
       setSubcategory(subcategoryData);
 
-      // Fetch products for the subcategory with all necessary joins
+      // Fetch products for the subcategory with explicit relationship specification
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select(`
@@ -89,7 +89,7 @@ export default function SubcategoryPage() {
             selling_price,
             minimum_quantity
           ),
-          color_variants (
+          color_variants!color_variants_product_id_fkey (
             id,
             color_name,
             image_url,

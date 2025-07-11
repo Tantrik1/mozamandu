@@ -46,7 +46,7 @@ export function LatestProducts() {
             selling_price,
             minimum_quantity
           ),
-          color_variants (
+          color_variants!color_variants_product_id_fkey (
             id,
             color_name,
             image_url,
