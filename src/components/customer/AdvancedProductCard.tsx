@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Star, ShoppingCart, Minus, Plus, Heart, Info } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { getRealTimeStock } from '@/utils/inventoryManager';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useCartPricing } from '@/hooks/useCartPricing';
 import { useComboManager } from '@/hooks/useComboManager';
@@ -53,8 +52,8 @@ export function AdvancedProductCard({ product }: AdvancedProductCardProps) {
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [quantity, setQuantity] = useState(1);
-  const [stock, setStock] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
+  const [stock, setStock] = useState<number>(100); // Default stock
+  const [loading, setLoading] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [showPricingDetails, setShowPricingDetails] = useState(false);
   const [discountTiers, setDiscountTiers] = useState<any[]>([]);
@@ -84,10 +83,6 @@ export function AdvancedProductCard({ product }: AdvancedProductCardProps) {
     }
   }, [selectedColor]);
 
-  useEffect(() => {
-    fetchStock();
-  }, [selectedColor, selectedSize]);
-
   const fetchDiscountTiers = async () => {
     try {
       const { data } = await supabase
@@ -99,29 +94,6 @@ export function AdvancedProductCard({ product }: AdvancedProductCardProps) {
       setDiscountTiers(data || []);
     } catch (error) {
       console.error('Error fetching discount tiers:', error);
-    }
-  };
-
-  const fetchStock = async () => {
-    try {
-      setLoading(true);
-      
-      let productInventoryId = product.id;
-      if (product.has_color_variants && selectedColor) {
-        if (selectedVariant?.has_sizes && selectedSize) {
-          productInventoryId = `${product.id}-${selectedColor}-${selectedSize}`;
-        } else {
-          productInventoryId = `${product.id}-${selectedColor}`;
-        }
-      }
-
-      const totalStock = await getRealTimeStock(productInventoryId);
-      setStock(totalStock);
-    } catch (error) {
-      console.error('Error fetching stock:', error);
-      setStock(0);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -294,41 +266,33 @@ export function AdvancedProductCard({ product }: AdvancedProductCardProps) {
                     </div>
                     <div className="flex justify-between">
                       <span className="font-medium">Price per item:</span>
-                      <span>Rs. {pricing.finalPrice.toFixed(2)}</span>
+                      <span>Rs. {pricing.finalPrice.toFixed(0)}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium">Total for {quantity}:</span>
-                      <span className="font-bold">Rs. {(pricing.finalPrice * quantity).toFixed(2)}</span>
-                    </div>
-                    <div className="border-t pt-2">
-                      <p className="text-sm text-gray-600">{pricing.description}</p>
-                      {pricing.breakdown && (
-                        <div className="mt-2 space-y-1">
-                          {pricing.breakdown.map((item, index) => (
-                            <p key={index} className="text-xs text-gray-500">{item}</p>
-                          ))}
+                    {pricing.mode !== 'normal' && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="font-medium">Original price:</span>
+                          <span>Rs. {basePrice.toFixed(0)}</span>
                         </div>
-                      )}
-                    </div>
+                        <div className="flex justify-between text-green-600">
+                          <span className="font-medium">You save:</span>
+                          <span>Rs. {(basePrice - pricing.finalPrice).toFixed(0)}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </DialogContent>
               </Dialog>
             </div>
           </div>
-
-          {showMinimumWarning() && (
-            <p className="text-xs text-orange-600">
-              Minimum {product.subcategories?.minimum_quantity} required for this subcategory
-            </p>
-          )}
         </div>
 
-        {/* Color Selection - Dropdown Only */}
-        {product.has_color_variants && product.color_variants && (
+        {/* Color Selection */}
+        {product.has_color_variants && product.color_variants && product.color_variants.length > 0 && (
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Color:</label>
+            <label className="text-sm font-medium text-gray-700">Color</label>
             <Select value={selectedColor} onValueChange={setSelectedColor}>
-              <SelectTrigger className="h-10 rounded-lg border-gray-200">
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select color" />
               </SelectTrigger>
               <SelectContent>
@@ -345,9 +309,9 @@ export function AdvancedProductCard({ product }: AdvancedProductCardProps) {
         {/* Size Selection */}
         {selectedVariant?.has_sizes && availableSizes.length > 0 && (
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Size:</label>
+            <label className="text-sm font-medium text-gray-700">Size</label>
             <Select value={selectedSize} onValueChange={setSelectedSize}>
-              <SelectTrigger className="h-10 rounded-lg border-gray-200">
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select size" />
               </SelectTrigger>
               <SelectContent>
@@ -361,51 +325,63 @@ export function AdvancedProductCard({ product }: AdvancedProductCardProps) {
           </div>
         )}
 
-        {/* Quantity Controls */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleQuantityChange(-1)}
-              disabled={quantity <= 1}
-              className="h-8 w-8 p-0 rounded-full border-gray-300"
-            >
-              <Minus className="h-3 w-3" />
-            </Button>
-            <span className="font-semibold text-lg min-w-[2rem] text-center">{quantity}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleQuantityChange(1)}
-              disabled={quantity >= stock}
-              className="h-8 w-8 p-0 rounded-full border-gray-300"
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-          </div>
-          
-          {/* Stock Info */}
-          <div className="text-sm text-gray-500">
-            {loading ? (
-              <span>Loading...</span>
-            ) : (
-              <Badge variant={stock > 0 ? 'default' : 'destructive'}>
-                {stock > 0 ? `${stock} in stock` : 'Out of Stock'}
-              </Badge>
-            )}
+        {/* Quantity Selection */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">Quantity</label>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center border rounded-lg">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleQuantityChange(-1)}
+                disabled={quantity <= 1}
+                className="h-8 w-8 p-0"
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+              <span className="px-4 py-1 text-sm font-medium">{quantity}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleQuantityChange(1)}
+                disabled={quantity >= stock}
+                className="h-8 w-8 p-0"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+            <span className="text-xs text-gray-500">{stock} available</span>
           </div>
         </div>
 
+        {/* Minimum Quantity Warning */}
+        {showMinimumWarning() && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <p className="text-xs text-yellow-800">
+              Minimum {product.subcategories?.minimum_quantity} items required for this category
+            </p>
+          </div>
+        )}
+
         {/* Add to Cart Button */}
-        <Button 
-          className="w-full h-12 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors duration-200" 
-          disabled={loading || stock === 0 || (product.has_color_variants && !selectedColor) || (selectedVariant?.has_sizes && !selectedSize)}
+        <Button
           onClick={handleAddToCart}
+          disabled={stock === 0 || loading}
+          className="w-full bg-red-500 hover:bg-red-600 text-white"
         >
           <ShoppingCart className="h-4 w-4 mr-2" />
-          Add to Cart - Rs. {(pricing.finalPrice * quantity).toFixed(0)}
+          {stock === 0 ? 'Out of Stock' : 'Add to Cart'}
         </Button>
+
+        {/* Total Price Preview */}
+        <div className="pt-2 border-t">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Total for {quantity} item(s):</span>
+            <span className="font-semibold text-lg text-red-500">
+              Rs. {(pricing.finalPrice * quantity).toFixed(0)}
+            </span>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
