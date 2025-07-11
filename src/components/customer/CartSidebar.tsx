@@ -115,7 +115,7 @@ export function CartSidebar() {
                       </div>
                     </div>
 
-                    {/* Pricing Display */}
+                    {/* Enhanced Pricing Display */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -135,24 +135,62 @@ export function CartSidebar() {
                             </DialogTrigger>
                             <DialogContent className="max-w-md">
                               <DialogHeader>
-                                <DialogTitle>Pricing Details</DialogTitle>
+                                <DialogTitle className="flex items-center gap-2">
+                                  Pricing Details
+                                  {pricing.mode !== 'normal' && (
+                                    <Badge 
+                                      variant={pricing.mode === 'combo' ? 'default' : 'secondary'}
+                                      className={pricing.mode === 'combo' ? 'bg-green-600' : 'bg-blue-600'}
+                                    >
+                                      {pricing.mode === 'combo' ? 'COMBO' : 'MOQ DISCOUNT'}
+                                    </Badge>
+                                  )}
+                                </DialogTitle>
                               </DialogHeader>
-                              <div className="space-y-2">
-                                <p className="text-sm">{pricing.description}</p>
-                                {pricing.breakdown && (
-                                  <div className="space-y-1">
-                                    {pricing.breakdown.map((item, index) => (
-                                      <p key={index} className="text-xs text-gray-600">{item}</p>
-                                    ))}
+                              <div className="space-y-3">
+                                <div className="bg-gray-50 p-3 rounded-lg">
+                                  <p className="text-sm font-medium">{pricing.description}</p>
+                                </div>
+                                
+                                {pricing.breakdown && pricing.breakdown.length > 0 && (
+                                  <div className="space-y-2">
+                                    <h4 className="text-sm font-medium text-gray-700">Breakdown:</h4>
+                                    <div className="space-y-1">
+                                      {pricing.breakdown.map((line, index) => (
+                                        <p key={index} className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                                          {line}
+                                        </p>
+                                      ))}
+                                    </div>
                                   </div>
                                 )}
+
+                                <div className="border-t pt-3 space-y-2">
+                                  <div className="flex justify-between text-sm">
+                                    <span>Base Price:</span>
+                                    <span>Rs. {item.basePrice.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-sm font-medium">
+                                    <span>Final Price:</span>
+                                    <span className="text-green-600">Rs. {pricing.finalPrice.toFixed(2)}</span>
+                                  </div>
+                                  {pricing.finalPrice < item.basePrice && (
+                                    <div className="flex justify-between text-sm text-green-600">
+                                      <span>You Save:</span>
+                                      <span>Rs. {(item.basePrice - pricing.finalPrice).toFixed(2)} per item</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </DialogContent>
                           </Dialog>
                         </div>
                         {pricing.mode !== 'normal' && (
-                          <Badge variant={pricing.mode === 'combo' ? 'default' : 'secondary'} className="text-xs">
-                            {pricing.mode === 'combo' ? 'Combo' : 'Discount'}
+                          <Badge 
+                            variant={pricing.mode === 'combo' ? 'default' : 'secondary'} 
+                            className={`text-xs ${pricing.mode === 'combo' ? 'bg-green-600' : 'bg-blue-600'}`}
+                          >
+                            {pricing.mode === 'combo' ? 'COMBO' : 'DISCOUNT'}
                           </Badge>
                         )}
                       </div>
@@ -167,7 +205,7 @@ export function CartSidebar() {
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
-                          <span className="w-8 text-center text-sm">{item.quantity}</span>
+                          <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
                           <Button
                             variant="outline"
                             size="sm"
@@ -178,7 +216,7 @@ export function CartSidebar() {
                           </Button>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">
+                          <span className="text-sm font-bold">
                             Rs. {(pricing.finalPrice * item.quantity).toFixed(2)}
                           </span>
                           <Button
@@ -197,11 +235,35 @@ export function CartSidebar() {
               })}
             </div>
 
-            {/* Cart Summary */}
-            <div className="border-t pt-4 space-y-2">
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total:</span>
-                <span>Rs. {totalPrice.toFixed(2)}</span>
+            {/* Enhanced Cart Summary */}
+            <div className="border-t pt-4 space-y-3">
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <h3 className="font-medium text-gray-900">Order Summary</h3>
+                
+                {/* Item breakdown */}
+                <div className="space-y-1">
+                  {cartItems.map((item) => {
+                    const pricing = getItemPricing(item);
+                    return (
+                      <div key={item.id} className="flex justify-between text-sm">
+                        <span className="text-gray-600">
+                          {item.productName} × {item.quantity}
+                          {pricing.mode !== 'normal' && (
+                            <span className={`ml-1 text-xs ${pricing.mode === 'combo' ? 'text-green-600' : 'text-blue-600'}`}>
+                              ({pricing.mode === 'combo' ? 'COMBO' : 'DISCOUNT'})
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-medium">Rs. {(pricing.finalPrice * item.quantity).toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="border-t pt-2 flex justify-between text-lg font-bold">
+                  <span>Total:</span>
+                  <span className="text-green-600">Rs. {totalPrice.toFixed(2)}</span>
+                </div>
               </div>
             </div>
 

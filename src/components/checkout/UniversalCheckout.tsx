@@ -6,11 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Info } from 'lucide-react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { usePromoCode } from '@/hooks/usePromoCode';
 import { useCheckoutData } from '@/hooks/useCheckoutData';
+import { useCartPricing } from '@/hooks/useCartPricing';
+import { useComboManager } from '@/hooks/useComboManager';
 import { PaymentScreenshotUpload } from './PaymentScreenshotUpload';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getVariantStockInfo } from '@/utils/inventoryManager';
@@ -18,6 +22,13 @@ import { reserveStockForOrder, getOrderItemsForStockOperation } from '@/utils/st
 
 export function UniversalCheckout() {
   const { cartItems, getTotalPrice, clearCart } = useRobustCart();
+  const { activeCombo } = useComboManager({ cartItems });
+  const [discountTiers, setDiscountTiers] = useState<{[key: string]: any[]}>({});
+  const { getItemPricing, getTotalPrice: getCartTotalPrice } = useCartPricing({
+    cartItems,
+    activeCombo,
+    discountTiers
+  });
   const { 
     promoCode, 
     setPromoCode, 
@@ -50,7 +61,35 @@ export function UniversalCheckout() {
 
   const { toast } = useToast();
 
-  const subtotal = getTotalPrice();
+  // Fetch discount tiers
+  useEffect(() => {
+    const fetchDiscountTiers = async () => {
+      const subcategoryIds = [...new Set(cartItems.map(item => item.subcategoryId))];
+      const allTiers: {[key: string]: any[]} = {};
+
+      for (const subcategoryId of subcategoryIds) {
+        try {
+          const { data } = await supabase
+            .from('discount_tiers')
+            .select('*')
+            .eq('subcategory_id', subcategoryId)
+            .order('min_quantity');
+          
+          allTiers[subcategoryId] = data || [];
+        } catch (error) {
+          console.error('Error fetching discount tiers:', error);
+        }
+      }
+
+      setDiscountTiers(allTiers);
+    };
+
+    if (cartItems.length > 0) {
+      fetchDiscountTiers();
+    }
+  }, [cartItems]);
+
+  const subtotal = getCartTotalPrice();
   const deliveryCharge = deliveryCharges.find(d => d.id === selectedDeliveryLocation)?.delivery_price || 0;
   const promoDiscount = isPromoApplied ? (appliedPromo?.discount_percentage || 0) * (subtotal + deliveryCharge) / 100 : 0;
   const finalTotal = subtotal + deliveryCharge - promoDiscount;
@@ -138,7 +177,8 @@ export function UniversalCheckout() {
         paid_amount: finalTotal,
         remaining_amount: 0,
         payment_screenshot_url: screenshotUrl,
-        status: 'pending_payment' as const
+        status: 'pending_payment' as const,
+        combo_applied: !!activeCombo
       };
 
       const { data: order, error: orderError } = await supabase
@@ -149,8 +189,10 @@ export function UniversalCheckout() {
 
       if (orderError) throw orderError;
 
-      // Create order items
+      // Create order items and detailed pricing information
       for (const item of cartItems) {
+        const pricing = getItemPricing(item);
+        
         await supabase
           .from('customer_order_items')
           .insert({
@@ -160,7 +202,7 @@ export function UniversalCheckout() {
             quantity: item.quantity
           });
 
-        // Create order item details
+        // Create detailed order item with enhanced pricing details
         await supabase
           .from('customer_order_item_details')
           .insert({
@@ -169,9 +211,18 @@ export function UniversalCheckout() {
             color_name: item.colorName,
             size_name: item.sizeName,
             quantity: item.quantity,
-            unit_price: item.basePrice,
-            total_price: item.basePrice * item.quantity,
-            pricing_mode: 'normal'
+            unit_price: pricing.finalPrice,
+            total_price: pricing.finalPrice * item.quantity,
+            pricing_mode: pricing.mode,
+            pricing_details: {
+              basePrice: item.basePrice,
+              finalPrice: pricing.finalPrice,
+              description: pricing.description,
+              breakdown: pricing.breakdown || [],
+              mode: pricing.mode,
+              savings: item.basePrice - pricing.finalPrice,
+              product_inventory_id: item.productInventoryId
+            }
           });
       }
 
@@ -350,16 +401,100 @@ export function UniversalCheckout() {
           <div>
             <Card>
               <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  Order Summary
+                  {activeCombo && (
+                    <Badge className="bg-green-600">Combo Applied</Badge>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  {cartItems.map((item) => (
-                    <div key={item.id} className="flex justify-between">
-                      <span>{item.productName} x {item.quantity}</span>
-                      <span>Rs. {(item.basePrice * item.quantity).toFixed(2)}</span>
-                    </div>
-                  ))}
+                {/* Enhanced item breakdown */}
+                <div className="space-y-3">
+                  {cartItems.map((item) => {
+                    const pricing = getItemPricing(item);
+                    return (
+                      <div key={item.id} className="border rounded-lg p-3 space-y-2">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-sm">{item.productName}</h4>
+                            {item.colorName && (
+                              <p className="text-xs text-gray-500">Color: {item.colorName}</p>
+                            )}
+                            {item.sizeName && (
+                              <p className="text-xs text-gray-500">Size: {item.sizeName}</p>
+                            )}
+                            <p className="text-xs text-gray-600">Qty: {item.quantity}</p>
+                          </div>
+                          <div className="text-right">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold">Rs. {(pricing.finalPrice * item.quantity).toFixed(2)}</span>
+                              {pricing.mode !== 'normal' && (
+                                <Badge 
+                                  variant="secondary" 
+                                  className={`text-xs ${pricing.mode === 'combo' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}
+                                >
+                                  {pricing.mode === 'combo' ? 'COMBO' : 'DISCOUNT'}
+                                </Badge>
+                              )}
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                    <Info className="h-3 w-3" />
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-md">
+                                  <DialogHeader>
+                                    <DialogTitle>Pricing Details</DialogTitle>
+                                  </DialogHeader>
+                                  <div className="space-y-3">
+                                    <div className="bg-gray-50 p-3 rounded-lg">
+                                      <p className="text-sm font-medium">{pricing.description}</p>
+                                    </div>
+                                    
+                                    {pricing.breakdown && pricing.breakdown.length > 0 && (
+                                      <div className="space-y-2">
+                                        <h4 className="text-sm font-medium text-gray-700">Breakdown:</h4>
+                                        <div className="space-y-1">
+                                          {pricing.breakdown.map((line, index) => (
+                                            <p key={index} className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                                              {line}
+                                            </p>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    <div className="border-t pt-3 space-y-2">
+                                      <div className="flex justify-between text-sm">
+                                        <span>Base Price:</span>
+                                        <span>Rs. {item.basePrice.toFixed(2)}</span>
+                                      </div>
+                                      <div className="flex justify-between text-sm font-medium">
+                                        <span>Final Price:</span>
+                                        <span className="text-green-600">Rs. {pricing.finalPrice.toFixed(2)}</span>
+                                      </div>
+                                      {pricing.finalPrice < item.basePrice && (
+                                        <div className="flex justify-between text-sm text-green-600">
+                                          <span>You Save:</span>
+                                          <span>Rs. {(item.basePrice - pricing.finalPrice).toFixed(2)} per item</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+                            </div>
+                            {pricing.finalPrice !== item.basePrice && (
+                              <p className="text-xs text-gray-500 line-through">
+                                Rs. {(item.basePrice * item.quantity).toFixed(2)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <hr />
@@ -379,9 +514,9 @@ export function UniversalCheckout() {
                       <span>-Rs. {promoDiscount.toFixed(2)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between font-bold text-lg">
+                  <div className="flex justify-between font-bold text-lg border-t pt-2">
                     <span>Total:</span>
-                    <span>Rs. {finalTotal.toFixed(2)}</span>
+                    <span className="text-green-600">Rs. {finalTotal.toFixed(2)}</span>
                   </div>
                 </div>
 

@@ -1,3 +1,4 @@
+
 import { useMemo } from 'react';
 import { usePricing } from './usePricing';
 
@@ -69,10 +70,15 @@ export function useCartPricing({ cartItems, activeCombo, discountTiers }: UseCar
         if (comboSubcategory && subcategoryTotalQty >= comboSubcategory.min_units) {
           return {
             finalPrice: comboSubcategory.price,
-            description: `Combo: Rs. ${comboSubcategory.price.toFixed(2)} each (Min qty requirements waived)`,
+            description: `Combo Price: Rs. ${comboSubcategory.price.toFixed(2)} each (${activeCombo.name})`,
             mode: 'combo',
             isCombo: true,
-            breakdown: [`Base price: Rs. ${item.basePrice.toFixed(2)}`, `Combo price: Rs. ${comboSubcategory.price.toFixed(2)}`, 'Minimum quantity requirements waived for combo']
+            breakdown: [
+              `Base price: Rs. ${item.basePrice.toFixed(2)}`,
+              `${activeCombo.name} combo price: Rs. ${comboSubcategory.price.toFixed(2)}`,
+              `You save: Rs. ${(item.basePrice - comboSubcategory.price).toFixed(2)} per item`,
+              'Minimum quantity requirements waived for combo pricing'
+            ]
           };
         }
       }
@@ -83,17 +89,27 @@ export function useCartPricing({ cartItems, activeCombo, discountTiers }: UseCar
         const pricing = calculateTieredPricing(item.basePrice, subcategoryTotalQty, tiers);
         return {
           finalPrice: pricing.finalPrice,
-          description: `MOQ Discount: ${pricing.description}`,
+          description: `MOQ Discount: Rs. ${pricing.finalPrice.toFixed(2)} each (${subcategoryTotalQty} units)`,
           mode: 'discount',
-          breakdown: pricing.breakdown
+          breakdown: [
+            `Base price: Rs. ${item.basePrice.toFixed(2)}`,
+            `Quantity discount applied for ${subcategoryTotalQty} units`,
+            `Final price: Rs. ${pricing.finalPrice.toFixed(2)} each`,
+            `You save: Rs. ${(item.basePrice - pricing.finalPrice).toFixed(2)} per item`,
+            ...pricing.breakdown
+          ]
         };
       }
 
       // Priority 3: Normal pricing
       return {
         finalPrice: item.basePrice,
-        description: `Rs. ${item.basePrice.toFixed(2)} each`,
-        mode: 'normal'
+        description: `Regular Price: Rs. ${item.basePrice.toFixed(2)} each`,
+        mode: 'normal',
+        breakdown: [
+          `Base price: Rs. ${item.basePrice.toFixed(2)}`,
+          'No discounts applied'
+        ]
       };
     };
   }, [subcategoryQuantities, activeCombo, discountTiers, calculateTieredPricing]);
