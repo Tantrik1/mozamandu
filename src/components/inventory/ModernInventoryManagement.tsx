@@ -120,17 +120,6 @@ export function ModernInventoryManagement() {
       filtered = filtered.filter(item => 
         item.available_stock <= item.low_stock_threshold && item.available_stock > 0
       );
-    } else if (activeTab === 'manual-updates') {
-      // Show items that need manual attention (very low stock or recently updated)
-      filtered = filtered.filter(item => 
-        item.available_stock <= 5 || 
-        new Date(item.updated_at) > new Date(Date.now() - 24 * 60 * 60 * 1000)
-      );
-    } else if (activeTab === 'audit-trail') {
-      // Show all items with recent activity
-      filtered = filtered.filter(item => 
-        new Date(item.updated_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      );
     }
 
     setFilteredInventory(filtered);
@@ -247,11 +236,9 @@ export function ModernInventoryManagement() {
 
         {/* Navigation Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="low-stock">Low Stock</TabsTrigger>
-            <TabsTrigger value="manual-updates">Manual Updates</TabsTrigger>
-            <TabsTrigger value="audit-trail">Audit Trail</TabsTrigger>
           </TabsList>
 
           {/* Tab Content */}
@@ -287,46 +274,6 @@ export function ModernInventoryManagement() {
               <div className="bg-white rounded-lg border p-8 text-center">
                 <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                 <p className="text-gray-500">No low stock items found</p>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {filteredInventory.map((item) => (
-                  <InventoryItemCard key={item.id} item={item} onRefresh={fetchInventory} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="manual-updates" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-blue-600">
-                Manual Updates ({filteredInventory.length} items)
-              </h3>  
-            </div>
-            {filteredInventory.length === 0 ? (
-              <div className="bg-white rounded-lg border p-8 text-center">
-                <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <p className="text-gray-500">No items requiring manual attention</p>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {filteredInventory.map((item) => (
-                  <InventoryItemCard key={item.id} item={item} onRefresh={fetchInventory} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="audit-trail" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-purple-600">
-                Recent Activity ({filteredInventory.length} items)
-              </h3>
-            </div>
-            {filteredInventory.length === 0 ? (
-              <div className="bg-white rounded-lg border p-8 text-center">
-                <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <p className="text-gray-500">No recent activity found</p>
               </div>
             ) : (
               <div className="grid gap-4">
