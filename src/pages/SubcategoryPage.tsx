@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -89,7 +88,7 @@ export default function SubcategoryPage() {
       console.log('Subcategory found:', subcategoryData);
       setSubcategory(subcategoryData);
 
-      // Fetch products for the subcategory with all variant information
+      // Fetch products for the subcategory
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select(`
@@ -104,21 +103,10 @@ export default function SubcategoryPage() {
           is_featured,
           has_color_variants,
           color_has_size_variants,
-          subcategories!inner (
+          subcategories!products_subcategory_id_fkey (
             name,
             selling_price,
             minimum_quantity
-          ),
-          color_variants (
-            id,
-            color_name,
-            image_url,
-            has_sizes,
-            size_variants (
-              id,
-              size_name,
-              size_code
-            )
           )
         `)
         .eq('subcategory_id', subcategoryId)
@@ -132,11 +120,68 @@ export default function SubcategoryPage() {
           description: "Failed to fetch products",
           variant: "destructive",
         });
-      } else {
-        console.log('Products found:', productsData?.length || 0);
-        console.log('Sample product data:', productsData?.[0]);
-        setProducts(productsData || []);
+        setProducts([]);
+        return;
       }
+
+      if (!productsData || productsData.length === 0) {
+        console.log('No products found for subcategory');
+        setProducts([]);
+        return;
+      }
+
+      console.log('Products found:', productsData.length);
+
+      // Get variants for products that have them
+      const productsWithVariants = [];
+      
+      for (const product of productsData) {
+        let productWithVariants = { ...product, color_variants: [] };
+
+        if (product.has_color_variants) {
+          const { data: colorVariants, error: colorError } = await supabase
+            .from('color_variants')
+            .select(`
+              id,
+              color_name,
+              image_url,
+              has_sizes
+            `)
+            .eq('product_id', product.id);
+
+          if (colorError) {
+            console.error('Error fetching color variants:', colorError);
+          } else if (colorVariants) {
+            for (const colorVariant of colorVariants) {
+              let colorWithSizes = { ...colorVariant, size_variants: [] };
+
+              if (colorVariant.has_sizes) {
+                const { data: sizeVariants, error: sizeError } = await supabase
+                  .from('size_variants')
+                  .select(`
+                    id,
+                    size_name,
+                    size_code
+                  `)
+                  .eq('color_variant_id', colorVariant.id);
+
+                if (sizeError) {
+                  console.error('Error fetching size variants:', sizeError);
+                } else if (sizeVariants) {
+                  colorWithSizes.size_variants = sizeVariants;
+                }
+              }
+
+              productWithVariants.color_variants.push(colorWithSizes);
+            }
+          }
+        }
+
+        productsWithVariants.push(productWithVariants);
+      }
+
+      console.log('Products with variants processed:', productsWithVariants.length);
+      setProducts(productsWithVariants);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({

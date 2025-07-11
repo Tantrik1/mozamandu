@@ -46,8 +46,10 @@ export default function Products() {
 
   const fetchProducts = async () => {
     try {
-      console.log('Fetching all products...');
-      const { data, error } = await supabase
+      console.log('Fetching all products with complete variant data...');
+      
+      // First get all active products with their subcategory info
+      const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select(`
           id,
@@ -61,33 +63,81 @@ export default function Products() {
           is_featured,
           has_color_variants,
           color_has_size_variants,
-          subcategories!inner (
+          subcategories!products_subcategory_id_fkey (
             name,
             selling_price,
             minimum_quantity
-          ),
-          color_variants (
-            id,
-            color_name,
-            image_url,
-            has_sizes,
-            size_variants (
-              id,
-              size_name,
-              size_code
-            )
           )
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching products:', error);
-        throw error;
+      if (productsError) {
+        console.error('Error fetching products:', productsError);
+        throw productsError;
       }
 
-      console.log('Products fetched:', data?.length || 0);
-      setProducts(data || []);
+      if (!productsData || productsData.length === 0) {
+        console.log('No products found');
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log('Products fetched:', productsData.length);
+
+      // Now get color variants for products that have them
+      const productsWithVariants = [];
+      
+      for (const product of productsData) {
+        let productWithVariants = { ...product, color_variants: [] };
+
+        if (product.has_color_variants) {
+          // Get color variants for this product
+          const { data: colorVariants, error: colorError } = await supabase
+            .from('color_variants')
+            .select(`
+              id,
+              color_name,
+              image_url,
+              has_sizes
+            `)
+            .eq('product_id', product.id);
+
+          if (colorError) {
+            console.error('Error fetching color variants:', colorError);
+          } else if (colorVariants) {
+            // For each color variant, get size variants if they exist
+            for (const colorVariant of colorVariants) {
+              let colorWithSizes = { ...colorVariant, size_variants: [] };
+
+              if (colorVariant.has_sizes) {
+                const { data: sizeVariants, error: sizeError } = await supabase
+                  .from('size_variants')
+                  .select(`
+                    id,
+                    size_name,
+                    size_code
+                  `)
+                  .eq('color_variant_id', colorVariant.id);
+
+                if (sizeError) {
+                  console.error('Error fetching size variants:', sizeError);
+                } else if (sizeVariants) {
+                  colorWithSizes.size_variants = sizeVariants;
+                }
+              }
+
+              productWithVariants.color_variants.push(colorWithSizes);
+            }
+          }
+        }
+
+        productsWithVariants.push(productWithVariants);
+      }
+
+      console.log('Products with variants processed:', productsWithVariants.length);
+      setProducts(productsWithVariants);
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {

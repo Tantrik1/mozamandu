@@ -46,8 +46,9 @@ export function FeaturedProductsCarousel() {
 
   const fetchFeaturedProducts = async () => {
     try {
-      console.log('Fetching featured products...');
-      const { data, error } = await supabase
+      console.log('Fetching featured products for carousel...');
+      
+      const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select(`
           id,
@@ -61,34 +62,78 @@ export function FeaturedProductsCarousel() {
           is_featured,
           has_color_variants,
           color_has_size_variants,
-          subcategories!inner (
+          subcategories!products_subcategory_id_fkey (
             name,
             selling_price,
             minimum_quantity
-          ),
-          color_variants (
-            id,
-            color_name,
-            image_url,
-            has_sizes,
-            size_variants (
-              id,
-              size_name,
-              size_code
-            )
           )
         `)
         .eq('status', 'active')
         .eq('is_featured', true)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching featured products:', error);
-        throw error;
+      if (productsError) {
+        console.error('Error fetching featured products:', productsError);
+        throw productsError;
       }
 
-      console.log('Featured products fetched:', data?.length || 0);
-      setProducts(data || []);
+      if (!productsData || productsData.length === 0) {
+        console.log('No featured products found');
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get variants for featured products
+      const productsWithVariants = [];
+      
+      for (const product of productsData) {
+        let productWithVariants = { ...product, color_variants: [] };
+
+        if (product.has_color_variants) {
+          const { data: colorVariants, error: colorError } = await supabase
+            .from('color_variants')
+            .select(`
+              id,
+              color_name,
+              image_url,
+              has_sizes
+            `)
+            .eq('product_id', product.id);
+
+          if (colorError) {
+            console.error('Error fetching color variants:', colorError);
+          } else if (colorVariants) {
+            for (const colorVariant of colorVariants) {
+              let colorWithSizes = { ...colorVariant, size_variants: [] };
+
+              if (colorVariant.has_sizes) {
+                const { data: sizeVariants, error: sizeError } = await supabase
+                  .from('size_variants')
+                  .select(`
+                    id,
+                    size_name,
+                    size_code
+                  `)
+                  .eq('color_variant_id', colorVariant.id);
+
+                if (sizeError) {
+                  console.error('Error fetching size variants:', sizeError);
+                } else if (sizeVariants) {
+                  colorWithSizes.size_variants = sizeVariants;
+                }
+              }
+
+              productWithVariants.color_variants.push(colorWithSizes);
+            }
+          }
+        }
+
+        productsWithVariants.push(productWithVariants);
+      }
+
+      console.log('Featured products with variants processed:', productsWithVariants.length);
+      setProducts(productsWithVariants);
     } catch (error) {
       console.error('Error fetching featured products:', error);
     } finally {
