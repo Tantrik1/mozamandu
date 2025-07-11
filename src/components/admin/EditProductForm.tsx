@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,7 +12,6 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
-import { ProductVariantForm } from './ProductVariantForm';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -24,8 +22,7 @@ const productSchema = z.object({
   subcategory_id: z.string().min(1, 'Subcategory is required'),
   is_featured: z.boolean().default(false),
   has_color_variants: z.boolean().default(false),
-  has_size_variants: z.boolean().default(false),
-  stock_quantity: z.number().min(0, 'Stock quantity must be positive').optional(),
+  color_has_size_variants: z.boolean().default(false),
   status: z.enum(['active', 'inactive']).default('active'),
 });
 
@@ -40,20 +37,21 @@ interface Subcategory {
   category_id: string;
 }
 
-interface SizeVariant {
-  id?: string;
-  size_name: string;
-  size_code?: string;
-  stock_quantity: number;
-}
-
-interface ColorVariant {
-  id?: string;
-  color_name: string;
-  image_url?: string;
-  has_sizes: boolean;
-  stock_quantity?: number;
-  size_variants: SizeVariant[];
+interface Product {
+  id: string;
+  name: string;
+  description: string | null;
+  cost_price: number;
+  selling_price: number | null;
+  category_id: string;
+  subcategory_id: string;
+  image_url: string | null;
+  is_featured: boolean;
+  has_color_variants: boolean;
+  color_has_size_variants: boolean;
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
 }
 
 interface EditProductFormProps {
@@ -66,13 +64,11 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [filteredSubcategories, setFilteredSubcategories] = useState<Subcategory[]>([]);
-  const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
+  const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
-  const [dataLoading, setDataLoading] = useState(true);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -86,39 +82,63 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       subcategory_id: '',
       is_featured: false,
       has_color_variants: false,
-      has_size_variants: false,
-      stock_quantity: 0,
+      color_has_size_variants: false,
       status: 'active',
     },
   });
 
   const watchedCategoryId = form.watch('category_id');
-  const watchedHasColorVariants = form.watch('has_color_variants');
-  const watchedHasSizeVariants = form.watch('has_size_variants');
 
   useEffect(() => {
-    const initializeData = async () => {
-      console.log('Initializing data for product:', productId);
-      await Promise.all([fetchCategories(), fetchSubcategories()]);
-      await fetchProduct();
-      setDataLoading(false);
-    };
-    initializeData();
+    fetchProduct();
+    fetchCategories();
+    fetchSubcategories();
   }, [productId]);
 
   useEffect(() => {
-    if (!dataLoading && watchedCategoryId) {
+    if (watchedCategoryId) {
       const filtered = subcategories.filter(sub => sub.category_id === watchedCategoryId);
       setFilteredSubcategories(filtered);
-      
-      const currentSubcategoryId = form.getValues('subcategory_id');
-      if (currentSubcategoryId && !filtered.find(sub => sub.id === currentSubcategoryId)) {
-        form.setValue('subcategory_id', '');
-      }
     } else {
       setFilteredSubcategories([]);
     }
-  }, [watchedCategoryId, subcategories, form, dataLoading]);
+  }, [watchedCategoryId, subcategories]);
+
+  const fetchProduct = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+
+      if (error) throw error;
+      
+      setProduct(data);
+      setImagePreview(data.image_url);
+      
+      // Set form values
+      form.reset({
+        name: data.name,
+        description: data.description || '',
+        cost_price: data.cost_price,
+        selling_price: data.selling_price || 0,
+        category_id: data.category_id,
+        subcategory_id: data.subcategory_id,
+        is_featured: data.is_featured,
+        has_color_variants: data.has_color_variants,
+        color_has_size_variants: data.color_has_size_variants || false,
+        status: data.status,
+      });
+    } catch (error) {
+      console.error('Error fetching product:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch product details',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const fetchCategories = async () => {
     try {
@@ -147,96 +167,33 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       setSubcategories(data || []);
     } catch (error) {
       console.error('Error fetching subcategories:', error);
-    }
-  };
-
-  const fetchProduct = async () => {
-    try {
-      console.log('Fetching product data for ID:', productId);
-      const { data: product, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', productId)
-        .single();
-
-      if (error) throw error;
-
-      console.log('Fetched product for editing:', product);
-
-      // Set form values
-      form.reset({
-        name: product.name,
-        description: product.description || '',
-        cost_price: Number(product.cost_price),
-        selling_price: product.selling_price ? Number(product.selling_price) : 0,
-        category_id: product.category_id,
-        subcategory_id: product.subcategory_id,
-        is_featured: Boolean(product.is_featured),
-        has_color_variants: Boolean(product.has_color_variants),
-        has_size_variants: Boolean(product.has_size_variants),
-        stock_quantity: product.stock_quantity ? Number(product.stock_quantity) : 0,
-        status: product.status,
-      });
-
-      // Set image preview and current URL
-      if (product.image_url) {
-        setImagePreview(product.image_url);
-        setCurrentImageUrl(product.image_url);
-        console.log('Set product image:', product.image_url);
-      }
-    } catch (error) {
-      console.error('Error fetching product:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch product details',
-        variant: 'destructive',
-      });
-    }
+    }  
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    console.log('Starting image upload for file:', file.name);
     setUploadingImage(true);
     
     try {
-      // Create preview immediately
       const reader = new FileReader();
       reader.onload = (e) => {
         setImagePreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
 
-      // Upload to Supabase storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `product-${productId}-${Date.now()}.${fileExt}`;
-      
-      const { data, error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(fileName);
-
-      const newImageUrl = urlData.publicUrl;
-      setCurrentImageUrl(newImageUrl);
       setImageFile(file);
       
-      console.log('Image uploaded successfully:', newImageUrl);
       toast({
         title: 'Success',
-        description: 'Image uploaded successfully',
+        description: 'Image selected successfully',
       });
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.error('Error handling image:', error);
       toast({
         title: 'Error',
-        description: 'Failed to upload image',
+        description: 'Failed to handle image',
         variant: 'destructive',
       });
     } finally {
@@ -246,17 +203,50 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   const removeImage = () => {
     setImageFile(null);
-    setImagePreview(null);
-    setCurrentImageUrl(null);
+    setImagePreview(product?.image_url || null);
+  };
+
+  const uploadImageAndGetUrl = async (): Promise<string | null> => {
+    if (!imageFile) return null;
+
+    try {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `product-${Date.now()}.${fileExt}`;
+
+      const { data, error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, imageFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to upload image',
+        variant: 'destructive',
+      });
+      return null;
+    }
   };
 
   const onSubmit = async (data: z.infer<typeof productSchema>) => {
     setLoading(true);
     try {
-      console.log('Updating product with data:', data);
-      console.log('Current image URL:', currentImageUrl);
+      let imageUrl = product?.image_url;
+      if (imageFile) {
+        const newImageUrl = await uploadImageAndGetUrl();
+        if (newImageUrl) {
+          imageUrl = newImageUrl;
+        }
+      }
 
-      const productData = {
+      const updateData = {
         name: data.name,
         description: data.description || null,
         cost_price: data.cost_price,
@@ -265,28 +255,18 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         subcategory_id: data.subcategory_id,
         is_featured: data.is_featured,
         has_color_variants: data.has_color_variants,
-        has_size_variants: data.has_size_variants,
-        stock_quantity: (!data.has_color_variants && !data.has_size_variants) ? data.stock_quantity || null : null,
+        color_has_size_variants: data.color_has_size_variants,
         status: data.status,
-        image_url: currentImageUrl,
+        image_url: imageUrl,
+        updated_at: new Date().toISOString(),
       };
-
-      console.log('Submitting product data:', productData);
 
       const { error } = await supabase
         .from('products')
-        .update(productData)
+        .update(updateData)
         .eq('id', productId);
 
       if (error) throw error;
-
-      // Save color variants if enabled
-      if (data.has_color_variants && colorVariants.length > 0) {
-        await saveColorVariants(data.has_size_variants);
-      } else if (!data.has_color_variants) {
-        // Delete existing variants if color variants are disabled
-        await deleteExistingVariants();
-      }
 
       toast({
         title: 'Success',
@@ -306,93 +286,8 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     }
   };
 
-  const deleteExistingVariants = async () => {
-    try {
-      // Get existing color variants
-      const { data: existingColors } = await supabase
-        .from('color_variants')
-        .select('id')
-        .eq('product_id', productId);
-
-      if (existingColors && existingColors.length > 0) {
-        // Delete size variants first
-        for (const color of existingColors) {
-          await supabase
-            .from('size_variants')
-            .delete()
-            .eq('color_variant_id', color.id);
-        }
-
-        // Delete color variants
-        await supabase
-          .from('color_variants')
-          .delete()
-          .eq('product_id', productId);
-      }
-    } catch (error) {
-      console.error('Error deleting existing variants:', error);
-    }
-  };
-
-  const saveColorVariants = async (hasSizeVariants: boolean) => {
-    try {
-      console.log('Saving color variants:', colorVariants);
-      
-      // Delete existing variants first
-      await deleteExistingVariants();
-
-      // Insert new color variants
-      const validVariants = colorVariants.filter(cv => cv.color_name.trim());
-      if (validVariants.length > 0) {
-        const { data: insertedColors, error: colorError } = await supabase
-          .from('color_variants')
-          .insert(
-            validVariants.map(cv => ({
-              product_id: productId,
-              color_name: cv.color_name,
-              stock_quantity: hasSizeVariants ? 0 : (cv.stock_quantity || 0),
-              image_url: cv.image_url || null,
-              has_sizes: hasSizeVariants,
-            }))
-          )
-          .select('id, color_name');
-
-        if (colorError) throw colorError;
-
-        // Insert size variants if applicable
-        if (hasSizeVariants && insertedColors) {
-          for (let i = 0; i < validVariants.length; i++) {
-            const variant = validVariants[i];
-            const insertedColor = insertedColors[i];
-            
-            if (variant.size_variants && variant.size_variants.length > 0) {
-              const validSizes = variant.size_variants.filter(sv => sv.size_name.trim());
-              if (validSizes.length > 0) {
-                const { error: sizeError } = await supabase
-                  .from('size_variants')
-                  .insert(
-                    validSizes.map(sv => ({
-                      color_variant_id: insertedColor.id,
-                      size_name: sv.size_name,
-                      size_code: sv.size_code || null,
-                      stock_quantity: sv.stock_quantity,
-                    }))
-                  );
-
-                if (sizeError) throw sizeError;
-              }
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error saving color variants:', error);
-      throw error;
-    }
-  };
-
-  if (dataLoading) {
-    return <div className="flex justify-center p-8">Loading product data...</div>;
+  if (!product) {
+    return <div className="flex justify-center p-8">Loading product...</div>;
   }
 
   return (
@@ -525,39 +420,20 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                     <Switch
                       id="has_color_variants"
                       checked={form.watch('has_color_variants')}
-                      onCheckedChange={(checked) => {
-                        form.setValue('has_color_variants', checked);
-                        if (!checked) {
-                          setColorVariants([]);
-                        }
-                      }}
+                      onCheckedChange={(checked) => form.setValue('has_color_variants', checked)}
                     />
                     <Label htmlFor="has_color_variants">Colors</Label>
                   </div>
 
                   <div className="flex items-center space-x-2">
                     <Switch
-                      id="has_size_variants"
-                      checked={form.watch('has_size_variants')}
-                      onCheckedChange={(checked) => {
-                        form.setValue('has_size_variants', checked);
-                      }}
+                      id="color_has_size_variants"
+                      checked={form.watch('color_has_size_variants')}
+                      onCheckedChange={(checked) => form.setValue('color_has_size_variants', checked)}
                     />
-                    <Label htmlFor="has_size_variants">Sizes</Label>
+                    <Label htmlFor="color_has_size_variants">Sizes</Label>
                   </div>
                 </div>
-
-                {!watchedHasColorVariants && !watchedHasSizeVariants && (
-                  <div>
-                    <Label htmlFor="stock_quantity">Stock Quantity *</Label>
-                    <Input
-                      id="stock_quantity"
-                      type="number"
-                      {...form.register('stock_quantity', { valueAsNumber: true })}
-                      placeholder="0"
-                    />
-                  </div>
-                )}
 
                 <div>
                   <Label htmlFor="status">Status</Label>
@@ -593,7 +469,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                       className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                      {uploadingImage ? 'Processing...' : 'Change Image'}
                     </label>
                   </div>
 
@@ -613,14 +489,16 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="destructive"
-                          onClick={removeImage}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                        {imageFile && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            onClick={removeImage}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -629,15 +507,6 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             </div>
           </CardContent>
         </Card>
-
-        {(watchedHasColorVariants || watchedHasSizeVariants) && (
-          <ProductVariantForm
-            productId={productId}
-            hasColorVariants={watchedHasColorVariants}
-            hasSizeVariants={watchedHasSizeVariants}
-            onVariantsChange={setColorVariants}
-          />
-        )}
 
         <div className="flex justify-end space-x-4">
           <Button type="button" variant="outline" onClick={onCancel}>

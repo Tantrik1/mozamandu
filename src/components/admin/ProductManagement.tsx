@@ -22,8 +22,7 @@ interface Product {
   image_url: string | null;
   is_featured: boolean;
   has_color_variants: boolean;
-  has_size_variants: boolean;
-  stock_quantity: number | null;
+  color_has_size_variants: boolean;
   status: 'active' | 'inactive';
   categories: { name: string } | null;
   subcategories: { name: string } | null;
@@ -83,7 +82,7 @@ export function ProductManagement() {
         stocks[product.id] = stock;
       } catch (error) {
         console.error('Error calculating stock for product:', product.id, error);
-        stocks[product.id] = product.stock_quantity || 0;
+        stocks[product.id] = 0;
       }
     }
     
@@ -274,18 +273,18 @@ export function ProductManagement() {
                           <Badge variant="outline" className="ml-2">
                             {productStocks[product.id] !== undefined ? productStocks[product.id] : 'Loading...'}
                           </Badge>
-                          {(product.has_color_variants || product.has_size_variants) && (
+                          {(product.has_color_variants || product.color_has_size_variants) && (
                             <span className="text-xs text-gray-500 ml-2">
                               (Calculated from variants)
                             </span>
                           )}
                         </p>
-                        {(product.has_color_variants || product.has_size_variants) && (
+                        {(product.has_color_variants || product.color_has_size_variants) && (
                           <div className="flex items-center space-x-1">
                             {product.has_color_variants && (
                               <Badge variant="outline" className="text-xs">Color Variants</Badge>
                             )}
-                            {product.has_size_variants && (
+                            {product.color_has_size_variants && (
                               <Badge variant="outline" className="text-xs">Size Variants</Badge>
                             )}
                           </div>
