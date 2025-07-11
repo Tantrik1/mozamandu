@@ -44,7 +44,6 @@ interface ColorVariant {
   color_name: string;
   image_url?: string;
   has_sizes: boolean;
-  stock_quantity?: number;
   size_variants: SizeVariant[];
 }
 
@@ -52,7 +51,6 @@ interface SizeVariant {
   id?: string;
   size_name: string;
   size_code?: string;
-  stock_quantity: number;
 }
 
 interface EditProductFormProps {
@@ -282,7 +280,8 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         description: 'Product updated successfully',
       });
 
-      onSave();
+      // Show inventory popup after successful update
+      setShowInventoryPopup(true);
     } catch (error) {
       console.error('Error updating product:', error);
       toast({
@@ -293,6 +292,11 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleInventoryClose = () => {
+    setShowInventoryPopup(false);
+    onSave(); // Navigate back after inventory management is complete
   };
 
   return (
@@ -535,6 +539,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             hasColorVariants={watchedHasColorVariants}
             hasSizeVariants={watchedHasSizeVariants}
             onVariantsChange={setColorVariants}
+            hideStockFields={true}
           />
         )}
 
@@ -551,7 +556,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       {showInventoryPopup && (
         <InventoryManagementPopup
           productId={productId}
-          onClose={() => setShowInventoryPopup(false)}
+          onClose={handleInventoryClose}
           isOpen={showInventoryPopup}
         />
       )}

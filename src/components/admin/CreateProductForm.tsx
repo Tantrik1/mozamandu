@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -26,7 +25,6 @@ const productSchema = z.object({
   is_featured: z.boolean().default(false),
   has_color_variants: z.boolean().default(false),
   has_size_variants: z.boolean().default(false),
-  stock_quantity: z.number().min(0, 'Stock quantity must be positive').optional(),
   status: z.enum(['active', 'inactive']).default('active'),
 });
 
@@ -46,7 +44,6 @@ interface ColorVariant {
   color_name: string;
   image_url?: string;
   has_sizes: boolean;
-  stock_quantity?: number;
   size_variants: SizeVariant[];
 }
 
@@ -54,7 +51,6 @@ interface SizeVariant {
   id?: string;
   size_name: string;
   size_code?: string;
-  stock_quantity: number;
 }
 
 interface CreateProductFormProps {
@@ -87,7 +83,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       is_featured: false,
       has_color_variants: false,
       has_size_variants: false,
-      stock_quantity: 0,
       status: 'active',
     },
   });
@@ -490,19 +485,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                   </div>
                 </div>
 
-                {!watchedHasColorVariants && !watchedHasSizeVariants && (
-                  <div>
-                    <Label htmlFor="stock_quantity">Initial Stock Quantity</Label>
-                    <Input
-                      id="stock_quantity"
-                      type="number"
-                      {...form.register('stock_quantity', { valueAsNumber: true })}
-                      placeholder="0"
-                    />
-                    <p className="text-sm text-gray-500 mt-1">You can adjust this in the inventory popup after creation</p>
-                  </div>
-                )}
-
                 <div>
                   <Label htmlFor="status">Status</Label>
                   <Select
@@ -579,6 +561,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
             hasColorVariants={watchedHasColorVariants}
             hasSizeVariants={watchedHasSizeVariants}
             onVariantsChange={setColorVariants}
+            hideStockFields={true}
           />
         )}
 

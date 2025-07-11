@@ -5,7 +5,23 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { AdminDashboard } from '@/components/admin/AdminDashboard';
+import { Routes, Route } from 'react-router-dom';
+import { DashboardStats } from '@/components/admin/DashboardStats';
+import { ProductManagement } from '@/components/admin/ProductManagement';
+import { EnhancedOrderManagement } from '@/components/admin/EnhancedOrderManagement';
+import { CustomerManagement } from '@/components/admin/CustomerManagement';
+import { CategoryManagement } from '@/components/admin/CategoryManagement';
+import { SubcategoryManagement } from '@/components/admin/SubcategoryManagement';
+import { ComboManagement } from '@/components/admin/ComboManagement';
+import { DeliveryChargeManagement } from '@/components/admin/DeliveryChargeManagement';
+import { PaymentMethodManagement } from '@/components/admin/PaymentMethodManagement';
+import { FAQManagement } from '@/components/admin/FAQManagement';
+import { NoticeManagement } from '@/components/admin/NoticeManagement';
+import { TopBarTextManagement } from '@/components/admin/TopBarTextManagement';
+import { NavbarManagement } from '@/components/admin/NavbarManagement';
+import { PromocodeManagement } from '@/components/admin/PromocodeManagement';
+import { AdminSettings } from '@/components/admin/AdminSettings';
+import { InventoryManagement } from '@/components/inventory/InventoryManagement';
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -75,8 +91,25 @@ export default function AdminPage() {
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AdminSidebar />
-        <main className="flex-1">
-          <AdminDashboard />
+        <main className="flex-1 p-6">
+          <Routes>
+            <Route path="/" element={<DashboardStats />} />
+            <Route path="/products" element={<ProductManagement />} />
+            <Route path="/inventory" element={<InventoryManagement />} />
+            <Route path="/orders" element={<EnhancedOrderManagement />} />
+            <Route path="/customers" element={<CustomerManagement />} />
+            <Route path="/categories" element={<CategoryManagement />} />
+            <Route path="/subcategories" element={<SubcategoryManagement />} />
+            <Route path="/combos" element={<ComboManagement />} />
+            <Route path="/delivery-charges" element={<DeliveryChargeManagement />} />
+            <Route path="/payments" element={<PaymentMethodManagement />} />
+            <Route path="/promocodes" element={<PromocodeManagement />} />
+            <Route path="/faqs" element={<FAQManagement />} />
+            <Route path="/notices" element={<NoticeManagement />} />
+            <Route path="/top-bar-text" element={<TopBarTextManagement />} />
+            <Route path="/navbar" element={<NavbarManagement />} />
+            <Route path="/settings" element={<AdminSettings />} />
+          </Routes>
         </main>
       </div>
     </SidebarProvider>
