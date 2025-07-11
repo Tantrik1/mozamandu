@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { AdvancedProductCard } from './AdvancedProductCard';
+import { UnifiedProductCard } from '@/components/products/UnifiedProductCard';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { fetchFeaturedProducts, type Product } from '@/utils/productFetcher';
@@ -103,7 +103,7 @@ export function FeaturedProductsCarousel() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {visibleProducts.map((product, index) => (
-              <AdvancedProductCard key={`${product.id}-${index}`} product={product} />
+              <UnifiedProductCard key={`${product.id}-${index}`} product={product} />
             ))}
           </div>
         </div>

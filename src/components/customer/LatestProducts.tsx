@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { AdvancedProductCard } from './AdvancedProductCard';
+import { UnifiedProductCard } from '@/components/products/UnifiedProductCard';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -63,7 +63,7 @@ export function LatestProducts() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {products.map((product) => (
-                <AdvancedProductCard key={product.id} product={product} />
+                <UnifiedProductCard key={product.id} product={product} />
               ))}
             </div>
             <div className="text-center mt-12">

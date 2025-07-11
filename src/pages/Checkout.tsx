@@ -1,5 +1,5 @@
 
-import { UniversalCheckout } from '@/components/checkout/UniversalCheckout';
+import { EnhancedCheckout } from '@/components/checkout/EnhancedCheckout';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
 
@@ -7,7 +7,7 @@ export default function Checkout() {
   return (
     <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
-      <UniversalCheckout />
+      <EnhancedCheckout />
       <Footer />
     </div>
   );
