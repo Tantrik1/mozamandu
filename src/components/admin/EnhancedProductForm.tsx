@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
+import { ArrowLeft, Upload, Eye, X, Plus, Trash2 } from 'lucide-react';
 import { useInventoryManager } from '@/hooks/useInventoryManager';
 
 const productSchema = z.object({
@@ -38,37 +39,30 @@ interface Subcategory {
   category_id: string;
 }
 
-interface SizeVariant {
-  id?: string;
-  size_name: string;
-  size_code?: string;
-  stock_quantity: number;
-}
-
-interface ColorVariant {
-  id?: string;
-  color_name: string;
-  image_url?: string;
-  has_sizes: boolean;
-  stock_quantity?: number;
-  size_variants: SizeVariant[];
-}
-
-interface Product {
+interface Color {
   id: string;
   name: string;
-  description: string | null;
+  hex_code: string;
+}
+
+interface Size {
+  id: string;
+  name: string;
+  code: string;
+  sort_order: number;
+}
+
+interface SKUVariant {
+  id?: string;
+  sku: string;
+  color_id?: string;
+  size_id?: string;
+  color_name?: string;
+  size_name?: string;
+  stock_quantity: number;
   cost_price: number;
-  selling_price: number | null;
-  category_id: string;
-  subcategory_id: string;
-  image_url: string | null;
-  is_featured: boolean;
-  has_color_variants: boolean;
-  color_has_size_variants: boolean;
-  status: 'active' | 'inactive';
-  created_at: string;
-  updated_at: string;
+  selling_price: number;
+  low_stock_threshold: number;
 }
 
 interface EnhancedProductFormProps {
@@ -82,12 +76,12 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [filteredSubcategories, setFilteredSubcategories] = useState<Subcategory[]>([]);
-  const [product, setProduct] = useState<Product | null>(null);
-  const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
+  const [colors, setColors] = useState<Color[]>([]);
+  const [sizes, setSizes] = useState<Size[]>([]);
+  const [skuVariants, setSkuVariants] = useState<SKUVariant[]>([]);
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
   const { toast } = useToast();
   const { createInventoryRecord } = useInventoryManager();
 
@@ -110,13 +104,15 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
   const watchedCategoryId = form.watch('category_id');
   const watchedHasColorVariants = form.watch('has_color_variants');
   const watchedHasSizeVariants = form.watch('color_has_size_variants');
+  const watchedProductName = form.watch('name');
 
   useEffect(() => {
     fetchCategories();
     fetchSubcategories();
+    fetchColors();
+    fetchSizes();
     if (mode === 'edit' && productId) {
       fetchProduct();
-      fetchProductVariants();
     }
   }, [mode, productId]);
 
@@ -127,81 +123,12 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
       if (mode === 'create') {
         form.setValue('subcategory_id', '');
       }
-    } else {
-      setFilteredSubcategories([]);
     }
   }, [watchedCategoryId, subcategories, form, mode]);
 
-  const fetchProduct = async () => {
-    if (!productId) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', productId)
-        .single();
-
-      if (error) throw error;
-      
-      setProduct(data);
-      setImagePreview(data.image_url);
-      
-      form.reset({
-        name: data.name,
-        description: data.description || '',
-        cost_price: data.cost_price,
-        selling_price: data.selling_price || 0,
-        category_id: data.category_id,
-        subcategory_id: data.subcategory_id,
-        is_featured: data.is_featured,
-        has_color_variants: data.has_color_variants,
-        color_has_size_variants: data.color_has_size_variants || false,
-        status: data.status,
-      });
-    } catch (error) {
-      console.error('Error fetching product:', error);
-    }
-  };
-
-  const fetchProductVariants = async () => {
-    if (!productId) return;
-
-    try {
-      const { data: colorData, error: colorError } = await supabase
-        .from('color_variants')
-        .select('*')
-        .eq('product_id', productId);
-
-      if (colorError) throw colorError;
-
-      const variantsWithSizes = await Promise.all(
-        (colorData || []).map(async (colorVariant) => {
-          const { data: sizeData, error: sizeError } = await supabase
-            .from('size_variants')
-            .select('*')
-            .eq('color_variant_id', colorVariant.id);
-
-          if (sizeError) throw sizeError;
-
-          return {
-            ...colorVariant,
-            size_variants: (sizeData || []).map(sv => ({
-              id: sv.id,
-              size_name: sv.size_name,
-              size_code: sv.size_code || '',
-              stock_quantity: 0, // Will be populated from inventory if needed
-            })),
-            stock_quantity: 0, // Will be populated from inventory if needed
-          };
-        })
-      );
-
-      setColorVariants(variantsWithSizes);
-    } catch (error) {
-      console.error('Error fetching variants:', error);
-    }
-  };
+  useEffect(() => {
+    generateSKUVariants();
+  }, [watchedHasColorVariants, watchedHasSizeVariants, watchedProductName]);
 
   const fetchCategories = async () => {
     try {
@@ -210,7 +137,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
         .select('id, name')
         .eq('status', 'on')
         .order('name');
-
       if (error) throw error;
       setCategories(data || []);
     } catch (error) {
@@ -225,7 +151,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
         .select('id, name, category_id')
         .eq('status', 'on')
         .order('name');
-
       if (error) throw error;
       setSubcategories(data || []);
     } catch (error) {
@@ -233,39 +158,170 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
     }
   };
 
+  const fetchColors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('colors')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      setColors(data || []);
+    } catch (error) {
+      console.error('Error fetching colors:', error);
+    }
+  };
+
+  const fetchSizes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('sizes')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order');
+      if (error) throw error;
+      setSizes(data || []);
+    } catch (error) {
+      console.error('Error fetching sizes:', error);
+    }
+  };
+
+  const fetchProduct = async () => {
+    if (!productId) return;
+    
+    try {
+      // Fetch product details
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+
+      if (productError) throw productError;
+      
+      setImagePreview(product.image_url);
+      form.reset({
+        name: product.name,
+        description: product.description || '',
+        cost_price: product.cost_price,
+        selling_price: product.selling_price || 0,
+        category_id: product.category_id,
+        subcategory_id: product.subcategory_id,
+        is_featured: product.is_featured,
+        has_color_variants: product.has_color_variants,
+        color_has_size_variants: product.color_has_size_variants || false,
+        status: product.status,
+      });
+
+      // Fetch existing SKU variants
+      const { data: variants, error: variantsError } = await supabase
+        .from('product_inventory')
+        .select('*')
+        .eq('product_id', productId);
+
+      if (variantsError) throw variantsError;
+
+      const existingVariants: SKUVariant[] = (variants || []).map(v => ({
+        id: v.id,
+        sku: v.sku,
+        color_name: v.color_name,
+        size_name: v.size_name,
+        stock_quantity: v.stock_quantity,
+        cost_price: v.cost_price,
+        selling_price: v.selling_price || 0,
+        low_stock_threshold: v.low_stock_threshold || 10,
+      }));
+
+      setSkuVariants(existingVariants);
+    } catch (error) {
+      console.error('Error fetching product:', error);
+    }
+  };
+
+  const generateSKUVariants = () => {
+    if (mode === 'edit') return; // Don't auto-generate for edit mode
+    
+    const variants: SKUVariant[] = [];
+    const productName = watchedProductName || 'Product';
+
+    if (!watchedHasColorVariants && !watchedHasSizeVariants) {
+      // Simple product - single SKU
+      variants.push({
+        sku: `${productName.toUpperCase().replace(/\s+/g, '')}-001`,
+        stock_quantity: 0,
+        cost_price: form.getValues('cost_price') || 0,
+        selling_price: form.getValues('selling_price') || 0,
+        low_stock_threshold: 10,
+      });
+    } else if (watchedHasColorVariants && !watchedHasSizeVariants) {
+      // Color variants only
+      colors.forEach((color, index) => {
+        variants.push({
+          sku: `${productName.toUpperCase().replace(/\s+/g, '')}-${color.name.toUpperCase().replace(/\s+/g, '')}-${String(index + 1).padStart(3, '0')}`,
+          color_id: color.id,
+          color_name: color.name,
+          stock_quantity: 0,
+          cost_price: form.getValues('cost_price') || 0,
+          selling_price: form.getValues('selling_price') || 0,
+          low_stock_threshold: 10,
+        });
+      });
+    } else if (watchedHasColorVariants && watchedHasSizeVariants) {
+      // Color and size variants
+      let counter = 1;
+      colors.forEach(color => {
+        sizes.forEach(size => {
+          variants.push({
+            sku: `${productName.toUpperCase().replace(/\s+/g, '')}-${color.name.toUpperCase().replace(/\s+/g, '')}-${size.code || size.name.toUpperCase()}-${String(counter).padStart(3, '0')}`,
+            color_id: color.id,
+            size_id: size.id,
+            color_name: color.name,
+            size_name: size.name,
+            stock_quantity: 0,
+            cost_price: form.getValues('cost_price') || 0,
+            selling_price: form.getValues('selling_price') || 0,
+            low_stock_threshold: 10,
+          });
+          counter++;
+        });
+      });
+    }
+
+    setSkuVariants(variants);
+  };
+
+  const updateSKUVariant = (index: number, field: keyof SKUVariant, value: any) => {
+    const updated = [...skuVariants];
+    updated[index] = { ...updated[index], [field]: value };
+    setSkuVariants(updated);
+  };
+
+  const addCustomSKU = () => {
+    const newSKU: SKUVariant = {
+      sku: `${watchedProductName.toUpperCase().replace(/\s+/g, '')}-CUSTOM-${String(skuVariants.length + 1).padStart(3, '0')}`,
+      stock_quantity: 0,
+      cost_price: form.getValues('cost_price') || 0,
+      selling_price: form.getValues('selling_price') || 0,
+      low_stock_threshold: 10,
+    };
+    setSkuVariants([...skuVariants, newSKU]);
+  };
+
+  const removeSKU = (index: number) => {
+    const updated = skuVariants.filter((_, i) => i !== index);
+    setSkuVariants(updated);
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploadingImage(true);
-    
-    try {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-      setImageFile(file);
-      
-      toast({
-        title: 'Success',
-        description: 'Image selected successfully',
-      });
-    } catch (error) {
-      console.error('Error handling image:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to handle image',
-        variant: 'destructive',
-      });
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
-  const removeImage = () => {
-    setImageFile(null);
-    setImagePreview(product?.image_url || null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+    setImageFile(file);
   };
 
   const uploadImageAndGetUrl = async (): Promise<string | null> => {
@@ -275,11 +331,11 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
       const fileExt = imageFile.name.split('.').pop();
       const fileName = `product-${Date.now()}.${fileExt}`;
 
-      const { data, error: uploadError } = await supabase.storage
+      const { data, error } = await supabase.storage
         .from('product-images')
         .upload(fileName, imageFile);
 
-      if (uploadError) throw uploadError;
+      if (error) throw error;
 
       const { data: urlData } = supabase.storage
         .from('product-images')
@@ -295,7 +351,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
   const onSubmit = async (data: z.infer<typeof productSchema>) => {
     setLoading(true);
     try {
-      let imageUrl = product?.image_url;
+      let imageUrl = imagePreview;
       if (imageFile) {
         const newImageUrl = await uploadImageAndGetUrl();
         if (newImageUrl) {
@@ -328,9 +384,6 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
 
         if (error) throw error;
         productResult = newProduct;
-
-        // Create inventory records for new product
-        await createProductInventory(productResult.id, data);
       } else if (mode === 'edit' && productId) {
         const { error } = await supabase
           .from('products')
@@ -341,10 +394,8 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
         productResult = { id: productId, ...productData };
       }
 
-      // Save variants if enabled
-      if (data.has_color_variants && colorVariants.length > 0) {
-        await saveColorVariants(productResult.id, data.color_has_size_variants);
-      }
+      // Save variants and create inventory records
+      await saveVariants(productResult.id, data);
 
       toast({
         title: 'Success',
@@ -364,9 +415,8 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
     }
   };
 
-  const createProductInventory = async (productId: string, formData: z.infer<typeof productSchema>) => {
+  const saveVariants = async (productId: string, formData: z.infer<typeof productSchema>) => {
     try {
-      // Get category and subcategory names
       const category = categories.find(c => c.id === formData.category_id);
       const subcategory = subcategories.find(s => s.id === formData.subcategory_id);
 
@@ -374,133 +424,98 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
         throw new Error('Category or subcategory not found');
       }
 
-      // If no variants, create a simple inventory record
-      if (!formData.has_color_variants && !formData.color_has_size_variants) {
-        await createInventoryRecord(
-          productId,
-          formData.name,
-          category.name,
-          subcategory.name,
-          formData.cost_price,
-          formData.selling_price,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          0
-        );
+      // Create color variants if needed
+      const colorVariantMap: Record<string, string> = {};
+      if (formData.has_color_variants) {
+        const uniqueColors = [...new Set(skuVariants.map(v => v.color_name).filter(Boolean))];
+        
+        for (const colorName of uniqueColors) {
+          const color = colors.find(c => c.name === colorName);
+          if (color) {
+            const { data: colorVariant, error } = await supabase
+              .from('color_variants')
+              .upsert({
+                product_id: productId,
+                color_name: colorName,
+                color_id: color.id,
+                has_sizes: formData.color_has_size_variants,
+              })
+              .select()
+              .single();
+
+            if (error) throw error;
+            colorVariantMap[colorName] = colorVariant.id;
+          }
+        }
       }
-    } catch (error) {
-      console.error('Error creating product inventory:', error);
-    }
-  };
 
-  const saveColorVariants = async (productId: string, hasSizeVariants: boolean) => {
-    try {
-      const validVariants = colorVariants.filter(cv => cv.color_name.trim());
-      if (validVariants.length === 0) return;
+      // Create size variants if needed
+      const sizeVariantMap: Record<string, string> = {};
+      if (formData.color_has_size_variants) {
+        for (const variant of skuVariants) {
+          if (variant.size_name && variant.color_name) {
+            const size = sizes.find(s => s.name === variant.size_name);
+            if (size && colorVariantMap[variant.color_name]) {
+              const { data: sizeVariant, error } = await supabase
+                .from('size_variants')
+                .upsert({
+                  color_variant_id: colorVariantMap[variant.color_name],
+                  size_name: variant.size_name,
+                  size_id: size.id,
+                  size_code: size.code,
+                })
+                .select()
+                .single();
 
-      // For edit mode, we might want to update existing variants
-      // For now, let's handle create mode
-      if (mode === 'create') {
-        const { data: insertedColors, error: colorError } = await supabase
-          .from('color_variants')
-          .insert(
-            validVariants.map(cv => ({
-              product_id: productId,
-              color_name: cv.color_name,
-              image_url: cv.image_url || null,
-              has_sizes: hasSizeVariants,
-            }))
-          )
-          .select('id, color_name');
-
-        if (colorError) throw colorError;
-
-        // Insert size variants if applicable
-        if (hasSizeVariants && insertedColors) {
-          for (let i = 0; i < validVariants.length; i++) {
-            const variant = validVariants[i];
-            const insertedColor = insertedColors[i];
-            
-            if (variant.size_variants && variant.size_variants.length > 0) {
-              const validSizes = variant.size_variants.filter(sv => sv.size_name.trim());
-              if (validSizes.length > 0) {
-                const { error: sizeError } = await supabase
-                  .from('size_variants')
-                  .insert(
-                    validSizes.map(sv => ({
-                      color_variant_id: insertedColor.id,
-                      size_name: sv.size_name,
-                      size_code: sv.size_code || null,
-                    }))
-                  );
-
-                if (sizeError) throw sizeError;
-              }
+              if (error) throw error;
+              sizeVariantMap[`${variant.color_name}-${variant.size_name}`] = sizeVariant.id;
             }
           }
         }
       }
+
+      // Create/update inventory records for each SKU
+      for (const variant of skuVariants) {
+        const inventoryData = {
+          sku: variant.sku,
+          product_id: productId,
+          product_name: formData.name,
+          category_name: category.name,
+          subcategory_name: subcategory.name,
+          color_name: variant.color_name || null,
+          size_name: variant.size_name || null,
+          color_variant_id: variant.color_name ? colorVariantMap[variant.color_name] : null,
+          size_variant_id: variant.color_name && variant.size_name ? sizeVariantMap[`${variant.color_name}-${variant.size_name}`] : null,
+          stock_quantity: variant.stock_quantity,
+          cost_price: variant.cost_price,
+          selling_price: variant.selling_price,
+          low_stock_threshold: variant.low_stock_threshold,
+          is_active: true,
+        };
+
+        if (variant.id) {
+          // Update existing
+          const { error } = await supabase
+            .from('product_inventory')
+            .update(inventoryData)
+            .eq('id', variant.id);
+          if (error) throw error;
+        } else {
+          // Create new
+          const { error } = await supabase
+            .from('product_inventory')
+            .insert(inventoryData);
+          if (error) throw error;
+        }
+      }
     } catch (error) {
-      console.error('Error saving color variants:', error);
+      console.error('Error saving variants:', error);
       throw error;
     }
   };
 
-  const addColorVariant = () => {
-    const newVariant: ColorVariant = {
-      color_name: '',
-      has_sizes: watchedHasSizeVariants,
-      stock_quantity: watchedHasSizeVariants ? 0 : 0,
-      size_variants: []
-    };
-    setColorVariants([...colorVariants, newVariant]);
-  };
-
-  const updateColorVariant = (index: number, field: keyof ColorVariant, value: any) => {
-    const updated = [...colorVariants];
-    updated[index] = { ...updated[index], [field]: value };
-    setColorVariants(updated);
-  };
-
-  const removeColorVariant = (index: number) => {
-    const updated = colorVariants.filter((_, i) => i !== index);
-    setColorVariants(updated);
-  };
-
-  const addSizeVariant = (colorIndex: number) => {
-    const updated = [...colorVariants];
-    const newSizeVariant: SizeVariant = {
-      size_name: '',
-      size_code: '',
-      stock_quantity: 0
-    };
-    updated[colorIndex].size_variants.push(newSizeVariant);
-    setColorVariants(updated);
-  };
-
-  const updateSizeVariant = (colorIndex: number, sizeIndex: number, field: keyof SizeVariant, value: any) => {
-    const updated = [...colorVariants];
-    updated[colorIndex].size_variants[sizeIndex] = {
-      ...updated[colorIndex].size_variants[sizeIndex],
-      [field]: value
-    };
-    setColorVariants(updated);
-  };
-
-  const removeSizeVariant = (colorIndex: number, sizeIndex: number) => {
-    const updated = [...colorVariants];
-    updated[colorIndex].size_variants = updated[colorIndex].size_variants.filter((_, i) => i !== sizeIndex);
-    setColorVariants(updated);
-  };
-
-  if (mode === 'edit' && !product) {
-    return <div className="flex justify-center p-8">Loading product...</div>;
-  }
-
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
           <Button variant="outline" onClick={onCancel}>
@@ -634,7 +649,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
                       onCheckedChange={(checked) => {
                         form.setValue('has_color_variants', checked);
                         if (!checked) {
-                          setColorVariants([]);
+                          form.setValue('color_has_size_variants', false);
                         }
                       }}
                     />
@@ -648,6 +663,7 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
                       onCheckedChange={(checked) => {
                         form.setValue('color_has_size_variants', checked);
                       }}
+                      disabled={!watchedHasColorVariants}
                     />
                     <Label htmlFor="color_has_size_variants">Sizes</Label>
                   </div>
@@ -680,14 +696,13 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
                       accept="image/*"
                       onChange={handleImageUpload}
                       className="hidden"
-                      disabled={uploadingImage}
                     />
                     <label
                       htmlFor="image-upload"
-                      className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className="cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      {uploadingImage ? 'Processing...' : mode === 'create' ? 'Upload Image' : 'Change Image'}
+                      {mode === 'create' ? 'Upload Image' : 'Change Image'}
                     </label>
                   </div>
 
@@ -707,16 +722,14 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {(imageFile || mode === 'create') && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            onClick={removeImage}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setImagePreview(null)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -726,91 +739,107 @@ export function EnhancedProductForm({ productId, onSave, onCancel, mode }: Enhan
           </CardContent>
         </Card>
 
-        {/* Variant management section would go here */}
-        {watchedHasColorVariants && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Variants</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <Button type="button" onClick={addColorVariant} variant="outline">
-                  Add Color Variant
-                </Button>
-                
-                {colorVariants.map((variant, index) => (
-                  <div key={index} className="border p-4 rounded">
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <Label>Color Name</Label>
-                        <Input
-                          value={variant.color_name}
-                          onChange={(e) => updateColorVariant(index, 'color_name', e.target.value)}
-                          placeholder="e.g., Red, Blue"
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => removeColorVariant(index)}
-                        >
-                          Remove Color
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    {watchedHasSizeVariants && (
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <Label>Size Variants</Label>
-                          <Button
-                            type="button"
-                            onClick={() => addSizeVariant(index)}
-                            size="sm"
-                            variant="outline"
-                          >
-                            Add Size
-                          </Button>
-                        </div>
-                        
-                        {variant.size_variants.map((sizeVariant, sizeIndex) => (
-                          <div key={sizeIndex} className="grid grid-cols-4 gap-2 mb-2">
-                            <Input
-                              placeholder="Size (S, M, L)"
-                              value={sizeVariant.size_name}
-                              onChange={(e) => updateSizeVariant(index, sizeIndex, 'size_name', e.target.value)}
-                            />
-                            <Input
-                              placeholder="Code"
-                              value={sizeVariant.size_code || ''}
-                              onChange={(e) => updateSizeVariant(index, sizeIndex, 'size_code', e.target.value)}
-                            />
-                            <Input
-                              type="number"
-                              placeholder="Stock"
-                              value={sizeVariant.stock_quantity}
-                              onChange={(e) => updateSizeVariant(index, sizeIndex, 'stock_quantity', parseInt(e.target.value) || 0)}
-                            />
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => removeSizeVariant(index, sizeIndex)}
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+        {/* SKU Management Section */}
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>SKU Management</CardTitle>
+              <Button type="button" onClick={addCustomSKU} variant="outline">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Custom SKU
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {skuVariants.map((variant, index) => (
+                <div key={index} className="grid grid-cols-12 gap-4 p-4 border rounded-lg">
+                  <div className="col-span-3">
+                    <Label>SKU</Label>
+                    <Input
+                      value={variant.sku}
+                      onChange={(e) => updateSKUVariant(index, 'sku', e.target.value)}
+                      placeholder="Enter SKU"
+                    />
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  
+                  {variant.color_name && (
+                    <div className="col-span-2">
+                      <Label>Color</Label>
+                      <Input value={variant.color_name} disabled />
+                    </div>
+                  )}
+                  
+                  {variant.size_name && (
+                    <div className="col-span-2">
+                      <Label>Size</Label>
+                      <Input value={variant.size_name} disabled />
+                    </div>
+                  )}
+                  
+                  <div className="col-span-1">
+                    <Label>Stock</Label>
+                    <Input
+                      type="number"
+                      value={variant.stock_quantity}
+                      onChange={(e) => updateSKUVariant(index, 'stock_quantity', parseInt(e.target.value) || 0)}
+                      placeholder="0"
+                    />
+                  </div>
+                  
+                  <div className="col-span-1">
+                    <Label>Cost</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={variant.cost_price}
+                      onChange={(e) => updateSKUVariant(index, 'cost_price', parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  
+                  <div className="col-span-1">
+                    <Label>Price</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={variant.selling_price}
+                      onChange={(e) => updateSKUVariant(index, 'selling_price', parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  
+                  <div className="col-span-1">
+                    <Label>Threshold</Label>
+                    <Input
+                      type="number"
+                      value={variant.low_stock_threshold}
+                      onChange={(e) => updateSKUVariant(index, 'low_stock_threshold', parseInt(e.target.value) || 0)}
+                      placeholder="10"
+                    />
+                  </div>
+                  
+                  <div className="col-span-1 flex items-end">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => removeSKU(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              
+              {skuVariants.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No SKUs configured. Configure product variants above to generate SKUs automatically.</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="flex justify-end space-x-4">
           <Button type="button" variant="outline" onClick={onCancel}>

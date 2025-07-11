@@ -1,51 +1,44 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/components/auth/AuthProvider";
-import { RobustCartProvider } from "@/hooks/useRobustCart";
-import Index from "./pages/Index";
-import Categories from "./pages/Categories";
-import CategoryPage from "./pages/CategoryPage";
-import SubcategoryPage from "./pages/SubcategoryPage";
-import Products from "./pages/Products";
-import Checkout from "./pages/Checkout";
-import OrderSummary from "./pages/OrderSummary";
-import CustomerOrderSummary from "./pages/CustomerOrderSummary";
-import FAQ from "./pages/FAQ";
-import Contact from "./pages/Contact";
-import InventoryDashboard from "./pages/InventoryDashboard";
+import { AuthProvider } from '@/contexts/AuthContext';
+import Index from '@/pages/Index';
+import AuthPage from '@/pages/AuthPage';
+import AdminPage from '@/pages/AdminPage';
+import InventoryDashboard from '@/pages/InventoryDashboard';
+import CheckoutPage from '@/pages/CheckoutPage';
+import CheckoutSuccess from '@/pages/CheckoutSuccess';
+import ProductsPage from '@/pages/ProductsPage';
+import ProductDetailPage from '@/pages/ProductDetailPage';
+import CustomerArea from '@/pages/CustomerArea';
+import ContactPage from '@/pages/ContactPage';
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <RobustCartProvider>
-        <TooltipProvider>
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
           <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/categories" element={<Categories />} />
-              <Route path="/categories/:categoryId" element={<CategoryPage />} />
-              <Route path="/subcategories/:subcategoryId" element={<SubcategoryPage />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/inventory" element={<InventoryDashboard />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/order-summary/:orderId" element={<OrderSummary />} />
-              <Route path="/customer-order-summary/:orderId" element={<CustomerOrderSummary />} />
-              <Route path="/faq" element={<FAQ />} />
-              <Route path="/contact" element={<Contact />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </RobustCartProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/inventory" element={<InventoryDashboard />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/checkout/success" element={<CheckoutSuccess />} />
+            <Route path="/products/:categoryId" element={<ProductsPage />} />
+            <Route path="/products/:categoryId/:subcategoryId" element={<ProductsPage />} />
+            <Route path="/product/:productId" element={<ProductDetailPage />} />
+            <Route path="/customer/*" element={<CustomerArea />} />
+            <Route path="/contact" element={<ContactPage />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}
 
 export default App;

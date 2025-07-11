@@ -2,10 +2,10 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ProductStockSummary {
+  productId: string;
   totalStock: number;
-  reservedStock: number;
   availableStock: number;
-  hasVariants: boolean;
+  reservedStock: number;
   variants: VariantStock[];
 }
 
@@ -15,23 +15,12 @@ export interface VariantStock {
   colorName?: string;
   sizeName?: string;
   stockQuantity: number;
-  reservedStock: number;
   availableStock: number;
+  reservedStock: number;
   lowStockThreshold: number;
   isLowStock: boolean;
-  isOutOfStock: boolean;
-}
-
-export interface StockCalculationResult {
-  totalStock: number;
-  colorBreakdown?: {
-    colorName: string;
-    stock: number;
-    sizeBreakdown?: {
-      sizeName: string;
-      stock: number;
-    }[];
-  }[];
+  costPrice: number;
+  sellingPrice: number;
 }
 
 export async function getProductStockSummary(productId: string): Promise<number> {
@@ -44,13 +33,9 @@ export async function getProductStockSummary(productId: string): Promise<number>
 
     if (error) throw error;
 
-    if (!data || data.length === 0) {
-      return 0;
-    }
-
-    return data.reduce((total, item) => total + (item.available_stock || 0), 0);
+    return (data || []).reduce((total, item) => total + (item.available_stock || 0), 0);
   } catch (error) {
-    console.error('Error calculating stock summary:', error);
+    console.error('Error calculating product stock:', error);
     return 0;
   }
 }
@@ -61,103 +46,52 @@ export async function getDetailedProductStock(productId: string): Promise<Produc
       .from('product_inventory')
       .select('*')
       .eq('product_id', productId)
-      .eq('is_active', true)
-      .order('color_name, size_name');
+      .eq('is_active', true);
 
     if (error) throw error;
 
     const variants: VariantStock[] = (data || []).map(item => ({
       id: item.id,
       sku: item.sku,
-      colorName: item.color_name || undefined,
-      sizeName: item.size_name || undefined,
+      colorName: item.color_name,
+      sizeName: item.size_name,
       stockQuantity: item.stock_quantity,
-      reservedStock: item.reserved_stock,
       availableStock: item.available_stock || 0,
+      reservedStock: item.reserved_stock || 0,
       lowStockThreshold: item.low_stock_threshold || 10,
       isLowStock: (item.available_stock || 0) <= (item.low_stock_threshold || 10),
-      isOutOfStock: (item.available_stock || 0) === 0,
+      costPrice: item.cost_price,
+      sellingPrice: item.selling_price || 0,
     }));
 
     const totalStock = variants.reduce((sum, v) => sum + v.stockQuantity, 0);
-    const reservedStock = variants.reduce((sum, v) => sum + v.reservedStock, 0);
     const availableStock = variants.reduce((sum, v) => sum + v.availableStock, 0);
+    const reservedStock = variants.reduce((sum, v) => sum + v.reservedStock, 0);
 
     return {
+      productId,
       totalStock,
-      reservedStock,
       availableStock,
-      hasVariants: variants.length > 1,
+      reservedStock,
       variants,
     };
   } catch (error) {
-    console.error('Error getting detailed product stock:', error);
+    console.error('Error fetching detailed product stock:', error);
     return {
+      productId,
       totalStock: 0,
-      reservedStock: 0,
       availableStock: 0,
-      hasVariants: false,
+      reservedStock: 0,
       variants: [],
     };
   }
 }
 
-export async function calculateProductStock(productId: string): Promise<StockCalculationResult> {
-  try {
-    const { data, error } = await supabase
-      .from('product_inventory')
-      .select('*')
-      .eq('product_id', productId)
-      .eq('is_active', true)
-      .order('color_name, size_name');
-
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      return { totalStock: 0 };
-    }
-
-    const totalStock = data.reduce((sum, item) => sum + (item.available_stock || 0), 0);
-
-    // Group by color if there are color variants
-    const colorGroups = data.reduce((groups, item) => {
-      if (!item.color_name) return groups;
-      
-      if (!groups[item.color_name]) {
-        groups[item.color_name] = [];
-      }
-      groups[item.color_name].push(item);
-      return groups;
-    }, {} as Record<string, any[]>);
-
-    const colorBreakdown = Object.entries(colorGroups).map(([colorName, items]) => {
-      const colorStock = items.reduce((sum, item) => sum + (item.available_stock || 0), 0);
-      
-      const sizeBreakdown = items
-        .filter(item => item.size_name)
-        .map(item => ({
-          sizeName: item.size_name,
-          stock: item.available_stock || 0
-        }));
-
-      return {
-        colorName,
-        stock: colorStock,
-        sizeBreakdown: sizeBreakdown.length > 0 ? sizeBreakdown : undefined
-      };
-    });
-
-    return {
-      totalStock,
-      colorBreakdown: colorBreakdown.length > 0 ? colorBreakdown : undefined
-    };
-  } catch (error) {
-    console.error('Error calculating product stock:', error);
-    return { totalStock: 0 };
-  }
-}
-
-export async function getVariantStock(productId: string, colorVariantId?: string, sizeVariantId?: string): Promise<VariantStock | null> {
+export async function getVariantStock(
+  productId: string,
+  colorVariantId?: string,
+  sizeVariantId?: string
+): Promise<VariantStock | null> {
   try {
     let query = supabase
       .from('product_inventory')
@@ -179,32 +113,40 @@ export async function getVariantStock(productId: string, colorVariantId?: string
 
     const { data, error } = await query.single();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // No inventory record found
-      }
-      throw error;
-    }
+    if (error) throw error;
+
+    if (!data) return null;
 
     return {
       id: data.id,
       sku: data.sku,
-      colorName: data.color_name || undefined,
-      sizeName: data.size_name || undefined,
+      colorName: data.color_name,
+      sizeName: data.size_name,
       stockQuantity: data.stock_quantity,
-      reservedStock: data.reserved_stock,
       availableStock: data.available_stock || 0,
+      reservedStock: data.reserved_stock || 0,
       lowStockThreshold: data.low_stock_threshold || 10,
       isLowStock: (data.available_stock || 0) <= (data.low_stock_threshold || 10),
-      isOutOfStock: (data.available_stock || 0) === 0,
+      costPrice: data.cost_price,
+      sellingPrice: data.selling_price || 0,
     };
   } catch (error) {
-    console.error('Error getting variant stock:', error);
+    console.error('Error fetching variant stock:', error);
     return null;
   }
 }
 
-export async function checkStockAvailability(productId: string, quantity: number, colorVariantId?: string, sizeVariantId?: string): Promise<boolean> {
-  const variantStock = await getVariantStock(productId, colorVariantId, sizeVariantId);
-  return variantStock ? variantStock.availableStock >= quantity : false;
+export async function checkProductAvailability(
+  productId: string,
+  colorVariantId?: string,
+  sizeVariantId?: string,
+  requestedQuantity: number = 1
+): Promise<boolean> {
+  try {
+    const variant = await getVariantStock(productId, colorVariantId, sizeVariantId);
+    return variant ? variant.availableStock >= requestedQuantity : false;
+  } catch (error) {
+    console.error('Error checking availability:', error);
+    return false;
+  }
 }
