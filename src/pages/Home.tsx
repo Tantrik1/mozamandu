@@ -1,6 +1,5 @@
 
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
-import { TopBar } from '@/components/customer/TopBar';
 import { HeroSection } from '@/components/customer/HeroSection';
 import { CategoriesCarousel } from '@/components/customer/CategoriesCarousel';
 import { EnhancedFeaturedProducts } from '@/components/customer/EnhancedFeaturedProducts';
@@ -16,7 +15,6 @@ import { HelpCircle } from 'lucide-react';
 export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopBar />
       <CustomerHeader />
       <NoticePopup />
       
@@ -24,13 +22,27 @@ export default function Home() {
       <HeroSection />
 
       {/* Categories Carousel */}
-      <CategoriesCarousel />
+      <section className="py-16 bg-background">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-foreground mb-4">Explore Subcategories</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Discover our diverse range of subcategories, each carefully curated to meet your specific needs.
+            </p>
+          </div>
+          <CategoriesCarousel />
+        </div>
+      </section>
 
       {/* Featured Products Carousel */}
       <EnhancedFeaturedProducts />
 
       {/* Latest Products */}
-      <LatestProducts />
+      <section className="py-16 bg-muted/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <LatestProducts />
+        </div>
+      </section>
 
       {/* FAQ Section */}
       <FAQSection />

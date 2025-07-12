@@ -81,24 +81,34 @@ export function LatestProducts() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-8">
-        <div className="text-lg">Loading latest products...</div>
+      <div className="text-center mb-12">
+        <h2 className="text-3xl font-bold text-foreground mb-4">Latest Products</h2>
+        <div className="flex justify-center items-center">
+          <div className="text-lg">Loading latest products...</div>
+        </div>
       </div>
     );
   }
 
   if (products.length === 0) {
     return (
-      <div className="text-center py-8">
-        <p className="text-gray-500">No products available at the moment.</p>
+      <div className="text-center mb-12">
+        <h2 className="text-3xl font-bold text-foreground mb-4">Latest Products</h2>
+        <p className="text-muted-foreground">No products available at the moment.</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto">
-      <h2 className="text-2xl font-bold mb-6">Latest Products</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div>
+      <div className="text-center mb-12">
+        <h2 className="text-3xl font-bold text-foreground mb-4">Latest Products</h2>
+        <p className="text-muted-foreground max-w-2xl mx-auto">
+          Discover our newest arrivals, featuring the latest additions to our carefully curated collection.
+        </p>
+      </div>
+      
+      <ProductGrid>
         {products.map((product) => (
           <ModernProductCard
             key={product.id}
@@ -106,7 +116,7 @@ export function LatestProducts() {
             subcategorySellingPrice={product.subcategories?.selling_price || 0}
           />
         ))}
-      </div>
+      </ProductGrid>
     </div>
   );
 }
