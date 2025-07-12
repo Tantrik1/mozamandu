@@ -19,6 +19,7 @@ export interface CartItem {
   imageUrl?: string;
   maxStock: number;
   subcategoryId: string;
+  addedOrder: number; // Order in which item was added to cart
 }
 
 export interface PricingInfo {
@@ -57,6 +58,7 @@ const RobustCartContext = createContext<RobustCartContextType | undefined>(undef
 export function RobustCartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [nextAddedOrder, setNextAddedOrder] = useState(1);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -73,6 +75,11 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
       if (savedCart) {
         const parsedCart = JSON.parse(savedCart);
         setCartItems(parsedCart);
+        
+        // Update next order counter based on existing items
+        const maxOrder = parsedCart.reduce((max: number, item: CartItem) => 
+          Math.max(max, item.addedOrder || 0), 0);
+        setNextAddedOrder(maxOrder + 1);
       }
     } catch (error) {
       console.error('Error loading cart from storage:', error);
@@ -236,7 +243,10 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
           imageUrl: variantDetails.imageUrl || productDetails.image_url,
           maxStock: stockCheck.maxStock,
           subcategoryId: productDetails.subcategory_id,
+          addedOrder: nextAddedOrder,
         };
+
+        setNextAddedOrder(prev => prev + 1);
 
         setCartItems(prev => [...prev, newItem]);
       }
@@ -322,6 +332,7 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
 
   const clearCart = () => {
     setCartItems([]);
+    setNextAddedOrder(1);
     localStorage.removeItem('cart');
     toast({
       title: 'Cart Cleared',

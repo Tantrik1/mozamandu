@@ -14,7 +14,7 @@ import { CustomerInfoForm } from './CustomerInfoForm';
 import { DeliveryLocationSelector } from './DeliveryLocationSelector';
 import { PromoCodeSection } from './PromoCodeSection';
 import { PaymentMethodSection } from './PaymentMethodSection';
-import { OrderSummaryCard } from './OrderSummaryCard';
+import { TieredOrderSummaryCard } from './TieredOrderSummaryCard';
 
 interface FormErrors {
   [key: string]: string;
@@ -552,19 +552,27 @@ export function UniversalCheckout() {
 
           {/* Right Column - Order Summary */}
           <div>
-            <OrderSummaryCard
-              cartItems={cartItems}
-              getItemPricing={getItemPricing}
-              subtotal={subtotal}
-              deliveryPrice={deliveryPrice}
-              appliedPromo={appliedPromo}
+            <TieredOrderSummaryCard
+              cartItems={cartItems.map(item => ({
+                id: item.id,
+                productId: item.productId,
+                productName: item.productName,
+                colorVariantId: item.colorVariantId,
+                sizeVariantId: item.sizeVariantId,
+                colorName: item.colorName,
+                sizeName: item.sizeName,
+                quantity: item.quantity,
+                basePrice: item.basePrice,
+                subcategoryId: item.subcategoryId,
+                image_url: item.imageUrl,
+                addedOrder: item.addedOrder || 0
+              }))}
+              deliveryCharge={deliveryPrice}
+              promoCode={appliedPromo}
               promoDiscount={promoDiscount}
+              totalSavings={0}
               finalTotal={finalTotal}
-              minimumPayment={minimumPayment}
-              paymentType={paymentType}
-              paidAmount={paidAmount}
-              submitting={submitting}
-              uploadingScreenshot={uploadingScreenshot}
+              isSubmitting={submitting}
               onSubmitOrder={handleSubmitOrder}
             />
           </div>
