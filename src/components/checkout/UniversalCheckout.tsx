@@ -8,25 +8,28 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
 
 import { usePromoCode } from '@/hooks/usePromoCode';
 import { CustomerInfoForm } from './CustomerInfoForm';
 import { DeliveryLocationSelector } from './DeliveryLocationSelector';
 import { PromoCodeSection } from './PromoCodeSection';
 import { PaymentMethodSection } from './PaymentMethodSection';
-import { TieredOrderSummaryCard } from './TieredOrderSummaryCard';
+import { AdvancedOrderSummary } from './AdvancedOrderSummary';
 
 interface FormErrors {
   [key: string]: string;
 }
 
 export function UniversalCheckout() {
-  const { cartItems, getTotalPrice, clearCart, getItemPricing } = useRobustCart();
+  const { cartItems, getTotalPrice, clearCart } = useRobustCart();
   const { user, userProfile } = useAuth();
   const navigate = useNavigate();
   const [deliveryCharges, setDeliveryCharges] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
+  const [discountTiers, setDiscountTiers] = useState({});
   const [loading, setLoading] = useState(true);
+  
   const { 
     promoCode, 
     setPromoCode, 
@@ -59,6 +62,30 @@ export function UniversalCheckout() {
   const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
 
+  // Tiered pricing integration
+  const {
+    subcategoryPricing,
+    getTotalPrice: getTieredTotalPrice,
+    getTotalSavings
+  } = useSubcategoryTieredPricing({
+    cartItems: cartItems.map(item => ({
+      id: item.id,
+      productId: item.productId,
+      productName: item.productName,
+      colorVariantId: item.colorVariantId,
+      sizeVariantId: item.sizeVariantId,
+      colorName: item.colorName,
+      sizeName: item.sizeName,
+      quantity: item.quantity,
+      basePrice: item.basePrice,
+      subcategoryId: item.subcategoryId,
+      image_url: item.imageUrl,
+      addedOrder: item.addedOrder || 0
+    })),
+    activeCombo: null,
+    discountTiers
+  });
+
   // Redirect if cart is empty
   useEffect(() => {
     if (cartItems.length === 0) {
@@ -78,16 +105,64 @@ export function UniversalCheckout() {
     }
   }, [cartItems, user, userProfile, navigate]);
 
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
+  const fetchInitialData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch delivery charges
+      const { data: deliveryData } = await supabase
+        .from('delivery_charges')
+        .select('*')
+        .eq('is_active', true)
+        .order('place_name');
+      
+      // Fetch payment methods
+      const { data: paymentData } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+
+      // Fetch discount tiers
+      const { data: tiersData } = await supabase
+        .from('discount_tiers')
+        .select('*')
+        .order('subcategory_id, min_quantity');
+
+      setDeliveryCharges(deliveryData || []);
+      setPaymentMethods(paymentData || []);
+      
+      if (tiersData) {
+        const tiersBySubcategory = {};
+        tiersData.forEach(tier => {
+          if (!tiersBySubcategory[tier.subcategory_id]) {
+            tiersBySubcategory[tier.subcategory_id] = [];
+          }
+          tiersBySubcategory[tier.subcategory_id].push(tier);
+        });
+        setDiscountTiers(tiersBySubcategory);
+      }
+      
+    } catch (error) {
+      console.error('Error fetching initial data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load checkout data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Determine which bucket to use based on user type
   const getBucketName = () => {
-    if (!user) {
-      return 'guest-payments';
-    }
-    
-    if (userProfile?.role === 'admin') {
-      return 'admin-payments';
-    }
-    
+    if (!user) return 'guest-payments';
+    if (userProfile?.role === 'admin') return 'admin-payments';
     return 'customer-payments';
   };
 
@@ -119,7 +194,7 @@ export function UniversalCheckout() {
       }
     }
 
-    // Make payment screenshot compulsory
+    // Payment screenshot is required
     if (!paymentScreenshot) {
       errors.paymentScreenshot = 'Payment screenshot is required';
     }
@@ -140,7 +215,6 @@ export function UniversalCheckout() {
 
       console.log(`Uploading payment screenshot to ${bucketName} bucket:`, filePath);
 
-      // Upload to the appropriate bucket based on user type
       const { error: uploadError } = await supabase.storage
         .from(bucketName)
         .upload(filePath, paymentScreenshot, {
@@ -163,7 +237,7 @@ export function UniversalCheckout() {
       console.error('Error uploading payment screenshot:', error);
       toast({
         title: "Upload Error",
-        description: error instanceof Error ? error.message : "Failed to upload payment screenshot",
+        description: "Failed to upload payment screenshot",
         variant: "destructive",
       });
       return null;
@@ -185,13 +259,10 @@ export function UniversalCheckout() {
     setSubmitting(true);
     try {
       console.log('Starting order submission process...');
-      console.log('User authenticated:', !!user);
-      console.log('User ID:', user?.id);
-      console.log('Is customer order:', isCustomerOrder());
 
       const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
       const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
-      const subtotal = getTotalPrice();
+      const subtotal = getTieredTotalPrice();
       const totalWithDelivery = subtotal + deliveryPrice;
       const promoDiscount = appliedPromo 
         ? (totalWithDelivery * appliedPromo.discount_percentage) / 100 
@@ -199,12 +270,10 @@ export function UniversalCheckout() {
       const finalTotal = totalWithDelivery - promoDiscount;
       const actualPaidAmount = paymentType === 'full' ? finalTotal : parseFloat(paidAmount);
 
-      // Upload payment screenshot if provided
+      // Upload payment screenshot
       let paymentScreenshotUrl = null;
       if (paymentScreenshot) {
         paymentScreenshotUrl = await uploadPaymentScreenshot();
-        
-        // If upload fails, we still continue with the order
         if (!paymentScreenshotUrl) {
           console.warn('Payment screenshot upload failed, but continuing with order');
         }
@@ -233,7 +302,7 @@ export function UniversalCheckout() {
 
       let orderResult = null;
 
-      // Submit to customer_orders table if logged in non-admin user
+      // Submit to appropriate table
       if (isCustomerOrder()) {
         console.log('Creating customer order...');
         const customerOrderData = {
@@ -253,9 +322,7 @@ export function UniversalCheckout() {
         }
 
         orderResult = order;
-        console.log('Customer order created successfully:', orderResult);
       } else {
-        // Submit to orders table for guest/admin orders
         console.log('Creating regular order...');
         const regularOrderData = {
           ...baseOrderData,
@@ -270,102 +337,57 @@ export function UniversalCheckout() {
 
         if (orderError) {
           console.error('Order creation error:', orderError);
-          
-          // Better error handling for RLS issues
-          if (orderError.code === '42501' || orderError.message.includes('row-level security')) {
-            console.log('Retrying as explicit guest order...');
-            const guestOrderData = {
-              ...regularOrderData,
-              user_id: null // Force null for guest orders
-            };
-            
-            const { data: guestOrder, error: guestOrderError } = await supabase
-              .from('orders')
-              .insert(guestOrderData)
-              .select()
-              .single();
-              
-            if (guestOrderError) {
-              console.error('Guest order creation also failed:', guestOrderError);
-              throw new Error('Unable to create order. Please try again or contact support.');
-            }
-            
-            orderResult = guestOrder;
-          } else {
-            throw new Error(`Order creation failed: ${orderError.message}`);
-          }
-        } else {
-          orderResult = order;
+          throw new Error(`Order creation failed: ${orderError.message}`);
         }
 
-        console.log('Regular order created successfully:', orderResult);
+        orderResult = order;
       }
 
       if (!orderResult) {
         throw new Error('Order was not created properly');
       }
 
-      // Create order items with better error handling and validation
+      // Create order items with detailed information
       const orderItems = [];
       const orderItemDetails = [];
       const orderItemsTable = isCustomerOrder() ? 'customer_order_items' : 'order_items';
       const orderItemDetailsTable = isCustomerOrder() ? 'customer_order_item_details' : 'order_item_details';
 
       for (const item of cartItems) {
-        // Validate that the variant IDs exist if they're provided
-        let validColorVariantId = null;
-        let validSizeVariantId = null;
+        // Get SKU from inventory
+        let itemSku = `${item.productName.substring(0, 3).toUpperCase()}`;
+        if (item.colorName) itemSku += `-${item.colorName.substring(0, 2).toUpperCase()}`;
+        if (item.sizeName) itemSku += `-${item.sizeName}`;
 
-        if (item.colorVariantId) {
-          const { data: colorVariant } = await supabase
-            .from('color_variants')
-            .select('id')
-            .eq('id', item.colorVariantId)
-            .single();
-          
-          if (colorVariant) {
-            validColorVariantId = item.colorVariantId;
-          } else {
-            console.warn(`Color variant ${item.colorVariantId} not found, setting to null`);
-          }
-        }
-
-        if (item.sizeVariantId) {
-          const { data: sizeVariant } = await supabase
-            .from('size_variants')
-            .select('id')
-            .eq('id', item.sizeVariantId)
-            .single();
-          
-          if (sizeVariant) {
-            validSizeVariantId = item.sizeVariantId;
-          } else {
-            console.warn(`Size variant ${item.sizeVariantId} not found, setting to null`);
-          }
-        }
-
-        // Create order item with validated variant IDs
         const orderItem = {
           order_id: orderResult.id,
           product_id: item.productId,
-          color_variant_id: validColorVariantId,
-          size_variant_id: validSizeVariantId,
+          color_variant_id: item.colorVariantId,
+          size_variant_id: item.sizeVariantId,
           quantity: item.quantity
         };
 
         orderItems.push(orderItem);
 
-        // Create order item details
-        const pricing = getItemPricing(item);
+        // Get pricing info from tiered pricing
+        const pricingInfo = subcategoryPricing[item.subcategoryId];
+        const itemPricing = pricingInfo?.itemBreakdown.find(breakdown => breakdown.itemId === item.id);
+        
         const orderItemDetail = {
           order_id: orderResult.id,
           product_name: item.productName,
           color_name: item.colorName || '',
           size_name: item.sizeName || '',
           quantity: item.quantity,
-          unit_price: pricing.finalPrice,
-          total_price: pricing.finalPrice * item.quantity,
-          pricing_mode: pricing.mode
+          unit_price: itemPricing?.unitPrice || item.unitPrice,
+          total_price: itemPricing?.totalPrice || (item.unitPrice * item.quantity),
+          pricing_mode: itemPricing?.appliedTier || 'normal',
+          sku: itemSku,
+          pricing_details: itemPricing ? {
+            tierInfo: itemPricing.tierInfo,
+            savings: itemPricing.savings,
+            appliedTier: itemPricing.appliedTier
+          } : null
         };
 
         orderItemDetails.push(orderItemDetail);
@@ -380,8 +402,6 @@ export function UniversalCheckout() {
 
       if (itemsError) {
         console.error('Order items creation error:', itemsError);
-        
-        // Try to cleanup the order if items creation fails
         const deleteTable = isCustomerOrder() ? 'customer_orders' : 'orders';
         await supabase.from(deleteTable).delete().eq('id', orderResult.id);
         throw new Error(`Failed to create order items: ${itemsError.message}`);
@@ -394,14 +414,12 @@ export function UniversalCheckout() {
 
       if (detailsError) {
         console.error('Order item details creation error:', detailsError);
-        // Don't fail the order for this, just log it
       }
 
       console.log('Order items created successfully');
 
       // Send order creation email
       try {
-        console.log('Sending order creation email...');
         const { error: emailError } = await supabase.functions.invoke('send-order-email', {
           body: {
             type: 'order_created',
@@ -412,24 +430,19 @@ export function UniversalCheckout() {
 
         if (emailError) {
           console.error('Email sending failed:', emailError);
-          // Don't fail the order if email fails
-        } else {
-          console.log('Order creation email sent successfully');
         }
       } catch (emailError) {
         console.error('Email sending error:', emailError);
-        // Don't fail the order if email fails
       }
 
-      // Clear cart and redirect to order summary
+      // Clear cart and redirect
       clearCart();
       
       toast({
         title: "Order Placed Successfully!",
-        description: `Your order #${orderResult.order_number} has been placed successfully. A confirmation email has been sent.`,
+        description: `Your order #${orderResult.order_number} has been placed successfully.`,
       });
 
-      // Redirect to appropriate order summary page
       const summaryRoute = isCustomerOrder() ? 'customer-order-summary' : 'order-summary';
       navigate(`/${summaryRoute}/${orderResult.id}`);
       
@@ -445,16 +458,17 @@ export function UniversalCheckout() {
     }
   };
 
-  // Calculate totals
+  // Calculate totals with tiered pricing
   const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
   const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
-  const subtotal = getTotalPrice();
+  const subtotal = getTieredTotalPrice();
   const totalWithDelivery = subtotal + deliveryPrice;
   const promoDiscount = appliedPromo 
     ? (totalWithDelivery * appliedPromo.discount_percentage) / 100 
     : 0;
   const finalTotal = totalWithDelivery - promoDiscount;
   const minimumPayment = finalTotal * 0.2; // 20% minimum
+  const totalSavings = getTotalSavings();
 
   const handlePaymentTypeChange = (type: 'full' | 'partial') => {
     setPaymentType(type);
@@ -482,7 +496,7 @@ export function UniversalCheckout() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
+      <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center mb-6">
           <Button variant="outline" onClick={() => navigate(-1)} className="mr-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -491,7 +505,7 @@ export function UniversalCheckout() {
           <h1 className="text-3xl font-bold">Checkout</h1>
         </div>
 
-        {/* Show user status */}
+        {/* User status alert */}
         {user ? (
           <Alert className="mb-6">
             <CheckCircle className="h-4 w-4" />
@@ -510,9 +524,10 @@ export function UniversalCheckout() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Customer Info & Delivery */}
-          <div className="space-y-6">
+        {/* Main checkout layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column - Forms (2/3 width on desktop) */}
+          <div className="lg:col-span-2 space-y-6">
             <CustomerInfoForm
               customerInfo={customerInfo}
               setCustomerInfo={setCustomerInfo}
@@ -552,33 +567,50 @@ export function UniversalCheckout() {
             />
           </div>
 
-          {/* Right Column - Order Summary */}
-          <div>
-            <TieredOrderSummaryCard
-              cartItems={cartItems.map(item => ({
-                id: item.id,
-                productId: item.productId,
-                productName: item.productName,
-                colorVariantId: item.colorVariantId,
-                sizeVariantId: item.sizeVariantId,
-                colorName: item.colorName,
-                sizeName: item.sizeName,
-                quantity: item.quantity,
-                basePrice: item.basePrice,
-                subcategoryId: item.subcategoryId,
-                image_url: item.imageUrl,
-                addedOrder: item.addedOrder || 0
-              }))}
-              deliveryCharge={deliveryPrice}
-              promoCode={appliedPromo}
-              promoDiscount={promoDiscount}
-              totalSavings={0}
-              finalTotal={finalTotal}
-              isSubmitting={submitting}
-              onSubmitOrder={handleSubmitOrder}
-            />
+          {/* Right Column - Order Summary (1/3 width on desktop, sticky) */}
+          <div className="lg:col-span-1">
+            <div className="lg:sticky lg:top-24">
+              <AdvancedOrderSummary
+                cartItems={cartItems}
+                subcategoryPricing={subcategoryPricing}
+                deliveryCharge={deliveryPrice}
+                promoCode={appliedPromo}
+                promoDiscount={promoDiscount}
+                totalSavings={totalSavings}
+                finalTotal={finalTotal}
+                isSubmitting={submitting}
+                onSubmitOrder={handleSubmitOrder}
+              />
+            </div>
           </div>
         </div>
+
+        {/* Mobile sticky order summary */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 z-50">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-semibold">Total: Rs. {finalTotal.toFixed(2)}</span>
+            {totalSavings > 0 && (
+              <span className="text-green-600 text-sm">Save Rs. {totalSavings.toFixed(2)}</span>
+            )}
+          </div>
+          <Button
+            onClick={handleSubmitOrder}
+            disabled={submitting}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              'Place Order'
+            )}
+          </Button>
+        </div>
+
+        {/* Add bottom padding on mobile to account for sticky summary */}
+        <div className="lg:hidden h-24"></div>
       </div>
     </div>
   );
