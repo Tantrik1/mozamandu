@@ -2,8 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { ModernProductCard } from '@/components/customer/ModernProductCard';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Breadcrumb,
   BreadcrumbItem,
@@ -13,7 +15,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { getProductStockSummary } from '@/utils/stockCalculation';
-import { ChevronRight, Home, Info } from 'lucide-react';
+import { ChevronRight, Home, ArrowUpDown } from 'lucide-react';
 
 interface Product {
   id: string;
@@ -41,25 +43,23 @@ interface Subcategory {
   } | null;
 }
 
-interface DiscountTier {
-  id: string;
-  min_quantity: number;
-  max_quantity: number | null;
-  discount_amount: number;
-}
-
 export default function SubcategoryPage() {
   const { subcategoryId } = useParams<{ subcategoryId: string }>();
   const [subcategory, setSubcategory] = useState<Subcategory | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [discountTiers, setDiscountTiers] = useState<DiscountTier[]>([]);
+  const [sortedProducts, setSortedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState<string>('name');
 
   useEffect(() => {
     if (subcategoryId) {
       fetchSubcategoryData();
     }
   }, [subcategoryId]);
+
+  useEffect(() => {
+    sortProducts();
+  }, [products, sortBy]);
 
   const fetchSubcategoryData = async () => {
     if (!subcategoryId) return;
@@ -78,16 +78,6 @@ export default function SubcategoryPage() {
 
       if (subcategoryError) throw subcategoryError;
       setSubcategory(subcategoryData);
-
-      // Fetch discount tiers for this subcategory
-      const { data: tiersData, error: tiersError } = await supabase
-        .from('discount_tiers')
-        .select('*')
-        .eq('subcategory_id', subcategoryId)
-        .order('min_quantity', { ascending: true });
-
-      if (tiersError) throw tiersError;
-      setDiscountTiers(tiersData || []);
 
       // Fetch products in this subcategory
       const { data: productsData, error: productsError } = await supabase
@@ -127,39 +117,29 @@ export default function SubcategoryPage() {
     }
   };
 
-  const renderVolumeDiscountInfo = () => {
-    if (discountTiers.length === 0) return null;
+  const sortProducts = () => {
+    if (!products.length) return;
 
-    return (
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mb-8 shadow-sm">
-        <div className="flex items-center gap-2 mb-4">
-          <Info className="h-5 w-5 text-blue-600" />
-          <h3 className="text-lg font-semibold text-blue-900">Volume Discounts Available</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {discountTiers.map((tier) => (
-            <div key={tier.id} className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">
-                  {tier.min_quantity}+ units
-                </span>
-                <span className="text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                  Save Rs {tier.discount_amount}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="text-xs text-blue-600 mt-4 bg-blue-50 p-2 rounded-lg">
-          💡 <strong>Tip:</strong> Discounts apply automatically when minimum quantities are met
-        </p>
-      </div>
-    );
+    const sorted = [...products].sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'price-low':
+          return (a.selling_price || 0) - (b.selling_price || 0);
+        case 'price-high':
+          return (b.selling_price || 0) - (a.selling_price || 0);
+        default:
+          return 0;
+      }
+    });
+
+    setSortedProducts(sorted);
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <CustomerHeader />
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center min-h-64">
             <div className="flex items-center gap-2">
@@ -175,6 +155,7 @@ export default function SubcategoryPage() {
   if (!subcategory) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <CustomerHeader />
         <div className="container mx-auto px-4 py-8">
           <div className="text-center py-12">
             <div className="bg-white rounded-xl p-8 shadow-sm max-w-md mx-auto">
@@ -192,6 +173,7 @@ export default function SubcategoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <CustomerHeader />
       <div className="container mx-auto px-4 py-6">
         {/* Breadcrumb Navigation */}
         <Breadcrumb className="mb-6">
@@ -210,7 +192,7 @@ export default function SubcategoryPage() {
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
                 <Link 
-                  to={`/category/${subcategory.categories?.id}`}
+                  to={`/categories/${subcategory.categories?.id}`}
                   className="text-gray-600 hover:text-blue-600 transition-colors"
                 >
                   {subcategory.categories?.name}
@@ -252,20 +234,6 @@ export default function SubcategoryPage() {
                 )}
               </div>
               
-              {/* Pricing Information */}
-              <div className="flex flex-wrap items-center gap-4 mb-6">
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg px-6 py-3 shadow-sm">
-                  <span className="text-sm text-green-700 font-medium block">Base Price</span>
-                  <span className="text-2xl font-bold text-green-800">Rs {subcategory.selling_price}</span>
-                </div>
-                {subcategory.minimum_quantity > 1 && (
-                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg px-6 py-3 shadow-sm">
-                    <span className="text-sm text-orange-700 font-medium block">Min Quantity</span>
-                    <span className="text-2xl font-bold text-orange-800">{subcategory.minimum_quantity}</span>
-                  </div>
-                )}
-              </div>
-
               {/* Product Count Badge */}
               {products.length > 0 && (
                 <Badge variant="outline" className="text-sm bg-blue-50 text-blue-700 border-blue-200">
@@ -276,11 +244,28 @@ export default function SubcategoryPage() {
           </div>
         </div>
 
-        {/* Volume Discount Information */}
-        {renderVolumeDiscountInfo()}
+        {/* Sort Options */}
+        {products.length > 0 && (
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <ArrowUpDown className="h-4 w-4 text-gray-600" />
+              <span className="text-sm text-gray-600">Sort by:</span>
+            </div>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name (A-Z)</SelectItem>
+                <SelectItem value="price-low">Price (Low to High)</SelectItem>
+                <SelectItem value="price-high">Price (High to Low)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Products Grid */}
-        {products.length === 0 ? (
+        {sortedProducts.length === 0 ? (
           <div className="text-center py-12">
             <div className="bg-white rounded-xl p-8 shadow-sm max-w-md mx-auto">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -292,12 +277,12 @@ export default function SubcategoryPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product) => (
-            <ModernProductCard
-              key={product.id}
-               product={{ ...product, subcategory_id: subcategory?.id || '' }}
-               subcategorySellingPrice={subcategory.selling_price}
-            />
+            {sortedProducts.map((product) => (
+              <ModernProductCard
+                key={product.id}
+                product={{ ...product, subcategory_id: subcategory?.id || '' }}
+                subcategorySellingPrice={subcategory.selling_price}
+              />
             ))}
           </div>
         )}

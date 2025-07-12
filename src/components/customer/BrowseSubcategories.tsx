@@ -77,20 +77,20 @@ export function BrowseSubcategories() {
 
   if (loading) {
     return (
-      <section className="py-8 sm:py-16 bg-white">
+      <section className="py-16 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-8 sm:mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Browse by Categories</h2>
-            <p className="mt-2 sm:mt-4 text-base sm:text-lg text-gray-600">
-              Explore our diverse range of sock categories, each crafted with precision and style
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-foreground mb-4">Explore Subcategories</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Discover our diverse range of subcategories, each carefully curated to meet your specific needs.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="animate-pulse">
-                <div className="bg-gray-200 h-32 sm:h-64 rounded-lg mb-4"></div>
-                <div className="h-4 sm:h-6 bg-gray-200 rounded mb-2"></div>
-                <div className="h-3 sm:h-4 bg-gray-200 rounded w-3/4"></div>
+                <div className="bg-muted h-64 rounded-lg mb-4"></div>
+                <div className="h-6 bg-muted rounded mb-2"></div>
+                <div className="h-4 bg-muted rounded w-3/4"></div>
               </div>
             ))}
           </div>
@@ -101,16 +101,16 @@ export function BrowseSubcategories() {
 
   if (subcategories.length === 0) {
     return (
-      <section className="py-8 sm:py-16 bg-white">
+      <section className="py-16 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-8 sm:mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Browse by Categories</h2>
-            <p className="mt-2 sm:mt-4 text-base sm:text-lg text-gray-600">
-              Explore our diverse range of sock categories, each crafted with precision and style
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-foreground mb-4">Explore Subcategories</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Discover our diverse range of subcategories, each carefully curated to meet your specific needs.
             </p>
           </div>
           <div className="text-center py-12">
-            <p className="text-gray-500">No categories available at the moment.</p>
+            <p className="text-muted-foreground">No subcategories available at the moment.</p>
           </div>
         </div>
       </section>
@@ -118,15 +118,15 @@ export function BrowseSubcategories() {
   }
 
   return (
-    <section className="py-8 sm:py-16 bg-white overflow-hidden">
+    <section className="py-16 bg-background overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-8 sm:mb-12">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 sm:mb-4">
-            Browse by Categories
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-foreground mb-4">
+            Explore Subcategories
           </h2>
-          <div className="w-20 h-1 bg-gradient-to-r from-red-500 to-red-600 rounded-full mx-auto mb-4"></div>
-          <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto">
-            Swipe through our diverse range of sock categories, each crafted with precision and style
+          <div className="w-20 h-1 bg-gradient-to-r from-primary to-primary/60 rounded-full mx-auto mb-4"></div>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Discover our diverse range of subcategories, each carefully curated to meet your specific needs.
           </p>
         </div>
         
@@ -138,7 +138,7 @@ export function BrowseSubcategories() {
             }}
             className="w-full"
           >
-            <CarouselContent className="-ml-1 md:-ml-4">
+            <CarouselContent className="-ml-2 md:-ml-4">
               {subcategories.map((subcategory) => (
                 <CarouselItem 
                   key={subcategory.id} 
@@ -155,17 +155,15 @@ export function BrowseSubcategories() {
               ))}
             </CarouselContent>
             
-            {/* Navigation Arrows - Hidden on mobile for better touch experience */}
-            <div className="">
-              <CarouselPrevious className="absolute -left-4 lg:-left-12 top-1/2 -translate-y-1/2 bg-white shadow-lg hover:bg-gray-50 border-2 border-gray-200" />
-              <CarouselNext className="absolute -right-4 lg:-right-12 top-1/2 -translate-y-1/2 bg-white shadow-lg hover:bg-gray-50 border-2 border-gray-200" />
+            <div className="hidden md:block">
+              <CarouselPrevious className="absolute -left-4 lg:-left-12 top-1/2 -translate-y-1/2 bg-background shadow-lg hover:bg-accent border-border" />
+              <CarouselNext className="absolute -right-4 lg:-right-12 top-1/2 -translate-y-1/2 bg-background shadow-lg hover:bg-accent border-border" />
             </div>
           </Carousel>
           
-          {/* Touch indicator for mobile */}
           <div className="md:hidden text-center mt-4">
-            <p className="text-xs text-gray-500 flex items-center justify-center gap-2">
-              <span>👆 Swipe to explore categories</span>
+            <p className="text-xs text-muted-foreground flex items-center justify-center gap-2">
+              <span>👆 Swipe to explore subcategories</span>
             </p>
           </div>
         </div>

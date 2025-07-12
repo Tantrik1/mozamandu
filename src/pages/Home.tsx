@@ -1,7 +1,7 @@
 
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { HeroSection } from '@/components/customer/HeroSection';
-import { CategoriesCarousel } from '@/components/customer/CategoriesCarousel';
+import { BrowseSubcategories } from '@/components/customer/BrowseSubcategories';
 import { EnhancedFeaturedProducts } from '@/components/customer/EnhancedFeaturedProducts';
 import { LatestProducts } from '@/components/customer/LatestProducts';
 import { FAQSection } from '@/components/customer/FAQSection';
@@ -21,18 +21,8 @@ export default function Home() {
       {/* Hero Section - Original Black Background */}
       <HeroSection />
 
-      {/* Categories Carousel */}
-      <section className="py-16 bg-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-foreground mb-4">Explore Subcategories</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Discover our diverse range of subcategories, each carefully curated to meet your specific needs.
-            </p>
-          </div>
-          <CategoriesCarousel />
-        </div>
-      </section>
+      {/* Subcategories Carousel */}
+      <BrowseSubcategories />
 
       {/* Featured Products Carousel */}
       <EnhancedFeaturedProducts />

@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ModernProductCard } from './ModernProductCard';
-import { ProductGrid } from './ProductGrid';
+import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { getProductStockSummary } from '@/utils/stockCalculation';
 
 interface Product {
@@ -26,6 +27,7 @@ interface Product {
 export function LatestProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetchLatestProducts();
@@ -41,7 +43,7 @@ export function LatestProducts() {
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
-        .limit(8);
+        .limit(12);
 
       if (error) throw error;
 
@@ -81,10 +83,12 @@ export function LatestProducts() {
 
   if (loading) {
     return (
-      <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold text-foreground mb-4">Latest Products</h2>
-        <div className="flex justify-center items-center">
-          <div className="text-lg">Loading latest products...</div>
+      <div>
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-foreground mb-4">Latest Products</h2>
+          <div className="flex justify-center items-center">
+            <div className="text-lg">Loading latest products...</div>
+          </div>
         </div>
       </div>
     );
@@ -92,31 +96,63 @@ export function LatestProducts() {
 
   if (products.length === 0) {
     return (
-      <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold text-foreground mb-4">Latest Products</h2>
-        <p className="text-muted-foreground">No products available at the moment.</p>
+      <div>
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-foreground mb-4">Latest Products</h2>
+          <p className="text-muted-foreground">No products available at the moment.</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="overflow-hidden">
       <div className="text-center mb-12">
         <h2 className="text-3xl font-bold text-foreground mb-4">Latest Products</h2>
+        <div className="w-20 h-1 bg-gradient-to-r from-primary to-primary/60 rounded-full mx-auto mb-4"></div>
         <p className="text-muted-foreground max-w-2xl mx-auto">
           Discover our newest arrivals, featuring the latest additions to our carefully curated collection.
         </p>
       </div>
       
-      <ProductGrid>
-        {products.map((product) => (
-          <ModernProductCard
-            key={product.id}
-            product={product}
-            subcategorySellingPrice={product.subcategories?.selling_price || 0}
-          />
-        ))}
-      </ProductGrid>
+      <div className="relative">
+        <Carousel
+          opts={{
+            align: "start",
+            loop: true,
+          }}
+          className="w-full"
+        >
+          <CarouselContent className="-ml-2 md:-ml-4">
+            {products.map((product) => (
+              <CarouselItem 
+                key={product.id} 
+                className={`pl-2 md:pl-4 ${
+                  isMobile 
+                    ? 'basis-full' 
+                    : 'basis-1/2 md:basis-1/3 lg:basis-1/5'
+                }`}
+              >
+                <ModernProductCard
+                  product={product}
+                  subcategorySellingPrice={product.subcategories?.selling_price || 0}
+                />
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          
+          <div className="hidden md:block">
+            <CarouselPrevious className="absolute -left-4 lg:-left-12 top-1/2 -translate-y-1/2 bg-background shadow-lg hover:bg-accent border-border" />
+            <CarouselNext className="absolute -right-4 lg:-right-12 top-1/2 -translate-y-1/2 bg-background shadow-lg hover:bg-accent border-border" />
+          </div>
+        </Carousel>
+        
+        <div className="md:hidden text-center mt-4">
+          <p className="text-xs text-muted-foreground flex items-center justify-center gap-2">
+            <span>👆 Swipe to explore products</span>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
