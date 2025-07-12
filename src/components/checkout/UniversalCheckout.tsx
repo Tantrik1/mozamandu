@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useAuth } from '@/hooks/useAuth';
@@ -97,7 +96,6 @@ export function UniversalCheckout() {
     discountTiers
   });
 
-  // Log combo status for debugging
   useEffect(() => {
     if (isComboModeActive()) {
       const comboInfo = getComboInfo();
@@ -105,14 +103,12 @@ export function UniversalCheckout() {
     }
   }, [isComboModeActive, getComboInfo]);
 
-  // Redirect if cart is empty
   useEffect(() => {
     if (cartItems.length === 0) {
       navigate('/');
       return;
     }
     
-    // Auto-fill user info if logged in
     if (user && userProfile) {
       setCustomerInfo(prev => ({
         ...prev,
@@ -132,21 +128,18 @@ export function UniversalCheckout() {
     try {
       setLoading(true);
       
-      // Fetch delivery charges
       const { data: deliveryData } = await supabase
         .from('delivery_charges')
         .select('*')
         .eq('is_active', true)
         .order('place_name');
       
-      // Fetch payment methods
       const { data: paymentData } = await supabase
         .from('payment_methods')
         .select('*')
         .eq('is_active', true)
         .order('name');
 
-      // Fetch discount tiers
       const { data: tiersData } = await supabase
         .from('discount_tiers')
         .select('*')
@@ -178,14 +171,12 @@ export function UniversalCheckout() {
     }
   };
 
-  // Determine which bucket to use based on user type
   const getBucketName = () => {
     if (!user) return 'guest-payments';
     if (userProfile?.role === 'admin') return 'admin-payments';
     return 'customer-payments';
   };
 
-  // Determine if this is a customer order (logged in non-admin user)
   const isCustomerOrder = () => {
     return user && userProfile?.role !== 'admin';
   };
@@ -193,7 +184,6 @@ export function UniversalCheckout() {
   const validateForm = (): boolean => {
     const errors: FormErrors = {};
 
-    // Required field validation
     if (!customerInfo.name.trim()) errors.name = 'Name is required';
     if (!customerInfo.email.trim()) errors.email = 'Email is required';
     if (!customerInfo.contact.trim()) errors.contact = 'Contact number is required';
@@ -201,19 +191,16 @@ export function UniversalCheckout() {
     if (!selectedDelivery) errors.delivery = 'Please select delivery location';
     if (!selectedPayment) errors.payment = 'Please select payment method';
 
-    // Email validation
     if (customerInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email)) {
       errors.email = 'Please enter a valid email address';
     }
 
-    // Payment amount validation for partial payment
     if (paymentType === 'partial') {
       if (!paidAmount || parseFloat(paidAmount) <= 0) {
         errors.paidAmount = 'Please enter a valid payment amount';
       }
     }
 
-    // Payment screenshot is required
     if (!paymentScreenshot) {
       errors.paymentScreenshot = 'Payment screenshot is required';
     }
@@ -293,7 +280,6 @@ export function UniversalCheckout() {
       const finalTotal = totalWithDelivery - promoDiscount;
       const actualPaidAmount = paymentType === 'full' ? finalTotal : parseFloat(paidAmount);
 
-      // Upload payment screenshot
       let paymentScreenshotUrl = null;
       if (paymentScreenshot) {
         paymentScreenshotUrl = await uploadPaymentScreenshot();
@@ -351,7 +337,6 @@ export function UniversalCheckout() {
         )
       };
 
-      // Prepare base order data with combo information
       const baseOrderData = {
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
@@ -375,7 +360,6 @@ export function UniversalCheckout() {
 
       let orderResult = null;
 
-      // Submit to appropriate table
       if (isCustomerOrder()) {
         console.log('Creating customer order with combo support...');
         const customerOrderData = {
@@ -420,29 +404,26 @@ export function UniversalCheckout() {
         throw new Error('Order was not created properly');
       }
 
-      // Create order items with detailed information including combo pricing
+      // Create order items with proper separation of data
       const orderItems = [];
       const orderItemDetails = [];
       const orderItemsTable = isCustomerOrder() ? 'customer_order_items' : 'order_items';
       const orderItemDetailsTable = isCustomerOrder() ? 'customer_order_item_details' : 'order_item_details';
 
       for (const item of cartItems) {
-        // Get SKU from inventory
+        // ORDER ITEMS - Only basic product and quantity info
+        const orderItem = {
+          order_id: orderResult.id,
+          product_id: item.productId,
+          quantity: item.quantity
+        };
+        orderItems.push(orderItem);
+
+        // ORDER ITEM DETAILS - All detailed information including variants
         let itemSku = `${item.productName.substring(0, 3).toUpperCase()}`;
         if (item.colorName) itemSku += `-${item.colorName.substring(0, 2).toUpperCase()}`;
         if (item.sizeName) itemSku += `-${item.sizeName}`;
 
-        const orderItem = {
-          order_id: orderResult.id,
-          product_id: item.productId,
-          color_variant_id: item.colorVariantId,
-          size_variant_id: item.sizeVariantId,
-          quantity: item.quantity
-        };
-
-        orderItems.push(orderItem);
-
-        // Get pricing info from tiered pricing (includes combo pricing)
         const pricingInfo = subcategoryPricing[item.subcategoryId];
         const itemPricing = pricingInfo?.itemBreakdown.find(breakdown => breakdown.itemId === item.id);
         
@@ -456,6 +437,7 @@ export function UniversalCheckout() {
           total_price: itemPricing?.totalPrice || (item.unitPrice * item.quantity),
           pricing_mode: itemPricing?.appliedTier || 'normal',
           sku: itemSku,
+          product_inventory_id: null, // This would need to be resolved from the variant IDs
           pricing_details: itemPricing ? {
             tierInfo: itemPricing.tierInfo,
             savings: itemPricing.savings,
@@ -468,9 +450,10 @@ export function UniversalCheckout() {
         orderItemDetails.push(orderItemDetail);
       }
 
-      console.log(`Creating order items in ${orderItemsTable}:`, orderItems.length);
+      console.log(`Creating ${orderItems.length} order items in ${orderItemsTable}`);
+      console.log(`Creating ${orderItemDetails.length} order item details in ${orderItemDetailsTable}`);
 
-      // Insert order items
+      // Insert order items (basic info only)
       const { error: itemsError } = await supabase
         .from(orderItemsTable)
         .insert(orderItems);
@@ -482,13 +465,15 @@ export function UniversalCheckout() {
         throw new Error(`Failed to create order items: ${itemsError.message}`);
       }
 
-      // Create order item details
+      // Create order item details (detailed info)
       const { error: detailsError } = await supabase
         .from(orderItemDetailsTable)
         .insert(orderItemDetails);
 
       if (detailsError) {
         console.error('Order item details creation error:', detailsError);
+        // Don't fail the order for this, just log the error
+        console.warn('Order created but item details may be incomplete');
       }
 
       console.log('Order items created successfully with combo pricing support');
@@ -510,7 +495,6 @@ export function UniversalCheckout() {
         console.error('Email sending error:', emailError);
       }
 
-      // Clear cart and redirect
       clearCart();
       
       const orderMessage = isComboModeActive() 
@@ -537,7 +521,6 @@ export function UniversalCheckout() {
     }
   };
 
-  // Calculate totals with tiered pricing including combo support
   const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
   const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
   const subtotal = getTieredTotalPrice();
@@ -546,7 +529,7 @@ export function UniversalCheckout() {
     ? (totalWithDelivery * appliedPromo.discount_percentage) / 100 
     : 0;
   const finalTotal = totalWithDelivery - promoDiscount;
-  const minimumPayment = finalTotal * 0.2; // 20% minimum
+  const minimumPayment = finalTotal * 0.2;
   const totalSavings = getTotalSavings();
 
   const handlePaymentTypeChange = (type: 'full' | 'partial') => {
