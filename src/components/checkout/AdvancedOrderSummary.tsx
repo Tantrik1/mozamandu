@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Eye, EyeOff, ChevronDown, ChevronUp, Star } from 'lucide-react';
 
 interface CartItem {
   id: string;
@@ -24,11 +24,13 @@ interface SubcategoryPricingInfo {
   totalQuantity: number;
   moqReached: boolean;
   moqRequired: number;
+  comboActive: boolean;
+  comboPrice?: number;
   itemBreakdown: {
     itemId: string;
     unitPrice: number;
     totalPrice: number;
-    appliedTier: 'normal' | 'discount';
+    appliedTier: 'normal' | 'discount' | 'combo';
     tierInfo?: string;
     savings: number;
   }[];
@@ -42,6 +44,16 @@ interface PromoCode {
   discount_percentage: number;
 }
 
+interface ComboInfo {
+  combo: {
+    id: string;
+    name: string;
+    description: string;
+  };
+  affectedSubcategories: SubcategoryPricingInfo[];
+  totalComboSavings: number;
+}
+
 interface AdvancedOrderSummaryProps {
   cartItems: CartItem[];
   subcategoryPricing: { [key: string]: SubcategoryPricingInfo };
@@ -52,6 +64,7 @@ interface AdvancedOrderSummaryProps {
   finalTotal: number;
   isSubmitting: boolean;
   onSubmitOrder: () => void;
+  comboInfo?: ComboInfo | null;
 }
 
 export function AdvancedOrderSummary({
@@ -63,7 +76,8 @@ export function AdvancedOrderSummary({
   totalSavings,
   finalTotal,
   isSubmitting,
-  onSubmitOrder
+  onSubmitOrder,
+  comboInfo
 }: AdvancedOrderSummaryProps) {
   const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>({});
   const [showAllItems, setShowAllItems] = useState(false);
@@ -94,7 +108,15 @@ export function AdvancedOrderSummary({
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="text-xl font-bold text-gray-900 flex items-center justify-between">
-          <span>Order Summary</span>
+          <div className="flex items-center space-x-2">
+            <span>Order Summary</span>
+            {comboInfo && (
+              <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
+                <Star className="h-3 w-3 mr-1" />
+                Combo Active
+              </Badge>
+            )}
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -104,6 +126,18 @@ export function AdvancedOrderSummary({
             {showAllItems ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
         </CardTitle>
+        {comboInfo && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mt-2">
+            <div className="flex items-center space-x-2 mb-1">
+              <Star className="h-4 w-4 text-purple-600" />
+              <span className="font-semibold text-purple-800">{comboInfo.combo.name}</span>
+            </div>
+            <p className="text-sm text-purple-700">{comboInfo.combo.description}</p>
+            <p className="text-xs text-purple-600 mt-1">
+              Total combo savings: Rs. {comboInfo.totalComboSavings.toFixed(2)}
+            </p>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Items breakdown - always visible on desktop, toggleable on mobile */}
@@ -115,11 +149,16 @@ export function AdvancedOrderSummary({
                   <h4 className="font-semibold text-gray-900 text-sm">
                     Subcategory ({subcategory.totalQuantity} items)
                   </h4>
-                  {subcategory.moqReached && (
+                  {subcategory.comboActive ? (
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
+                      <Star className="h-3 w-3 mr-1" />
+                      Combo Price
+                    </Badge>
+                  ) : subcategory.moqReached ? (
                     <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
                       MOQ Reached
                     </Badge>
-                  )}
+                  ) : null}
                 </div>
                 <Button
                   variant="ghost"
@@ -155,6 +194,11 @@ export function AdvancedOrderSummary({
                               <Badge variant="outline" className="text-xs">
                                 {displaySku}
                               </Badge>
+                              {item.appliedTier === 'combo' && (
+                                <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
+                                  Combo
+                                </Badge>
+                              )}
                             </div>
                             {cartItem?.colorName && (
                               <span className="text-gray-500 text-xs">Color: {cartItem.colorName}</span>
@@ -166,7 +210,9 @@ export function AdvancedOrderSummary({
                               Qty: {cartItem?.quantity} × Rs. {item.unitPrice.toFixed(2)}
                             </p>
                             {item.tierInfo && (
-                              <p className="text-xs text-blue-600 mt-1">
+                              <p className={`text-xs mt-1 ${
+                                item.appliedTier === 'combo' ? 'text-purple-600' : 'text-blue-600'
+                              }`}>
                                 {item.tierInfo}
                               </p>
                             )}
@@ -176,7 +222,9 @@ export function AdvancedOrderSummary({
                               Rs. {item.totalPrice.toFixed(2)}
                             </p>
                             {item.savings > 0 && (
-                              <p className="text-green-600 text-xs">
+                              <p className={`text-xs ${
+                                item.appliedTier === 'combo' ? 'text-purple-600' : 'text-green-600'
+                              }`}>
                                 Save Rs. {item.savings.toFixed(2)}
                               </p>
                             )}
@@ -196,7 +244,9 @@ export function AdvancedOrderSummary({
                   </span>
                 </div>
                 {subcategory.totalSavings > 0 && (
-                  <div className="flex justify-between text-green-600 text-sm">
+                  <div className={`flex justify-between text-sm ${
+                    subcategory.comboActive ? 'text-purple-600' : 'text-green-600'
+                  }`}>
                     <span>Savings:</span>
                     <span>-Rs. {subcategory.totalSavings.toFixed(2)}</span>
                   </div>
@@ -228,8 +278,10 @@ export function AdvancedOrderSummary({
           )}
 
           {totalSavings > 0 && (
-            <div className="flex justify-between text-green-600 text-sm">
-              <span>MOQ Discount Savings</span>
+            <div className={`flex justify-between text-sm ${
+              comboInfo ? 'text-purple-600' : 'text-green-600'
+            }`}>
+              <span>{comboInfo ? 'Combo Savings' : 'MOQ Discount Savings'}</span>
               <span>-Rs. {totalSavings.toFixed(2)}</span>
             </div>
           )}
@@ -242,8 +294,11 @@ export function AdvancedOrderSummary({
           </div>
 
           {(totalSavings + promoDiscount) > 0 && (
-            <div className="text-center text-green-600 font-medium text-sm">
+            <div className={`text-center font-medium text-sm ${
+              comboInfo ? 'text-purple-600' : 'text-green-600'
+            }`}>
               You saved Rs. {(totalSavings + promoDiscount).toFixed(2)} total!
+              {comboInfo && ' (includes combo savings)'}
             </div>
           )}
         </div>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,6 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
+import { useComboManager } from '@/hooks/useComboManager';
 
 import { usePromoCode } from '@/hooks/usePromoCode';
 import { CustomerInfoForm } from './CustomerInfoForm';
@@ -29,6 +29,14 @@ export function UniversalCheckout() {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [discountTiers, setDiscountTiers] = useState({});
   const [loading, setLoading] = useState(true);
+  
+  // Combo management integration
+  const { 
+    activeCombo, 
+    isComboActive, 
+    getComboPrice, 
+    shouldIgnoreMinimumQuantity 
+  } = useComboManager({ cartItems });
   
   const { 
     promoCode, 
@@ -62,11 +70,13 @@ export function UniversalCheckout() {
   const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
 
-  // Tiered pricing integration
+  // Enhanced tiered pricing integration with combo support
   const {
     subcategoryPricing,
     getTotalPrice: getTieredTotalPrice,
-    getTotalSavings
+    getTotalSavings,
+    getComboInfo,
+    isComboModeActive
   } = useSubcategoryTieredPricing({
     cartItems: cartItems.map(item => ({
       id: item.id,
@@ -82,9 +92,17 @@ export function UniversalCheckout() {
       image_url: item.imageUrl,
       addedOrder: item.addedOrder || 0
     })),
-    activeCombo: null,
+    activeCombo,
     discountTiers
   });
+
+  // Log combo status for debugging
+  useEffect(() => {
+    if (isComboModeActive()) {
+      const comboInfo = getComboInfo();
+      console.log('🎯 Combo mode is active in checkout:', comboInfo);
+    }
+  }, [isComboModeActive, getComboInfo]);
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -259,6 +277,10 @@ export function UniversalCheckout() {
     setSubmitting(true);
     try {
       console.log('Starting order submission process...');
+      console.log('🎯 Combo mode active:', isComboModeActive());
+      if (isComboModeActive()) {
+        console.log('🎯 Combo details:', getComboInfo());
+      }
 
       const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
       const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
@@ -279,7 +301,7 @@ export function UniversalCheckout() {
         }
       }
 
-      // Prepare base order data
+      // Prepare base order data with combo information
       const baseOrderData = {
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
@@ -295,16 +317,25 @@ export function UniversalCheckout() {
         payment_method_id: selectedPayment,
         payment_screenshot_url: paymentScreenshotUrl,
         status: 'pending_payment' as const,
-        combo_applied: false,
+        combo_applied: isComboModeActive(),
         promocode_used: appliedPromo?.code || null,
-        promocode_discount: promoDiscount
+        promocode_discount: promoDiscount,
+        pricing_breakdown: {
+          subtotal,
+          deliveryPrice,
+          promoDiscount,
+          finalTotal,
+          comboActive: isComboModeActive(),
+          comboInfo: isComboModeActive() ? getComboInfo() : null,
+          subcategoryBreakdown: subcategoryPricing
+        }
       };
 
       let orderResult = null;
 
       // Submit to appropriate table
       if (isCustomerOrder()) {
-        console.log('Creating customer order...');
+        console.log('Creating customer order with combo support...');
         const customerOrderData = {
           ...baseOrderData,
           user_id: user!.id
@@ -323,7 +354,7 @@ export function UniversalCheckout() {
 
         orderResult = order;
       } else {
-        console.log('Creating regular order...');
+        console.log('Creating regular order with combo support...');
         const regularOrderData = {
           ...baseOrderData,
           user_id: user?.id || null
@@ -347,7 +378,7 @@ export function UniversalCheckout() {
         throw new Error('Order was not created properly');
       }
 
-      // Create order items with detailed information
+      // Create order items with detailed information including combo pricing
       const orderItems = [];
       const orderItemDetails = [];
       const orderItemsTable = isCustomerOrder() ? 'customer_order_items' : 'order_items';
@@ -369,7 +400,7 @@ export function UniversalCheckout() {
 
         orderItems.push(orderItem);
 
-        // Get pricing info from tiered pricing
+        // Get pricing info from tiered pricing (includes combo pricing)
         const pricingInfo = subcategoryPricing[item.subcategoryId];
         const itemPricing = pricingInfo?.itemBreakdown.find(breakdown => breakdown.itemId === item.id);
         
@@ -386,7 +417,9 @@ export function UniversalCheckout() {
           pricing_details: itemPricing ? {
             tierInfo: itemPricing.tierInfo,
             savings: itemPricing.savings,
-            appliedTier: itemPricing.appliedTier
+            appliedTier: itemPricing.appliedTier,
+            comboActive: pricingInfo?.comboActive || false,
+            comboPrice: pricingInfo?.comboPrice || null
           } : null
         };
 
@@ -416,7 +449,7 @@ export function UniversalCheckout() {
         console.error('Order item details creation error:', detailsError);
       }
 
-      console.log('Order items created successfully');
+      console.log('Order items created successfully with combo pricing support');
 
       // Send order creation email
       try {
@@ -438,9 +471,13 @@ export function UniversalCheckout() {
       // Clear cart and redirect
       clearCart();
       
+      const orderMessage = isComboModeActive() 
+        ? `Your order #${orderResult.order_number} has been placed successfully with combo pricing!`
+        : `Your order #${orderResult.order_number} has been placed successfully.`;
+      
       toast({
         title: "Order Placed Successfully!",
-        description: `Your order #${orderResult.order_number} has been placed successfully.`,
+        description: orderMessage,
       });
 
       const summaryRoute = isCustomerOrder() ? 'customer-order-summary' : 'order-summary';
@@ -458,7 +495,7 @@ export function UniversalCheckout() {
     }
   };
 
-  // Calculate totals with tiered pricing
+  // Calculate totals with tiered pricing including combo support
   const selectedDeliveryCharge = deliveryCharges.find(d => d.id === selectedDelivery);
   const deliveryPrice = selectedDeliveryCharge?.delivery_price || 0;
   const subtotal = getTieredTotalPrice();
@@ -505,7 +542,7 @@ export function UniversalCheckout() {
           <h1 className="text-3xl font-bold">Checkout</h1>
         </div>
 
-        {/* User status alert */}
+        {/* User status alert with combo information */}
         {user ? (
           <Alert className="mb-6">
             <CheckCircle className="h-4 w-4" />
@@ -513,6 +550,11 @@ export function UniversalCheckout() {
               Logged in as <strong>{userProfile?.full_name || user.email}</strong>
               {userProfile?.role === 'admin' && <span className="ml-2 text-blue-600">(Admin)</span>}
               {isCustomerOrder() && <span className="ml-2 text-green-600">(Customer Order)</span>}
+              {isComboModeActive() && (
+                <span className="ml-2 text-purple-600 font-semibold">
+                  🎯 Combo Active: {activeCombo?.name}
+                </span>
+              )}
             </AlertDescription>
           </Alert>
         ) : (
@@ -520,6 +562,11 @@ export function UniversalCheckout() {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               You're checking out as a guest. <strong>Your order will be processed normally.</strong>
+              {isComboModeActive() && (
+                <span className="ml-2 text-purple-600 font-semibold">
+                  🎯 Combo Active: {activeCombo?.name}
+                </span>
+              )}
             </AlertDescription>
           </Alert>
         )}
@@ -580,6 +627,7 @@ export function UniversalCheckout() {
                 finalTotal={finalTotal}
                 isSubmitting={submitting}
                 onSubmitOrder={handleSubmitOrder}
+                comboInfo={isComboModeActive() ? getComboInfo() : null}
               />
             </div>
           </div>
@@ -589,9 +637,14 @@ export function UniversalCheckout() {
         <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 z-50">
           <div className="flex items-center justify-between mb-2">
             <span className="font-semibold">Total: Rs. {finalTotal.toFixed(2)}</span>
-            {totalSavings > 0 && (
-              <span className="text-green-600 text-sm">Save Rs. {totalSavings.toFixed(2)}</span>
-            )}
+            <div className="flex items-center space-x-2">
+              {totalSavings > 0 && (
+                <span className="text-green-600 text-sm">Save Rs. {totalSavings.toFixed(2)}</span>
+              )}
+              {isComboModeActive() && (
+                <span className="text-purple-600 text-xs font-semibold">🎯 Combo</span>
+              )}
+            </div>
           </div>
           <Button
             onClick={handleSubmitOrder}
