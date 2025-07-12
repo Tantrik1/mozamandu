@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useAuth } from '@/hooks/useAuth';
@@ -301,6 +302,55 @@ export function UniversalCheckout() {
         }
       }
 
+      // Create serializable pricing breakdown for JSON storage
+      const comboInfo = isComboModeActive() ? getComboInfo() : null;
+      const serializablePricingBreakdown = {
+        subtotal,
+        deliveryPrice,
+        promoDiscount,
+        finalTotal,
+        comboActive: isComboModeActive(),
+        comboInfo: comboInfo ? {
+          combo: {
+            id: comboInfo.combo.id,
+            name: comboInfo.combo.name,
+            description: comboInfo.combo.description
+          },
+          totalComboSavings: comboInfo.totalComboSavings,
+          affectedSubcategories: comboInfo.affectedSubcategories.map(sub => ({
+            subcategoryId: sub.subcategoryId,
+            totalQuantity: sub.totalQuantity,
+            comboActive: sub.comboActive,
+            comboPrice: sub.comboPrice,
+            totalSavings: sub.totalSavings,
+            description: sub.description
+          }))
+        } : null,
+        subcategoryBreakdown: Object.fromEntries(
+          Object.entries(subcategoryPricing).map(([key, value]) => [
+            key,
+            {
+              subcategoryId: value.subcategoryId,
+              totalQuantity: value.totalQuantity,
+              moqReached: value.moqReached,
+              moqRequired: value.moqRequired,
+              comboActive: value.comboActive,
+              comboPrice: value.comboPrice,
+              totalSavings: value.totalSavings,
+              description: value.description,
+              itemBreakdown: value.itemBreakdown.map(item => ({
+                itemId: item.itemId,
+                unitPrice: item.unitPrice,
+                totalPrice: item.totalPrice,
+                appliedTier: item.appliedTier,
+                tierInfo: item.tierInfo,
+                savings: item.savings
+              }))
+            }
+          ])
+        )
+      };
+
       // Prepare base order data with combo information
       const baseOrderData = {
         customer_name: customerInfo.name,
@@ -320,15 +370,7 @@ export function UniversalCheckout() {
         combo_applied: isComboModeActive(),
         promocode_used: appliedPromo?.code || null,
         promocode_discount: promoDiscount,
-        pricing_breakdown: {
-          subtotal,
-          deliveryPrice,
-          promoDiscount,
-          finalTotal,
-          comboActive: isComboModeActive(),
-          comboInfo: isComboModeActive() ? getComboInfo() : null,
-          subcategoryBreakdown: subcategoryPricing
-        }
+        pricing_breakdown: serializablePricingBreakdown
       };
 
       let orderResult = null;
