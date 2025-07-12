@@ -1,7 +1,7 @@
 
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { TopBar } from '@/components/customer/TopBar';
-import { EnhancedHeroSection } from '@/components/customer/EnhancedHeroSection';
+import { HeroSection } from '@/components/customer/HeroSection';
 import { CategoriesCarousel } from '@/components/customer/CategoriesCarousel';
 import { EnhancedFeaturedProducts } from '@/components/customer/EnhancedFeaturedProducts';
 import { LatestProducts } from '@/components/customer/LatestProducts';
@@ -20,8 +20,8 @@ export default function Home() {
       <CustomerHeader />
       <NoticePopup />
       
-      {/* Hero Section - Full Viewport */}
-      <EnhancedHeroSection />
+      {/* Hero Section - Original Black Background */}
+      <HeroSection />
 
       {/* Categories Carousel */}
       <CategoriesCarousel />

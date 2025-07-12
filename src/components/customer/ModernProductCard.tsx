@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +44,10 @@ interface DiscountTier {
   discount_amount: number;
 }
 
+interface SubcategoryInfo {
+  selling_price: number;
+}
+
 interface ModernProductCardProps {
   product: Product;
   subcategorySellingPrice: number;
@@ -57,6 +62,7 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
   const [loading, setLoading] = useState(false);
   const [productStock, setProductStock] = useState<number>(0);
   const [discountTiers, setDiscountTiers] = useState<DiscountTier[]>([]);
+  const [realtimeSubcategoryPrice, setRealtimeSubcategoryPrice] = useState<number>(subcategorySellingPrice);
   
   const { addToCart } = useRobustCart();
 
@@ -66,13 +72,32 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
     }
     fetchProductStock();
     fetchDiscountTiers();
-  }, [product.id, product.has_color_variants]);
+    fetchRealtimeSubcategoryPrice();
+  }, [product.id, product.has_color_variants, product.subcategory_id]);
 
   useEffect(() => {
     if (selectedColor && product.color_has_size_variants) {
       fetchSizeVariants(selectedColor);
     }
   }, [selectedColor, product.color_has_size_variants]);
+
+  const fetchRealtimeSubcategoryPrice = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('subcategories')
+        .select('selling_price')
+        .eq('id', product.subcategory_id)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setRealtimeSubcategoryPrice(data.selling_price);
+      }
+    } catch (error) {
+      console.error('Error fetching realtime subcategory price:', error);
+      setRealtimeSubcategoryPrice(subcategorySellingPrice);
+    }
+  };
 
   const fetchDiscountTiers = async () => {
     try {
@@ -183,7 +208,7 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
         quantity: quantity,
         colorVariantId: selectedColor || undefined,
         sizeVariantId: selectedSize || undefined,
-        unitPrice: product.selling_price || subcategorySellingPrice,
+        unitPrice: product.selling_price || realtimeSubcategoryPrice,
       });
       
       if (success) {
@@ -196,15 +221,15 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
     }
   };
 
-  const basePrice = product.selling_price || subcategorySellingPrice;
+  const basePrice = product.selling_price || realtimeSubcategoryPrice;
   const pricingInfo = calculateDiscountedPrice(basePrice, quantity);
   const selectedColorVariant = colorVariants.find(cv => cv.id === selectedColor);
   const currentImage = selectedColorVariant?.image_url || product.image_url;
 
   return (
     <Card className="group h-full flex flex-col overflow-hidden bg-card shadow-sm hover:shadow-md transition-all duration-300 border-border rounded-lg">
-      {/* Product Image */}
-      <div className="relative overflow-hidden bg-muted/50 aspect-square">
+      {/* Product Image - 16:9 Aspect Ratio */}
+      <div className="relative overflow-hidden bg-muted/50" style={{ aspectRatio: '16/9' }}>
         {currentImage ? (
           <img
             src={currentImage}
