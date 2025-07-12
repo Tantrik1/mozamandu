@@ -6,7 +6,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { RobustCartProvider } from '@/hooks/useRobustCart';
 import Index from '@/pages/Index';
+import Auth from '@/pages/Auth';
 import AdminPage from '@/pages/AdminPage';
+import CustomerDashboard from '@/pages/CustomerDashboard';
 import InventoryDashboard from '@/pages/InventoryDashboard';
 import Checkout from '@/pages/Checkout';
 import ShippingPolicy from '@/pages/ShippingPolicy';
@@ -26,6 +28,8 @@ function App() {
             <Toaster />
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/dashboard" element={<CustomerDashboard />} />
               <Route path="/home" element={<Home />} />
               <Route path="/products" element={<Products />} />
               <Route path="/subcategory/:subcategoryId" element={<SubcategoryPage />} />
