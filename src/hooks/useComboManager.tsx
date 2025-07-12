@@ -40,6 +40,7 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
     try {
       if (cartItems.length === 0) {
         if (activeCombo) {
+          console.log('🔄 Cart is empty, clearing combo');
           setActiveCombo(null);
           setPreviousComboId(null);
         }
@@ -47,7 +48,12 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
       }
 
       console.log('🔍 Checking combo eligibility...');
-      console.log('📦 Cart items:', cartItems);
+      console.log('📦 Cart items:', cartItems.length);
+      console.log('📦 Cart details:', cartItems.map(item => ({
+        name: item.productName,
+        subcategoryId: item.subcategoryId,
+        quantity: item.quantity
+      })));
 
       const { data: combos, error: combosError } = await supabase
         .from('combos')
@@ -69,7 +75,8 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
         return;
       }
 
-      console.log('📋 Available combos:', combos);
+      console.log('📋 Available active combos:', combos?.length || 0);
+      console.log('📋 Combo details:', combos);
 
       // Calculate subcategory quantities
       const subcategoryCounts: { [key: string]: number } = {};
@@ -108,11 +115,12 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
       
       // Check each combo for eligibility
       for (const combo of combos || []) {
-        console.log(`🎯 Checking combo: ${combo.name}`);
+        console.log(`🎯 Checking combo: "${combo.name}" (ID: ${combo.id})`);
         console.log(`📋 Combo requirements:`, combo.combo_subcategories);
         
         let isEligible = true;
         const missingRequirements: string[] = [];
+        const metRequirements: string[] = [];
         
         for (const comboSubcategory of combo.combo_subcategories) {
           const requiredUnits = comboSubcategory.min_units;
@@ -120,25 +128,32 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
           
           console.log(`📏 Subcategory ${comboSubcategory.subcategory_id}: needs ${requiredUnits}, has ${availableUnits}`);
           
-          if (availableUnits < requiredUnits) {
+          if (availableUnits >= requiredUnits) {
+            metRequirements.push(`✅ Subcategory ${comboSubcategory.subcategory_id}: has ${availableUnits}/${requiredUnits}`);
+          } else {
             isEligible = false;
-            missingRequirements.push(`Subcategory ${comboSubcategory.subcategory_id}: needs ${requiredUnits}, has ${availableUnits}`);
+            missingRequirements.push(`❌ Subcategory ${comboSubcategory.subcategory_id}: needs ${requiredUnits}, has ${availableUnits} (missing ${requiredUnits - availableUnits})`);
           }
         }
 
+        console.log('Met requirements:', metRequirements);
+        if (missingRequirements.length > 0) {
+          console.log('Missing requirements:', missingRequirements);
+        }
+
         if (isEligible) {
-          console.log(`✅ Combo "${combo.name}" is eligible!`);
+          console.log(`✅ COMBO ELIGIBLE: "${combo.name}"`);
           newActiveCombo = combo;
           break; // Take the first eligible combo
         } else {
-          console.log(`❌ Combo "${combo.name}" not eligible. Missing:`, missingRequirements);
+          console.log(`❌ Combo "${combo.name}" NOT eligible`);
         }
       }
 
       // Handle combo state changes and notifications
       if (newActiveCombo && (!activeCombo || activeCombo.id !== newActiveCombo.id)) {
         // New combo activated
-        console.log(`🎉 Activating combo: ${newActiveCombo.name}`);
+        console.log(`🎉 ACTIVATING COMBO: ${newActiveCombo.name}`);
         toast({
           title: "🎉 Combo Applied!",
           description: `${newActiveCombo.name}: ${newActiveCombo.description}`,
@@ -172,12 +187,15 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
   };
 
   useEffect(() => {
+    console.log('🔄 useComboManager useEffect triggered, cart items:', cartItems.length);
     checkComboEligibility();
   }, [cartItems]);
 
   const isComboActive = (subcategoryId: string): boolean => {
     if (!activeCombo) return false;
-    return activeCombo.combo_subcategories.some(cs => cs.subcategory_id === subcategoryId);
+    const isActive = activeCombo.combo_subcategories.some(cs => cs.subcategory_id === subcategoryId);
+    console.log(`🎯 isComboActive(${subcategoryId}):`, isActive);
+    return isActive;
   };
 
   const getComboPrice = (subcategoryId: string): number | null => {
@@ -185,12 +203,16 @@ export function useComboManager({ cartItems }: UseComboManagerProps) {
     const comboSubcategory = activeCombo.combo_subcategories.find(
       cs => cs.subcategory_id === subcategoryId
     );
-    return comboSubcategory ? comboSubcategory.price : null;
+    const price = comboSubcategory ? comboSubcategory.price : null;
+    console.log(`🎯 getComboPrice(${subcategoryId}):`, price);
+    return price;
   };
 
   // Function to check if minimum quantity requirements should be ignored
   const shouldIgnoreMinimumQuantity = (subcategoryId: string): boolean => {
-    return isComboActive(subcategoryId);
+    const ignore = isComboActive(subcategoryId);
+    console.log(`🎯 shouldIgnoreMinimumQuantity(${subcategoryId}):`, ignore);
+    return ignore;
   };
 
   return {
