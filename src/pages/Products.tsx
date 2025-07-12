@@ -17,6 +17,7 @@ interface Product {
   has_color_variants: boolean;
   color_has_size_variants: boolean;
   subcategory_id: string;
+  stock_quantity: number;
   categories: {
     name: string;
   } | null;
