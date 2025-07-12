@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,17 +5,9 @@ import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { ModernProductCard } from '@/components/customer/ModernProductCard';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { getProductStockSummary } from '@/utils/stockCalculation';
 import { ChevronRight, Home, ArrowUpDown } from 'lucide-react';
-
 interface Product {
   id: string;
   name: string;
@@ -29,7 +20,6 @@ interface Product {
   color_has_size_variants: boolean;
   stock_quantity: number;
 }
-
 interface Subcategory {
   id: string;
   name: string;
@@ -42,72 +32,64 @@ interface Subcategory {
     name: string;
   } | null;
 }
-
 export default function SubcategoryPage() {
-  const { subcategoryId } = useParams<{ subcategoryId: string }>();
+  const {
+    subcategoryId
+  } = useParams<{
+    subcategoryId: string;
+  }>();
   const [subcategory, setSubcategory] = useState<Subcategory | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [sortedProducts, setSortedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<string>('name');
-
   useEffect(() => {
     if (subcategoryId) {
       fetchSubcategoryData();
     }
   }, [subcategoryId]);
-
   useEffect(() => {
     sortProducts();
   }, [products, sortBy]);
-
   const fetchSubcategoryData = async () => {
     if (!subcategoryId) return;
-
     try {
       // Fetch subcategory details
-      const { data: subcategoryData, error: subcategoryError } = await supabase
-        .from('subcategories')
-        .select(`
+      const {
+        data: subcategoryData,
+        error: subcategoryError
+      } = await supabase.from('subcategories').select(`
           *,
           categories(id, name)
-        `)
-        .eq('id', subcategoryId)
-        .eq('status', 'on')
-        .single();
-
+        `).eq('id', subcategoryId).eq('status', 'on').single();
       if (subcategoryError) throw subcategoryError;
       setSubcategory(subcategoryData);
 
       // Fetch products in this subcategory
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-        .eq('subcategory_id', subcategoryId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
+      const {
+        data: productsData,
+        error: productsError
+      } = await supabase.from('products').select('*').eq('subcategory_id', subcategoryId).eq('status', 'active').order('created_at', {
+        ascending: false
+      });
       if (productsError) throw productsError;
-
       if (productsData) {
         // Calculate stock for each product
-        const productsWithStock = await Promise.all(
-          productsData.map(async (product) => {
-            try {
-              const stock = await getProductStockSummary(product.id);
-              return {
-                ...product,
-                stock_quantity: stock,
-              };
-            } catch (error) {
-              console.error('Error calculating stock for product:', product.id, error);
-              return {
-                ...product,
-                stock_quantity: 0,
-              };
-            }
-          })
-        );
+        const productsWithStock = await Promise.all(productsData.map(async product => {
+          try {
+            const stock = await getProductStockSummary(product.id);
+            return {
+              ...product,
+              stock_quantity: stock
+            };
+          } catch (error) {
+            console.error('Error calculating stock for product:', product.id, error);
+            return {
+              ...product,
+              stock_quantity: 0
+            };
+          }
+        }));
         setProducts(productsWithStock);
       }
     } catch (error) {
@@ -116,10 +98,8 @@ export default function SubcategoryPage() {
       setLoading(false);
     }
   };
-
   const sortProducts = () => {
     if (!products.length) return;
-
     const sorted = [...products].sort((a, b) => {
       switch (sortBy) {
         case 'name':
@@ -132,13 +112,10 @@ export default function SubcategoryPage() {
           return 0;
       }
     });
-
     setSortedProducts(sorted);
   };
-
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
+    return <div className="min-h-screen bg-gray-50">
         <CustomerHeader />
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center min-h-64">
@@ -148,13 +125,10 @@ export default function SubcategoryPage() {
             </div>
           </div>
         </div>
-      </div>
-    );
+      </div>;
   }
-
   if (!subcategory) {
-    return (
-      <div className="min-h-screen bg-gray-50">
+    return <div className="min-h-screen bg-gray-50">
         <CustomerHeader />
         <div className="container mx-auto px-4 py-8">
           <div className="text-center py-12">
@@ -167,86 +141,21 @@ export default function SubcategoryPage() {
             </div>
           </div>
         </div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
+  return <div className="min-h-screen bg-gray-50">
       <CustomerHeader />
       <div className="container mx-auto px-4 py-6">
         {/* Breadcrumb Navigation */}
         <Breadcrumb className="mb-6">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link to="/" className="flex items-center gap-1 text-gray-600 hover:text-blue-600 transition-colors">
-                  <Home className="h-4 w-4" />
-                  Home
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator>
-              <ChevronRight className="h-4 w-4 text-gray-400" />
-            </BreadcrumbSeparator>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link 
-                  to={`/categories/${subcategory.categories?.id}`}
-                  className="text-gray-600 hover:text-blue-600 transition-colors"
-                >
-                  {subcategory.categories?.name}
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator>
-              <ChevronRight className="h-4 w-4 text-gray-400" />
-            </BreadcrumbSeparator>
-            <BreadcrumbItem>
-              <BreadcrumbPage className="text-blue-600 font-medium">{subcategory.name}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
+          
         </Breadcrumb>
 
         {/* Subcategory Header */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Subcategory Image */}
-            {subcategory.image_url && (
-              <div className="lg:w-1/3">
-                <img
-                  src={subcategory.image_url}
-                  alt={subcategory.name}
-                  className="w-full h-64 lg:h-48 object-cover rounded-lg shadow-sm"
-                />
-              </div>
-            )}
-            
-            {/* Subcategory Info */}
-            <div className="flex-1">
-              <div className="mb-4">
-                <Badge variant="outline" className="mb-3 text-blue-600 border-blue-200 bg-blue-50">
-                  {subcategory.categories?.name}
-                </Badge>
-                <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-3">{subcategory.name}</h1>
-                {subcategory.description && (
-                  <p className="text-gray-600 text-lg leading-relaxed mb-6">{subcategory.description}</p>
-                )}
-              </div>
-              
-              {/* Product Count Badge */}
-              {products.length > 0 && (
-                <Badge variant="outline" className="text-sm bg-blue-50 text-blue-700 border-blue-200">
-                  {products.length} product{products.length !== 1 ? 's' : ''} available
-                </Badge>
-              )}
-            </div>
-          </div>
-        </div>
+        
 
         {/* Sort Options */}
-        {products.length > 0 && (
-          <div className="flex items-center gap-4 mb-6">
+        {products.length > 0 && <div className="flex items-center gap-4 mb-6">
             <div className="flex items-center gap-2">
               <ArrowUpDown className="h-4 w-4 text-gray-600" />
               <span className="text-sm text-gray-600">Sort by:</span>
@@ -261,12 +170,10 @@ export default function SubcategoryPage() {
                 <SelectItem value="price-high">Price (High to Low)</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-        )}
+          </div>}
 
         {/* Products Grid */}
-        {sortedProducts.length === 0 ? (
-          <div className="text-center py-12">
+        {sortedProducts.length === 0 ? <div className="text-center py-12">
             <div className="bg-white rounded-xl p-8 shadow-sm max-w-md mx-auto">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl">📦</span>
@@ -274,19 +181,12 @@ export default function SubcategoryPage() {
               <p className="text-gray-500 text-lg mb-2">No products available</p>
               <p className="text-gray-400 text-sm">Check back later for new arrivals in this category!</p>
             </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {sortedProducts.map((product) => (
-              <ModernProductCard
-                key={product.id}
-                product={{ ...product, subcategory_id: subcategory?.id || '' }}
-                subcategorySellingPrice={subcategory.selling_price}
-              />
-            ))}
-          </div>
-        )}
+          </div> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {sortedProducts.map(product => <ModernProductCard key={product.id} product={{
+          ...product,
+          subcategory_id: subcategory?.id || ''
+        }} subcategorySellingPrice={subcategory.selling_price} />)}
+          </div>}
       </div>
-    </div>
-  );
+    </div>;
 }
