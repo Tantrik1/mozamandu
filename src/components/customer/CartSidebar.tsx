@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, Plus, Minus, X, AlertTriangle, Gift, Tag } from 'lucide-react';
 import { useRobustCart } from '@/hooks/useRobustCart';
+import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -23,20 +24,55 @@ export function CartSidebar() {
     cartItems, 
     updateQuantity, 
     removeFromCart, 
-    getTotalPrice, 
     getTotalItems, 
-    getItemPricing,
     activeCombo 
   } = useRobustCart();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [subcategoryRequirements, setSubcategoryRequirements] = useState<SubcategoryRequirement[]>([]);
+  const [discountTiers, setDiscountTiers] = useState<{ [key: string]: any[] }>({});
+
+  // Use tiered pricing hook
+  const {
+    getTotalPrice: getTieredTotalPrice,
+    getItemPricing: getTieredItemPricing
+  } = useSubcategoryTieredPricing({
+    cartItems,
+    activeCombo,
+    discountTiers
+  });
+
+  useEffect(() => {
+    fetchDiscountTiers();
+  }, []);
 
   useEffect(() => {
     if (cartItems.length > 0) {
       checkSubcategoryRequirements();
     }
   }, [cartItems, activeCombo]);
+
+  const fetchDiscountTiers = async () => {
+    try {
+      const { data } = await supabase
+        .from('discount_tiers')
+        .select('*')
+        .order('subcategory_id, min_quantity');
+      
+      if (data) {
+        const tiersBySubcategory: { [key: string]: any[] } = {};
+        data.forEach(tier => {
+          if (!tiersBySubcategory[tier.subcategory_id]) {
+            tiersBySubcategory[tier.subcategory_id] = [];
+          }
+          tiersBySubcategory[tier.subcategory_id].push(tier);
+        });
+        setDiscountTiers(tiersBySubcategory);
+      }
+    } catch (error) {
+      console.error('Error fetching discount tiers:', error);
+    }
+  };
 
   const checkSubcategoryRequirements = async () => {
     const subcategoryTotals: { [key: string]: number } = {};
@@ -69,7 +105,7 @@ export function CartSidebar() {
   };
 
   const canCheckout = subcategoryRequirements.every(req => req.fulfilled);
-  const totalPrice = getTotalPrice();
+  const totalPrice = getTieredTotalPrice();
 
   const handleCheckout = () => {
     if (!canCheckout) {
@@ -140,8 +176,16 @@ export function CartSidebar() {
                 {/* Cart Items */}
                 <div className="space-y-3">
                   {cartItems.map((item) => {
-                    const pricing = getItemPricing(item);
-                    const itemTotal = pricing.finalPrice * item.quantity;
+                    const pricingResult = getTieredItemPricing(item.id);
+                    const pricing = pricingResult || {
+                      unitPrice: item.basePrice,
+                      totalPrice: item.basePrice * item.quantity,
+                      appliedTier: 'normal' as const,
+                      savings: 0,
+                      tierInfo: undefined,
+                      subcategoryInfo: null
+                    };
+                    const itemTotal = pricing.totalPrice;
 
                     return (
                       <div key={item.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
@@ -174,36 +218,33 @@ export function CartSidebar() {
                               <span className="text-sm font-bold text-red-600">
                                 Rs.{itemTotal.toFixed(2)}
                               </span>
-                              {pricing.mode === 'combo' && (
-                                <Badge variant="secondary" className="text-xs px-2 py-0 bg-green-100 text-green-800 border border-green-200">
-                                  <Gift className="w-2 h-2 mr-1" />
-                                  Combo
-                                </Badge>
-                              )}
-                              {pricing.mode === 'discount' && (
+                              {pricing.appliedTier === 'discount' && (
                                 <Badge variant="secondary" className="text-xs px-2 py-0 bg-blue-100 text-blue-800 border border-blue-200">
                                   <Tag className="w-2 h-2 mr-1" />
                                   MOQ Discount
                                 </Badge>
                               )}
-                              {pricing.mode === 'normal' && (
+                              {pricing.appliedTier === 'normal' && (
                                 <Badge variant="outline" className="text-xs px-2 py-0 bg-gray-50 text-gray-700">
                                   Normal
                                 </Badge>
                               )}
+                              {pricing.savings > 0 && (
+                                <span className="text-xs text-green-600">
+                                  Save Rs.{pricing.savings.toFixed(2)}
+                                </span>
+                              )}
                             </div>
                             
                             <p className="text-xs text-gray-600">
-                              {pricing.description}
+                              Rs.{pricing.unitPrice.toFixed(2)} avg per item
                             </p>
                             
-                            {/* Show breakdown for discount pricing */}
-                            {pricing.breakdown && pricing.breakdown.length > 1 && (
+                            {/* Show tier info */}
+                            {pricingResult?.tierInfo && (
                               <div className="text-xs text-gray-500 mt-1 bg-blue-50 p-2 rounded">
-                                <div className="font-medium">MOQ Discount breakdown:</div>
-                                {pricing.breakdown.map((line, index) => (
-                                  <div key={index} className="ml-2">• {line}</div>
-                                ))}
+                                <div className="font-medium">Pricing details:</div>
+                                <div className="ml-2">{pricingResult.tierInfo}</div>
                               </div>
                             )}
                           </div>
