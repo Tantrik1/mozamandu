@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useCheckoutData } from '@/hooks/useCheckoutData';
+
 import { usePromoCode } from '@/hooks/usePromoCode';
 import { CustomerInfoForm } from './CustomerInfoForm';
 import { DeliveryLocationSelector } from './DeliveryLocationSelector';
@@ -24,7 +24,9 @@ export function UniversalCheckout() {
   const { cartItems, getTotalPrice, clearCart, getItemPricing } = useRobustCart();
   const { user, userProfile } = useAuth();
   const navigate = useNavigate();
-  const { deliveryCharges, paymentMethods, loading } = useCheckoutData();
+  const [deliveryCharges, setDeliveryCharges] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [loading, setLoading] = useState(true);
   const { 
     promoCode, 
     setPromoCode, 

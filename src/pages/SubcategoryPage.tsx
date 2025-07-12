@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { AnimatedProductCard } from '@/components/customer/AnimatedProductCard';
+import { ModernProductCard } from '@/components/customer/ModernProductCard';
 import { Badge } from '@/components/ui/badge';
 import { 
   Breadcrumb,
@@ -293,11 +293,10 @@ export default function SubcategoryPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {products.map((product) => (
-            <AnimatedProductCard
+            <ModernProductCard
               key={product.id}
-              product={product}
-              subcategorySellingPrice={subcategory.selling_price}
-              discountTiers={discountTiers}
+               product={{ ...product, subcategory_id: subcategory?.id || '' }}
+               subcategorySellingPrice={subcategory.selling_price}
             />
             ))}
           </div>

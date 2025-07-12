@@ -20,6 +20,7 @@ interface Product {
   is_featured: boolean;
   has_color_variants: boolean;
   color_has_size_variants: boolean;
+  stock_quantity: number;
   subcategory_id: string;
   subcategories: {
     name: string;
@@ -68,7 +69,7 @@ export function EnhancedFeaturedProducts() {
         return;
       }
 
-      setProducts(data || []);
+      setProducts((data || []).map(product => ({ ...product, stock_quantity: 0 })));
     } catch (error) {
       console.error('Error fetching featured products:', error);
     } finally {

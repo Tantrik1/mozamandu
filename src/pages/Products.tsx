@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { ProductCard } from '@/components/customer/ProductCard';
+import { ModernProductCard } from '@/components/customer/ModernProductCard';
 import { Badge } from '@/components/ui/badge';
 import { getProductStockSummary } from '@/utils/stockCalculation';
 
@@ -16,7 +16,7 @@ interface Product {
   is_featured: boolean;
   has_color_variants: boolean;
   color_has_size_variants: boolean;
-  stock_quantity: number;
+  subcategory_id: string;
   categories: {
     name: string;
   } | null;
@@ -42,6 +42,7 @@ export default function Products() {
         .from('products')
         .select(`
           *,
+           subcategory_id,
           categories(name),
           subcategories(name, selling_price)
         `)
@@ -115,7 +116,7 @@ export default function Products() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {products.map((product) => (
-            <ProductCard
+            <ModernProductCard
               key={product.id}
               product={product}
               subcategorySellingPrice={product.subcategories?.selling_price || 0}
