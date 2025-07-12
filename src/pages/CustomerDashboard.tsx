@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { ContactInfoForm } from '@/components/customer/ContactInfoForm';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { TopBar } from '@/components/customer/TopBar';
 import { Footer } from '@/components/layout/Footer';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -117,7 +118,8 @@ export default function CustomerDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
+      <TopBar />
       <CustomerHeader />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

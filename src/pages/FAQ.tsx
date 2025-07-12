@@ -1,6 +1,8 @@
 
 import { useState, useEffect } from 'react';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { TopBar } from '@/components/customer/TopBar';
+import { Footer } from '@/components/layout/Footer';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,7 +56,8 @@ export default function FAQ() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
+      <TopBar />
       <CustomerHeader />
       
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

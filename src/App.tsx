@@ -16,6 +16,15 @@ import TermsConditions from '@/pages/TermsConditions';
 import Home from '@/pages/Home';
 import SubcategoryPage from '@/pages/SubcategoryPage';
 import Products from '@/pages/Products';
+import FAQ from '@/pages/FAQ';
+import Categories from '@/pages/Categories';
+import CategoryPage from '@/pages/CategoryPage';
+import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import About from '@/pages/About';
+import Contact from '@/pages/Contact';
+import NotFound from '@/pages/NotFound';
+import OrderSummary from '@/pages/OrderSummary';
+import CustomerOrderSummary from '@/pages/CustomerOrderSummary';
 
 const queryClient = new QueryClient();
 
@@ -27,18 +36,26 @@ function App() {
           <BrowserRouter>
             <Toaster />
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<Home />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/dashboard" element={<CustomerDashboard />} />
-              <Route path="/home" element={<Home />} />
               <Route path="/products" element={<Products />} />
               <Route path="/subcategory/:subcategoryId" element={<SubcategoryPage />} />
               <Route path="/subcategories/:subcategoryId" element={<SubcategoryPage />} />
+              <Route path="/categories" element={<Categories />} />
+              <Route path="/categories/:categoryId" element={<CategoryPage />} />
+              <Route path="/faq" element={<FAQ />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/order-summary/:orderId" element={<OrderSummary />} />
+              <Route path="/customer-order-summary/:orderId" element={<CustomerOrderSummary />} />
               <Route path="/admin/*" element={<AdminPage />} />
               <Route path="/inventory" element={<InventoryDashboard />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/shipping-policy" element={<ShippingPolicy />} />
               <Route path="/terms-conditions" element={<TermsConditions />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
         </RobustCartProvider>

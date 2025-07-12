@@ -2,15 +2,16 @@
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { TopBar } from '@/components/customer/TopBar';
 import { EnhancedHeroSection } from '@/components/customer/EnhancedHeroSection';
+import { CategoriesCarousel } from '@/components/customer/CategoriesCarousel';
 import { EnhancedFeaturedProducts } from '@/components/customer/EnhancedFeaturedProducts';
-import { BrowseSubcategories } from '@/components/customer/BrowseSubcategories';
-import { SubcategoryProductTabs } from '@/components/customer/SubcategoryProductTabs';
 import { LatestProducts } from '@/components/customer/LatestProducts';
-import { WhyChooseUs } from '@/components/customer/WhyChooseUs';
-import { DeliveryInfo } from '@/components/customer/DeliveryInfo';
 import { FAQSection } from '@/components/customer/FAQSection';
+import { SubcategoryProductTabs } from '@/components/customer/SubcategoryProductTabs';
 import { Footer } from '@/components/layout/Footer';
 import { NoticePopup } from '@/components/notices/NoticePopup';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { HelpCircle } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -22,26 +23,38 @@ export default function Home() {
       {/* Hero Section - Full Viewport */}
       <EnhancedHeroSection />
 
-      {/* Browse Subcategories */}
-      <BrowseSubcategories />
+      {/* Categories Carousel */}
+      <CategoriesCarousel />
 
       {/* Featured Products Carousel */}
       <EnhancedFeaturedProducts />
 
-      {/* Subcategory Product Tabs */}
-      <SubcategoryProductTabs />
-
       {/* Latest Products */}
       <LatestProducts />
 
-      {/* Why Choose Us */}
-      <WhyChooseUs />
-
-      {/* Delivery Info */}
-      <DeliveryInfo />
-
       {/* FAQ Section */}
       <FAQSection />
+
+      {/* CTA Section for FAQ */}
+      <section className="py-12 bg-muted/50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
+            Still have questions?
+          </h2>
+          <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
+            Browse our comprehensive FAQ section for detailed answers to common questions about our products, shipping, and policies.
+          </p>
+          <Button asChild size="lg" className="bg-primary hover:bg-primary/90">
+            <Link to="/faq" className="flex items-center gap-2">
+              <HelpCircle className="w-4 h-4" />
+              View All FAQs
+            </Link>
+          </Button>
+        </div>
+      </section>
+
+      {/* Subcategory Product Tabs */}
+      <SubcategoryProductTabs />
 
       {/* Footer */}
       <Footer />

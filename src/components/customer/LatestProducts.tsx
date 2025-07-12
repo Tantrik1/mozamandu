@@ -1,7 +1,8 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ProductCard } from './ProductCard';
+import { ModernProductCard } from './ModernProductCard';
+import { ProductGrid } from './ProductGrid';
 import { getProductStockSummary } from '@/utils/stockCalculation';
 
 interface Product {

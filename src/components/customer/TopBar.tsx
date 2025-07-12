@@ -46,7 +46,7 @@ export function TopBar() {
   if (!topBarText || !isVisible) return null;
 
   return (
-    <div className="bg-red-600 text-white text-center py-2 px-4 relative z-50">
+    <div className="bg-red-600 text-white text-center py-2 px-4 relative z-50 sticky top-0">
       <div className="flex items-center justify-center">
         <p className="text-sm font-medium flex-1 text-center pr-8">
           {topBarText.text}
