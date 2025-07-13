@@ -13,7 +13,7 @@ import { usePromoCode } from '@/hooks/usePromoCode';
 import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
 import { useComboManager } from '@/hooks/useComboManager';
 import { useInventoryManager } from '@/hooks/useInventoryManager';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { Package, Loader2 } from 'lucide-react';
 
 interface CustomerInfo {
@@ -46,16 +46,15 @@ interface PromoCode {
 export function UniversalCheckout() {
   const { user } = useAuth();
   const { getInventoryRecord, validateStockAvailability, reserveStock } = useInventoryManager();
+  const { toast } = useToast();
   
   const {
     cartItems,
     clearCart
   } = useRobustCart();
 
-  // Initialize discount tiers state first
   const [discountTiers, setDiscountTiers] = useState<{ [key: string]: any[] }>({});
 
-  // Use the EXACT same combo management as CartSidebar
   const { 
     activeCombo, 
     isComboActive, 
@@ -63,7 +62,6 @@ export function UniversalCheckout() {
     shouldIgnoreMinimumQuantity 
   } = useComboManager({ cartItems });
 
-  // Use the EXACT same tiered pricing hook as CartSidebar
   const {
     getTotalPrice: getTieredTotalPrice,
     getItemPricing: getTieredItemPricing,
@@ -118,7 +116,6 @@ export function UniversalCheckout() {
     }
   }, [appliedPromo, cartItems]);
 
-  // Debug combo activation - EXACT same as CartSidebar
   useEffect(() => {
     console.log('🎯 UniversalCheckout Debug - Combo Status:');
     console.log('Active combo:', activeCombo);
@@ -128,14 +125,12 @@ export function UniversalCheckout() {
     if (activeCombo) {
       console.log('Combo requirements:', activeCombo.combo_subcategories);
       
-      // Check subcategory quantities
       const subcategoryCounts: { [key: string]: number } = {};
       cartItems.forEach(item => {
         subcategoryCounts[item.subcategoryId] = (subcategoryCounts[item.subcategoryId] || 0) + item.quantity;
       });
       console.log('Current subcategory quantities:', subcategoryCounts);
       
-      // Check if combo requirements are met
       activeCombo.combo_subcategories.forEach(req => {
         const currentQty = subcategoryCounts[req.subcategory_id] || 0;
         console.log(`Subcategory ${req.subcategory_id}: needs ${req.min_units}, has ${currentQty}`);
@@ -157,7 +152,11 @@ export function UniversalCheckout() {
       setDeliveryLocations(data || []);
     } catch (error) {
       console.error('Error fetching delivery locations:', error);
-      toast.error('Failed to load delivery options.');
+      toast({
+        title: 'Error',
+        description: 'Failed to load delivery options.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -175,7 +174,11 @@ export function UniversalCheckout() {
       setPaymentMethods(data || []);
     } catch (error) {
       console.error('Error fetching payment methods:', error);
-      toast.error('Failed to load payment methods.');
+      toast({
+        title: 'Error',
+        description: 'Failed to load payment methods.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -203,7 +206,6 @@ export function UniversalCheckout() {
 
   const calculatePromoDiscount = () => {
     if (appliedPromo) {
-      // Use the EXACT same tiered pricing calculation as cart
       const accurateSubtotal = getTieredTotalPrice();
       const discount = (accurateSubtotal * appliedPromo.discount_percentage) / 100;
       setPromoDiscount(discount);
@@ -232,38 +234,60 @@ export function UniversalCheckout() {
       console.log('🚀 Starting enhanced order submission with immediate stock reservation...');
       console.log('🔍 User status:', { isAuthenticated: !!user, userId: user?.id });
       
-      // Enhanced validation checks
       if (!customerInfo.name.trim()) {
-        toast.error('Please enter your name');
+        toast({
+          title: 'Validation Error',
+          description: 'Please enter your name',
+          variant: 'destructive',
+        });
         return;
       }
 
       if (!customerInfo.email.trim()) {
-        toast.error('Please enter your email');
+        toast({
+          title: 'Validation Error',
+          description: 'Please enter your email',
+          variant: 'destructive',
+        });
         return;
       }
 
       if (!customerInfo.phone.trim()) {
-        toast.error('Please enter your phone number');
+        toast({
+          title: 'Validation Error',
+          description: 'Please enter your phone number',
+          variant: 'destructive',
+        });
         return;
       }
 
       if (!customerInfo.address.trim()) {
-        toast.error('Please enter your delivery address');
+        toast({
+          title: 'Validation Error',
+          description: 'Please enter your delivery address',
+          variant: 'destructive',
+        });
         return;
       }
 
       if (!deliveryLocation) {
-        toast.error('Please select a delivery location');
+        toast({
+          title: 'Validation Error',
+          description: 'Please select a delivery location',
+          variant: 'destructive',
+        });
         return;
       }
 
       if (!paymentMethod) {
-        toast.error('Please select a payment method');  
+        toast({
+          title: 'Validation Error',
+          description: 'Please select a payment method',
+          variant: 'destructive',
+        });
         return;
       }
 
-      // Pre-validate cart items format
       console.log('🔍 Pre-validating cart items format...');
       const validCartItems = cartItems.filter(item => {
         const isValid = item.productId && item.productName && item.quantity > 0;
@@ -279,18 +303,20 @@ export function UniversalCheckout() {
 
       console.log(`✅ Found ${validCartItems.length} valid cart items`);
 
-      // Enhanced stock validation with detailed logging
       console.log('🔍 Starting comprehensive stock validation...');
       try {
         await validateStockAvailability(validCartItems);
         console.log('✅ Stock validation passed for all items');
       } catch (stockError) {
         console.error('❌ Stock validation failed:', stockError);
-        toast.error(`Stock validation failed: ${stockError.message}`);
+        toast({
+          title: 'Stock Error',
+          description: `Stock validation failed: ${stockError.message}`,
+          variant: 'destructive',
+        });
         return;
       }
 
-      // Get inventory records with enhanced validation and error handling
       console.log('🔍 Retrieving inventory records for all items...');
       const cartItemsWithInventory = [];
       
@@ -309,7 +335,6 @@ export function UniversalCheckout() {
             throw new Error(`Inventory record not found for ${item.productName}. This product may not be available for purchase.`);
           }
 
-          // Validate stock availability one more time
           if (inventoryRecord.available_stock < item.quantity) {
             throw new Error(`Insufficient stock for ${item.productName}. Available: ${inventoryRecord.available_stock}, Required: ${item.quantity}`);
           }
@@ -329,14 +354,17 @@ export function UniversalCheckout() {
           });
         } catch (itemError) {
           console.error(`❌ Failed to process item ${item.productName}:`, itemError);
-          toast.error(itemError.message);
+          toast({
+            title: 'Item Error',
+            description: itemError.message,
+            variant: 'destructive',
+          });
           return;
         }
       }
 
       console.log('✅ All inventory records validated:', cartItemsWithInventory.length, 'items');
 
-      // Calculate pricing using the same hooks as cart
       const accurateSubtotal = getTieredTotalPrice();
       const accurateSavings = getTotalSavings();
       const comboInfo = getComboInfo();
@@ -355,7 +383,6 @@ export function UniversalCheckout() {
       const paidAmount = Math.round(finalTotal * (paymentPercentage / 100));
       const remainingAmount = finalTotal - paidAmount;
 
-      // Create comprehensive pricing breakdown
       const pricingBreakdown = {
         subcategoryPricing: Object.fromEntries(
           Object.entries(subcategoryPricing).map(([id, data]) => [
@@ -398,12 +425,9 @@ export function UniversalCheckout() {
 
       console.log('📋 Enhanced pricing breakdown:', pricingBreakdown);
 
-      // Create order with enhanced error handling - CRITICAL FIX for guest orders
       console.log('📝 Creating order with validated inventory data...');
       
-      // Prepare order data with proper user_id handling and status typing
       const orderData = {
-        // CRITICAL: Set user_id to null for guest orders explicitly
         user_id: user?.id || null,
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
@@ -441,7 +465,6 @@ export function UniversalCheckout() {
 
       console.log('✅ Order created successfully:', createdOrder.id);
 
-      // Insert basic order items for compatibility
       const orderItemsToInsert = cartItemsWithInventory.map(item => ({
         order_id: createdOrder.id,
         product_id: item.productId,
@@ -457,7 +480,6 @@ export function UniversalCheckout() {
         throw new Error(`Failed to create order items: ${orderItemsError.message}`);
       }
 
-      // Insert detailed order item information with validated inventory IDs
       const orderItemDetailsToInsert = cartItemsWithInventory.map(item => {
         const pricingResult = getTieredItemPricing(item.id);
         const pricingInfo = pricingResult || {
@@ -508,35 +530,47 @@ export function UniversalCheckout() {
         throw new Error(`Failed to create order item details: ${orderItemDetailsError.message}`);
       }
 
-      // CRITICAL FIX: Reserve stock immediately after order creation
       console.log('🔒 Reserving stock immediately for order:', createdOrder.id);
       try {
         await reserveStock(createdOrder.id);
         console.log('✅ Stock reserved successfully for order:', createdOrder.id);
-        toast.success('Stock has been reserved for your order!');
+        toast({
+          title: 'Order Placed Successfully!',
+          description: 'Stock has been reserved for your order!',
+        });
       } catch (reserveError) {
         console.error('❌ Failed to reserve stock:', reserveError);
-        // Don't fail the entire order, but log the issue
-        toast.error('Order created but stock reservation failed. Please contact support.');
+        toast({
+          title: 'Order Created',
+          description: 'Order created but stock reservation failed. Please contact support.',
+          variant: 'destructive',
+        });
       }
 
       console.log('🎉 Enhanced order completed successfully with immediate stock reservation!');
       
-      // Clear cart and show success
+      toast({
+        title: 'Order Placed Successfully!', 
+        description: 'Your order has been created and you will be redirected to order details.',
+        duration: 5000,
+      });
+
       clearCart();
       setOrderId(createdOrder.id);
       setShowSuccess(true);
-      toast.success('Order placed successfully! Stock has been reserved and order tracking is now active.');
 
     } catch (error) {
       console.error('💥 Enhanced order submission failed:', error);
-      toast.error(`Failed to place order: ${error.message}`);
+      toast({
+        title: 'Order Failed',
+        description: `Failed to place order: ${error.message}`,
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Use EXACT cart pricing calculations using SAME pricing hooks
   const totalSavings = getTotalSavings() + promoDiscount;
   const subtotal = getTieredTotalPrice();
   const totalBeforeDelivery = subtotal - promoDiscount;
@@ -577,6 +611,9 @@ export function UniversalCheckout() {
           <Card className="shadow-sm border-gray-200">
             <CardContent className="p-6">
               <PaymentMethodSection
+                onDiscountApplied={setPromoDiscount}
+                onPromoCodeUsed={(code) => {}}
+                orderTotal={getTieredTotalPrice() + (deliveryLocation ? deliveryLocation.delivery_price : 0)}
                 paymentMethods={paymentMethods}
                 selectedPayment={paymentMethod?.id || ''}
                 setSelectedPayment={(value) => {
@@ -634,10 +671,8 @@ export function UniversalCheckout() {
         </div>
       </div>
 
-      {/* Enhanced Mobile Checkout Button */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 lg:hidden z-50 shadow-2xl">
         <div className="container mx-auto">
-          {/* Total and savings display */}
           {(getTotalSavings() + promoDiscount) > 0 && (
             <div className="text-center mb-3">
               <div className="text-green-600 font-semibold text-sm">

@@ -1,10 +1,11 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Package, Truck, Clock } from 'lucide-react';
 import { useOrderStatus } from '@/hooks/useOrderStatus';
 import { CleanOrderSummary } from './CleanOrderSummary';
+import { useToast } from '@/hooks/use-toast';
+import { useEffect } from 'react';
 
 interface CheckoutSuccessProps {
   orderId: string;
@@ -12,6 +13,25 @@ interface CheckoutSuccessProps {
 
 export function CheckoutSuccess({ orderId }: CheckoutSuccessProps) {
   const { orderStatus, loading } = useOrderStatus(orderId);
+  const { toast } = useToast();
+
+  // Show success notification on component mount
+  useEffect(() => {
+    toast({
+      title: "Order Placed Successfully!",
+      description: "Your order has been created and stock has been reserved. You will receive real-time updates.",
+      duration: 5000,
+    });
+  }, [toast]);
+
+  // Auto-redirect to order summary after 3 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.location.href = `/orders/${orderId}`;
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [orderId]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -102,6 +122,9 @@ export function CheckoutSuccess({ orderId }: CheckoutSuccessProps) {
               <p className="text-gray-600 mt-2">
                 Thank you for your order. We'll process it shortly.
               </p>
+              <p className="text-sm text-blue-600 mt-2">
+                Redirecting to order details in 3 seconds...
+              </p>
             </CardHeader>
 
             <CardContent className="space-y-6">
@@ -148,7 +171,7 @@ export function CheckoutSuccess({ orderId }: CheckoutSuccessProps) {
                   onClick={() => window.location.href = `/orders/${orderId}`}
                   className="flex-1"
                 >
-                  Track Order
+                  View Order Details
                 </Button>
               </div>
 

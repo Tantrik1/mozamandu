@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -60,7 +59,6 @@ export function EnhancedUniversalCheckout() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
-  // Enhanced stock validation on component mount
   useEffect(() => {
     validateInitialStock();
   }, []);
@@ -120,16 +118,15 @@ export function EnhancedUniversalCheckout() {
       }
 
       try {
-        // Use the enhanced stock reservation function
         const { error } = await supabase.rpc('safe_update_stock', {
           p_product_id: item.productId,
-          p_stock_change: 0, // No change to total stock
+          p_stock_change: 0,
           p_color_variant_id: item.colorVariantId || null,
           p_size_variant_id: item.sizeVariantId || null,
-          p_reservation_change: item.quantity, // Reserve this quantity
+          p_reservation_change: item.quantity,
           p_reason: `Stock reservation for order - ${item.productName}`,
           p_order_id: orderId,
-          p_order_number: null, // Will be set by trigger
+          p_order_number: null,
           p_transaction_type: 'reserve'
         });
 
@@ -158,7 +155,6 @@ export function EnhancedUniversalCheckout() {
       setIsSubmitting(true);
       console.log('🚀 Starting enhanced checkout process...');
 
-      // Validate form
       if (!validateForm()) {
         toast({
           title: 'Validation Error',
@@ -168,7 +164,6 @@ export function EnhancedUniversalCheckout() {
         return;
       }
 
-      // Final stock validation
       console.log('🔍 Final stock validation...');
       const isStockValid = await validateCartStock();
       if (!isStockValid) {
@@ -182,7 +177,6 @@ export function EnhancedUniversalCheckout() {
 
       const totals = calculateTotals();
 
-      // Create the order
       console.log('📝 Creating order...');
       const { data: createdOrder, error: orderError } = await supabase
         .from('customer_orders')
@@ -216,11 +210,9 @@ export function EnhancedUniversalCheckout() {
 
       console.log('✅ Order created:', createdOrder.id);
 
-      // Create order item details with proper inventory linking
-      console.log('📦 Creating order item details...');
       const orderItemsToInsert = cartItems.map(item => ({
         order_id: createdOrder.id,
-        product_inventory_id: item.inventoryId, // Critical: Link to inventory
+        product_inventory_id: item.inventoryId,
         product_name: item.productName,
         color_name: item.colorName || null,
         size_name: item.sizeName || null,
@@ -241,21 +233,22 @@ export function EnhancedUniversalCheckout() {
         throw new Error(`Failed to create order items: ${itemDetailsError.message}`);
       }
 
-      // Reserve stock immediately after order creation
       console.log('🔒 Reserving inventory stock...');
       await reserveInventoryStock(createdOrder.id);
 
       console.log('🎉 Order completed successfully!');
       
+      // Show success toast notification
+      toast({
+        title: 'Order Placed Successfully!',
+        description: 'Your order has been created and stock has been reserved.',
+        duration: 5000,
+      });
+
       // Clear cart and show success
       clearCart();
       setOrderId(createdOrder.id);
       setShowSuccess(true);
-      
-      toast({
-        title: 'Order Placed Successfully!',
-        description: 'Your order has been created and stock has been reserved.',
-      });
 
     } catch (error) {
       console.error('💥 Checkout failed:', error);
