@@ -18,7 +18,7 @@ interface CustomerOrder {
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;
-  status: string;
+  status: 'pending_payment' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   created_at: string;
   payment_screenshot_url?: string;
 }
@@ -55,7 +55,7 @@ export function CustomerOrderManagement() {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+  const updateOrderStatus = async (orderId: string, newStatus: 'pending_payment' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled') => {
     try {
       const { error } = await supabase
         .from('customer_orders')

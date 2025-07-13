@@ -83,7 +83,7 @@ export function UniversalCheckout() {
     email: '',
     phone: '',
     address: '',
-    contact: ''
+    whatsapp: ''
   });
   const [deliveryLocations, setDeliveryLocations] = useState<DeliveryLocation[]>([]);
   const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocation | null>(null);
