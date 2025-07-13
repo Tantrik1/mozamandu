@@ -247,7 +247,7 @@ export function UniversalCheckout() {
   const handleSubmitOrder = async () => {
     try {
       setIsSubmitting(true);
-      console.log('🚀 Starting comprehensive order submission process...');
+      console.log('🚀 Starting comprehensive order submission with correct MOQ pricing...');
       
       // Validation checks
       if (!customerInfo.name.trim()) {
@@ -308,13 +308,13 @@ export function UniversalCheckout() {
 
       console.log('📦 Cart items with inventory validated:', cartItemsWithInventory);
 
-      // Calculate comprehensive pricing details
+      // Calculate comprehensive pricing details using the correct tiered pricing
       const tieredSubtotal = getTotalPrice();
       const tieredSavings = getTotalSavings();
       const comboInfo = getComboInfo();
       const isComboActive = isComboModeActive();
       
-      console.log('💰 Comprehensive pricing details:', {
+      console.log('💰 Correct pricing details:', {
         tieredSubtotal,
         tieredSavings,
         comboInfo,
@@ -327,7 +327,7 @@ export function UniversalCheckout() {
       const paidAmount = Math.round(finalTotal * (paymentPercentage / 100));
       const remainingAmount = finalTotal - paidAmount;
 
-      // Create comprehensive pricing breakdown for all modes (normal, combo, discount)
+      // Create comprehensive pricing breakdown with correct MOQ details
       const pricingBreakdown = {
         subcategoryPricing: Object.fromEntries(
           Object.entries(subcategoryPricing).map(([id, data]) => [
@@ -368,7 +368,7 @@ export function UniversalCheckout() {
         pricingMode: isComboActive ? 'combo' : (tieredSavings > 0 ? 'moq_discount' : 'normal')
       };
 
-      console.log('📋 Complete pricing breakdown for all modes:', pricingBreakdown);
+      console.log('📋 Complete pricing breakdown with MOQ details:', pricingBreakdown);
 
       // Create order with comprehensive data
       const { data: orderData, error: orderError } = await supabase
@@ -421,7 +421,7 @@ export function UniversalCheckout() {
         throw orderItemsError;
       }
 
-      // Insert detailed order item information with comprehensive pricing and inventory data
+      // Insert detailed order item information with correct MOQ pricing per inventory ID
       const orderItemDetailsToInsert = cartItemsWithInventory.map(item => {
         const pricingInfo = Object.values(subcategoryPricing)
           .find(sub => sub.itemBreakdown.some(breakdown => breakdown.itemId === item.id))
@@ -445,12 +445,14 @@ export function UniversalCheckout() {
             basePrice: item.basePrice,
             subcategoryId: item.subcategoryId,
             comboApplied: isComboActive,
-            discountApplied: (pricingInfo?.savings || 0) > 0
+            discountApplied: (pricingInfo?.savings || 0) > 0,
+            inventoryId: item.inventoryId,
+            moqPricingApplied: pricingInfo?.appliedTier === 'discount'
           }
         };
       });
 
-      console.log('📝 Comprehensive order item details to insert:', orderItemDetailsToInsert);
+      console.log('📝 Detailed order items with correct MOQ pricing per inventory ID:', orderItemDetailsToInsert);
 
       const { error: orderItemDetailsError } = await supabase
         .from('customer_order_item_details')
@@ -461,13 +463,13 @@ export function UniversalCheckout() {
         throw orderItemDetailsError;
       }
 
-      console.log('✅ Order completed successfully with all pricing modes supported!');
+      console.log('✅ Order completed successfully with accurate MOQ pricing per inventory ID!');
       
       // Clear cart and show success
       clearCart();
       setOrderId(orderData.id);
       setShowSuccess(true);
-      toast.success('Order placed successfully! All pricing modes and inventory calculations applied correctly.');
+      toast.success('Order placed successfully! MOQ pricing correctly applied and saved to database.');
 
     } catch (error) {
       console.error('💥 Order submission failed:', error);

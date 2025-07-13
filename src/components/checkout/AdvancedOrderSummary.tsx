@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -99,7 +100,7 @@ export function AdvancedOrderSummary({
     return sku;
   };
 
-  // Calculate subtotal from tiered pricing
+  // Calculate subtotal using the tiered pricing from subcategoryPricing
   const subtotal = Object.values(subcategoryPricing).reduce((total, subcategory) => {
     return total + subcategory.itemBreakdown.reduce((subtotal, item) => {
       return subtotal + item.totalPrice;
@@ -112,7 +113,7 @@ export function AdvancedOrderSummary({
     sub.moqReached && !sub.comboActive && sub.totalSavings > 0
   );
 
-  // Get item pricing details
+  // Get item pricing details from subcategory pricing
   const getItemPricingDetails = (item: CartItem) => {
     const pricingInfo = Object.values(subcategoryPricing)
       .find(sub => sub.itemBreakdown.some(breakdown => breakdown.itemId === item.id))
@@ -235,28 +236,25 @@ export function AdvancedOrderSummary({
                           {item.sizeName && <div>Size: {item.sizeName}</div>}
                         </div>
                         
-                        {/* Pricing Details */}
+                        {/* Pricing Details with proper MOQ breakdown */}
                         <div className="mt-2 space-y-1">
                           <div className="flex items-center gap-2 text-sm">
                             <span className="text-gray-600">Qty: {item.quantity}</span>
-                            <span className="text-gray-400">×</span>
-                            <div className="flex items-center gap-1">
-                              <span className="font-medium text-gray-900">Rs. {currentPrice.toFixed(2)}</span>
-                              {savings > 0 && originalPrice !== currentPrice && (
-                                <span className="text-xs text-gray-500 line-through">Rs. {originalPrice.toFixed(2)}</span>
-                              )}
-                            </div>
+                            {pricingInfo?.tierInfo && (
+                              <span className="text-xs text-blue-600 ml-2">
+                                {pricingInfo.tierInfo}
+                              </span>
+                            )}
                           </div>
                           
-                          {/* Pricing Tier Info */}
-                          {pricingInfo?.tierInfo && (
-                            <p className={`text-xs ${
-                              pricingInfo.appliedTier === 'combo' ? 'text-purple-600' : 
-                              pricingInfo.appliedTier === 'discount' ? 'text-green-600' : 'text-blue-600'
-                            }`}>
-                              {pricingInfo.tierInfo}
-                            </p>
-                          )}
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium text-gray-900">Total: Rs. {totalItemPrice.toFixed(2)}</span>
+                            {savings > 0 && (
+                              <span className="text-xs text-gray-500 ml-2">
+                                (Save Rs. {savings.toFixed(2)})
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       
@@ -281,91 +279,9 @@ export function AdvancedOrderSummary({
           })}
         </div>
 
-        {/* Subcategory Breakdown (Advanced View) */}
-        {Object.keys(subcategoryPricing).length > 1 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium text-gray-900 text-sm">Pricing Breakdown by Category</h4>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  const allExpanded = Object.keys(subcategoryPricing).every(id => showDetails[id]);
-                  const newState: { [key: string]: boolean } = {};
-                  Object.keys(subcategoryPricing).forEach(id => {
-                    newState[id] = !allExpanded;
-                  });
-                  setShowDetails(newState);
-                }}
-                className="text-xs"
-              >
-                {Object.keys(subcategoryPricing).every(id => showDetails[id]) ? 'Collapse All' : 'Expand All'}
-              </Button>
-            </div>
-            
-            {Object.values(subcategoryPricing).map((subcategory) => (
-              <div key={subcategory.subcategoryId} className="border rounded-lg p-3 bg-blue-50">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <h5 className="font-medium text-gray-900 text-sm">
-                      Category ({subcategory.totalQuantity} items)
-                    </h5>
-                    {subcategory.comboActive ? (
-                      <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
-                        <Star className="h-3 w-3 mr-1" />
-                        Combo Price
-                      </Badge>
-                    ) : subcategory.moqReached && subcategory.totalSavings > 0 ? (
-                      <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                        <TrendingDown className="h-3 w-3 mr-1" />
-                        Volume Discount
-                      </Badge>
-                    ) : subcategory.moqReached ? (
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
-                        MOQ Reached
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleDetails(subcategory.subcategoryId)}
-                  >
-                    {showDetails[subcategory.subcategoryId] ? (
-                      <ChevronUp className="h-4 w-4" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-                
-                <p className="text-xs text-gray-600 mb-2">{subcategory.description}</p>
-                
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium">Category Total:</span>
-                  <span className="font-semibold">
-                    Rs. {subcategory.itemBreakdown.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(2)}
-                  </span>
-                </div>
-                
-                {subcategory.totalSavings > 0 && (
-                  <div className={`flex justify-between text-sm ${
-                    subcategory.comboActive ? 'text-purple-600' : 'text-green-600'
-                  }`}>
-                    <span>
-                      {subcategory.comboActive ? 'Combo Savings:' : 'Volume Discount Savings:'}
-                    </span>
-                    <span>-Rs. {subcategory.totalSavings.toFixed(2)}</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
         <Separator />
 
-        {/* Summary totals */}
+        {/* Summary totals using correct subtotal from tiered pricing */}
         <div className="space-y-3">
           <div className="flex justify-between text-sm">
             <span>Subtotal</span>
