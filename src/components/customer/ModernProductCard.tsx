@@ -376,7 +376,7 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
   return (
     <Card className="group h-full flex flex-col overflow-hidden bg-gradient-to-br from-card via-card to-card/80 shadow-lg hover:shadow-xl transition-all duration-500 border border-border/50 hover:border-primary/20 rounded-xl backdrop-blur-sm">
       {/* Product Image - Enhanced 16:9 Aspect Ratio */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-muted/30 to-muted/60 rounded-t-xl" style={{ aspectRatio: '16/9' }}>
+      <div className="relative overflow-hidden bg-gradient-to-br from-muted/30 to-muted/60 rounded-t-xl h-48" style={{ aspectRatio: '16/9' }}>
         {currentImage ? (
           <img
             src={currentImage}
