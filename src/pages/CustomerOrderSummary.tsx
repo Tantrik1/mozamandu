@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Package, Phone, Mail, MapPin, Calendar, CreditCard } from 'lucide-react';
+import { ArrowLeft, Package, Phone, Mail, MapPin, Calendar, CreditCard, Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
@@ -46,6 +45,12 @@ interface OrderItem {
   unit_price: number;
   total_price: number;
   pricing_mode: string;
+  sku?: string;
+  pricing_details?: {
+    savings: number;
+    tierInfo?: string;
+    basePrice?: number;
+  };
 }
 
 export default function CustomerOrderSummary() {
@@ -122,6 +127,15 @@ export default function CustomerOrderSummary() {
     return status.replace('_', ' ').toUpperCase();
   };
 
+  const getPricingModeDisplay = (mode: string) => {
+    switch (mode) {
+      case 'combo': return { text: 'Combo Price', color: 'bg-purple-100 text-purple-800' };
+      case 'discount': return { text: 'MOQ Discount', color: 'bg-green-100 text-green-800' };
+      case 'moq_discount': return { text: 'MOQ Discount', color: 'bg-green-100 text-green-800' };
+      default: return { text: 'Normal Price', color: 'bg-gray-100 text-gray-800' };
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -176,9 +190,17 @@ export default function CustomerOrderSummary() {
               <h1 className="text-3xl font-bold text-gray-900">Order Details</h1>
               <p className="text-gray-600">Order #{orderDetails.order_number}</p>
             </div>
-            <Badge className={getStatusColor(orderDetails.status)}>
-              {getStatusText(orderDetails.status)}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className={getStatusColor(orderDetails.status)}>
+                {getStatusText(orderDetails.status)}
+              </Badge>
+              {orderDetails.combo_applied && (
+                <Badge className="bg-purple-100 text-purple-800">
+                  <Star className="h-3 w-3 mr-1" />
+                  Combo Applied
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
 
@@ -195,30 +217,105 @@ export default function CustomerOrderSummary() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {orderItems.map((item) => (
-                    <div key={item.id} className="flex justify-between items-start py-4 border-b last:border-b-0">
-                      <div className="flex-1">
-                        <h4 className="font-medium">{item.product_name}</h4>
-                        {item.color_name && (
-                          <p className="text-sm text-gray-600">Color: {item.color_name}</p>
-                        )}
-                        {item.size_name && (
-                          <p className="text-sm text-gray-600">Size: {item.size_name}</p>
-                        )}
-                        <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
-                        {item.pricing_mode !== 'normal' && (
-                          <Badge variant="secondary" className="mt-1">
-                            {item.pricing_mode === 'combo' ? 'Combo Price' : 'Discount Applied'}
-                          </Badge>
-                        )}
+                  {orderItems.map((item) => {
+                    const pricingMode = getPricingModeDisplay(item.pricing_mode);
+                    return (
+                      <div key={item.id} className="flex justify-between items-start py-4 border-b last:border-b-0">
+                        <div className="flex-1">
+                          <h4 className="font-medium">{item.product_name}</h4>
+                          {item.color_name && (
+                            <p className="text-sm text-gray-600">Color: {item.color_name}</p>
+                          )}
+                          {item.size_name && (
+                            <p className="text-sm text-gray-600">Size: {item.size_name}</p>
+                          )}
+                          {item.sku && (
+                            <p className="text-sm text-gray-500">SKU: {item.sku}</p>
+                          )}
+                          <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                          
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="secondary" className={pricingMode.color}>
+                              {pricingMode.text}
+                            </Badge>
+                            {item.pricing_details?.savings > 0 && (
+                              <span className="text-sm text-green-600">
+                                Saved Rs. {item.pricing_details.savings.toFixed(2)}
+                              </span>
+                            )}
+                          </div>
+                          
+                          {item.pricing_details?.tierInfo && (
+                            <p className="text-xs text-blue-600 mt-1">
+                              {item.pricing_details.tierInfo}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">Rs. {item.total_price.toFixed(2)}</p>
+                          <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
+                          {item.pricing_details?.basePrice && item.pricing_details.basePrice !== item.unit_price && (
+                            <p className="text-xs text-gray-500 line-through">
+                              Rs. {item.pricing_details.basePrice.toFixed(2)} base
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold">Rs. {item.total_price.toFixed(2)}</p>
-                        <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+                
+                {/* Pricing Breakdown Summary */}
+                {orderDetails.pricing_breakdown && (
+                  <div className="mt-6 pt-4 border-t">
+                    <h5 className="font-medium text-gray-900 mb-3">Pricing Breakdown</h5>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                      {orderDetails.pricing_breakdown.pricingMode === 'combo' && orderDetails.pricing_breakdown.comboInfo && (
+                        <div className="bg-purple-50 border border-purple-200 rounded p-3 mb-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Star className="h-4 w-4 text-purple-600" />
+                            <span className="font-medium text-purple-800">
+                              {orderDetails.pricing_breakdown.comboInfo.combo.name}
+                            </span>
+                          </div>
+                          <p className="text-sm text-purple-700">
+                            {orderDetails.pricing_breakdown.comboInfo.combo.description}
+                          </p>
+                          <p className="text-xs text-purple-600 mt-1">
+                            Total combo savings: Rs. {orderDetails.pricing_breakdown.comboInfo.totalComboSavings.toFixed(2)}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {orderDetails.pricing_breakdown.pricingMode === 'moq_discount' && orderDetails.pricing_breakdown.tieredSavings > 0 && (
+                        <div className="bg-green-50 border border-green-200 rounded p-3 mb-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Package className="h-4 w-4 text-green-600" />
+                            <span className="font-medium text-green-800">MOQ Discount Applied</span>
+                          </div>
+                          <p className="text-sm text-green-700">
+                            You reached the minimum order quantity and received tiered pricing discounts.
+                          </p>
+                          <p className="text-xs text-green-600 mt-1">
+                            Total MOQ savings: Rs. {orderDetails.pricing_breakdown.tieredSavings.toFixed(2)}
+                          </p>
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-between text-sm">
+                        <span>Items Subtotal:</span>
+                        <span>Rs. {orderDetails.pricing_breakdown.tieredSubtotal?.toFixed(2) || orderDetails.subtotal.toFixed(2)}</span>
+                      </div>
+                      
+                      {(orderDetails.pricing_breakdown.tieredSavings > 0 || orderDetails.pricing_breakdown.comboInfo?.totalComboSavings > 0) && (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span>Pricing Discounts:</span>
+                          <span>-Rs. {(orderDetails.pricing_breakdown.tieredSavings || orderDetails.pricing_breakdown.comboInfo?.totalComboSavings || 0).toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
