@@ -84,12 +84,19 @@ export function CleanOrderSummary({
   onSubmitOrder,
   comboInfo
 }: CleanOrderSummaryProps) {
-  // Calculate subtotal using the exact same logic as cart
+  // Calculate subtotal using exact same logic as cart
   const subtotal = Object.values(subcategoryPricing).reduce((total, subcategory) => {
     return total + subcategory.itemBreakdown.reduce((subtotal, item) => {
       return subtotal + item.totalPrice;
     }, 0);
   }, 0);
+
+  console.log('🧮 Checkout Pricing Debug:', {
+    subtotal,
+    subcategoryPricing,
+    totalSavings,
+    finalTotal
+  });
 
   // Check pricing modes
   const hasActiveCombo = comboInfo && Object.values(subcategoryPricing).some(sub => sub.comboActive);
@@ -97,7 +104,7 @@ export function CleanOrderSummary({
     sub.moqReached && !sub.comboActive && sub.totalSavings > 0
   );
 
-  // Get item pricing details from subcategory pricing
+  // Get item pricing details - exact same as cart
   const getItemPricingDetails = (item: CartItem) => {
     const pricingInfo = Object.values(subcategoryPricing)
       .find(sub => sub.itemBreakdown.some(breakdown => breakdown.itemId === item.id))
@@ -121,13 +128,13 @@ export function CleanOrderSummary({
             {hasMOQDiscounts && !hasActiveCombo && (
               <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
                 <TrendingDown className="h-3 w-3 mr-1" />
-                Volume Discount
+                MOQ Discount
               </Badge>
             )}
           </div>
         </CardTitle>
 
-        {/* Combo/MOQ Banner */}
+        {/* Combo/MOQ Banner - exact same as cart */}
         {hasActiveCombo && comboInfo && (
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mt-2">
             <div className="flex items-center space-x-2 mb-1">
@@ -144,20 +151,20 @@ export function CleanOrderSummary({
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-2">
             <div className="flex items-center space-x-2 mb-1">
               <TrendingDown className="h-4 w-4 text-green-600" />
-              <span className="font-semibold text-green-800">Volume Discount Applied</span>
+              <span className="font-semibold text-green-800">MOQ Discount Applied</span>
             </div>
             <p className="text-sm text-green-700">
               You've reached the minimum order quantity for volume pricing!
             </p>
             <p className="text-xs text-green-600 mt-1">
-              Total volume savings: Rs. {totalSavings.toFixed(2)}
+              Total savings: Rs. {totalSavings.toFixed(2)}
             </p>
           </div>
         )}
       </CardHeader>
       
       <CardContent className="space-y-6">
-        {/* Cart Items Display */}
+        {/* Cart Items Display - exact same format as cart */}
         <div className="space-y-4">
           <h3 className="font-medium text-gray-900 text-sm mb-3">
             Items in Your Order ({cartItems.length})
@@ -195,7 +202,7 @@ export function CleanOrderSummary({
                           <div>Qty: {item.quantity}</div>
                         </div>
                         
-                        {/* Pricing tier info - exactly like cart */}
+                        {/* Pricing tier info - EXACT same as cart */}
                         {pricingInfo?.tierInfo && (
                           <div className="text-xs text-blue-600 mb-2">
                             {pricingInfo.tierInfo}
@@ -213,7 +220,7 @@ export function CleanOrderSummary({
                           {pricingInfo?.appliedTier === 'discount' && (
                             <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
                               <TrendingDown className="h-3 w-3 mr-1" />
-                              Volume Discount
+                              MOQ Discount
                             </Badge>
                           )}
                         </div>
@@ -252,7 +259,7 @@ export function CleanOrderSummary({
 
         <Separator />
 
-        {/* Summary totals */}
+        {/* Summary totals - exact same as cart */}
         <div className="space-y-3">
           <div className="flex justify-between text-sm">
             <span>Subtotal</span>
@@ -275,7 +282,7 @@ export function CleanOrderSummary({
             <div className={`flex justify-between text-sm ${
               hasActiveCombo ? 'text-purple-600' : 'text-green-600'
             }`}>
-              <span>{hasActiveCombo ? 'Combo Savings' : 'Volume Discount Savings'}</span>
+              <span>{hasActiveCombo ? 'Combo Savings' : 'MOQ Discount Savings'}</span>
               <span>-Rs. {totalSavings.toFixed(2)}</span>
             </div>
           )}
@@ -292,7 +299,7 @@ export function CleanOrderSummary({
               hasActiveCombo ? 'text-purple-600' : 'text-green-600'
             }`}>
               You saved Rs. {(totalSavings + promoDiscount).toFixed(2)} total!
-              {hasActiveCombo ? ' (includes combo savings)' : ' (includes volume discounts)'}
+              {hasActiveCombo ? ' (includes combo savings)' : ' (includes MOQ discounts)'}
             </div>
           )}
         </div>
