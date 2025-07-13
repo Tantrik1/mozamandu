@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { usePromoCode } from '@/hooks/usePromoCode';
 import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
+import { useInventoryManager } from '@/hooks/useInventoryManager';
 import { toast } from 'sonner';
 
 interface CustomerInfo {
@@ -77,11 +77,13 @@ interface DiscountTier {
 
 export function UniversalCheckout() {
   const { user } = useAuth();
+  const { getInventoryRecord } = useInventoryManager();
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
     name: '',
     email: '',
     phone: '',
-    address: ''
+    address: '',
+    contact: ''
   });
   const [deliveryLocations, setDeliveryLocations] = useState<DeliveryLocation[]>([]);
   const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocation | null>(null);
@@ -256,6 +258,29 @@ export function UniversalCheckout() {
         return;
       }
 
+      // Get inventory records for all cart items
+      const cartItemsWithInventory = await Promise.all(
+        cartItems.map(async (item) => {
+          const inventoryRecord = await getInventoryRecord(
+            item.productId,
+            item.colorVariantId,
+            item.sizeVariantId
+          );
+          
+          if (!inventoryRecord) {
+            throw new Error(`Inventory record not found for ${item.productName}`);
+          }
+
+          return {
+            ...item,
+            inventoryId: inventoryRecord.id,
+            sku: inventoryRecord.sku
+          };
+        })
+      );
+
+      console.log('📦 Cart items with inventory:', cartItemsWithInventory);
+
       const tieredSubtotal = getTotalPrice();
       const tieredSavings = getTotalSavings();
       const comboInfo = getComboInfo();
@@ -353,7 +378,7 @@ export function UniversalCheckout() {
       console.log('✅ Order created successfully:', orderData);
 
       // Insert order items (basic info only)
-      const orderItemsToInsert = cartItems.map(item => ({
+      const orderItemsToInsert = cartItemsWithInventory.map(item => ({
         order_id: orderData.id,
         product_id: item.productId,
         quantity: item.quantity
@@ -368,19 +393,19 @@ export function UniversalCheckout() {
         throw orderItemsError;
       }
 
-      // Insert detailed order item information with pricing details
-      const orderItemDetailsToInsert = cartItems.map(item => {
+      // Insert detailed order item information with pricing details and inventory info
+      const orderItemDetailsToInsert = cartItemsWithInventory.map(item => {
         const pricingInfo = Object.values(subcategoryPricing)
           .find(sub => sub.itemBreakdown.some(breakdown => breakdown.itemId === item.id))
           ?.itemBreakdown.find(breakdown => breakdown.itemId === item.id);
 
         return {
           order_id: orderData.id,
-          product_inventory_id: item.inventoryId || null,
+          product_inventory_id: item.inventoryId,
           product_name: item.productName,
           color_name: item.colorName || null,
           size_name: item.sizeName || null,
-          sku: item.sku || null,
+          sku: item.sku,
           quantity: item.quantity,
           unit_price: pricingInfo?.unitPrice || item.basePrice,
           total_price: pricingInfo?.totalPrice || (item.basePrice * item.quantity),
@@ -412,7 +437,7 @@ export function UniversalCheckout() {
       clearCart();
       setOrderId(orderData.id);
       setShowSuccess(true);
-      toast.success('Order placed successfully!');
+      toast.success('Order placed successfully! Stock will be reserved when payment is confirmed.');
 
     } catch (error) {
       console.error('💥 Order submission failed:', error);

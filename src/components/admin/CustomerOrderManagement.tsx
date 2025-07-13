@@ -1,15 +1,12 @@
 
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
-import { Eye, RefreshCw, Search } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
+import { useInventoryManager } from '@/hooks/useInventoryManager';
+import { Eye, CheckCircle, XCircle, Package, Truck } from 'lucide-react';
 
 interface CustomerOrder {
   id: string;
@@ -17,54 +14,41 @@ interface CustomerOrder {
   customer_name: string;
   customer_email: string;
   contact_number: string;
+  delivery_address: string;
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;
-  status: 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled';
+  status: string;
   created_at: string;
-  user_id: string;
+  payment_screenshot_url?: string;
 }
 
 export function CustomerOrderManagement() {
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const navigate = useNavigate();
+  const [selectedOrder, setSelectedOrder] = useState<CustomerOrder | null>(null);
+  const { toast } = useToast();
+  const { reserveStock, releaseStock, fulfillStock } = useInventoryManager();
 
   useEffect(() => {
-    fetchCustomerOrders();
+    fetchOrders();
   }, []);
 
-  const fetchCustomerOrders = async () => {
-    setLoading(true);
+  const fetchOrders = async () => {
     try {
-      console.log('Fetching customer orders...');
-      
-      const { data: ordersData, error: ordersError } = await supabase
+      const { data, error } = await supabase
         .from('customer_orders')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (ordersError) {
-        console.error('Error fetching customer orders:', ordersError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch customer orders: " + ordersError.message,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('Fetched customer orders count:', ordersData?.length || 0);
-      setOrders(ordersData || []);
+      if (error) throw error;
+      setOrders(data || []);
     } catch (error) {
-      console.error('Unexpected error fetching customer orders:', error);
+      console.error('Error fetching orders:', error);
       toast({
-        title: "Error",
-        description: "Failed to load customer orders. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to fetch orders',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -72,302 +56,244 @@ export function CustomerOrderManagement() {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return;
-
-    const oldStatus = order.status;
-    
-    setUpdating(orderId);
     try {
-      console.log('Updating customer order status:', orderId, 'to', newStatus);
-      
       const { error } = await supabase
         .from('customer_orders')
         .update({ 
-          status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled', 
-          updated_at: new Date().toISOString() 
+          status: newStatus,
+          updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
 
-      if (error) {
-        console.error('Error updating customer order status:', error);
-        toast({
-          title: "Error",
-          description: "Failed to update order status: " + error.message,
-          variant: "destructive",
-        });
-        return;
-      }
+      if (error) throw error;
 
-      console.log('Customer order status updated successfully');
-      toast({
-        title: "Success",
-        description: "Order status updated successfully",
-      });
-      
-      setOrders(prev => prev.map(order => 
-        order.id === orderId 
-          ? { ...order, status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled' }
-          : order
-      ));
-
-      // Send status update email
-      try {
-        console.log('Sending customer order status update email...');
-        const { error: emailError } = await supabase.functions.invoke('send-order-email', {
-          body: {
-            type: 'status_updated',
-            orderId: orderId,
-            isCustomerOrder: true, // This is for customer orders
-            oldStatus: oldStatus,
-            newStatus: newStatus
-          }
-        });
-
-        if (emailError) {
-          console.error('Status update email failed:', emailError);
-        } else {
-          console.log('Status update email sent successfully');
+      // Handle inventory operations based on status change
+      if (newStatus === 'confirmed' || newStatus === 'processing') {
+        console.log('🔒 Reserving stock for order:', orderId);
+        try {
+          await reserveStock(orderId);
+          toast({
+            title: 'Success',
+            description: 'Order status updated and stock reserved successfully',
+          });
+        } catch (stockError) {
+          console.error('Stock reservation failed:', stockError);
+          toast({
+            title: 'Warning',
+            description: 'Order updated but stock reservation failed. Please check inventory.',
+            variant: 'destructive',
+          });
         }
-      } catch (emailError) {
-        console.error('Email sending error:', emailError);
+      } else if (newStatus === 'delivered') {
+        console.log('📦 Fulfilling stock for order:', orderId);
+        try {
+          await fulfillStock(orderId);
+          toast({
+            title: 'Success',
+            description: 'Order delivered and inventory updated successfully',
+          });
+        } catch (stockError) {
+          console.error('Stock fulfillment failed:', stockError);
+          toast({
+            title: 'Warning',
+            description: 'Order marked as delivered but inventory update failed.',
+            variant: 'destructive',
+          });
+        }
+      } else if (newStatus === 'cancelled') {
+        console.log('🔓 Releasing reserved stock for order:', orderId);
+        try {
+          await releaseStock(orderId);
+          toast({
+            title: 'Success',
+            description: 'Order cancelled and reserved stock released',
+          });
+        } catch (stockError) {
+          console.error('Stock release failed:', stockError);
+          toast({
+            title: 'Warning',
+            description: 'Order cancelled but stock release failed.',
+            variant: 'destructive',
+          });
+        }
+      } else {
+        toast({
+          title: 'Success',
+          description: 'Order status updated successfully',
+        });
       }
 
+      fetchOrders();
     } catch (error) {
-      console.error('Unexpected error updating customer order status:', error);
+      console.error('Error updating order status:', error);
       toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to update order status',
+        variant: 'destructive',
       });
-    } finally {
-      setUpdating(null);
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
-      case 'payment_confirmed': return 'bg-blue-100 text-blue-800';
-      case 'on_delivery': return 'bg-purple-100 text-purple-800';
-      case 'delivered': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'pending_payment':
+        return 'secondary';
+      case 'confirmed':
+        return 'default';
+      case 'processing':
+        return 'default';
+      case 'shipped':
+        return 'default';
+      case 'delivered':
+        return 'default';
+      case 'cancelled':
+        return 'destructive';
+      default:
+        return 'secondary';
     }
   };
 
-  const handleViewOrder = (orderId: string) => {
-    navigate(`/customer-order-summary/${orderId}`);
+  const getStatusActions = (order: CustomerOrder) => {
+    const actions = [];
+    
+    switch (order.status) {
+      case 'pending_payment':
+        actions.push(
+          <Button
+            key="confirm"
+            size="sm"
+            onClick={() => updateOrderStatus(order.id, 'confirmed')}
+            className="mr-2"
+          >
+            <CheckCircle className="h-4 w-4 mr-1" />
+            Confirm Payment
+          </Button>
+        );
+        actions.push(
+          <Button
+            key="cancel"
+            size="sm"
+            variant="destructive"
+            onClick={() => updateOrderStatus(order.id, 'cancelled')}
+          >
+            <XCircle className="h-4 w-4 mr-1" />
+            Cancel
+          </Button>
+        );
+        break;
+      case 'confirmed':
+        actions.push(
+          <Button
+            key="process"
+            size="sm"
+            onClick={() => updateOrderStatus(order.id, 'processing')}
+            className="mr-2"
+          >
+            <Package className="h-4 w-4 mr-1" />
+            Start Processing
+          </Button>
+        );
+        break;
+      case 'processing':
+        actions.push(
+          <Button
+            key="ship"
+            size="sm"
+            onClick={() => updateOrderStatus(order.id, 'shipped')}
+            className="mr-2"
+          >
+            <Truck className="h-4 w-4 mr-1" />
+            Mark as Shipped
+          </Button>
+        );
+        break;
+      case 'shipped':
+        actions.push(
+          <Button
+            key="deliver"
+            size="sm"
+            onClick={() => updateOrderStatus(order.id, 'delivered')}
+            className="mr-2"
+          >
+            <CheckCircle className="h-4 w-4 mr-1" />
+            Mark as Delivered
+          </Button>
+        );
+        break;
+    }
+    
+    return actions;
   };
-
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.customer_email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  const getOrderStats = () => {
-    const totalOrders = orders.length;
-    const pendingPayment = orders.filter(o => o.status === 'pending_payment').length;
-    const confirmed = orders.filter(o => o.status === 'payment_confirmed').length;
-    const onDelivery = orders.filter(o => o.status === 'on_delivery').length;
-    const delivered = orders.filter(o => o.status === 'delivered').length;
-    const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total_amount), 0);
-
-    return { totalOrders, pendingPayment, confirmed, onDelivery, delivered, totalRevenue };
-  };
-
-  const stats = getOrderStats();
 
   if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center">
-        <RefreshCw className="h-6 w-6 animate-spin mr-2" />
-        Loading customer orders...
-      </div>
-    );
+    return <div className="flex justify-center p-8">Loading orders...</div>;
   }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Customer Order Management</h1>
-        <Button onClick={fetchCustomerOrders} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <h2 className="text-2xl font-bold">Customer Order Management</h2>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalOrders}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Pending Payment</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.pendingPayment}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Confirmed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.confirmed}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">On Delivery</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{stats.onDelivery}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Delivered</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.delivered}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">Rs. {stats.totalRevenue.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search by order number, customer name, or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="pending_payment">Pending Payment</SelectItem>
-            <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
-            <SelectItem value="on_delivery">On Delivery</SelectItem>
-            <SelectItem value="delivered">Delivered</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Orders Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Customer Orders ({filteredOrders.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order #</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Paid</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-medium">{order.order_number}</TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{order.customer_name}</p>
-                      <p className="text-sm text-gray-600">{order.customer_email}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>Rs. {Number(order.total_amount).toFixed(2)}</TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="text-green-600">Rs. {Number(order.paid_amount).toFixed(2)}</p>
-                      {order.remaining_amount > 0 && (
-                        <p className="text-sm text-orange-600">
-                          Remaining: Rs. {Number(order.remaining_amount).toFixed(2)}
-                        </p>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={order.status}
-                      onValueChange={(value) => updateOrderStatus(order.id, value)}
-                      disabled={updating === order.id}
-                    >
-                      <SelectTrigger className="w-40">
-                        <SelectValue>
-                          <Badge className={getStatusColor(order.status)}>
-                            {updating === order.id ? (
-                              <RefreshCw className="h-3 w-3 animate-spin mr-1" />
-                            ) : null}
-                            {order.status.replace('_', ' ')}
-                          </Badge>
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                        <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
-                        <SelectItem value="on_delivery">On Delivery</SelectItem>
-                        <SelectItem value="delivered">Delivered</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
+      <div className="grid gap-4">
+        {orders.map((order) => (
+          <Card key={order.id}>
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-lg">{order.order_number}</CardTitle>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {order.customer_name} • {order.customer_email}
+                  </p>
+                  <p className="text-sm text-gray-600">
                     {new Date(order.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewOrder(order.id)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View Details
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredOrders.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                    No customer orders found matching your criteria.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <Badge variant={getStatusColor(order.status)}>
+                    {order.status.replace('_', ' ').toUpperCase()}
+                  </Badge>
+                  <p className="text-lg font-semibold mt-2">Rs {order.total_amount}</p>
+                  {order.remaining_amount > 0 && (
+                    <p className="text-sm text-orange-600">
+                      Remaining: Rs {order.remaining_amount}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-gray-600">
+                    Contact: {order.contact_number}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Address: {order.delivery_address}
+                  </p>
+                </div>
+                <div className="flex space-x-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelectedOrder(order)}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    View Details
+                  </Button>
+                  {getStatusActions(order)}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {orders.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-gray-500">No orders found</p>
+        </div>
+      )}
     </div>
   );
 }
