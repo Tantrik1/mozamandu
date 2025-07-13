@@ -1,6 +1,8 @@
 
+import { useState, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DeliveryCharge {
   id: string;
@@ -8,23 +10,46 @@ interface DeliveryCharge {
   delivery_price: number;
 }
 
-interface FormErrors {
-  [key: string]: string;
-}
-
 interface DeliveryLocationSelectorProps {
-  deliveryCharges: DeliveryCharge[];
-  selectedDelivery: string;
-  setSelectedDelivery: (value: string) => void;
-  formErrors: FormErrors;
+  selectedLocationId: string;
+  onLocationChange: (locationId: string, charge: number) => void;
 }
 
 export function DeliveryLocationSelector({ 
-  deliveryCharges, 
-  selectedDelivery, 
-  setSelectedDelivery, 
-  formErrors 
+  selectedLocationId, 
+  onLocationChange
 }: DeliveryLocationSelectorProps) {
+  const [deliveryCharges, setDeliveryCharges] = useState<DeliveryCharge[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDeliveryCharges();
+  }, []);
+
+  const fetchDeliveryCharges = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_charges')
+        .select('*')
+        .eq('is_active', true)
+        .order('place_name');
+
+      if (error) throw error;
+      setDeliveryCharges(data || []);
+    } catch (error) {
+      console.error('Error fetching delivery charges:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLocationChange = (locationId: string) => {
+    const selectedLocation = deliveryCharges.find(loc => loc.id === locationId);
+    if (selectedLocation) {
+      onLocationChange(locationId, selectedLocation.delivery_price);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -32,9 +57,9 @@ export function DeliveryLocationSelector({
         <CardDescription>Select your delivery area to calculate shipping costs</CardDescription>
       </CardHeader>
       <CardContent>
-        <Select value={selectedDelivery} onValueChange={setSelectedDelivery}>
-          <SelectTrigger className={formErrors.delivery ? 'border-red-500' : ''}>
-            <SelectValue placeholder="Select delivery location" />
+        <Select value={selectedLocationId} onValueChange={handleLocationChange} disabled={loading}>
+          <SelectTrigger>
+            <SelectValue placeholder={loading ? "Loading..." : "Select delivery location"} />
           </SelectTrigger>
           <SelectContent>
             {deliveryCharges.map((delivery) => (
@@ -44,7 +69,6 @@ export function DeliveryLocationSelector({
             ))}
           </SelectContent>
         </Select>
-        {formErrors.delivery && <p className="text-sm text-red-500 mt-1">{formErrors.delivery}</p>}
       </CardContent>
     </Card>
   );

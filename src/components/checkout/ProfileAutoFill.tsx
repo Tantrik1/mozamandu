@@ -3,25 +3,29 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 
-interface ProfileAutoFillProps {
-  onAutoFill: (data: {
-    customerName: string;
-    customerEmail: string;
-    contactNumber: string;
-    whatsappNumber: string;
-  }) => void;
-  isChecked: boolean;
-  onCheckedChange: (checked: boolean) => void;
+interface CheckoutFormData {
+  customerName: string;
+  customerEmail: string;
+  contactNumber: string;
+  whatsappNumber: string;
+  deliveryAddress: string;
+  deliveryLocationId: string;
+  paymentMethodId: string;
+  paymentScreenshotUrl?: string;
+  promocodeUsed?: string;
+  paymentPercentage: number;
 }
 
-export function ProfileAutoFill({ onAutoFill, isChecked, onCheckedChange }: ProfileAutoFillProps) {
+interface ProfileAutoFillProps {
+  onDataFilled: (data: Partial<CheckoutFormData>) => void;
+}
+
+export function ProfileAutoFill({ onDataFilled }: ProfileAutoFillProps) {
   const { user, userProfile } = useAuth();
 
   const handleAutoFill = (checked: boolean) => {
-    onCheckedChange(checked);
-    
     if (checked && user && userProfile) {
-      onAutoFill({
+      onDataFilled({
         customerName: userProfile.full_name || '',
         customerEmail: user.email || '',
         contactNumber: userProfile.contact_number || '',
@@ -39,7 +43,6 @@ export function ProfileAutoFill({ onAutoFill, isChecked, onCheckedChange }: Prof
     <div className="flex items-center space-x-2 p-4 bg-blue-50 rounded-lg border border-blue-200">
       <Checkbox
         id="auto-fill-profile"
-        checked={isChecked}
         onCheckedChange={handleAutoFill}
       />
       <Label htmlFor="auto-fill-profile" className="text-sm font-medium cursor-pointer">
