@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Eye, EyeOff, ChevronDown, ChevronUp, Star } from 'lucide-react';
+import { Loader2, Eye, EyeOff, ChevronDown, ChevronUp, Star, Package } from 'lucide-react';
 
 interface CartItem {
   id: string;
@@ -303,21 +302,33 @@ export function AdvancedOrderSummary({
           )}
         </div>
 
-        {/* Desktop place order button */}
-        <Button
-          onClick={onSubmitOrder}
-          disabled={isSubmitting}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 hidden lg:flex"
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing Order...
-            </>
-          ) : (
-            'Place Order'
+        {/* Desktop place order button - Make it more prominent */}
+        <div className="space-y-4">
+          <Button
+            onClick={onSubmitOrder}
+            disabled={isSubmitting || cartItems.length === 0}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 text-lg hidden lg:flex"
+            size="lg"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Processing Order...
+              </>
+            ) : (
+              <>
+                <Package className="mr-2 h-5 w-5" />
+                Place Order - Rs. {finalTotal.toFixed(2)}
+              </>
+            )}
+          </Button>
+          
+          {cartItems.length === 0 && (
+            <p className="text-center text-sm text-gray-500">
+              Your cart is empty. Add items to place an order.
+            </p>
           )}
-        </Button>
+        </div>
       </CardContent>
     </Card>
   );

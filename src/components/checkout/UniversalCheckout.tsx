@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,7 @@ import { usePromoCode } from '@/hooks/usePromoCode';
 import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
 import { useInventoryManager } from '@/hooks/useInventoryManager';
 import { toast } from 'sonner';
+import { Package, Loader2 } from 'lucide-react';
 
 interface CustomerInfo {
   name: string;
@@ -249,6 +249,27 @@ export function UniversalCheckout() {
       setIsSubmitting(true);
       console.log('🚀 Starting comprehensive order submission process...');
       
+      // Validation checks
+      if (!customerInfo.name.trim()) {
+        toast.error('Please enter your name');
+        return;
+      }
+
+      if (!customerInfo.email.trim()) {
+        toast.error('Please enter your email');
+        return;
+      }
+
+      if (!customerInfo.phone.trim()) {
+        toast.error('Please enter your phone number');
+        return;
+      }
+
+      if (!customerInfo.address.trim()) {
+        toast.error('Please enter your delivery address');
+        return;
+      }
+
       if (!deliveryLocation) {
         toast.error('Please select a delivery location');
         return;
@@ -466,66 +487,101 @@ export function UniversalCheckout() {
   }
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-8 pb-32">
       <h1 className="text-2xl font-bold mb-4">Universal Checkout - All Pricing Modes</h1>
 
-      <Card className="mb-6">
-        <CardContent className="grid md:grid-cols-2 gap-4">
-          <CustomerInfoForm
-            customerInfo={customerInfo}
-            setCustomerInfo={setCustomerInfo}
-            deliveryLocations={deliveryLocations}
-            deliveryLocation={deliveryLocation}
-            setDeliveryLocation={setDeliveryLocation}
+      <div className="grid lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
+          <Card>
+            <CardContent className="p-6">
+              <CustomerInfoForm
+                customerInfo={customerInfo}
+                setCustomerInfo={setCustomerInfo}
+                deliveryLocations={deliveryLocations}
+                deliveryLocation={deliveryLocation}
+                setDeliveryLocation={setDeliveryLocation}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <PaymentMethodSection
+                paymentMethods={paymentMethods}
+                selectedPayment={paymentMethod?.id || ''}
+                setSelectedPayment={(value) => {
+                  const method = paymentMethods.find(m => m.id === value);
+                  setPaymentMethod(method || null);
+                }}
+                paymentType={paymentPercentage === 100 ? 'full' : 'partial'}
+                onPaymentTypeChange={(type) => {
+                  setPaymentPercentage(type === 'full' ? 100 : 20);
+                }}
+                paidAmount={Math.round(finalTotal * (paymentPercentage / 100)).toString()}
+                setPaidAmount={(value) => {
+                  const amount = parseFloat(value);
+                  const percentage = (amount / finalTotal) * 100;
+                  setPaymentPercentage(Math.min(100, Math.max(20, percentage)));
+                }}
+                paymentScreenshot={null}
+                setPaymentScreenshot={() => {}}
+                finalTotal={finalTotal}
+                minimumPayment={finalTotal * 0.2}
+                formErrors={{}}
+                uploadingScreenshot={false}
+              />
+            </CardContent>
+          </Card>
+
+          <PromoCodeSection
+            promoCode={promoCode}
+            setPromoCode={setPromoCode}
+            appliedPromo={appliedPromo}
+            isPromoApplied={isPromoApplied}
+            onApplyPromo={() => handlePromoCodeApplied(appliedPromo!)}
+            onRemovePromo={handlePromoCodeRemoved}
           />
-          <PaymentMethodSection
-            paymentMethods={paymentMethods}
-            selectedPayment={paymentMethod?.id || ''}
-            setSelectedPayment={(value) => {
-              const method = paymentMethods.find(m => m.id === value);
-              setPaymentMethod(method || null);
-            }}
-            paymentType={paymentPercentage === 100 ? 'full' : 'partial'}
-            onPaymentTypeChange={(type) => {
-              setPaymentPercentage(type === 'full' ? 100 : 20);
-            }}
-            paidAmount={Math.round(finalTotal * (paymentPercentage / 100)).toString()}
-            setPaidAmount={(value) => {
-              const amount = parseFloat(value);
-              const percentage = (amount / finalTotal) * 100;
-              setPaymentPercentage(Math.min(100, Math.max(20, percentage)));
-            }}
-            paymentScreenshot={null}
-            setPaymentScreenshot={() => {}}
+        </div>
+
+        <div className="space-y-6">
+          <AdvancedOrderSummary
+            cartItems={cartItems}
+            subcategoryPricing={subcategoryPricing}
+            deliveryCharge={deliveryLocation ? deliveryLocation.delivery_price : 0}
+            promoCode={appliedPromo}
+            promoDiscount={promoDiscount}
+            totalSavings={totalSavings}
             finalTotal={finalTotal}
-            minimumPayment={finalTotal * 0.2}
-            formErrors={{}}
-            uploadingScreenshot={false}
+            isSubmitting={isSubmitting}
+            onSubmitOrder={handleSubmitOrder}
+            comboInfo={getComboInfo()}
           />
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <PromoCodeSection
-        promoCode={promoCode}
-        setPromoCode={setPromoCode}
-        appliedPromo={appliedPromo}
-        isPromoApplied={isPromoApplied}
-        onApplyPromo={() => handlePromoCodeApplied(appliedPromo!)}
-        onRemovePromo={handlePromoCodeRemoved}
-      />
-
-      <AdvancedOrderSummary
-        cartItems={cartItems}
-        subcategoryPricing={subcategoryPricing}
-        deliveryCharge={deliveryLocation ? deliveryLocation.delivery_price : 0}
-        promoCode={appliedPromo}
-        promoDiscount={promoDiscount}
-        totalSavings={totalSavings}
-        finalTotal={finalTotal}
-        isSubmitting={isSubmitting}
-        onSubmitOrder={handleSubmitOrder}
-        comboInfo={getComboInfo()}
-      />
+      {/* Fixed Bottom Checkout Button for Mobile */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 lg:hidden z-50">
+        <div className="container mx-auto">
+          <Button
+            onClick={handleSubmitOrder}
+            disabled={isSubmitting || cartItems.length === 0}
+            className="w-full h-12 text-base font-semibold bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 transition-colors duration-200"
+            size="lg"
+          >
+            {isSubmitting ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Processing Order...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Place Order - Rs. {finalTotal.toFixed(2)}
+              </div>
+            )}
+          </Button>
+        </div>
+      </div>
 
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-500">
