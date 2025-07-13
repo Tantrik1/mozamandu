@@ -18,7 +18,7 @@ interface CustomerOrder {
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;
-  status: 'pending_payment' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled';
   created_at: string;
   payment_screenshot_url?: string;
 }
@@ -55,7 +55,7 @@ export function CustomerOrderManagement() {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: 'pending_payment' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled') => {
+  const updateOrderStatus = async (orderId: string, newStatus: 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled') => {
     try {
       const { error } = await supabase
         .from('customer_orders')
@@ -68,7 +68,7 @@ export function CustomerOrderManagement() {
       if (error) throw error;
 
       // Handle inventory operations based on status change
-      if (newStatus === 'confirmed' || newStatus === 'processing') {
+      if (newStatus === 'payment_confirmed') {
         console.log('🔒 Reserving stock for order:', orderId);
         try {
           await reserveStock(orderId);
@@ -138,11 +138,9 @@ export function CustomerOrderManagement() {
     switch (status) {
       case 'pending_payment':
         return 'secondary';
-      case 'confirmed':
+      case 'payment_confirmed':
         return 'default';
-      case 'processing':
-        return 'default';
-      case 'shipped':
+      case 'on_delivery':
         return 'default';
       case 'delivered':
         return 'default';
@@ -162,7 +160,7 @@ export function CustomerOrderManagement() {
           <Button
             key="confirm"
             size="sm"
-            onClick={() => updateOrderStatus(order.id, 'confirmed')}
+            onClick={() => updateOrderStatus(order.id, 'payment_confirmed')}
             className="mr-2"
           >
             <CheckCircle className="h-4 w-4 mr-1" />
@@ -181,33 +179,20 @@ export function CustomerOrderManagement() {
           </Button>
         );
         break;
-      case 'confirmed':
-        actions.push(
-          <Button
-            key="process"
-            size="sm"
-            onClick={() => updateOrderStatus(order.id, 'processing')}
-            className="mr-2"
-          >
-            <Package className="h-4 w-4 mr-1" />
-            Start Processing
-          </Button>
-        );
-        break;
-      case 'processing':
+      case 'payment_confirmed':
         actions.push(
           <Button
             key="ship"
             size="sm"
-            onClick={() => updateOrderStatus(order.id, 'shipped')}
+            onClick={() => updateOrderStatus(order.id, 'on_delivery')}
             className="mr-2"
           >
             <Truck className="h-4 w-4 mr-1" />
-            Mark as Shipped
+            Mark as On Delivery
           </Button>
         );
         break;
-      case 'shipped':
+      case 'on_delivery':
         actions.push(
           <Button
             key="deliver"
