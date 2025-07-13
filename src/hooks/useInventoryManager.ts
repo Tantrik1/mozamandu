@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getDetailedProductStock, ProductStockSummary, getVariantStock, VariantStock } from '@/utils/stockCalculation';
@@ -158,47 +159,60 @@ export function useInventoryManager() {
     }
   };
 
-  // Enhanced function to get inventory record for cart items with validation
+  // Enhanced function to get inventory record with better error handling
   const getInventoryRecord = async (
     productId: string,
     colorVariantId?: string,
     sizeVariantId?: string
   ) => {
     try {
-      console.log('🔍 Getting inventory record for:', { productId, colorVariantId, sizeVariantId });
+      console.log('🔍 Getting inventory record for:', { 
+        productId, 
+        colorVariantId: colorVariantId || 'null', 
+        sizeVariantId: sizeVariantId || 'null' 
+      });
       
-      // Build the query dynamically to handle null values properly
+      // Build the query step by step with proper null handling
       let query = supabase
         .from('product_inventory')
         .select('*')
-        .eq('product_id', productId);
+        .eq('product_id', productId)
+        .eq('is_active', true);
 
-      // Handle color variant ID - use is.null() for undefined/null values
-      if (colorVariantId && colorVariantId !== 'undefined') {
+      // Handle color variant - be very explicit about null handling
+      if (colorVariantId && colorVariantId !== 'undefined' && colorVariantId !== 'null') {
         query = query.eq('color_variant_id', colorVariantId);
       } else {
         query = query.is('color_variant_id', null);
       }
 
-      // Handle size variant ID - use is.null() for undefined/null values  
-      if (sizeVariantId && sizeVariantId !== 'undefined') {
+      // Handle size variant - be very explicit about null handling
+      if (sizeVariantId && sizeVariantId !== 'undefined' && sizeVariantId !== 'null') {
         query = query.eq('size_variant_id', sizeVariantId);
       } else {
         query = query.is('size_variant_id', null);
       }
 
-      const { data, error } = await query.single();
+      console.log('🔍 Executing inventory query...');
+      const { data, error } = await query.maybeSingle();
 
       if (error) {
-        console.error('❌ Error getting inventory record:', error);
+        console.error('❌ Database error getting inventory record:', error);
         throw error;
       }
 
       if (!data) {
-        throw new Error('Inventory record not found');
+        console.error('❌ No inventory record found for the specified criteria');
+        return null;
       }
 
-      console.log('✅ Inventory record found:', data);
+      console.log('✅ Inventory record found:', {
+        id: data.id,
+        sku: data.sku,
+        available_stock: data.available_stock,
+        stock_quantity: data.stock_quantity
+      });
+      
       return data;
     } catch (error) {
       console.error('❌ Error getting inventory record:', error);
@@ -206,13 +220,21 @@ export function useInventoryManager() {
     }
   };
 
-  // Enhanced function to validate stock availability for all pricing modes
+  // Enhanced function to validate stock availability with better error reporting
   const validateStockAvailability = async (cartItems: any[]) => {
     try {
-      console.log('🔍 Validating stock availability for all items...');
+      console.log('🔍 Validating stock availability for', cartItems.length, 'items...');
       
       const validationResults = await Promise.all(
-        cartItems.map(async (item) => {
+        cartItems.map(async (item, index) => {
+          console.log(`🔍 Validating item ${index + 1}:`, {
+            productName: item.productName,
+            productId: item.productId,
+            colorVariantId: item.colorVariantId || 'null',
+            sizeVariantId: item.sizeVariantId || 'null',
+            quantity: item.quantity
+          });
+
           const inventoryRecord = await getInventoryRecord(
             item.productId,
             item.colorVariantId,
@@ -220,15 +242,22 @@ export function useInventoryManager() {
           );
           
           if (!inventoryRecord) {
+            console.error(`❌ No inventory record found for ${item.productName}`);
             return {
               item,
               valid: false,
-              error: `Inventory record not found for ${item.productName}`
+              error: `No inventory record found for ${item.productName}. Please check if this product variant exists in inventory.`
             };
           }
 
           const available = inventoryRecord.available_stock || 0;
           const required = item.quantity;
+
+          console.log(`📊 Stock check for ${item.productName}:`, {
+            available,
+            required,
+            sufficient: available >= required
+          });
 
           if (available < required) {
             return {
@@ -249,7 +278,8 @@ export function useInventoryManager() {
       const invalidItems = validationResults.filter(result => !result.valid);
       
       if (invalidItems.length > 0) {
-        const errorMessages = invalidItems.map(result => result.error).join(', ');
+        const errorMessages = invalidItems.map(result => result.error).join('; ');
+        console.error('❌ Stock validation failed:', errorMessages);
         throw new Error(`Stock validation failed: ${errorMessages}`);
       }
 

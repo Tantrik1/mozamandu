@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -263,13 +262,42 @@ export function UniversalCheckout() {
         return;
       }
 
-      // Enhanced stock validation before proceeding
-      console.log('🔍 Validating stock availability for all items...');
-      await validateStockAvailability(cartItems);
+      // Pre-validate cart items format
+      console.log('🔍 Pre-validating cart items format...');
+      const validCartItems = cartItems.filter(item => {
+        const isValid = item.productId && item.productName && item.quantity > 0;
+        if (!isValid) {
+          console.warn('❌ Invalid cart item:', item);
+        }
+        return isValid;
+      });
 
-      // Get inventory records with enhanced validation
-      const cartItemsWithInventory = await Promise.all(
-        cartItems.map(async (item) => {
+      if (validCartItems.length === 0) {
+        throw new Error('No valid items in cart for checkout');
+      }
+
+      console.log(`✅ Found ${validCartItems.length} valid cart items`);
+
+      // Enhanced stock validation with detailed logging
+      console.log('🔍 Starting comprehensive stock validation...');
+      try {
+        await validateStockAvailability(validCartItems);
+        console.log('✅ Stock validation passed for all items');
+      } catch (stockError) {
+        console.error('❌ Stock validation failed:', stockError);
+        toast.error(`Stock validation failed: ${stockError.message}`);
+        return;
+      }
+
+      // Get inventory records with enhanced validation and error handling
+      console.log('🔍 Retrieving inventory records for all items...');
+      const cartItemsWithInventory = [];
+      
+      for (let i = 0; i < validCartItems.length; i++) {
+        const item = validCartItems[i];
+        console.log(`🔍 Processing item ${i + 1}/${validCartItems.length}: ${item.productName}`);
+        
+        try {
           const inventoryRecord = await getInventoryRecord(
             item.productId,
             item.colorVariantId,
@@ -277,23 +305,35 @@ export function UniversalCheckout() {
           );
           
           if (!inventoryRecord) {
-            throw new Error(`Inventory record not found for ${item.productName}`);
+            throw new Error(`Inventory record not found for ${item.productName}. This product may not be available for purchase.`);
           }
 
-          // Double-check stock availability
+          // Validate stock availability one more time
           if (inventoryRecord.available_stock < item.quantity) {
             throw new Error(`Insufficient stock for ${item.productName}. Available: ${inventoryRecord.available_stock}, Required: ${item.quantity}`);
           }
 
-          return {
+          cartItemsWithInventory.push({
             ...item,
             inventoryId: inventoryRecord.id,
-            sku: inventoryRecord.sku
-          };
-        })
-      );
+            sku: inventoryRecord.sku,
+            availableStock: inventoryRecord.available_stock
+          });
 
-      console.log('✅ All inventory records validated:', cartItemsWithInventory);
+          console.log(`✅ Item ${i + 1} validated:`, {
+            productName: item.productName,
+            sku: inventoryRecord.sku,
+            inventoryId: inventoryRecord.id,
+            availableStock: inventoryRecord.available_stock
+          });
+        } catch (itemError) {
+          console.error(`❌ Failed to process item ${item.productName}:`, itemError);
+          toast.error(itemError.message);
+          return;
+        }
+      }
+
+      console.log('✅ All inventory records validated:', cartItemsWithInventory.length, 'items');
 
       // Calculate pricing using the same hooks as cart
       const accurateSubtotal = getTieredTotalPrice();
@@ -357,11 +397,12 @@ export function UniversalCheckout() {
 
       console.log('📋 Enhanced pricing breakdown:', pricingBreakdown);
 
-      // Create order with proper user handling for all user types
+      // Create order with enhanced error handling
+      console.log('📝 Creating order with validated inventory data...');
       const { data: orderData, error: orderError } = await supabase
         .from('customer_orders')
         .insert({
-          user_id: user?.id || null, // Handle guest checkouts
+          user_id: user?.id || null,
           customer_name: customerInfo.name,
           customer_email: customerInfo.email,
           contact_number: customerInfo.phone,
@@ -387,10 +428,10 @@ export function UniversalCheckout() {
 
       if (orderError) {
         console.error('❌ Order creation error:', orderError);
-        throw orderError;
+        throw new Error(`Failed to create order: ${orderError.message}`);
       }
 
-      console.log('✅ Order created successfully:', orderData);
+      console.log('✅ Order created successfully:', orderData.id);
 
       // Insert basic order items for compatibility
       const orderItemsToInsert = cartItemsWithInventory.map(item => ({
@@ -405,10 +446,10 @@ export function UniversalCheckout() {
 
       if (orderItemsError) {
         console.error('❌ Order items error:', orderItemsError);
-        throw orderItemsError;
+        throw new Error(`Failed to create order items: ${orderItemsError.message}`);
       }
 
-      // Insert detailed order item information with proper inventory IDs
+      // Insert detailed order item information with validated inventory IDs
       const orderItemDetailsToInsert = cartItemsWithInventory.map(item => {
         const pricingResult = getTieredItemPricing(item.id);
         const pricingInfo = pricingResult || {
@@ -422,7 +463,7 @@ export function UniversalCheckout() {
 
         return {
           order_id: orderData.id,
-          product_inventory_id: item.inventoryId, // Ensure inventory ID is properly set
+          product_inventory_id: item.inventoryId,
           product_name: item.productName,
           color_name: item.colorName || null,
           size_name: item.sizeName || null,
@@ -442,12 +483,13 @@ export function UniversalCheckout() {
             inventoryId: item.inventoryId,
             moqPricingApplied: pricingInfo.appliedTier === 'discount',
             accurateUnitPrice: pricingInfo.unitPrice,
-            accurateTotalPrice: pricingInfo.totalPrice
+            accurateTotalPrice: pricingInfo.totalPrice,
+            availableStock: item.availableStock
           }
         };
       });
 
-      console.log('📝 Enhanced order item details with inventory IDs:', orderItemDetailsToInsert);
+      console.log('📝 Enhanced order item details with validated inventory IDs:', orderItemDetailsToInsert.length);
 
       const { error: orderItemDetailsError } = await supabase
         .from('customer_order_item_details')
@@ -455,7 +497,7 @@ export function UniversalCheckout() {
 
       if (orderItemDetailsError) {
         console.error('❌ Order item details error:', orderItemDetailsError);
-        throw orderItemDetailsError;
+        throw new Error(`Failed to create order item details: ${orderItemDetailsError.message}`);
       }
 
       console.log('🎉 Enhanced order completed successfully with inventory management!');
