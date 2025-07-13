@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -230,6 +231,7 @@ export function UniversalCheckout() {
     try {
       setIsSubmitting(true);
       console.log('🚀 Starting enhanced order submission with inventory management...');
+      console.log('🔍 User status:', { isAuthenticated: !!user, userId: user?.id });
       
       // Enhanced validation checks
       if (!customerInfo.name.trim()) {
@@ -397,32 +399,39 @@ export function UniversalCheckout() {
 
       console.log('📋 Enhanced pricing breakdown:', pricingBreakdown);
 
-      // Create order with enhanced error handling
+      // Create order with enhanced error handling - CRITICAL FIX for guest orders
       console.log('📝 Creating order with validated inventory data...');
-      const { data: orderData, error: orderError } = await supabase
+      
+      // Prepare order data with proper user_id handling
+      const orderData = {
+        // CRITICAL: Set user_id to null for guest orders explicitly
+        user_id: user?.id || null,
+        customer_name: customerInfo.name,
+        customer_email: customerInfo.email,
+        contact_number: customerInfo.phone,
+        whatsapp_number: customerInfo.whatsapp || null,
+        delivery_address: customerInfo.address,
+        delivery_location_id: deliveryLocation.id,
+        delivery_charge: deliveryLocation.delivery_price,
+        subtotal: accurateSubtotal,
+        promocode_used: appliedPromo?.code || null,
+        promocode_discount: promoDiscount,
+        total_amount: finalTotal,
+        paid_amount: paidAmount,
+        remaining_amount: remainingAmount,
+        payment_percentage: paymentPercentage,
+        payment_method_id: paymentMethod.id,
+        payment_screenshot_url: paymentScreenshotUrl,
+        combo_applied: isComboActive,
+        pricing_breakdown: pricingBreakdown,
+        status: 'pending_payment'
+      };
+
+      console.log('📋 Order data being sent:', orderData);
+      
+      const { data: createdOrder, error: orderError } = await supabase
         .from('customer_orders')
-        .insert({
-          user_id: user?.id || null,
-          customer_name: customerInfo.name,
-          customer_email: customerInfo.email,
-          contact_number: customerInfo.phone,
-          whatsapp_number: customerInfo.whatsapp || null,
-          delivery_address: customerInfo.address,
-          delivery_location_id: deliveryLocation.id,
-          delivery_charge: deliveryLocation.delivery_price,
-          subtotal: accurateSubtotal,
-          promocode_used: appliedPromo?.code || null,
-          promocode_discount: promoDiscount,
-          total_amount: finalTotal,
-          paid_amount: paidAmount,
-          remaining_amount: remainingAmount,
-          payment_percentage: paymentPercentage,
-          payment_method_id: paymentMethod.id,
-          payment_screenshot_url: paymentScreenshotUrl,
-          combo_applied: isComboActive,
-          pricing_breakdown: pricingBreakdown,
-          status: 'pending_payment'
-        })
+        .insert(orderData)
         .select()
         .single();
 
@@ -431,11 +440,11 @@ export function UniversalCheckout() {
         throw new Error(`Failed to create order: ${orderError.message}`);
       }
 
-      console.log('✅ Order created successfully:', orderData.id);
+      console.log('✅ Order created successfully:', createdOrder.id);
 
       // Insert basic order items for compatibility
       const orderItemsToInsert = cartItemsWithInventory.map(item => ({
-        order_id: orderData.id,
+        order_id: createdOrder.id,
         product_id: item.productId,
         quantity: item.quantity
       }));
@@ -462,7 +471,7 @@ export function UniversalCheckout() {
         };
 
         return {
-          order_id: orderData.id,
+          order_id: createdOrder.id,
           product_inventory_id: item.inventoryId,
           product_name: item.productName,
           color_name: item.colorName || null,
@@ -504,7 +513,7 @@ export function UniversalCheckout() {
       
       // Clear cart and show success
       clearCart();
-      setOrderId(orderData.id);
+      setOrderId(createdOrder.id);
       setShowSuccess(true);
       toast.success('Order placed successfully! Inventory has been reserved and order tracking is now active.');
 
