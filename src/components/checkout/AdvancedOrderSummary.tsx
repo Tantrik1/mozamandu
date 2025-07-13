@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Eye, EyeOff, ChevronDown, ChevronUp, Star, Package } from 'lucide-react';
+import { Loader2, Eye, EyeOff, ChevronDown, ChevronUp, Star, Package, TrendingDown } from 'lucide-react';
 
 interface CartItem {
   id: string;
@@ -104,16 +103,28 @@ export function AdvancedOrderSummary({
     }, 0);
   }, 0);
 
+  // Check if we have actual combo pricing vs MOQ discounts
+  const hasActualCombo = comboInfo && Object.values(subcategoryPricing).some(sub => sub.comboActive);
+  const hasMOQDiscounts = Object.values(subcategoryPricing).some(sub => 
+    sub.moqReached && !sub.comboActive && sub.totalSavings > 0
+  );
+
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="text-xl font-bold text-gray-900 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <span>Order Summary</span>
-            {comboInfo && (
+            {hasActualCombo && (
               <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
                 <Star className="h-3 w-3 mr-1" />
                 Combo Active
+              </Badge>
+            )}
+            {hasMOQDiscounts && !hasActualCombo && (
+              <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                <TrendingDown className="h-3 w-3 mr-1" />
+                Volume Discount
               </Badge>
             )}
           </div>
@@ -126,7 +137,7 @@ export function AdvancedOrderSummary({
             {showAllItems ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
         </CardTitle>
-        {comboInfo && (
+        {hasActualCombo && comboInfo && (
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mt-2">
             <div className="flex items-center space-x-2 mb-1">
               <Star className="h-4 w-4 text-purple-600" />
@@ -135,6 +146,20 @@ export function AdvancedOrderSummary({
             <p className="text-sm text-purple-700">{comboInfo.combo.description}</p>
             <p className="text-xs text-purple-600 mt-1">
               Total combo savings: Rs. {comboInfo.totalComboSavings.toFixed(2)}
+            </p>
+          </div>
+        )}
+        {hasMOQDiscounts && !hasActualCombo && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-2">
+            <div className="flex items-center space-x-2 mb-1">
+              <TrendingDown className="h-4 w-4 text-green-600" />
+              <span className="font-semibold text-green-800">Volume Discount Applied</span>
+            </div>
+            <p className="text-sm text-green-700">
+              You've reached the minimum order quantity for discounted pricing!
+            </p>
+            <p className="text-xs text-green-600 mt-1">
+              Total MOQ savings: Rs. {totalSavings.toFixed(2)}
             </p>
           </div>
         )}
@@ -164,11 +189,12 @@ export function AdvancedOrderSummary({
                       {pricingInfo?.appliedTier === 'combo' && (
                         <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
                           <Star className="h-3 w-3 mr-1" />
-                          Combo
+                          Combo Price
                         </Badge>
                       )}
                       {pricingInfo?.appliedTier === 'discount' && (
                         <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                          <TrendingDown className="h-3 w-3 mr-1" />
                           MOQ Discount
                         </Badge>
                       )}
@@ -249,11 +275,16 @@ export function AdvancedOrderSummary({
                         <Star className="h-3 w-3 mr-1" />
                         Combo Price
                       </Badge>
-                    ) : subcategory.moqReached && (
+                    ) : subcategory.moqReached && subcategory.totalSavings > 0 ? (
                       <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                        <TrendingDown className="h-3 w-3 mr-1" />
+                        MOQ Discount
+                      </Badge>
+                    ) : subcategory.moqReached ? (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
                         MOQ Reached
                       </Badge>
-                    )}
+                    ) : null}
                   </div>
                   <Button
                     variant="ghost"
@@ -281,7 +312,9 @@ export function AdvancedOrderSummary({
                   <div className={`flex justify-between text-sm ${
                     subcategory.comboActive ? 'text-purple-600' : 'text-green-600'
                   }`}>
-                    <span>Category Savings:</span>
+                    <span>
+                      {subcategory.comboActive ? 'Combo Savings:' : 'MOQ Discount Savings:'}
+                    </span>
                     <span>-Rs. {subcategory.totalSavings.toFixed(2)}</span>
                   </div>
                 )}
@@ -313,9 +346,9 @@ export function AdvancedOrderSummary({
 
           {totalSavings > 0 && (
             <div className={`flex justify-between text-sm ${
-              comboInfo ? 'text-purple-600' : 'text-green-600'
+              hasActualCombo ? 'text-purple-600' : 'text-green-600'
             }`}>
-              <span>{comboInfo ? 'Combo Savings' : 'MOQ Discount Savings'}</span>
+              <span>{hasActualCombo ? 'Combo Savings' : 'Volume Discount Savings'}</span>
               <span>-Rs. {totalSavings.toFixed(2)}</span>
             </div>
           )}
@@ -329,10 +362,10 @@ export function AdvancedOrderSummary({
 
           {(totalSavings + promoDiscount) > 0 && (
             <div className={`text-center font-medium text-sm ${
-              comboInfo ? 'text-purple-600' : 'text-green-600'
+              hasActualCombo ? 'text-purple-600' : 'text-green-600'
             }`}>
               You saved Rs. {(totalSavings + promoDiscount).toFixed(2)} total!
-              {comboInfo && ' (includes combo savings)'}
+              {hasActualCombo ? ' (includes combo savings)' : ' (includes volume discounts)'}
             </div>
           )}
         </div>

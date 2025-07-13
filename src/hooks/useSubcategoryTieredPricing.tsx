@@ -178,11 +178,11 @@ export function useSubcategoryTieredPricing({
 
           let tierInfo = '';
           if (normalPriceQuantity > 0 && discountPriceQuantity > 0) {
-            tierInfo = `Items ${itemStartPosition}-${itemStartPosition + normalPriceQuantity - 1}: Rs.${item.basePrice} each, Items ${itemStartPosition + normalPriceQuantity}-${itemEndPosition}: Rs.${discountedPrice} each`;
+            tierInfo = `Items ${itemStartPosition}-${itemStartPosition + normalPriceQuantity - 1}: Rs.${item.basePrice} each, Items ${itemStartPosition + normalPriceQuantity}-${itemEndPosition}: Rs.${discountedPrice} each (MOQ discount)`;
           } else if (normalPriceQuantity > 0) {
             tierInfo = `Items ${itemStartPosition}-${itemEndPosition}: Rs.${item.basePrice} each (before MOQ)`;
           } else {
-            tierInfo = `Items ${itemStartPosition}-${itemEndPosition}: Rs.${discountedPrice} each (MOQ discount)`;
+            tierInfo = `Items ${itemStartPosition}-${itemEndPosition}: Rs.${discountedPrice} each (MOQ discount applied)`;
           }
 
           itemBreakdown.push({
@@ -207,8 +207,8 @@ export function useSubcategoryTieredPricing({
         itemBreakdown,
         totalSavings: itemBreakdown.reduce((sum, item) => sum + item.savings, 0),
         description: moqReached 
-          ? `MOQ ${moqTier.min_quantity} reached - tiered pricing active` 
-          : `Need ${moqTier.min_quantity - totalQuantity} more items for MOQ discount`
+          ? `MOQ ${moqTier.min_quantity} reached - volume discount active` 
+          : `Need ${moqTier.min_quantity - totalQuantity} more items for volume discount`
       };
     });
 
