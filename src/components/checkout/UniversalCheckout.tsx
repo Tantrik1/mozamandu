@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { CustomerInfoForm } from './CustomerInfoForm';
 import { PaymentMethodSection } from './PaymentMethodSection';
 import { PromoCodeSection } from './PromoCodeSection';
-import { AdvancedOrderSummary } from './AdvancedOrderSummary';
+import { CleanOrderSummary } from './CleanOrderSummary';
 import { CheckoutSuccess } from './CheckoutSuccess';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -495,7 +495,7 @@ export function UniversalCheckout() {
 
   return (
     <div className="container mx-auto py-8 pb-32">
-      <h1 className="text-2xl font-bold mb-4">Universal Checkout - Accurate Pricing</h1>
+      <h1 className="text-2xl font-bold mb-4">Checkout</h1>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="space-y-6">
@@ -551,7 +551,7 @@ export function UniversalCheckout() {
         </div>
 
         <div className="space-y-6">
-          <AdvancedOrderSummary
+          <CleanOrderSummary
             cartItems={cartItems}
             subcategoryPricing={subcategoryPricing}
             deliveryCharge={deliveryLocation ? deliveryLocation.delivery_price : 0}
