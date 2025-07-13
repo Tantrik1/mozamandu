@@ -251,8 +251,6 @@ export function EnhancedAdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AdminHeader />
-      
       <div className="p-4 md:p-6 space-y-6">
         {/* Welcome Section */}
         <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-background p-6 rounded-xl border">

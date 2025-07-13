@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { AdminHeader } from '@/components/admin/AdminHeader';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { EnhancedAdminDashboard } from '@/components/admin/EnhancedAdminDashboard';
 import { ProductManagement } from '@/components/admin/ProductManagement';
@@ -91,27 +92,30 @@ export default function AdminPage() {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AdminSidebar />
-        <main className="flex-1 overflow-auto">
-          <Routes>
-            <Route index element={<EnhancedAdminDashboard />} />
-            <Route path="products" element={<ProductManagement />} />
-            <Route path="inventory" element={<ModernInventoryManagement />} />
-            <Route path="orders" element={<EnhancedOrderManagement />} />
-            <Route path="customers" element={<CustomerManagement />} />
-            <Route path="categories" element={<CategoryManagement />} />
-            <Route path="subcategories" element={<SubcategoryManagement />} />
-            <Route path="combos" element={<ComboManagement />} />
-            <Route path="delivery-charges" element={<DeliveryChargeManagement />} />
-            <Route path="payments" element={<PaymentMethodManagement />} />
-            <Route path="promocodes" element={<PromocodeManagement />} />
-            <Route path="faqs" element={<FAQManagement />} />
-            <Route path="notices" element={<NoticeManagement />} />
-            <Route path="top-bar-text" element={<TopBarTextManagement />} />
-            <Route path="navbar" element={<NavbarManagement />} />
-            <Route path="settings" element={<AdminSettings />} />
-            <Route path="*" element={<Navigate to="/admin" replace />} />
-          </Routes>
-        </main>
+        <div className="flex-1 flex flex-col">
+          <AdminHeader />
+          <main className="flex-1 overflow-auto">
+            <Routes>
+              <Route index element={<EnhancedAdminDashboard />} />
+              <Route path="products" element={<ProductManagement />} />
+              <Route path="inventory" element={<ModernInventoryManagement />} />
+              <Route path="orders" element={<EnhancedOrderManagement />} />
+              <Route path="customers" element={<CustomerManagement />} />
+              <Route path="categories" element={<CategoryManagement />} />
+              <Route path="subcategories" element={<SubcategoryManagement />} />
+              <Route path="combos" element={<ComboManagement />} />
+              <Route path="delivery-charges" element={<DeliveryChargeManagement />} />
+              <Route path="payments" element={<PaymentMethodManagement />} />
+              <Route path="promocodes" element={<PromocodeManagement />} />
+              <Route path="faqs" element={<FAQManagement />} />
+              <Route path="notices" element={<NoticeManagement />} />
+              <Route path="top-bar-text" element={<TopBarTextManagement />} />
+              <Route path="navbar" element={<NavbarManagement />} />
+              <Route path="settings" element={<AdminSettings />} />
+              <Route path="*" element={<Navigate to="/admin" replace />} />
+            </Routes>
+          </main>
+        </div>
       </div>
     </SidebarProvider>
   );
