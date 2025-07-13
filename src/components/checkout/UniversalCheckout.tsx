@@ -285,7 +285,7 @@ export function UniversalCheckout() {
               moqReached: data.moqReached,
               moqRequired: data.moqRequired,
               comboActive: data.comboActive,
-              comboPrice: data.comboPrice,
+              comboPrice: data.comboPrice || 0,
               totalSavings: data.totalSavings,
               description: data.description,
               itemBreakdown: data.itemBreakdown.map(item => ({
@@ -293,7 +293,7 @@ export function UniversalCheckout() {
                 unitPrice: item.unitPrice,
                 totalPrice: item.totalPrice,
                 appliedTier: item.appliedTier,
-                tierInfo: item.tierInfo,
+                tierInfo: item.tierInfo || '',
                 savings: item.savings
               }))
             }
@@ -304,9 +304,13 @@ export function UniversalCheckout() {
         promoDiscount,
         deliveryCharge: deliveryLocation.delivery_price,
         finalTotal,
-        comboInfo: isComboActive ? {
-          combo: comboInfo?.combo,
-          totalComboSavings: comboInfo?.totalComboSavings || 0
+        comboInfo: isComboActive && comboInfo ? {
+          combo: {
+            id: comboInfo.combo.id,
+            name: comboInfo.combo.name,
+            description: comboInfo.combo.description
+          },
+          totalComboSavings: comboInfo.totalComboSavings || 0
         } : null,
         pricingMode: isComboActive ? 'combo' : (tieredSavings > 0 ? 'moq_discount' : 'normal')
       };
@@ -372,7 +376,7 @@ export function UniversalCheckout() {
 
         return {
           order_id: orderData.id,
-          product_inventory_id: item.inventoryId,
+          product_inventory_id: item.inventoryId || null,
           product_name: item.productName,
           color_name: item.colorName || null,
           size_name: item.sizeName || null,
@@ -442,11 +446,27 @@ export function UniversalCheckout() {
           />
           <PaymentMethodSection
             paymentMethods={paymentMethods}
-            paymentMethod={paymentMethod}
-            setPaymentMethod={setPaymentMethod}
-            paymentPercentage={paymentPercentage}
-            setPaymentPercentage={setPaymentPercentage}
-            onScreenshotUpload={handlePaymentScreenshotUpload}
+            selectedPayment={paymentMethod?.id || ''}
+            setSelectedPayment={(value) => {
+              const method = paymentMethods.find(m => m.id === value);
+              setPaymentMethod(method || null);
+            }}
+            paymentType={paymentPercentage === 100 ? 'full' : 'partial'}
+            onPaymentTypeChange={(type) => {
+              setPaymentPercentage(type === 'full' ? 100 : 20);
+            }}
+            paidAmount={Math.round(finalTotal * (paymentPercentage / 100)).toString()}
+            setPaidAmount={(value) => {
+              const amount = parseFloat(value);
+              const percentage = (amount / finalTotal) * 100;
+              setPaymentPercentage(Math.min(100, Math.max(20, percentage)));
+            }}
+            paymentScreenshot={null}
+            setPaymentScreenshot={() => {}}
+            finalTotal={finalTotal}
+            minimumPayment={finalTotal * 0.2}
+            formErrors={{}}
+            uploadingScreenshot={false}
           />
         </CardContent>
       </Card>

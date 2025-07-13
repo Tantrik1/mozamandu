@@ -1,84 +1,115 @@
 
-import { Label } from '@/components/ui/label';
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CustomerInfo {
   name: string;
   email: string;
-  contact: string;
-  whatsapp: string;
+  phone: string;
+  whatsapp?: string;
   address: string;
 }
 
-interface FormErrors {
-  [key: string]: string;
+interface DeliveryLocation {
+  id: string;
+  place_name: string;
+  delivery_price: number;
 }
 
 interface CustomerInfoFormProps {
   customerInfo: CustomerInfo;
   setCustomerInfo: React.Dispatch<React.SetStateAction<CustomerInfo>>;
-  formErrors: FormErrors;
+  deliveryLocations: DeliveryLocation[];
+  deliveryLocation: DeliveryLocation | null;
+  setDeliveryLocation: React.Dispatch<React.SetStateAction<DeliveryLocation | null>>;
 }
 
-export function CustomerInfoForm({ customerInfo, setCustomerInfo, formErrors }: CustomerInfoFormProps) {
+export function CustomerInfoForm({
+  customerInfo,
+  setCustomerInfo,
+  deliveryLocations,
+  deliveryLocation,
+  setDeliveryLocation,
+}: CustomerInfoFormProps) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Customer Information</CardTitle>
-        <CardDescription>Please provide your contact details for order delivery</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <Label>Full Name *</Label>
+          <Label htmlFor="name">Full Name *</Label>
           <Input
+            id="name"
             value={customerInfo.name}
             onChange={(e) => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))}
-            placeholder="Enter your full name"
-            className={formErrors.name ? 'border-red-500' : ''}
+            required
           />
-          {formErrors.name && <p className="text-sm text-red-500 mt-1">{formErrors.name}</p>}
         </div>
+
         <div>
-          <Label>Email Address *</Label>
+          <Label htmlFor="email">Email *</Label>
           <Input
+            id="email"
             type="email"
             value={customerInfo.email}
             onChange={(e) => setCustomerInfo(prev => ({ ...prev, email: e.target.value }))}
-            placeholder="Enter your email"
-            className={formErrors.email ? 'border-red-500' : ''}
+            required
           />
-          {formErrors.email && <p className="text-sm text-red-500 mt-1">{formErrors.email}</p>}
         </div>
+
         <div>
-          <Label>Contact Number *</Label>
+          <Label htmlFor="phone">Contact Number *</Label>
           <Input
-            value={customerInfo.contact}
-            onChange={(e) => setCustomerInfo(prev => ({ ...prev, contact: e.target.value }))}
-            placeholder="Enter your contact number"
-            className={formErrors.contact ? 'border-red-500' : ''}
+            id="phone"
+            value={customerInfo.phone}
+            onChange={(e) => setCustomerInfo(prev => ({ ...prev, phone: e.target.value }))}
+            required
           />
-          {formErrors.contact && <p className="text-sm text-red-500 mt-1">{formErrors.contact}</p>}
         </div>
+
         <div>
-          <Label>WhatsApp Number</Label>
+          <Label htmlFor="whatsapp">WhatsApp Number (Optional)</Label>
           <Input
-            value={customerInfo.whatsapp}
+            id="whatsapp"
+            value={customerInfo.whatsapp || ''}
             onChange={(e) => setCustomerInfo(prev => ({ ...prev, whatsapp: e.target.value }))}
-            placeholder="Enter WhatsApp number (optional)"
           />
         </div>
+
         <div>
-          <Label>Delivery Address *</Label>
-          <Textarea
+          <Label htmlFor="address">Delivery Address *</Label>
+          <Input
+            id="address"
             value={customerInfo.address}
             onChange={(e) => setCustomerInfo(prev => ({ ...prev, address: e.target.value }))}
-            placeholder="Enter complete delivery address"
-            rows={3}
-            className={formErrors.address ? 'border-red-500' : ''}
+            required
           />
-          {formErrors.address && <p className="text-sm text-red-500 mt-1">{formErrors.address}</p>}
+        </div>
+
+        <div>
+          <Label>Delivery Location *</Label>
+          <Select 
+            value={deliveryLocation?.id || ''} 
+            onValueChange={(value) => {
+              const location = deliveryLocations.find(loc => loc.id === value);
+              setDeliveryLocation(location || null);
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select delivery location" />
+            </SelectTrigger>
+            <SelectContent>
+              {deliveryLocations.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.place_name} - Rs. {location.delivery_price.toFixed(2)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </CardContent>
     </Card>

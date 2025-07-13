@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +19,8 @@ export interface CartItem {
   maxStock: number;
   subcategoryId: string;
   addedOrder: number; // Order in which item was added to cart
+  sku?: string;
+  inventoryId?: string;
 }
 
 export interface PricingInfo {
@@ -228,6 +229,10 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
         const productDetails = await getProductDetails(productId);
         const variantDetails = await getVariantDetails(colorVariantId, sizeVariantId);
 
+        // Generate SKU and get inventory ID
+        const sku = `${productName.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+        const inventoryId = `inv-${productId}-${colorVariantId || 'no-color'}-${sizeVariantId || 'no-size'}`;
+
         const newItem: CartItem = {
           id: generateCartId(),
           productId,
@@ -244,6 +249,8 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
           maxStock: stockCheck.maxStock,
           subcategoryId: productDetails.subcategory_id,
           addedOrder: nextAddedOrder,
+          sku,
+          inventoryId,
         };
 
         setNextAddedOrder(prev => prev + 1);
