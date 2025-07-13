@@ -167,13 +167,27 @@ export function useInventoryManager() {
     try {
       console.log('🔍 Getting inventory record for:', { productId, colorVariantId, sizeVariantId });
       
-      const { data, error } = await supabase
+      // Build the query dynamically to handle null values properly
+      let query = supabase
         .from('product_inventory')
         .select('*')
-        .eq('product_id', productId)
-        .eq('color_variant_id', colorVariantId || null)
-        .eq('size_variant_id', sizeVariantId || null)
-        .single();
+        .eq('product_id', productId);
+
+      // Handle color variant ID - use is.null() for undefined/null values
+      if (colorVariantId && colorVariantId !== 'undefined') {
+        query = query.eq('color_variant_id', colorVariantId);
+      } else {
+        query = query.is('color_variant_id', null);
+      }
+
+      // Handle size variant ID - use is.null() for undefined/null values  
+      if (sizeVariantId && sizeVariantId !== 'undefined') {
+        query = query.eq('size_variant_id', sizeVariantId);
+      } else {
+        query = query.is('size_variant_id', null);
+      }
+
+      const { data, error } = await query.single();
 
       if (error) {
         console.error('❌ Error getting inventory record:', error);
