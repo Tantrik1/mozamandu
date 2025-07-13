@@ -23,6 +23,7 @@ import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import About from '@/pages/About';
 import Contact from '@/pages/Contact';
 import NotFound from '@/pages/NotFound';
+import ThankYou from '@/pages/ThankYou';
 import OrderSummary from '@/pages/OrderSummary';
 import CustomerOrderSummary from '@/pages/CustomerOrderSummary';
 
@@ -48,6 +49,7 @@ function App() {
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/thank-you/:orderId" element={<ThankYou />} />
               <Route path="/order-summary/:orderId" element={<OrderSummary />} />
               <Route path="/customer-order-summary/:orderId" element={<CustomerOrderSummary />} />
               <Route path="/admin/*" element={<AdminPage />} />

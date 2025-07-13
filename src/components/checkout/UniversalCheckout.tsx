@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CustomerInfoForm } from './CustomerInfoForm';
 import { PaymentMethodSection } from './PaymentMethodSection';
+import { PaymentScreenshotUpload } from './PaymentScreenshotUpload';
 import { PromoCodeSection } from './PromoCodeSection';
 import { CleanOrderSummary } from './CleanOrderSummary';
 import { CheckoutSuccess } from './CheckoutSuccess';
@@ -279,6 +280,14 @@ export function UniversalCheckout() {
         return;
       }
 
+      if (!paymentScreenshotUrl) {
+        toast({
+          title: 'Validation Error',
+          description: 'Please upload payment screenshot to complete your order',
+          variant: 'destructive',
+        });
+        return;
+      }
       if (!paymentMethod) {
         toast({
           title: 'Validation Error',
@@ -549,15 +558,8 @@ export function UniversalCheckout() {
 
       console.log('🎉 Enhanced order completed successfully with immediate stock reservation!');
       
-      toast({
-        title: 'Order Placed Successfully!', 
-        description: 'Your order has been created and you will be redirected to order details.',
-        duration: 5000,
-      });
-
-      clearCart();
-      setOrderId(createdOrder.id);
-      setShowSuccess(true);
+      // Redirect to thank you page instead of showing inline success
+      window.location.href = `/thank-you/${createdOrder.id}`;
 
     } catch (error) {
       console.error('💥 Enhanced order submission failed:', error);
@@ -583,10 +585,8 @@ export function UniversalCheckout() {
     finalTotal
   });
 
-  if (showSuccess && orderId) {
-    return <CheckoutSuccess orderId={orderId} />;
-  }
-
+  // Remove the showSuccess condition since we're redirecting to thank you page
+  
   return (
     <div className="container mx-auto py-8 pb-32">
       <div className="mb-6">
@@ -637,6 +637,17 @@ export function UniversalCheckout() {
             </CardContent>
           </Card>
 
+          {/* Payment Screenshot Upload */}
+          <Card className="shadow-sm border-gray-200">
+            <CardContent className="p-6">
+              <PaymentScreenshotUpload
+                onUploadComplete={handlePaymentScreenshotUpload}
+                currentImageUrl={paymentScreenshotUrl || undefined}
+                onRemove={() => setPaymentScreenshotUrl(null)}
+              />
+            </CardContent>
+          </Card>
+
           <PromoCodeSection
             onDiscountApplied={setPromoDiscount}
             onPromoCodeUsed={(code) => {}}
@@ -680,7 +691,7 @@ export function UniversalCheckout() {
           
           <Button
             onClick={handleSubmitOrder}
-            disabled={isSubmitting || cartItems.length === 0}
+            disabled={isSubmitting || cartItems.length === 0 || !paymentScreenshotUrl}
             className="w-full h-14 text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
             size="lg"
           >
