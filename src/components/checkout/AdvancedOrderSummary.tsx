@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -79,7 +80,7 @@ export function AdvancedOrderSummary({
   comboInfo
 }: AdvancedOrderSummaryProps) {
   const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>({});
-  const [showAllItems, setShowAllItems] = useState(false);
+  const [showAllItems, setShowAllItems] = useState(true); // Show items by default
 
   const toggleDetails = (subcategoryId: string) => {
     setShowDetails(prev => ({
@@ -138,122 +139,156 @@ export function AdvancedOrderSummary({
           </div>
         )}
       </CardHeader>
+      
       <CardContent className="space-y-6">
-        {/* Items breakdown - always visible on desktop, toggleable on mobile */}
+        {/* Cart Items Display */}
         <div className={`space-y-4 ${!showAllItems ? 'hidden lg:block' : ''}`}>
-          {Object.values(subcategoryPricing).map((subcategory) => (
-            <div key={subcategory.subcategoryId} className="border rounded-lg p-4 bg-gray-50">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center space-x-2">
-                  <h4 className="font-semibold text-gray-900 text-sm">
-                    Subcategory ({subcategory.totalQuantity} items)
-                  </h4>
-                  {subcategory.comboActive ? (
-                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
-                      <Star className="h-3 w-3 mr-1" />
-                      Combo Price
-                    </Badge>
-                  ) : subcategory.moqReached ? (
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                      MOQ Reached
-                    </Badge>
-                  ) : null}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => toggleDetails(subcategory.subcategoryId)}
-                >
-                  {showDetails[subcategory.subcategoryId] ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              
-              <p className="text-xs text-gray-600 mb-3">
-                {subcategory.description}
-              </p>
-
-              {showDetails[subcategory.subcategoryId] && (
-                <div className="space-y-2">
-                  {subcategory.itemBreakdown.map((item) => {
-                    const cartItem = cartItems.find(ci => ci.id === item.itemId);
-                    const displaySku = cartItem ? generateDisplaySku(cartItem) : '';
+          <h3 className="font-medium text-gray-900 text-sm mb-3">
+            Items in Your Order ({cartItems.length})
+          </h3>
+          
+          {cartItems.map((item) => {
+            const pricingInfo = Object.values(subcategoryPricing)
+              .find(sub => sub.itemBreakdown.some(breakdown => breakdown.itemId === item.id))
+              ?.itemBreakdown.find(breakdown => breakdown.itemId === item.id);
+            
+            const displaySku = generateDisplaySku(item);
+            
+            return (
+              <div key={item.id} className="bg-gray-50 border rounded-lg p-4">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <h4 className="font-medium text-gray-900 text-sm">{item.productName}</h4>
+                      <Badge variant="outline" className="text-xs">{displaySku}</Badge>
+                      {pricingInfo?.appliedTier === 'combo' && (
+                        <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
+                          <Star className="h-3 w-3 mr-1" />
+                          Combo
+                        </Badge>
+                      )}
+                      {pricingInfo?.appliedTier === 'discount' && (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                          MOQ Discount
+                        </Badge>
+                      )}
+                    </div>
                     
-                    return (
-                      <div key={item.itemId} className="bg-white p-3 rounded border">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2">
-                              <h5 className="font-medium text-gray-900 text-sm">
-                                {cartItem?.productName}
-                              </h5>
-                              <Badge variant="outline" className="text-xs">
-                                {displaySku}
-                              </Badge>
-                              {item.appliedTier === 'combo' && (
-                                <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
-                                  Combo
-                                </Badge>
-                              )}
-                            </div>
-                            {cartItem?.colorName && (
-                              <span className="text-gray-500 text-xs">Color: {cartItem.colorName}</span>
-                            )}
-                            {cartItem?.sizeName && (
-                              <span className="text-gray-500 text-xs ml-2">Size: {cartItem.sizeName}</span>
-                            )}
-                            <p className="text-xs text-gray-600">
-                              Qty: {cartItem?.quantity} × Rs. {item.unitPrice.toFixed(2)}
-                            </p>
-                            {item.tierInfo && (
-                              <p className={`text-xs mt-1 ${
-                                item.appliedTier === 'combo' ? 'text-purple-600' : 'text-blue-600'
-                              }`}>
-                                {item.tierInfo}
-                              </p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-sm">
-                              Rs. {item.totalPrice.toFixed(2)}
-                            </p>
-                            {item.savings > 0 && (
-                              <p className={`text-xs ${
-                                item.appliedTier === 'combo' ? 'text-purple-600' : 'text-green-600'
-                              }`}>
-                                Save Rs. {item.savings.toFixed(2)}
-                              </p>
-                            )}
-                          </div>
-                        </div>
+                    <div className="text-xs text-gray-600 space-x-4">
+                      {item.colorName && <span>Color: {item.colorName}</span>}
+                      {item.sizeName && <span>Size: {item.sizeName}</span>}
+                    </div>
+                    
+                    <div className="flex items-center justify-between mt-2">
+                      <div className="text-sm">
+                        <span className="text-gray-600">Qty: {item.quantity}</span>
+                        <span className="mx-2">×</span>
+                        <span className="text-gray-900">Rs. {(pricingInfo?.unitPrice || item.unitPrice).toFixed(2)}</span>
                       </div>
-                    );
-                  })}
+                    </div>
+                    
+                    {pricingInfo?.tierInfo && (
+                      <p className={`text-xs mt-1 ${
+                        pricingInfo.appliedTier === 'combo' ? 'text-purple-600' : 
+                        pricingInfo.appliedTier === 'discount' ? 'text-green-600' : 'text-blue-600'
+                      }`}>
+                        {pricingInfo.tierInfo}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="text-right ml-4">
+                    <p className="font-semibold text-sm text-gray-900">
+                      Rs. {(pricingInfo?.totalPrice || (item.unitPrice * item.quantity)).toFixed(2)}
+                    </p>
+                    {pricingInfo?.savings && pricingInfo.savings > 0 && (
+                      <p className={`text-xs ${
+                        pricingInfo.appliedTier === 'combo' ? 'text-purple-600' : 'text-green-600'
+                      }`}>
+                        Save Rs. {pricingInfo.savings.toFixed(2)}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              )}
+              </div>
+            );
+          })}
+        </div>
 
-              <div className="mt-3 pt-3 border-t border-gray-200">
+        {/* Subcategory Breakdown (Advanced View) */}
+        {Object.keys(subcategoryPricing).length > 1 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium text-gray-900 text-sm">Pricing Breakdown by Category</h4>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const allExpanded = Object.keys(subcategoryPricing).every(id => showDetails[id]);
+                  const newState: { [key: string]: boolean } = {};
+                  Object.keys(subcategoryPricing).forEach(id => {
+                    newState[id] = !allExpanded;
+                  });
+                  setShowDetails(newState);
+                }}
+                className="text-xs"
+              >
+                {Object.keys(subcategoryPricing).every(id => showDetails[id]) ? 'Collapse All' : 'Expand All'}
+              </Button>
+            </div>
+            
+            {Object.values(subcategoryPricing).map((subcategory) => (
+              <div key={subcategory.subcategoryId} className="border rounded-lg p-3 bg-blue-50">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <h5 className="font-medium text-gray-900 text-sm">
+                      Category ({subcategory.totalQuantity} items)
+                    </h5>
+                    {subcategory.comboActive ? (
+                      <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
+                        <Star className="h-3 w-3 mr-1" />
+                        Combo Price
+                      </Badge>
+                    ) : subcategory.moqReached && (
+                      <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                        MOQ Reached
+                      </Badge>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleDetails(subcategory.subcategoryId)}
+                  >
+                    {showDetails[subcategory.subcategoryId] ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                
+                <p className="text-xs text-gray-600 mb-2">{subcategory.description}</p>
+                
                 <div className="flex justify-between text-sm">
-                  <span className="font-medium">Subcategory Total:</span>
+                  <span className="font-medium">Category Total:</span>
                   <span className="font-semibold">
                     Rs. {subcategory.itemBreakdown.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(2)}
                   </span>
                 </div>
+                
                 {subcategory.totalSavings > 0 && (
                   <div className={`flex justify-between text-sm ${
                     subcategory.comboActive ? 'text-purple-600' : 'text-green-600'
                   }`}>
-                    <span>Savings:</span>
+                    <span>Category Savings:</span>
                     <span>-Rs. {subcategory.totalSavings.toFixed(2)}</span>
                   </div>
                 )}
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         <Separator />
 
@@ -302,7 +337,7 @@ export function AdvancedOrderSummary({
           )}
         </div>
 
-        {/* Desktop place order button - Make it more prominent */}
+        {/* Desktop place order button */}
         <div className="space-y-4">
           <Button
             onClick={onSubmitOrder}
