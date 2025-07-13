@@ -112,7 +112,8 @@ export function useInventoryManager() {
 
       if (error) throw error;
 
-      if (!data) {
+      // The function returns a boolean: true for success, false for failure
+      if (data === false) {
         throw new Error('Failed to reserve stock for some items');
       }
 
