@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,6 +53,9 @@ export function UniversalCheckout() {
     clearCart
   } = useRobustCart();
 
+  // Initialize discount tiers state first
+  const [discountTiers, setDiscountTiers] = useState<{ [key: string]: any[] }>({});
+
   // Use the EXACT same combo management as CartSidebar
   const { 
     activeCombo, 
@@ -96,7 +100,6 @@ export function UniversalCheckout() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentPercentage, setPaymentPercentage] = useState(100);
   const [paymentScreenshotUrl, setPaymentScreenshotUrl] = useState<string | null>(null);
-  const [discountTiers, setDiscountTiers] = useState<{ [key: string]: any[] }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
