@@ -572,6 +572,9 @@ export function UniversalCheckout() {
 
       console.log('🎉 Enhanced order completed successfully with immediate stock reservation!');
       
+      // Clear cart after successful order
+      clearCart();
+      
       // Redirect to thank you page instead of showing inline success
       window.location.href = `/thank-you/${createdOrder.id}`;
 
