@@ -126,25 +126,43 @@ export function AdminSidebar() {
   }
 
   return (
-    <Sidebar>
-      <SidebarContent>
+    <Sidebar className="border-r bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+      <SidebarContent className="p-4">
+        {/* Logo Section */}
+        <div className="flex items-center gap-3 px-3 py-4 mb-4 border-b">
+          <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
+            <span className="text-primary-foreground font-bold">A</span>
+          </div>
+          <div>
+            <h2 className="font-semibold text-lg">Admin Panel</h2>
+            <p className="text-xs text-muted-foreground">Management Portal</p>
+          </div>
+        </div>
+
         <SidebarGroup>
-          <SidebarGroupLabel>Admin Panel</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            Navigation
+          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               {menuItems.map((item) => {
                 const isActive = location.pathname === item.url || 
                   (item.url === "/admin" && location.pathname === "/admin");
                 
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive}>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={isActive}
+                      className="h-11 px-3 rounded-lg transition-all duration-200 hover:bg-accent/50 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:shadow-sm"
+                    >
                       <Link 
                         to={item.url}
                         onClick={() => handleNavClick(item.url)}
+                        className="flex items-center gap-3"
                       >
-                        <item.icon />
-                        <span>{item.title}</span>
+                        <item.icon className="h-4 w-4" />
+                        <span className="font-medium">{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -154,12 +172,16 @@ export function AdminSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
+      
+      <SidebarFooter className="p-4 border-t">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleSignOut}>
-              <LogOut />
-              <span>Sign Out</span>
+            <SidebarMenuButton 
+              onClick={handleSignOut}
+              className="h-11 px-3 rounded-lg transition-all duration-200 hover:bg-destructive/10 hover:text-destructive"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="font-medium">Sign Out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { DashboardStats } from '@/components/admin/DashboardStats';
+import { EnhancedAdminDashboard } from '@/components/admin/EnhancedAdminDashboard';
 import { ProductManagement } from '@/components/admin/ProductManagement';
 import { EnhancedOrderManagement } from '@/components/admin/EnhancedOrderManagement';
 import { CustomerManagement } from '@/components/admin/CustomerManagement';
@@ -89,11 +89,11 @@ export default function AdminPage() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-background">
         <AdminSidebar />
         <main className="flex-1 overflow-auto">
           <Routes>
-            <Route index element={<DashboardStats />} />
+            <Route index element={<EnhancedAdminDashboard />} />
             <Route path="products" element={<ProductManagement />} />
             <Route path="inventory" element={<ModernInventoryManagement />} />
             <Route path="orders" element={<EnhancedOrderManagement />} />
