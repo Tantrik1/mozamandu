@@ -131,9 +131,13 @@ export function AdminOrdersPage() {
         });
       } else {
         console.log('Order status updated successfully');
+        const inventoryMessage = (newStatus === 'delivered' || newStatus === 'cancelled') 
+          ? ' Inventory changes have been applied automatically.' 
+          : '';
+          
         toast({
           title: "Success",
-          description: `Order status updated to ${newStatus.replace('_', ' ')}. Inventory changes have been applied automatically.`,
+          description: `Order status updated to ${newStatus.replace('_', ' ')}.${inventoryMessage}`,
         });
         
         setOrders(prev => prev.map(order => 
