@@ -1436,10 +1436,6 @@ export type Database = {
           last_updated: string
         }[]
       }
-      fulfill_order_stock: {
-        Args: { p_order_id: string }
-        Returns: boolean
-      }
       fulfill_order_stock_enhanced: {
         Args: { p_order_id: string }
         Returns: boolean
@@ -1509,15 +1505,7 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
-      release_order_stock: {
-        Args: { p_order_id: string }
-        Returns: boolean
-      }
       release_order_stock_enhanced: {
-        Args: { p_order_id: string }
-        Returns: boolean
-      }
-      reserve_order_stock: {
         Args: { p_order_id: string }
         Returns: boolean
       }
