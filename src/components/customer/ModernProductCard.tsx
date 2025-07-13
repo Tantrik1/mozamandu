@@ -235,16 +235,57 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
     }
   };
 
-  // Get real-time pricing using the advanced pricing hooks
-  const currentPricing = getItemPricing(mockCartItem.id);
+  // Get marginal price (price for the next/current unit) instead of average
+  const getMarginalPrice = () => {
+    if (currentCartQuantity === 0) {
+      return basePrice; // Show base price when no items in cart
+    }
+    
+    // Find the discount tier that applies to the current quantity
+    const tiers = discountTiers[product.subcategory_id] || [];
+    const sortedTiers = tiers.sort((a, b) => a.min_quantity - b.min_quantity);
+    
+    // Check if combo is active
+    const comboSubcategory = activeCombo?.combo_subcategories.find(
+      cs => cs.subcategory_id === product.subcategory_id
+    );
+    
+    if (comboSubcategory && isComboActive(product.subcategory_id)) {
+      return comboSubcategory.price;
+    }
+    
+    // Find the tier that applies to the current quantity
+    let applicableTier = null;
+    for (const tier of sortedTiers) {
+      if (currentCartQuantity >= tier.min_quantity && 
+          (tier.max_quantity === null || currentCartQuantity <= tier.max_quantity)) {
+        applicableTier = tier;
+      }
+    }
+    
+    if (applicableTier) {
+      return basePrice - applicableTier.discount_amount;
+    }
+    
+    return basePrice;
+  };
+
   const basePrice = product.selling_price || realtimeSubcategoryPrice;
+  const marginalUnitPrice = getMarginalPrice();
+  const marginalTotalPrice = marginalUnitPrice * currentCartQuantity;
+
+  // Calculate savings for display
+  const savings = currentCartQuantity > 0 ? (basePrice - marginalUnitPrice) * currentCartQuantity : 0;
+  const hasDiscount = savings > 0;
+  
+  // Get real-time pricing using the advanced pricing hooks for tier detection
+  const currentPricing = getItemPricing(mockCartItem.id);
   const isComboModeActive = isComboActive(product.subcategory_id);
-  const hasVolumeDiscount = currentPricing.appliedTier === 'discount';
-  const hasComboPrice = currentPricing.appliedTier === 'combo';
+  const hasVolumeDiscount = currentPricing?.appliedTier === 'discount';
+  const hasComboPrice = currentPricing?.appliedTier === 'combo';
 
   const handleQuantityIncrease = async () => {
     if (currentCartQuantity >= productStock) return;
-    
     setLoading(true);
     try {
       if (currentCartQuantity === 0) {
@@ -475,9 +516,9 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-black text-foreground bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                    Rs. {currentCartQuantity > 0 ? currentPricing.unitPrice.toFixed(0) : basePrice.toFixed(0)}
+                    Rs. {marginalUnitPrice.toFixed(0)}
                   </span>
-                  {currentCartQuantity > 0 && currentPricing.savings > 0 && (
+                  {hasDiscount && (
                     <span className="text-sm text-muted-foreground line-through">
                       Rs. {basePrice.toFixed(0)}
                     </span>
@@ -485,13 +526,13 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
                 </div>
                 {currentCartQuantity > 1 && (
                   <span className="text-xs text-muted-foreground font-medium">
-                    Total: Rs. {currentPricing.totalPrice.toFixed(0)}
+                    Total: Rs. {marginalTotalPrice.toFixed(0)}
                   </span>
                 )}
               </div>
-              {currentCartQuantity > 0 && currentPricing.savings > 0 && (
+              {hasDiscount && (
                 <Badge variant="outline" className="text-xs text-green-600 border-green-300 bg-green-50 animate-pulse">
-                  Save Rs. {currentPricing.savings.toFixed(0)}
+                  Save Rs. {savings.toFixed(0)}
                 </Badge>
               )}
             </div>
