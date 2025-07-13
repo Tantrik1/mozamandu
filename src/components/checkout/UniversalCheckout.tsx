@@ -611,9 +611,6 @@ export function UniversalCheckout() {
           <Card className="shadow-sm border-gray-200">
             <CardContent className="p-6">
               <PaymentMethodSection
-                onDiscountApplied={setPromoDiscount}
-                onPromoCodeUsed={(code) => {}}
-                orderTotal={getTieredTotalPrice() + (deliveryLocation ? deliveryLocation.delivery_price : 0)}
                 paymentMethods={paymentMethods}
                 selectedPayment={paymentMethod?.id || ''}
                 setSelectedPayment={(value) => {
