@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { usePromoCode } from '@/hooks/usePromoCode';
 import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
+import { useComboManager } from '@/hooks/useComboManager';
 import { useInventoryManager } from '@/hooks/useInventoryManager';
 import { toast } from 'sonner';
 import { Package, Loader2 } from 'lucide-react';
@@ -42,40 +44,6 @@ interface PromoCode {
   description?: string;
 }
 
-interface CartItem {
-  id: string;
-  productId: string;
-  productName: string;
-  colorVariantId?: string | null;
-  sizeVariantId?: string | null;
-  colorName?: string;
-  sizeName?: string;
-  quantity: number;
-  basePrice: number;
-  subcategoryId: string;
-  image_url?: string;
-  sku?: string;
-  inventoryId?: string;
-  addedOrder: number;
-}
-
-interface ComboData {
-  id: string;
-  name: string;
-  description: string;
-  combo_subcategories: {
-    subcategory_id: string;
-    min_units: number;
-    price: number;
-  }[];
-}
-
-interface DiscountTier {
-  min_quantity: number;
-  max_quantity: number | null;
-  discount_amount: number;
-}
-
 export function UniversalCheckout() {
   const { user } = useAuth();
   const { getInventoryRecord } = useInventoryManager();
@@ -92,23 +60,29 @@ export function UniversalCheckout() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentPercentage, setPaymentPercentage] = useState(100);
   const [paymentScreenshotUrl, setPaymentScreenshotUrl] = useState<string | null>(null);
-  const [discountTiers, setDiscountTiers] = useState<{ [key: string]: DiscountTier[] }>({});
-  const [activePromoCode, setActivePromoCode] = useState<PromoCode | null>(null);
-  const [promoDiscount, setPromoDiscount] = useState(0);
-  const [activeCombo, setActiveCombo] = useState<ComboData | null>(null);
+  const [discountTiers, setDiscountTiers] = useState<{ [key: string]: any[] }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
 
   const {
     cartItems,
-    clearCart,
-    getCartTotal
+    clearCart
   } = useRobustCart();
 
+  // Use the EXACT same combo management as CartSidebar
+  const { 
+    activeCombo, 
+    isComboActive, 
+    getComboPrice, 
+    shouldIgnoreMinimumQuantity 
+  } = useComboManager({ cartItems });
+
+  // Use the EXACT same tiered pricing hook as CartSidebar
   const {
+    getTotalPrice: getTieredTotalPrice,
+    getItemPricing: getTieredItemPricing,
     subcategoryPricing,
-    getTotalPrice,
     getTotalSavings,
     getComboInfo,
     isComboModeActive
@@ -127,11 +101,12 @@ export function UniversalCheckout() {
     removePromoCode
   } = usePromoCode();
 
+  const [promoDiscount, setPromoDiscount] = useState(0);
+
   useEffect(() => {
     fetchDeliveryLocations();
     fetchPaymentMethods();
     fetchDiscountTiers();
-    fetchActiveCombo();
   }, []);
 
   useEffect(() => {
@@ -141,6 +116,31 @@ export function UniversalCheckout() {
       setPromoDiscount(0);
     }
   }, [appliedPromo, cartItems]);
+
+  // Debug combo activation - EXACT same as CartSidebar
+  useEffect(() => {
+    console.log('🎯 UniversalCheckout Debug - Combo Status:');
+    console.log('Active combo:', activeCombo);
+    console.log('Is combo mode active:', isComboModeActive());
+    console.log('Cart items count:', cartItems.length);
+    
+    if (activeCombo) {
+      console.log('Combo requirements:', activeCombo.combo_subcategories);
+      
+      // Check subcategory quantities
+      const subcategoryCounts: { [key: string]: number } = {};
+      cartItems.forEach(item => {
+        subcategoryCounts[item.subcategoryId] = (subcategoryCounts[item.subcategoryId] || 0) + item.quantity;
+      });
+      console.log('Current subcategory quantities:', subcategoryCounts);
+      
+      // Check if combo requirements are met
+      activeCombo.combo_subcategories.forEach(req => {
+        const currentQty = subcategoryCounts[req.subcategory_id] || 0;
+        console.log(`Subcategory ${req.subcategory_id}: needs ${req.min_units}, has ${currentQty}`);
+      });
+    }
+  }, [activeCombo, cartItems, isComboModeActive]);
 
   const fetchDeliveryLocations = async () => {
     try {
@@ -186,7 +186,7 @@ export function UniversalCheckout() {
         .order('subcategory_id, min_quantity');
       
       if (data) {
-        const tiersBySubcategory: { [key: string]: DiscountTier[] } = {};
+        const tiersBySubcategory: { [key: string]: any[] } = {};
         data.forEach(tier => {
           if (!tiersBySubcategory[tier.subcategory_id]) {
             tiersBySubcategory[tier.subcategory_id] = [];
@@ -200,31 +200,10 @@ export function UniversalCheckout() {
     }
   };
 
-  const fetchActiveCombo = async () => {
-    try {
-      const { data } = await supabase
-        .from('combos')
-        .select(`
-          *,
-          combo_subcategories (
-            subcategory_id,
-            min_units,
-            price
-          )
-        `)
-        .eq('status', 'active')
-        .maybeSingle();
-      
-      setActiveCombo(data);
-    } catch (error) {
-      console.error('Error fetching active combo:', error);
-    }
-  };
-
   const calculatePromoDiscount = () => {
     if (appliedPromo) {
       // Use the EXACT same tiered pricing calculation as cart
-      const accurateSubtotal = getTotalPrice();
+      const accurateSubtotal = getTieredTotalPrice();
       const discount = (accurateSubtotal * appliedPromo.discount_percentage) / 100;
       setPromoDiscount(discount);
       console.log('🔢 Promo calculation - Subtotal:', accurateSubtotal, 'Discount:', discount);
@@ -234,7 +213,7 @@ export function UniversalCheckout() {
   };
 
   const handlePromoCodeApplied = (promoCode: PromoCode) => {
-    const totalWithDelivery = getTotalPrice() + (deliveryLocation ? deliveryLocation.delivery_price : 0);
+    const totalWithDelivery = getTieredTotalPrice() + (deliveryLocation ? deliveryLocation.delivery_price : 0);
     applyPromoCode(totalWithDelivery);
   };
 
@@ -310,8 +289,8 @@ export function UniversalCheckout() {
 
       console.log('📦 Cart items with inventory validated:', cartItemsWithInventory);
 
-      // Calculate EXACT same pricing as cart
-      const accurateSubtotal = getTotalPrice(); // This matches cart calculation exactly
+      // Calculate EXACT same pricing as cart using the SAME pricing hook
+      const accurateSubtotal = getTieredTotalPrice(); // This matches cart calculation exactly
       const accurateSavings = getTotalSavings();
       const comboInfo = getComboInfo();
       const isComboActive = isComboModeActive();
@@ -330,7 +309,7 @@ export function UniversalCheckout() {
       const paidAmount = Math.round(finalTotal * (paymentPercentage / 100));
       const remainingAmount = finalTotal - paidAmount;
 
-      // Create comprehensive pricing breakdown with EXACT cart details
+      // Create comprehensive pricing breakdown with EXACT cart details using SAME pricing hook
       const pricingBreakdown = {
         subcategoryPricing: Object.fromEntries(
           Object.entries(subcategoryPricing).map(([id, data]) => [
@@ -385,7 +364,7 @@ export function UniversalCheckout() {
           delivery_address: customerInfo.address,
           delivery_location_id: deliveryLocation.id,
           delivery_charge: deliveryLocation.delivery_price,
-          subtotal: accurateSubtotal, // EXACT cart subtotal
+          subtotal: accurateSubtotal, // EXACT cart subtotal using SAME pricing hook
           promocode_used: appliedPromo?.code || null,
           promocode_discount: promoDiscount,
           total_amount: finalTotal,
@@ -424,11 +403,17 @@ export function UniversalCheckout() {
         throw orderItemsError;
       }
 
-      // Insert detailed order item information with EXACT cart pricing per inventory ID
+      // Insert detailed order item information with EXACT cart pricing per inventory ID using SAME pricing hook
       const orderItemDetailsToInsert = cartItemsWithInventory.map(item => {
-        const pricingInfo = Object.values(subcategoryPricing)
-          .find(sub => sub.itemBreakdown.some(breakdown => breakdown.itemId === item.id))
-          ?.itemBreakdown.find(breakdown => breakdown.itemId === item.id);
+        const pricingResult = getTieredItemPricing(item.id); // Use EXACT same method as CartSidebar
+        const pricingInfo = pricingResult || {
+          unitPrice: item.basePrice,
+          totalPrice: item.basePrice * item.quantity,
+          appliedTier: 'normal',
+          savings: 0,
+          tierInfo: undefined,
+          subcategoryInfo: null
+        };
 
         return {
           order_id: orderData.id,
@@ -438,26 +423,26 @@ export function UniversalCheckout() {
           size_name: item.sizeName || null,
           sku: item.sku,
           quantity: item.quantity,
-          unit_price: pricingInfo?.unitPrice || item.basePrice,
-          total_price: pricingInfo?.totalPrice || (item.basePrice * item.quantity),
-          pricing_mode: pricingInfo?.appliedTier || 'normal',
+          unit_price: pricingInfo.unitPrice, // EXACT same pricing as cart
+          total_price: pricingInfo.totalPrice, // EXACT same pricing as cart
+          pricing_mode: pricingInfo.appliedTier || 'normal',
           pricing_details: {
-            appliedTier: pricingInfo?.appliedTier || 'normal',
-            tierInfo: pricingInfo?.tierInfo || null,
-            savings: pricingInfo?.savings || 0,
+            appliedTier: pricingInfo.appliedTier || 'normal',
+            tierInfo: pricingInfo.tierInfo || null,
+            savings: pricingInfo.savings || 0,
             basePrice: item.basePrice,
             subcategoryId: item.subcategoryId,
             comboApplied: isComboActive,
-            discountApplied: (pricingInfo?.savings || 0) > 0,
+            discountApplied: (pricingInfo.savings || 0) > 0,
             inventoryId: item.inventoryId,
-            moqPricingApplied: pricingInfo?.appliedTier === 'discount',
-            accurateUnitPrice: pricingInfo?.unitPrice || item.basePrice,
-            accurateTotalPrice: pricingInfo?.totalPrice || (item.basePrice * item.quantity)
+            moqPricingApplied: pricingInfo.appliedTier === 'discount',
+            accurateUnitPrice: pricingInfo.unitPrice,
+            accurateTotalPrice: pricingInfo.totalPrice
           }
         };
       });
 
-      console.log('📝 Detailed order items with EXACT cart pricing per inventory ID:', orderItemDetailsToInsert);
+      console.log('📝 Detailed order items with EXACT cart pricing per inventory ID using SAME pricing hook:', orderItemDetailsToInsert);
 
       const { error: orderItemDetailsError } = await supabase
         .from('customer_order_item_details')
@@ -468,13 +453,13 @@ export function UniversalCheckout() {
         throw orderItemDetailsError;
       }
 
-      console.log('✅ Order completed successfully with EXACT cart pricing matching perfectly!');
+      console.log('✅ Order completed successfully with EXACT cart pricing matching perfectly using SAME pricing hooks!');
       
       // Clear cart and show success
       clearCart();
       setOrderId(orderData.id);
       setShowSuccess(true);
-      toast.success('Order placed successfully! Exact cart pricing applied and saved to database.');
+      toast.success('Order placed successfully! Exact cart pricing applied and saved to database using same pricing logic as cart.');
 
     } catch (error) {
       console.error('💥 Order submission failed:', error);
@@ -484,13 +469,13 @@ export function UniversalCheckout() {
     }
   };
 
-  // Use EXACT cart pricing calculations
+  // Use EXACT cart pricing calculations using SAME pricing hooks
   const totalSavings = getTotalSavings() + promoDiscount;
-  const subtotal = getTotalPrice(); // This matches cart calculation exactly
+  const subtotal = getTieredTotalPrice(); // This matches cart calculation exactly using SAME hook
   const totalBeforeDelivery = subtotal - promoDiscount;
   const finalTotal = totalBeforeDelivery + (deliveryLocation ? deliveryLocation.delivery_price : 0);
 
-  console.log('🎯 Final checkout calculations (should match cart):', {
+  console.log('🎯 Final checkout calculations using SAME pricing hooks as cart:', {
     subtotal,
     totalSavings: getTotalSavings(),
     promoDiscount,
@@ -570,6 +555,8 @@ export function UniversalCheckout() {
             isSubmitting={isSubmitting}
             onSubmitOrder={handleSubmitOrder}
             comboInfo={getComboInfo()}
+            getTieredItemPricing={getTieredItemPricing}
+            isComboModeActive={isComboModeActive()}
           />
         </div>
       </div>
@@ -600,7 +587,7 @@ export function UniversalCheckout() {
 
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-500">
-          Checkout pricing now matches cart pricing EXACTLY with identical MOQ calculations.
+          Checkout pricing now uses EXACT same pricing hooks as cart for perfect consistency.
         </p>
       </div>
     </div>

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Package, TrendingDown, Star } from 'lucide-react';
+import { Loader2, Package, TrendingDown, Star, Tag } from 'lucide-react';
 
 interface CartItem {
   id: string;
@@ -70,6 +70,8 @@ interface CleanOrderSummaryProps {
   isSubmitting: boolean;
   onSubmitOrder: () => void;
   comboInfo?: ComboInfo | null;
+  getTieredItemPricing: (itemId: string) => any;
+  isComboModeActive: boolean;
 }
 
 export function CleanOrderSummary({
@@ -82,7 +84,9 @@ export function CleanOrderSummary({
   finalTotal,
   isSubmitting,
   onSubmitOrder,
-  comboInfo
+  comboInfo,
+  getTieredItemPricing,
+  isComboModeActive
 }: CleanOrderSummaryProps) {
   // Calculate subtotal using exact same logic as cart
   const subtotal = Object.values(subcategoryPricing).reduce((total, subcategory) => {
@@ -91,26 +95,22 @@ export function CleanOrderSummary({
     }, 0);
   }, 0);
 
-  console.log('🧮 Checkout Pricing Debug:', {
+  console.log('🧮 Checkout Pricing Debug using EXACT cart pricing logic:', {
     subtotal,
     subcategoryPricing,
     totalSavings,
     finalTotal
   });
 
-  // Check pricing modes
+  // Check pricing modes - EXACT same as cart
   const hasActiveCombo = comboInfo && Object.values(subcategoryPricing).some(sub => sub.comboActive);
   const hasMOQDiscounts = Object.values(subcategoryPricing).some(sub => 
     sub.moqReached && !sub.comboActive && sub.totalSavings > 0
   );
 
-  // Get item pricing details - exact same as cart
+  // Get item pricing details using EXACT same function as cart
   const getItemPricingDetails = (item: CartItem) => {
-    const pricingInfo = Object.values(subcategoryPricing)
-      .find(sub => sub.itemBreakdown.some(breakdown => breakdown.itemId === item.id))
-      ?.itemBreakdown.find(breakdown => breakdown.itemId === item.id);
-    
-    return pricingInfo;
+    return getTieredItemPricing(item.id); // Use EXACT same function as CartSidebar
   };
 
   return (
@@ -128,7 +128,7 @@ export function CleanOrderSummary({
             {hasMOQDiscounts && !hasActiveCombo && (
               <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
                 <TrendingDown className="h-3 w-3 mr-1" />
-                MOQ Discount
+                Volume Discount
               </Badge>
             )}
           </div>
@@ -151,7 +151,7 @@ export function CleanOrderSummary({
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-2">
             <div className="flex items-center space-x-2 mb-1">
               <TrendingDown className="h-4 w-4 text-green-600" />
-              <span className="font-semibold text-green-800">MOQ Discount Applied</span>
+              <span className="font-semibold text-green-800">Volume Discount Applied</span>
             </div>
             <p className="text-sm text-green-700">
               You've reached the minimum order quantity for volume pricing!
@@ -164,16 +164,24 @@ export function CleanOrderSummary({
       </CardHeader>
       
       <CardContent className="space-y-6">
-        {/* Cart Items Display - exact same format as cart */}
+        {/* Cart Items Display - exact same format as cart using SAME pricing function */}
         <div className="space-y-4">
           <h3 className="font-medium text-gray-900 text-sm mb-3">
             Items in Your Order ({cartItems.length})
           </h3>
           
           {cartItems.map((item) => {
-            const pricingInfo = getItemPricingDetails(item);
-            const totalItemPrice = pricingInfo?.totalPrice || (item.unitPrice * item.quantity);
-            const savings = pricingInfo?.savings || 0;
+            const pricingInfo = getItemPricingDetails(item); // Use EXACT same function as CartSidebar
+            const pricing = pricingInfo || {
+              unitPrice: item.basePrice,
+              totalPrice: item.basePrice * item.quantity,
+              appliedTier: 'normal' as const,
+              savings: 0,
+              tierInfo: undefined,
+              subcategoryInfo: null
+            };
+            const totalItemPrice = pricing.totalPrice;
+            const savings = pricing.savings || 0;
             
             return (
               <div key={item.id} className="border rounded-lg p-4">
@@ -203,36 +211,45 @@ export function CleanOrderSummary({
                         </div>
                         
                         {/* Pricing tier info - EXACT same as cart */}
-                        {pricingInfo?.tierInfo && (
-                          <div className="text-xs text-blue-600 mb-2">
-                            {pricingInfo.tierInfo}
+                        {pricing.tierInfo && (
+                          <div className="text-xs text-blue-600 mb-2 bg-blue-50 p-2 rounded">
+                            <div className="font-medium">Pricing details:</div>
+                            <div className="ml-2">{pricing.tierInfo}</div>
                           </div>
                         )}
                         
-                        {/* Price badges */}
+                        {/* Price badges - EXACT same as cart */}
                         <div className="flex items-center gap-2 mb-2">
-                          {pricingInfo?.appliedTier === 'combo' && (
-                            <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
-                              <Star className="h-3 w-3 mr-1" />
-                              Combo Price
+                          {pricing.appliedTier === 'combo' && (
+                            <Badge variant="secondary" className="text-xs px-2 py-0 bg-purple-100 text-purple-800 border border-purple-200">
+                              <Star className="w-2 h-2 mr-1" />
+                              COMBO
                             </Badge>
                           )}
-                          {pricingInfo?.appliedTier === 'discount' && (
-                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                              <TrendingDown className="h-3 w-3 mr-1" />
-                              MOQ Discount
+                          {pricing.appliedTier === 'discount' && (
+                            <Badge variant="secondary" className="text-xs px-2 py-0 bg-blue-100 text-blue-800 border border-blue-200">
+                              <Tag className="w-2 h-2 mr-1" />
+                              Volume Discount
                             </Badge>
+                          )}
+                          {pricing.appliedTier === 'normal' && (
+                            <Badge variant="outline" className="text-xs px-2 py-0 bg-gray-50 text-gray-700">
+                              Normal
+                            </Badge>
+                          )}
+                          {savings > 0 && (
+                            <span className="text-xs text-green-600">
+                              Save Rs.{savings.toFixed(2)}
+                            </span>
                           )}
                         </div>
                         
                         {/* Total price */}
                         <div className="flex items-center gap-1">
                           <span className="font-medium text-gray-900">Total: Rs. {totalItemPrice.toFixed(2)}</span>
-                          {savings > 0 && (
-                            <span className="text-xs text-green-600 ml-2">
-                              (Save Rs. {savings.toFixed(2)})
-                            </span>
-                          )}
+                          <p className="text-xs text-gray-600 ml-2">
+                            Rs.{pricing.unitPrice.toFixed(2)} avg per item
+                          </p>
                         </div>
                       </div>
                       
@@ -243,7 +260,7 @@ export function CleanOrderSummary({
                         </p>
                         {savings > 0 && (
                           <p className={`text-xs ${
-                            pricingInfo?.appliedTier === 'combo' ? 'text-purple-600' : 'text-green-600'
+                            pricing.appliedTier === 'combo' ? 'text-purple-600' : 'text-green-600'
                           }`}>
                             Save Rs. {savings.toFixed(2)}
                           </p>
@@ -282,7 +299,7 @@ export function CleanOrderSummary({
             <div className={`flex justify-between text-sm ${
               hasActiveCombo ? 'text-purple-600' : 'text-green-600'
             }`}>
-              <span>{hasActiveCombo ? 'Combo Savings' : 'MOQ Discount Savings'}</span>
+              <span>{hasActiveCombo ? 'Combo Savings' : 'Volume Discount Savings'}</span>
               <span>-Rs. {totalSavings.toFixed(2)}</span>
             </div>
           )}
@@ -299,7 +316,7 @@ export function CleanOrderSummary({
               hasActiveCombo ? 'text-purple-600' : 'text-green-600'
             }`}>
               You saved Rs. {(totalSavings + promoDiscount).toFixed(2)} total!
-              {hasActiveCombo ? ' (includes combo savings)' : ' (includes MOQ discounts)'}
+              {hasActiveCombo ? ' (includes combo savings)' : ' (includes volume discounts)'}
             </div>
           )}
         </div>
