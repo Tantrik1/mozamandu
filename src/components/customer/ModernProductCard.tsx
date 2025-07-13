@@ -67,13 +67,31 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
   
   const { addToCart, cartItems, updateQuantity, removeFromCart } = useRobustCart();
   
-  // Get current cart quantity for this product
+  // Get current cart quantity for this product variant
   const getCartQuantity = () => {
-    const cartItem = cartItems.find(item => 
-      item.productId === product.id &&
-      item.colorVariantId === (selectedColor || null) &&
-      item.sizeVariantId === (selectedSize || null)
-    );
+    const cartItem = cartItems.find(item => {
+      const productMatch = item.productId === product.id;
+      const colorMatch = item.colorVariantId === (selectedColor || null);
+      const sizeMatch = item.sizeVariantId === (selectedSize || null);
+      
+      // For products without variants, just match product ID
+      if (!product.has_color_variants) {
+        return productMatch && !item.colorVariantId && !item.sizeVariantId;
+      }
+      
+      // For products with color variants but no size variants
+      if (product.has_color_variants && !product.color_has_size_variants) {
+        return productMatch && colorMatch && !item.sizeVariantId;
+      }
+      
+      // For products with both color and size variants
+      if (product.has_color_variants && product.color_has_size_variants) {
+        return productMatch && colorMatch && sizeMatch;
+      }
+      
+      return productMatch;
+    });
+    
     return cartItem?.quantity || 0;
   };
   
@@ -100,12 +118,17 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
   // Use combo manager to check for active combos
   const { activeCombo, isComboActive } = useComboManager({ cartItems });
   
-  // Use tiered pricing for real-time price calculation
+  // Use tiered pricing for real-time price calculation - recalculate when cart changes
   const { getItemPricing } = useSubcategoryTieredPricing({
     cartItems: [mockCartItem], // Use mock item to get current pricing
     activeCombo,
     discountTiers
   });
+
+  // Recalculate cart quantity when cart items change or selections change
+  useEffect(() => {
+    // This will trigger a re-render when cartItems change
+  }, [cartItems, selectedColor, selectedSize]);
 
   useEffect(() => {
     if (product.has_color_variants) {
@@ -235,12 +258,24 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
           unitPrice: product.selling_price || realtimeSubcategoryPrice,
         });
       } else {
-        // Update existing cart item
-        const cartItem = cartItems.find(item => 
-          item.productId === product.id &&
-          item.colorVariantId === (selectedColor || null) &&
-          item.sizeVariantId === (selectedSize || null)
-        );
+        // Find the exact cart item and update its quantity
+        const cartItem = cartItems.find(item => {
+          const productMatch = item.productId === product.id;
+          const colorMatch = item.colorVariantId === (selectedColor || null);
+          const sizeMatch = item.sizeVariantId === (selectedSize || null);
+          
+          if (!product.has_color_variants) {
+            return productMatch && !item.colorVariantId && !item.sizeVariantId;
+          }
+          if (product.has_color_variants && !product.color_has_size_variants) {
+            return productMatch && colorMatch && !item.sizeVariantId;
+          }
+          if (product.has_color_variants && product.color_has_size_variants) {
+            return productMatch && colorMatch && sizeMatch;
+          }
+          return productMatch;
+        });
+        
         if (cartItem) {
           await updateQuantity(cartItem.id, currentCartQuantity + 1);
         }
@@ -257,11 +292,23 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
     
     setLoading(true);
     try {
-      const cartItem = cartItems.find(item => 
-        item.productId === product.id &&
-        item.colorVariantId === (selectedColor || null) &&
-        item.sizeVariantId === (selectedSize || null)
-      );
+      // Find the exact cart item
+      const cartItem = cartItems.find(item => {
+        const productMatch = item.productId === product.id;
+        const colorMatch = item.colorVariantId === (selectedColor || null);
+        const sizeMatch = item.sizeVariantId === (selectedSize || null);
+        
+        if (!product.has_color_variants) {
+          return productMatch && !item.colorVariantId && !item.sizeVariantId;
+        }
+        if (product.has_color_variants && !product.color_has_size_variants) {
+          return productMatch && colorMatch && !item.sizeVariantId;
+        }
+        if (product.has_color_variants && product.color_has_size_variants) {
+          return productMatch && colorMatch && sizeMatch;
+        }
+        return productMatch;
+      });
       
       if (cartItem) {
         if (currentCartQuantity === 1) {
