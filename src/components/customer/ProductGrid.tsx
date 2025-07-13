@@ -13,7 +13,7 @@ export function ProductGrid({ children, className = '' }: ProductGridProps) {
       sm:grid-cols-2 
       md:grid-cols-3 
       lg:grid-cols-4 
-      xl:grid-cols-5
+      xl:grid-cols-4
       ${className}
     `}>
       {children}

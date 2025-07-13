@@ -181,7 +181,7 @@ export default function SubcategoryPage() {
               <p className="text-gray-500 text-lg mb-2">No products available</p>
               <p className="text-gray-400 text-sm">Check back later for new arrivals in this category!</p>
             </div>
-          </div> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          </div> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-6">
             {sortedProducts.map(product => <ModernProductCard key={product.id} product={{
           ...product,
           subcategory_id: subcategory?.id || ''
