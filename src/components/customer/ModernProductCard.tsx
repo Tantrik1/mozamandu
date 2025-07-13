@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useRobustCart } from '@/hooks/useRobustCart';
-import { Star, ShoppingCart, Plus, Minus } from 'lucide-react';
+import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
+import { useComboManager } from '@/hooks/useComboManager';
+import { Star, ShoppingCart, Plus, Minus, Zap, Target } from 'lucide-react';
 import { getProductStockSummary } from '@/utils/stockCalculation';
 
 interface ColorVariant {
@@ -61,10 +63,38 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
   const [quantity, setQuantity] = useState<number>(1);
   const [loading, setLoading] = useState(false);
   const [productStock, setProductStock] = useState<number>(0);
-  const [discountTiers, setDiscountTiers] = useState<DiscountTier[]>([]);
+  const [discountTiers, setDiscountTiers] = useState<{ [key: string]: DiscountTier[] }>({});
   const [realtimeSubcategoryPrice, setRealtimeSubcategoryPrice] = useState<number>(subcategorySellingPrice);
   
-  const { addToCart } = useRobustCart();
+  const { addToCart, cartItems } = useRobustCart();
+  
+  // Create mock cart item for pricing calculation
+  const mockCartItem = {
+    id: 'mock',
+    productId: product.id,
+    productName: product.name,
+    quantity: quantity,
+    basePrice: product.selling_price || realtimeSubcategoryPrice,
+    subcategoryId: product.subcategory_id,
+    colorVariantId: selectedColor || null,
+    sizeVariantId: selectedSize || null,
+    colorName: selectedColor ? colorVariants.find(c => c.id === selectedColor)?.color_name : undefined,
+    sizeName: selectedSize ? sizeVariants.find(s => s.id === selectedSize)?.size_name : undefined,
+    addedOrder: 999,
+    image_url: product.image_url,
+    sku: `${product.name.slice(0, 3).toUpperCase()}-PREVIEW`,
+    inventoryId: `preview-${product.id}`
+  };
+  
+  // Use combo manager to check for active combos
+  const { activeCombo, isComboActive } = useComboManager({ cartItems });
+  
+  // Use tiered pricing for real-time price calculation
+  const { getItemPricing } = useSubcategoryTieredPricing({
+    cartItems: [mockCartItem], // Use mock item to get current pricing
+    activeCombo,
+    discountTiers
+  });
 
   useEffect(() => {
     if (product.has_color_variants) {
@@ -108,10 +138,10 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
         .order('min_quantity');
 
       if (error) throw error;
-      setDiscountTiers(data || []);
+      setDiscountTiers({ [product.subcategory_id]: data || [] });
     } catch (error) {
       console.error('Error fetching discount tiers:', error);
-      setDiscountTiers([]);
+      setDiscountTiers({});
     }
   };
 
@@ -171,25 +201,12 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
     }
   };
 
-  const calculateDiscountedPrice = (basePrice: number, qty: number) => {
-    if (discountTiers.length === 0) return { currentPrice: basePrice, savings: 0, hasDiscount: false };
-    
-    const applicableTier = discountTiers
-      .filter(tier => qty >= tier.min_quantity)
-      .sort((a, b) => b.min_quantity - a.min_quantity)[0];
-    
-    if (applicableTier) {
-      const discountedPrice = Math.max(0, basePrice - applicableTier.discount_amount);
-      return {
-        currentPrice: discountedPrice,
-        savings: (basePrice - discountedPrice) * qty,
-        hasDiscount: true,
-        tierInfo: `MOQ ${applicableTier.min_quantity}+ = Rs. ${discountedPrice} each`
-      };
-    }
-    
-    return { currentPrice: basePrice, savings: 0, hasDiscount: false };
-  };
+  // Get real-time pricing using the advanced pricing hooks
+  const currentPricing = getItemPricing(mockCartItem.id);
+  const basePrice = product.selling_price || realtimeSubcategoryPrice;
+  const isComboModeActive = isComboActive(product.subcategory_id);
+  const hasVolumeDiscount = currentPricing.appliedTier === 'discount';
+  const hasComboPrice = currentPricing.appliedTier === 'combo';
 
   const handleQuantityChange = (newQuantity: number) => {
     if (newQuantity >= 1 && newQuantity <= productStock) {
@@ -221,87 +238,95 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
     }
   };
 
-  const basePrice = product.selling_price || realtimeSubcategoryPrice;
-  const pricingInfo = calculateDiscountedPrice(basePrice, quantity);
   const selectedColorVariant = colorVariants.find(cv => cv.id === selectedColor);
   const currentImage = selectedColorVariant?.image_url || product.image_url;
 
   return (
-    <Card className="group h-full flex flex-col overflow-hidden bg-card shadow-sm hover:shadow-md transition-all duration-300 border-border rounded-lg">
-      {/* Product Image - 16:9 Aspect Ratio */}
-      <div className="relative overflow-hidden bg-muted/50" style={{ aspectRatio: '16/9' }}>
+    <Card className="group h-full flex flex-col overflow-hidden bg-gradient-to-br from-card via-card to-card/80 shadow-lg hover:shadow-xl transition-all duration-500 border border-border/50 hover:border-primary/20 rounded-xl backdrop-blur-sm">
+      {/* Product Image - Enhanced 16:9 Aspect Ratio */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-muted/30 to-muted/60 rounded-t-xl" style={{ aspectRatio: '16/9' }}>
         {currentImage ? (
           <img
             src={currentImage}
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 filter group-hover:brightness-110"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
             }}
           />
         ) : (
-          <div className="w-full h-full bg-muted flex items-center justify-center">
-            <span className="text-muted-foreground text-sm">No Image</span>
+          <div className="w-full h-full bg-gradient-to-br from-muted to-muted/60 flex items-center justify-center">
+            <span className="text-muted-foreground text-sm font-medium">No Image</span>
           </div>
         )}
         
-        {/* Badges */}
-        <div className="absolute top-2 left-2 flex flex-col gap-1">
+        {/* Enhanced Badges with animations */}
+        <div className="absolute top-3 left-3 flex flex-col gap-2">
           {product.is_featured && (
-            <Badge variant="default" className="text-xs px-2 py-0.5 bg-primary text-primary-foreground">
+            <Badge variant="default" className="text-xs px-3 py-1 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg animate-pulse">
               <Star className="w-3 h-3 fill-current mr-1" />
               Featured
             </Badge>
           )}
-          {pricingInfo.hasDiscount && (
-            <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-green-100 text-green-700">
+          {hasComboPrice && (
+            <Badge variant="secondary" className="text-xs px-3 py-1 bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg">
+              <Zap className="w-3 h-3 mr-1" />
+              Combo
+            </Badge>
+          )}
+          {hasVolumeDiscount && (
+            <Badge variant="secondary" className="text-xs px-3 py-1 bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg">
+              <Target className="w-3 h-3 mr-1" />
               Volume
             </Badge>
           )}
         </div>
 
-        {/* Stock Status */}
-        <div className="absolute top-2 right-2">
+        {/* Enhanced Stock Status */}
+        <div className="absolute top-3 right-3">
           {productStock === 0 ? (
-            <Badge variant="destructive" className="text-xs">
+            <Badge variant="destructive" className="text-xs shadow-lg animate-bounce">
               Out of Stock
             </Badge>
           ) : productStock <= 5 ? (
-            <Badge variant="outline" className="text-xs bg-orange-100 text-orange-700 border-orange-200">
+            <Badge variant="outline" className="text-xs bg-gradient-to-r from-orange-100 to-orange-200 text-orange-700 border-orange-300 shadow-lg">
               Low Stock
             </Badge>
           ) : (
-            <Badge variant="outline" className="text-xs bg-green-100 text-green-700 border-green-200">
+            <Badge variant="outline" className="text-xs bg-gradient-to-r from-green-100 to-green-200 text-green-700 border-green-300 shadow-lg">
               In Stock
             </Badge>
           )}
         </div>
+
+        {/* Futuristic overlay gradient */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
       </div>
       
-      <CardContent className="p-3 flex-1 flex flex-col">
-        {/* Product Name */}
-        <h3 className="font-semibold text-foreground text-sm mb-2 line-clamp-2 leading-tight">
+      <CardContent className="p-4 flex-1 flex flex-col bg-gradient-to-b from-card to-card/90">
+        {/* Enhanced Product Name */}
+        <h3 className="font-bold text-foreground text-sm mb-3 line-clamp-2 leading-tight group-hover:text-primary transition-colors duration-300">
           {product.name}
         </h3>
         
-        {/* Description */}
+        {/* Enhanced Description */}
         {product.description && (
-          <p className="text-xs text-muted-foreground mb-3 line-clamp-2 leading-relaxed">
+          <p className="text-xs text-muted-foreground mb-4 line-clamp-2 leading-relaxed">
             {product.description}
           </p>
         )}
 
-        {/* Color Selection */}
+        {/* Enhanced Color Selection */}
         {product.has_color_variants && colorVariants.length > 0 && (
-          <div className="mb-2">
-            <label className="text-xs font-medium text-foreground mb-1 block">Color</label>
+          <div className="mb-3">
+            <label className="text-xs font-semibold text-foreground mb-2 block">Color</label>
             <Select value={selectedColor} onValueChange={setSelectedColor}>
-              <SelectTrigger className="h-7 text-xs">
+              <SelectTrigger className="h-8 text-xs border-2 border-border/60 hover:border-primary/50 focus:border-primary transition-colors duration-300 bg-gradient-to-r from-muted/30 to-muted/60">
                 <SelectValue placeholder="Select color" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-card/95 backdrop-blur-sm border-2">
                 {colorVariants.map((color) => (
-                  <SelectItem key={color.id} value={color.id} className="text-xs">
+                  <SelectItem key={color.id} value={color.id} className="text-xs hover:bg-primary/10 transition-colors duration-200">
                     {color.color_name}
                   </SelectItem>
                 ))}
@@ -310,17 +335,17 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
           </div>
         )}
 
-        {/* Size Selection */}
+        {/* Enhanced Size Selection */}
         {product.color_has_size_variants && sizeVariants.length > 0 && (
-          <div className="mb-2">
-            <label className="text-xs font-medium text-foreground mb-1 block">Size</label>
+          <div className="mb-3">
+            <label className="text-xs font-semibold text-foreground mb-2 block">Size</label>
             <Select value={selectedSize} onValueChange={setSelectedSize}>
-              <SelectTrigger className="h-7 text-xs">
+              <SelectTrigger className="h-8 text-xs border-2 border-border/60 hover:border-primary/50 focus:border-primary transition-colors duration-300 bg-gradient-to-r from-muted/30 to-muted/60">
                 <SelectValue placeholder="Select size" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-card/95 backdrop-blur-sm border-2">
                 {sizeVariants.map((size) => (
-                  <SelectItem key={size.id} value={size.id} className="text-xs">
+                  <SelectItem key={size.id} value={size.id} className="text-xs hover:bg-primary/10 transition-colors duration-200">
                     {size.size_name}
                   </SelectItem>
                 ))}
@@ -329,25 +354,25 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
           </div>
         )}
 
-        {/* Quantity Controls */}
+        {/* Enhanced Quantity Controls */}
         {productStock > 0 && (
-          <div className="mb-3">
-            <label className="text-xs font-medium text-foreground mb-1 block">Quantity</label>
-            <div className="flex items-center gap-2">
+          <div className="mb-4">
+            <label className="text-xs font-semibold text-foreground mb-2 block">Quantity</label>
+            <div className="flex items-center gap-3 bg-gradient-to-r from-muted/30 to-muted/60 rounded-lg p-2">
               <Button
                 variant="outline"
                 size="sm"
-                className="h-7 w-7 p-0"
+                className="h-8 w-8 p-0 border-2 border-border/60 hover:border-primary/50 hover:bg-primary/10 transition-all duration-300"
                 onClick={() => handleQuantityChange(quantity - 1)}
                 disabled={quantity <= 1}
               >
                 <Minus className="h-3 w-3" />
               </Button>
-              <span className="font-medium text-sm w-6 text-center">{quantity}</span>
+              <span className="font-bold text-sm w-8 text-center bg-background rounded px-2 py-1">{quantity}</span>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-7 w-7 p-0"
+                className="h-8 w-8 p-0 border-2 border-border/60 hover:border-primary/50 hover:bg-primary/10 transition-all duration-300"
                 onClick={() => handleQuantityChange(quantity + 1)}
                 disabled={quantity >= productStock}
               >
@@ -357,62 +382,78 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
           </div>
         )}
 
-        {/* Pricing */}
+        {/* Enhanced Real-time Pricing */}
         <div className="mt-auto">
-          <div className="space-y-2 mb-3">
+          <div className="space-y-3 mb-4">
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold text-foreground">
-                    Rs. {pricingInfo.currentPrice.toFixed(0)}
+                  <span className="text-lg font-black text-foreground bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                    Rs. {currentPricing.unitPrice.toFixed(0)}
                   </span>
-                  {pricingInfo.hasDiscount && (
+                  {currentPricing.savings > 0 && (
                     <span className="text-sm text-muted-foreground line-through">
                       Rs. {basePrice.toFixed(0)}
                     </span>
                   )}
                 </div>
                 {quantity > 1 && (
-                  <span className="text-xs text-muted-foreground">
-                    Total: Rs. {(pricingInfo.currentPrice * quantity).toFixed(0)}
+                  <span className="text-xs text-muted-foreground font-medium">
+                    Total: Rs. {currentPricing.totalPrice.toFixed(0)}
                   </span>
                 )}
               </div>
-              {pricingInfo.savings > 0 && (
-                <Badge variant="outline" className="text-xs text-green-600 border-green-200">
-                  Save Rs. {pricingInfo.savings.toFixed(0)}
+              {currentPricing.savings > 0 && (
+                <Badge variant="outline" className="text-xs text-green-600 border-green-300 bg-green-50 animate-pulse">
+                  Save Rs. {currentPricing.savings.toFixed(0)}
                 </Badge>
               )}
             </div>
 
-            {/* Volume Discount Info */}
-            {pricingInfo.hasDiscount && pricingInfo.tierInfo && (
-              <div className="text-xs p-2 bg-blue-50 rounded border border-blue-200">
-                <div className="text-blue-700">
-                  <span className="font-medium">✓ Volume discount active!</span>
+            {/* Enhanced Pricing Mode Indicators */}
+            {hasComboPrice && (
+              <div className="text-xs p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200 shadow-sm">
+                <div className="text-purple-700">
+                  <span className="font-bold flex items-center gap-1">
+                    <Zap className="w-3 h-3" />
+                    Combo pricing active!
+                  </span>
                   <br />
-                  <span className="text-blue-600">{pricingInfo.tierInfo}</span>
+                  <span className="text-purple-600">{currentPricing.tierInfo}</span>
+                </div>
+              </div>
+            )}
+
+            {hasVolumeDiscount && !hasComboPrice && (
+              <div className="text-xs p-3 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200 shadow-sm">
+                <div className="text-green-700">
+                  <span className="font-bold flex items-center gap-1">
+                    <Target className="w-3 h-3" />
+                    Volume discount active!
+                  </span>
+                  <br />
+                  <span className="text-green-600">{currentPricing.tierInfo}</span>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Add to Cart Button */}
+          {/* Enhanced Add to Cart Button */}
           <Button
             onClick={handleAddToCart}
             disabled={loading || productStock === 0}
-            className="w-full h-8 text-xs font-medium transition-colors duration-200"
+            className="w-full h-10 text-sm font-bold transition-all duration-300 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
           >
             {loading ? (
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 Adding...
               </div>
             ) : productStock === 0 ? (
               'Out of Stock'
             ) : (
               <div className="flex items-center gap-2">
-                <ShoppingCart className="w-3 h-3" />
+                <ShoppingCart className="w-4 h-4" />
                 Add to Cart
               </div>
             )}
