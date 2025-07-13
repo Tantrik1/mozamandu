@@ -45,7 +45,7 @@ interface PromoCode {
 }
 
 export function UniversalCheckout() {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { getInventoryRecord, validateStockAvailability, reserveStock } = useInventoryManager();
   const { toast } = useToast();
   
@@ -116,6 +116,20 @@ export function UniversalCheckout() {
       setPromoDiscount(0);
     }
   }, [appliedPromo, cartItems]);
+
+  // Auto-fill customer info for authenticated users
+  useEffect(() => {
+    if (user && userProfile) {
+      console.log('🔄 Auto-filling customer info for authenticated user');
+      setCustomerInfo(prev => ({
+        ...prev,
+        name: userProfile.full_name || prev.name,
+        email: user.email || prev.email,
+        phone: userProfile.contact_number || prev.phone,
+        whatsapp: userProfile.whatsapp_number || prev.whatsapp,
+      }));
+    }
+  }, [user, userProfile]);
 
   useEffect(() => {
     console.log('🎯 UniversalCheckout Debug - Combo Status:');
