@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, RefreshCw } from 'lucide-react';
+import { Eye, RefreshCw, CheckCircle, Truck, Package, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useEnhancedInventoryManager } from '@/hooks/useEnhancedInventoryManager';
 
 interface Order {
   id: string;
@@ -64,23 +64,87 @@ export function AdminOrdersTable({
     }
   };
 
+  const { fulfillStock, releaseStock } = useEnhancedInventoryManager();
+
+  const handleInventoryUpdate = async (orderId: string, newStatus: string, oldStatus: string) => {
+    try {
+      console.log('🔄 Handling inventory update for order:', orderId, 'from', oldStatus, 'to', newStatus);
+      
+      // Get order items for inventory management
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('customer_order_item_details')
+        .select('*')
+        .eq('order_id', orderId);
+
+      if (itemsError || !orderItems) {
+        console.error('❌ Failed to fetch order items:', itemsError);
+        throw new Error('Failed to fetch order items for inventory update');
+      }
+
+      console.log('📦 Found order items:', orderItems.length);
+
+      // Handle inventory based on status change
+      if (newStatus === 'delivered' && oldStatus !== 'delivered') {
+        // Fulfill stock: reduce both reserved and total stock
+        console.log('📦 Fulfilling stock for delivery...');
+        for (const item of orderItems) {
+          if (item.product_inventory_id) {
+            const success = await fulfillStock(
+              item.product_inventory_id,
+              item.quantity,
+              orderId,
+              `Order delivered - ${item.sku}`
+            );
+            if (!success) {
+              throw new Error(`Failed to fulfill stock for ${item.sku}`);
+            }
+          }
+        }
+      } else if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
+        // Release stock: only reduce reserved stock, keep total stock
+        console.log('🔓 Releasing reserved stock for cancellation...');
+        for (const item of orderItems) {
+          if (item.product_inventory_id) {
+            const success = await releaseStock(
+              item.product_inventory_id,
+              item.quantity,
+              orderId,
+              `Order cancelled - ${item.sku}`
+            );
+            if (!success) {
+              throw new Error(`Failed to release stock for ${item.sku}`);
+            }
+          }
+        }
+      }
+
+      console.log('✅ Inventory update completed successfully');
+    } catch (error) {
+      console.error('❌ Inventory update failed:', error);
+      throw error;
+    }
+  };
+
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
 
     const oldStatus = order.status;
     
-    // Call the parent update function
-    await onUpdateStatus(orderId, newStatus);
-    
-    // Send status update email
     try {
+      // Handle inventory changes first
+      await handleInventoryUpdate(orderId, newStatus, oldStatus);
+      
+      // Update order status in database
+      await onUpdateStatus(orderId, newStatus);
+      
+      // Send status update email
       console.log('Sending status update email...');
       const { error: emailError } = await supabase.functions.invoke('send-order-email', {
         body: {
           type: 'status_updated',
           orderId: orderId,
-          isCustomerOrder: true, // Updated to true since we're using customer_orders table
+          isCustomerOrder: true,
           oldStatus: oldStatus,
           newStatus: newStatus
         }
@@ -91,9 +155,71 @@ export function AdminOrdersTable({
       } else {
         console.log('Status update email sent successfully');
       }
-    } catch (emailError) {
-      console.error('Email sending error:', emailError);
+    } catch (error) {
+      console.error('Status update failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update order status. Please try again.",
+        variant: "destructive",
+      });
     }
+  };
+
+  const getStatusActions = (order: Order) => {
+    const actions = [];
+    
+    switch (order.status) {
+      case 'pending_payment':
+        actions.push({
+          label: 'Confirm Payment',
+          icon: CheckCircle,
+          nextStatus: 'payment_confirmed',
+          variant: 'default' as const,
+          color: 'bg-blue-600 hover:bg-blue-700'
+        });
+        break;
+        
+      case 'payment_confirmed':
+        actions.push({
+          label: 'Mark On Delivery',
+          icon: Truck,
+          nextStatus: 'on_delivery',
+          variant: 'default' as const,
+          color: 'bg-purple-600 hover:bg-purple-700'
+        });
+        break;
+        
+      case 'on_delivery':
+        actions.push({
+          label: 'Mark Delivered',
+          icon: Package,
+          nextStatus: 'delivered',
+          variant: 'default' as const,
+          color: 'bg-green-600 hover:bg-green-700'
+        });
+        break;
+        
+      case 'delivered':
+        // No actions for delivered orders
+        break;
+        
+      case 'cancelled':
+        // No actions for cancelled orders
+        break;
+    }
+    
+    // Add cancel option for non-final statuses
+    if (!['delivered', 'cancelled'].includes(order.status)) {
+      actions.push({
+        label: 'Cancel Order',
+        icon: X,
+        nextStatus: 'cancelled',
+        variant: 'destructive' as const,
+        color: 'bg-red-600 hover:bg-red-700'
+      });
+    }
+    
+    return actions;
   };
 
   const handleViewOrder = (orderId: string) => {
@@ -109,77 +235,80 @@ export function AdminOrdersTable({
           <TableHead>Type</TableHead>
           <TableHead>Total</TableHead>
           <TableHead>Paid</TableHead>
-          <TableHead>Status</TableHead>
+          <TableHead>Current Status</TableHead>
           <TableHead>Date</TableHead>
           <TableHead>Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {filteredOrders.map((order) => (
-          <TableRow key={order.id}>
-            <TableCell className="font-medium">{order.order_number}</TableCell>
-            <TableCell>
-              <div>
-                <p className="font-medium">{order.customer_name}</p>
-                <p className="text-sm text-gray-600">{order.customer_email}</p>
-              </div>
-            </TableCell>
-            <TableCell>
-              <Badge variant="outline" className={getOrderTypeBadgeColor(getOrderType(order))}>
-                {getOrderType(order)}
-              </Badge>
-            </TableCell>
-            <TableCell>Rs. {Number(order.total_amount).toFixed(2)}</TableCell>
-            <TableCell>
-              <div>
-                <p className="text-green-600">Rs. {Number(order.paid_amount).toFixed(2)}</p>
-                {order.remaining_amount > 0 && (
-                  <p className="text-sm text-orange-600">
-                    Remaining: Rs. {Number(order.remaining_amount).toFixed(2)}
-                  </p>
-                )}
-              </div>
-            </TableCell>
-            <TableCell>
-              <Select
-                value={order.status}
-                onValueChange={(value) => handleStatusUpdate(order.id, value)}
-                disabled={updating === order.id}
-              >
-                <SelectTrigger className="w-40">
-                  <SelectValue>
-                    <Badge className={getStatusColor(order.status)}>
-                      {updating === order.id ? (
-                        <RefreshCw className="h-3 w-3 animate-spin mr-1" />
-                      ) : null}
-                      {order.status.replace('_', ' ')}
-                    </Badge>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                  <SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
-                  <SelectItem value="on_delivery">On Delivery</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </TableCell>
-            <TableCell>
-              {new Date(order.created_at).toLocaleDateString()}
-            </TableCell>
-            <TableCell>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleViewOrder(order.id)}
-              >
-                <Eye className="h-4 w-4 mr-1" />
-                View Details
-              </Button>
-            </TableCell>
-          </TableRow>
-        ))}
+        {filteredOrders.map((order) => {
+          const statusActions = getStatusActions(order);
+          
+          return (
+            <TableRow key={order.id}>
+              <TableCell className="font-medium">{order.order_number}</TableCell>
+              <TableCell>
+                <div>
+                  <p className="font-medium">{order.customer_name}</p>
+                  <p className="text-sm text-gray-600">{order.customer_email}</p>
+                </div>
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline" className={getOrderTypeBadgeColor(getOrderType(order))}>
+                  {getOrderType(order)}
+                </Badge>
+              </TableCell>
+              <TableCell>Rs. {Number(order.total_amount).toFixed(2)}</TableCell>
+              <TableCell>
+                <div>
+                  <p className="text-green-600">Rs. {Number(order.paid_amount).toFixed(2)}</p>
+                  {order.remaining_amount > 0 && (
+                    <p className="text-sm text-orange-600">
+                      Remaining: Rs. {Number(order.remaining_amount).toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell>
+                <Badge className={getStatusColor(order.status)}>
+                  {updating === order.id ? (
+                    <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                  ) : null}
+                  {order.status.replace('_', ' ')}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                {new Date(order.created_at).toLocaleDateString()}
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-1">
+                  {statusActions.map((action, index) => (
+                    <Button
+                      key={index}
+                      variant={action.variant}
+                      size="sm"
+                      onClick={() => handleStatusUpdate(order.id, action.nextStatus)}
+                      disabled={updating === order.id}
+                      className={`text-xs ${action.color}`}
+                    >
+                      <action.icon className="h-3 w-3 mr-1" />
+                      {action.label}
+                    </Button>
+                  ))}
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewOrder(order.id)}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    View
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          );
+        })}
         {filteredOrders.length === 0 && (
           <TableRow>
             <TableCell colSpan={8} className="text-center py-8 text-gray-500">
