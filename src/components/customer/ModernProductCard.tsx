@@ -235,13 +235,18 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
     }
   };
 
-  // Get marginal price (price for the next/current unit) instead of average
+  // Get marginal price based on total subcategory quantity in cart
   const getMarginalPrice = () => {
-    if (currentCartQuantity === 0) {
-      return basePrice; // Show base price when no items in cart
+    // Calculate total quantity for this subcategory across all products in cart
+    const totalSubcategoryQuantity = cartItems
+      .filter(item => item.subcategoryId === product.subcategory_id)
+      .reduce((total, item) => total + item.quantity, 0);
+    
+    if (totalSubcategoryQuantity === 0) {
+      return basePrice; // Show base price when no items from this subcategory in cart
     }
     
-    // Find the discount tier that applies to the current quantity
+    // Find the discount tier that applies to the total subcategory quantity
     const tiers = discountTiers[product.subcategory_id] || [];
     const sortedTiers = tiers.sort((a, b) => a.min_quantity - b.min_quantity);
     
@@ -254,11 +259,11 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
       return comboSubcategory.price;
     }
     
-    // Find the tier that applies to the current quantity
+    // Find the tier that applies to the total subcategory quantity
     let applicableTier = null;
     for (const tier of sortedTiers) {
-      if (currentCartQuantity >= tier.min_quantity && 
-          (tier.max_quantity === null || currentCartQuantity <= tier.max_quantity)) {
+      if (totalSubcategoryQuantity >= tier.min_quantity && 
+          (tier.max_quantity === null || totalSubcategoryQuantity <= tier.max_quantity)) {
         applicableTier = tier;
       }
     }
