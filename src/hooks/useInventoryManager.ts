@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getDetailedProductStock, ProductStockSummary, getVariantStock, VariantStock } from '@/utils/stockCalculation';
@@ -159,7 +158,7 @@ export function useInventoryManager() {
     }
   };
 
-  // Enhanced function to get inventory record with better error handling
+  // Enhanced function to get inventory record with duplicate handling
   const getInventoryRecord = async (
     productId: string,
     colorVariantId?: string,
@@ -194,26 +193,61 @@ export function useInventoryManager() {
       }
 
       console.log('🔍 Executing inventory query...');
-      const { data, error } = await query.maybeSingle();
+      
+      // Use .select() instead of .maybeSingle() to handle multiple results
+      const { data, error } = await query;
 
       if (error) {
         console.error('❌ Database error getting inventory record:', error);
         throw error;
       }
 
-      if (!data) {
+      if (!data || data.length === 0) {
         console.error('❌ No inventory record found for the specified criteria');
         return null;
       }
 
+      // Handle multiple records by selecting the best one
+      let selectedRecord = data[0];
+      
+      if (data.length > 1) {
+        console.warn('⚠️ Multiple inventory records found, selecting the best one:', data.length);
+        
+        // Priority selection logic:
+        // 1. Record with highest available stock
+        // 2. Record with most recent update
+        // 3. Record with highest total stock
+        selectedRecord = data.reduce((best, current) => {
+          // Prefer record with higher available stock
+          if (current.available_stock > best.available_stock) return current;
+          if (current.available_stock < best.available_stock) return best;
+          
+          // If same available stock, prefer more recently updated
+          if (new Date(current.updated_at) > new Date(best.updated_at)) return current;
+          if (new Date(current.updated_at) < new Date(best.updated_at)) return best;
+          
+          // If same update time, prefer higher total stock
+          if (current.stock_quantity > best.stock_quantity) return current;
+          
+          return best;
+        });
+        
+        console.log('✅ Selected best inventory record:', {
+          id: selectedRecord.id,
+          sku: selectedRecord.sku,
+          available_stock: selectedRecord.available_stock,
+          reason: 'Highest available stock and most recent'
+        });
+      }
+
       console.log('✅ Inventory record found:', {
-        id: data.id,
-        sku: data.sku,
-        available_stock: data.available_stock,
-        stock_quantity: data.stock_quantity
+        id: selectedRecord.id,
+        sku: selectedRecord.sku,
+        available_stock: selectedRecord.available_stock,
+        stock_quantity: selectedRecord.stock_quantity
       });
       
-      return data;
+      return selectedRecord;
     } catch (error) {
       console.error('❌ Error getting inventory record:', error);
       return null;
