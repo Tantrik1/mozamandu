@@ -68,22 +68,9 @@ export function AdminOrdersTable({
 
   const handleInventoryUpdate = async (orderId: string, newStatus: string, oldStatus: string) => {
     try {
-      console.log('🔄 Handling inventory update for order:', orderId, 'from', oldStatus, 'to', newStatus);
+      console.log('🔄 Checking inventory update for order:', orderId, 'from', oldStatus, 'to', newStatus);
       
-      // Get order items for inventory management
-      const { data: orderItems, error: itemsError } = await supabase
-        .from('customer_order_item_details')
-        .select('*')
-        .eq('order_id', orderId);
-
-      if (itemsError || !orderItems) {
-        console.error('❌ Failed to fetch order items:', itemsError);
-        throw new Error('Failed to fetch order items for inventory update');
-      }
-
-      console.log('📦 Found order items:', orderItems.length);
-
-      // Handle inventory based on status change
+      // Only handle inventory for specific status changes
       if (newStatus === 'delivered' && oldStatus !== 'delivered') {
         // Fulfill stock: reduce both reserved and total stock
         console.log('📦 Fulfilling stock for delivery...');
@@ -92,6 +79,10 @@ export function AdminOrdersTable({
         // Release stock: only reduce reserved stock, keep total stock
         console.log('🔓 Releasing reserved stock for cancellation...');
         await releaseStock(orderId);
+      } else {
+        // No inventory changes needed for other status transitions
+        console.log('ℹ️ No inventory changes required for this status transition');
+        return;
       }
 
       console.log('✅ Inventory update completed successfully');
