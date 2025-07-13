@@ -102,7 +102,7 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
     id: 'mock',
     productId: product.id,
     productName: product.name,
-    quantity: currentCartQuantity || 1,
+    quantity: Math.max(currentCartQuantity, 1), // Use actual cart quantity, minimum 1 for price preview
     basePrice: product.selling_price || realtimeSubcategoryPrice,
     subcategoryId: product.subcategory_id,
     colorVariantId: selectedColor || null,
@@ -468,16 +468,16 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
           </div>
         )}
 
-        {/* Enhanced Real-time Pricing */}
+        {/* Enhanced Real-time Pricing - Shows price for current cart quantity */}
         <div className="mt-auto">
           <div className="space-y-3 mb-4">
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-black text-foreground bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                    Rs. {currentPricing.unitPrice.toFixed(0)}
+                    Rs. {currentCartQuantity > 0 ? currentPricing.unitPrice.toFixed(0) : basePrice.toFixed(0)}
                   </span>
-                  {currentPricing.savings > 0 && (
+                  {currentCartQuantity > 0 && currentPricing.savings > 0 && (
                     <span className="text-sm text-muted-foreground line-through">
                       Rs. {basePrice.toFixed(0)}
                     </span>
@@ -489,7 +489,7 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
                   </span>
                 )}
               </div>
-              {currentPricing.savings > 0 && (
+              {currentCartQuantity > 0 && currentPricing.savings > 0 && (
                 <Badge variant="outline" className="text-xs text-green-600 border-green-300 bg-green-50 animate-pulse">
                   Save Rs. {currentPricing.savings.toFixed(0)}
                 </Badge>
