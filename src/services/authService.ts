@@ -49,33 +49,36 @@ export const authService = {
 
   async signUp(email: string, password: string, fullName: string) {
     try {
-      console.log('🔄 AuthService: Starting sign up via custom edge function');
+      console.log('🔄 AuthService: Starting sign up');
       
-      // Call the custom edge function to handle user creation and email sending
-      const { data, error } = await supabase.functions.invoke('send-verification-email', {
-        body: {
-          email: email.trim().toLowerCase(),
-          password,
-          name: fullName.trim(),
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth?confirmed=true`,
+          data: {
+            full_name: fullName.trim(),
+          }
         }
       });
 
       if (error) {
         console.error('❌ AuthService: Sign up error:', error);
-        return { error: { message: error.message || 'Failed to create account. Please try again.' } };
+        
+        // Handle specific error cases
+        if (error.message.includes('User already registered')) {
+          return { error: { message: 'An account with this email already exists. Please try signing in instead.' } };
+        }
+        
+        return { error };
       }
 
-      if (data && !data.success) {
-        console.error('❌ AuthService: Sign up failed:', data.error);
-        return { error: { message: data.error || 'Failed to create account. Please try again.' } };
+      if (data.user && !data.user.identities?.length) {
+        console.warn('⚠️ AuthService: User already exists');
+        return { error: { message: 'An account with this email already exists. Please try signing in instead.' } };
       }
 
-      console.log('✅ AuthService: Sign up successful via edge function');
-      
-      toast({
-        title: "Account Created!",
-        description: "We've sent you a verification email. Please check your inbox and verify your account before signing in.",
-      });
+      console.log('✅ AuthService: Sign up successful');
       
       return { error: null };
     } catch (error) {

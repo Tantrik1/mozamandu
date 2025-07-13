@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { RobustCartProvider } from '@/hooks/useRobustCart';
+import { RouteGuard } from '@/components/RouteGuard';
 import Index from '@/pages/Index';
 import Auth from '@/pages/Auth';
 import AdminPage from '@/pages/AdminPage';
@@ -39,7 +40,11 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/dashboard" element={<CustomerDashboard />} />
+              <Route path="/dashboard" element={
+                <RouteGuard requireAuth={true}>
+                  <CustomerDashboard />
+                </RouteGuard>
+              } />
               <Route path="/products" element={<Products />} />
               <Route path="/subcategory/:subcategoryId" element={<SubcategoryPage />} />
               <Route path="/subcategories/:subcategoryId" element={<SubcategoryPage />} />
@@ -51,9 +56,21 @@ function App() {
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/thank-you/:orderId" element={<ThankYou />} />
               <Route path="/order-summary/:orderId" element={<OrderSummary />} />
-              <Route path="/customer-order-summary/:orderId" element={<CustomerOrderSummary />} />
-              <Route path="/admin/*" element={<AdminPage />} />
-              <Route path="/inventory" element={<InventoryDashboard />} />
+              <Route path="/customer-order-summary/:orderId" element={
+                <RouteGuard requireAuth={true}>
+                  <CustomerOrderSummary />
+                </RouteGuard>
+              } />
+              <Route path="/admin/*" element={
+                <RouteGuard requireAuth={true} requireAdmin={true}>
+                  <AdminPage />
+                </RouteGuard>
+              } />
+              <Route path="/inventory" element={
+                <RouteGuard requireAuth={true} requireAdmin={true}>
+                  <InventoryDashboard />
+                </RouteGuard>
+              } />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/shipping-policy" element={<ShippingPolicy />} />
               <Route path="/terms-conditions" element={<TermsConditions />} />

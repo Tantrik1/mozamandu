@@ -40,14 +40,20 @@ export default function Auth() {
     }
   }, [searchParams]);
 
-  // Redirect authenticated users
+  // Redirect authenticated users based on role
   useEffect(() => {
     if (user && userProfile && !isLoading) {
       // Only redirect if email is confirmed
       if (user.email_confirmed_at) {
+        console.log('🔄 Auth: Redirecting authenticated user with role:', userProfile.role);
+        
+        // Route based on user role
         if (userProfile.role === 'admin') {
           navigate('/admin');
+        } else if (userProfile.role === 'customer') {
+          navigate('/dashboard');
         } else {
+          // Default to dashboard for any other roles
           navigate('/dashboard');
         }
       }
