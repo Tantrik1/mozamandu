@@ -43,7 +43,28 @@ export function OrdersTab() {
 
   useEffect(() => {
     fetchOrderStats();
-    setupRealtimeSubscription();
+    
+    // Setup realtime subscription with proper cleanup
+    const channel = supabase
+      .channel('orders-realtime-' + Math.random().toString(36).substr(2, 9))
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'customer_orders'
+        },
+        (payload) => {
+          console.log('Order change detected:', payload);
+          fetchOrderStats();
+        }
+      )
+      .subscribe();
+
+    // Cleanup function
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchOrderStats = async () => {
@@ -79,27 +100,6 @@ export function OrdersTab() {
     }
   };
 
-  const setupRealtimeSubscription = () => {
-    const channel = supabase
-      .channel('orders-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'customer_orders'
-        },
-        (payload) => {
-          console.log('Order change detected:', payload);
-          fetchOrderStats();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
 
   if (loading) {
     return (

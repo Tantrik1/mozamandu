@@ -50,7 +50,28 @@ export function InventoryTab() {
 
   useEffect(() => {
     fetchInventoryStats();
-    setupRealtimeSubscription();
+    
+    // Setup realtime subscription with proper cleanup
+    const channel = supabase
+      .channel('inventory-realtime-' + Math.random().toString(36).substr(2, 9))
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'product_inventory'
+        },
+        (payload) => {
+          console.log('Inventory change detected:', payload);
+          fetchInventoryStats();
+        }
+      )
+      .subscribe();
+
+    // Cleanup function
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchInventoryStats = async () => {
@@ -83,27 +104,6 @@ export function InventoryTab() {
     }
   };
 
-  const setupRealtimeSubscription = () => {
-    const channel = supabase
-      .channel('inventory-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'product_inventory'
-        },
-        (payload) => {
-          console.log('Inventory change detected:', payload);
-          fetchInventoryStats();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
 
   if (loading) {
     return (

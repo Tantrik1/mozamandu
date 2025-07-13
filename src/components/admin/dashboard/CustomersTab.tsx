@@ -49,7 +49,30 @@ export function CustomersTab() {
 
   useEffect(() => {
     fetchCustomerStats();
-    setupRealtimeSubscription();
+    
+    // Setup realtime subscription with proper cleanup
+    const channel = supabase
+      .channel('customers-realtime-' + Math.random().toString(36).substr(2, 9))
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'profiles'
+        },
+        (payload) => {
+          if (payload.new.role === 'customer') {
+            console.log('New customer registered:', payload);
+            fetchCustomerStats();
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup function
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchCustomerStats = async () => {
@@ -100,29 +123,6 @@ export function CustomersTab() {
     }
   };
 
-  const setupRealtimeSubscription = () => {
-    const channel = supabase
-      .channel('customer-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'profiles'
-        },
-        (payload) => {
-          if (payload.new.role === 'customer') {
-            console.log('New customer registered:', payload);
-            fetchCustomerStats();
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
 
   if (loading) {
     return (
