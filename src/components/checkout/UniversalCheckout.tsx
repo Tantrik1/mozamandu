@@ -604,6 +604,9 @@ export function UniversalCheckout() {
           </Card>
 
           <PromoCodeSection
+            onDiscountApplied={setPromoDiscount}
+            onPromoCodeUsed={(code) => {}}
+            orderTotal={getTieredTotalPrice() + (deliveryLocation ? deliveryLocation.delivery_price : 0)}
             promoCode={promoCode}
             setPromoCode={setPromoCode}
             appliedPromo={appliedPromo}

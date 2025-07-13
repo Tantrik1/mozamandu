@@ -146,6 +146,13 @@ export function EnhancedUniversalCheckout() {
     }
   };
 
+  const handleProfileAutoFill = (data: Partial<CheckoutFormData>) => {
+    setFormData(prev => ({
+      ...prev,
+      ...data
+    }));
+  };
+
   const handleSubmitOrder = async () => {
     try {
       setIsSubmitting(true);
@@ -318,7 +325,7 @@ export function EnhancedUniversalCheckout() {
               <CardContent className="p-6">
                 <h2 className="text-xl font-semibold mb-4">Customer Information</h2>
                 
-                {user && <ProfileAutoFill onDataFilled={setFormData} />}
+                {user && <ProfileAutoFill onDataFilled={handleProfileAutoFill} />}
                 
                 <div className="space-y-4">
                   <div>
