@@ -106,11 +106,30 @@ export function useInventoryManager() {
   const reserveStock = async (orderId: string) => {
     try {
       console.log('🔒 Reserving stock using enhanced function for order:', orderId);
+      
+      // First, let's check what order item details exist for this order
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('customer_order_item_details')
+        .select('*')
+        .eq('order_id', orderId);
+      
+      if (itemsError) {
+        console.error('❌ Error fetching order items:', itemsError);
+        throw itemsError;
+      }
+      
+      console.log('📋 Order items to reserve:', orderItems);
+      
       const { data, error } = await supabase.rpc('reserve_order_stock_enhanced', {
         p_order_id: orderId
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database function error:', error);
+        throw error;
+      }
+
+      console.log('📊 Reserve stock function returned:', data);
 
       // The function returns a boolean: true for success, false for failure
       if (data === false) {
