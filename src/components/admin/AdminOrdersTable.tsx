@@ -80,7 +80,7 @@ export function AdminOrdersTable({
         body: {
           type: 'status_updated',
           orderId: orderId,
-          isCustomerOrder: false, // This is for admin orders table
+          isCustomerOrder: true, // Updated to true since we're using customer_orders table
           oldStatus: oldStatus,
           newStatus: newStatus
         }
@@ -97,7 +97,7 @@ export function AdminOrdersTable({
   };
 
   const handleViewOrder = (orderId: string) => {
-    navigate(`/order-summary/${orderId}`);
+    navigate(`/customer-order-summary/${orderId}`);
   };
 
   return (

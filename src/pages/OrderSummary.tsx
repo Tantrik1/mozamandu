@@ -27,10 +27,18 @@ interface OrderDetails {
   delivery_charge: number;
   status: string;
   created_at: string;
+  updated_at: string;
   combo_applied: boolean;
   promocode_used: string | null;
   promocode_discount: number;
   payment_screenshot_url: string | null;
+  pricing_breakdown: any;
+  payment_method?: {
+    name: string;
+  };
+  delivery_location?: {
+    place_name: string;
+  };
 }
 
 interface OrderItem {
@@ -71,8 +79,12 @@ export default function OrderSummary() {
       console.log('Fetching order details for:', orderId);
 
       const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .select('*')
+        .from('customer_orders')
+        .select(`
+          *,
+          payment_method:payment_methods(name),
+          delivery_location:delivery_charges(place_name)
+        `)
         .eq('id', orderId)
         .single();
 
@@ -88,7 +100,7 @@ export default function OrderSummary() {
       }
 
       const { data: items, error: itemsError } = await supabase
-        .from('order_item_details')
+        .from('customer_order_item_details')
         .select('*')
         .eq('order_id', orderId);
 
@@ -122,7 +134,9 @@ export default function OrderSummary() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
+      case 'payment_confirmed': return 'bg-blue-100 text-blue-800';
+      case 'on_delivery': return 'bg-purple-100 text-purple-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RefreshCw } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { AdminOrdersStats } from './AdminOrdersStats';
@@ -38,16 +39,16 @@ export function AdminOrdersPage() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      console.log('Fetching all orders...');
+      console.log('Fetching all customer orders...');
       
-      // Fetch all orders first
+      // Fetch all customer orders from the unified table
       const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
+        .from('customer_orders')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (ordersError) {
-        console.error('Error fetching orders:', ordersError);
+        console.error('Error fetching customer orders:', ordersError);
         toast({
           title: "Error",
           description: "Failed to fetch orders: " + ordersError.message,
@@ -56,7 +57,7 @@ export function AdminOrdersPage() {
         return;
       }
 
-      console.log('Fetched orders count:', ordersData?.length || 0);
+      console.log('Fetched customer orders count:', ordersData?.length || 0);
 
       // Get unique user IDs that are not null
       const userIds = ordersData
@@ -114,7 +115,7 @@ export function AdminOrdersPage() {
       console.log('Updating order status:', orderId, 'to', newStatus);
       
       const { error } = await supabase
-        .from('orders')
+        .from('customer_orders')
         .update({ 
           status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled', 
           updated_at: new Date().toISOString() 
@@ -132,7 +133,7 @@ export function AdminOrdersPage() {
         console.log('Order status updated successfully');
         toast({
           title: "Success",
-          description: "Order status updated successfully",
+          description: `Order status updated to ${newStatus.replace('_', ' ')}. Inventory changes have been applied automatically.`,
         });
         
         setOrders(prev => prev.map(order => 
@@ -170,6 +171,16 @@ export function AdminOrdersPage() {
     );
   }
 
+  // Helper function to get orders by status
+  const getOrdersByStatus = (status: string) => {
+    return orders.filter(order => {
+      const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           order.customer_email.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesSearch && (status === 'all' || order.status === status);
+    });
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -189,19 +200,124 @@ export function AdminOrdersPage() {
         setStatusFilter={setStatusFilter}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All Orders ({filteredOrders.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <AdminOrdersTable
-            orders={orders}
-            filteredOrders={filteredOrders}
-            updating={updating}
-            onUpdateStatus={updateOrderStatus}
-          />
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="all" className="w-full">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="all">
+            All Orders ({getOrdersByStatus('all').length})
+          </TabsTrigger>
+          <TabsTrigger value="pending_payment">
+            Pending ({getOrdersByStatus('pending_payment').length})
+          </TabsTrigger>
+          <TabsTrigger value="payment_confirmed">
+            Confirmed ({getOrdersByStatus('payment_confirmed').length})
+          </TabsTrigger>
+          <TabsTrigger value="on_delivery">
+            On Delivery ({getOrdersByStatus('on_delivery').length})
+          </TabsTrigger>
+          <TabsTrigger value="delivered">
+            Delivered ({getOrdersByStatus('delivered').length})
+          </TabsTrigger>
+          <TabsTrigger value="cancelled">
+            Cancelled ({getOrdersByStatus('cancelled').length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>All Orders ({getOrdersByStatus('all').length})</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <AdminOrdersTable
+                orders={orders}
+                filteredOrders={getOrdersByStatus('all')}
+                updating={updating}
+                onUpdateStatus={updateOrderStatus}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pending_payment" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Payment Orders ({getOrdersByStatus('pending_payment').length})</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <AdminOrdersTable
+                orders={orders}
+                filteredOrders={getOrdersByStatus('pending_payment')}
+                updating={updating}
+                onUpdateStatus={updateOrderStatus}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payment_confirmed" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment Confirmed Orders ({getOrdersByStatus('payment_confirmed').length})</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <AdminOrdersTable
+                orders={orders}
+                filteredOrders={getOrdersByStatus('payment_confirmed')}
+                updating={updating}
+                onUpdateStatus={updateOrderStatus}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="on_delivery" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>On Delivery Orders ({getOrdersByStatus('on_delivery').length})</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <AdminOrdersTable
+                orders={orders}
+                filteredOrders={getOrdersByStatus('on_delivery')}
+                updating={updating}
+                onUpdateStatus={updateOrderStatus}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="delivered" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Delivered Orders ({getOrdersByStatus('delivered').length})</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <AdminOrdersTable
+                orders={orders}
+                filteredOrders={getOrdersByStatus('delivered')}
+                updating={updating}
+                onUpdateStatus={updateOrderStatus}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="cancelled" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Cancelled Orders ({getOrdersByStatus('cancelled').length})</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <AdminOrdersTable
+                orders={orders}
+                filteredOrders={getOrdersByStatus('cancelled')}
+                updating={updating}
+                onUpdateStatus={updateOrderStatus}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
