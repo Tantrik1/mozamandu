@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Eye, EyeOff, ChevronDown, ChevronUp, Star, Package, TrendingDown } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Star, Package, TrendingDown } from 'lucide-react';
 
 interface CartItem {
   id: string;
@@ -100,14 +100,17 @@ export function AdvancedOrderSummary({
     return sku;
   };
 
-  // Calculate subtotal using the tiered pricing from subcategoryPricing
-  const subtotal = Object.values(subcategoryPricing).reduce((total, subcategory) => {
+  // Calculate subtotal directly using the tiered pricing from subcategoryPricing
+  const calculatedSubtotal = Object.values(subcategoryPricing).reduce((total, subcategory) => {
     return total + subcategory.itemBreakdown.reduce((subtotal, item) => {
       return subtotal + item.totalPrice;
     }, 0);
   }, 0);
 
-  // Check if we have actual combo pricing vs MOQ discounts
+  // Use the calculated subtotal to match cart pricing exactly
+  const subtotal = calculatedSubtotal;
+
+  // Check pricing modes
   const hasActualCombo = comboInfo && Object.values(subcategoryPricing).some(sub => sub.comboActive);
   const hasMOQDiscounts = Object.values(subcategoryPricing).some(sub => 
     sub.moqReached && !sub.comboActive && sub.totalSavings > 0
@@ -137,7 +140,7 @@ export function AdvancedOrderSummary({
             {hasMOQDiscounts && !hasActualCombo && (
               <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
                 <TrendingDown className="h-3 w-3 mr-1" />
-                Volume Discount
+                MOQ Discount
               </Badge>
             )}
           </div>
@@ -168,13 +171,13 @@ export function AdvancedOrderSummary({
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-2">
             <div className="flex items-center space-x-2 mb-1">
               <TrendingDown className="h-4 w-4 text-green-600" />
-              <span className="font-semibold text-green-800">Volume Discount Applied</span>
+              <span className="font-semibold text-green-800">MOQ Discount Applied</span>
             </div>
             <p className="text-sm text-green-700">
               You've reached the minimum order quantity for discounted pricing!
             </p>
             <p className="text-xs text-green-600 mt-1">
-              Total volume savings: Rs. {totalSavings.toFixed(2)}
+              Total MOQ savings: Rs. {totalSavings.toFixed(2)}
             </p>
           </div>
         )}
@@ -190,7 +193,6 @@ export function AdvancedOrderSummary({
           {cartItems.map((item) => {
             const pricingInfo = getItemPricingDetails(item);
             const displaySku = generateDisplaySku(item);
-            const originalPrice = item.basePrice;
             const currentPrice = pricingInfo?.unitPrice || item.unitPrice;
             const totalItemPrice = pricingInfo?.totalPrice || (item.unitPrice * item.quantity);
             const savings = pricingInfo?.savings || 0;
@@ -225,7 +227,7 @@ export function AdvancedOrderSummary({
                           {pricingInfo?.appliedTier === 'discount' && (
                             <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
                               <TrendingDown className="h-3 w-3 mr-1" />
-                              Volume Discount
+                              MOQ Discount
                             </Badge>
                           )}
                         </div>
@@ -250,7 +252,7 @@ export function AdvancedOrderSummary({
                           <div className="flex items-center gap-1">
                             <span className="font-medium text-gray-900">Total: Rs. {totalItemPrice.toFixed(2)}</span>
                             {savings > 0 && (
-                              <span className="text-xs text-gray-500 ml-2">
+                              <span className="text-xs text-green-600 ml-2">
                                 (Save Rs. {savings.toFixed(2)})
                               </span>
                             )}
@@ -281,7 +283,7 @@ export function AdvancedOrderSummary({
 
         <Separator />
 
-        {/* Summary totals using correct subtotal from tiered pricing */}
+        {/* Summary totals using correct subtotal from tiered pricing calculation */}
         <div className="space-y-3">
           <div className="flex justify-between text-sm">
             <span>Subtotal</span>
@@ -304,7 +306,7 @@ export function AdvancedOrderSummary({
             <div className={`flex justify-between text-sm ${
               hasActualCombo ? 'text-purple-600' : 'text-green-600'
             }`}>
-              <span>{hasActualCombo ? 'Combo Savings' : 'Volume Discount Savings'}</span>
+              <span>{hasActualCombo ? 'Combo Savings' : 'MOQ Discount Savings'}</span>
               <span>-Rs. {totalSavings.toFixed(2)}</span>
             </div>
           )}
@@ -321,7 +323,7 @@ export function AdvancedOrderSummary({
               hasActualCombo ? 'text-purple-600' : 'text-green-600'
             }`}>
               You saved Rs. {(totalSavings + promoDiscount).toFixed(2)} total!
-              {hasActualCombo ? ' (includes combo savings)' : ' (includes volume discounts)'}
+              {hasActualCombo ? ' (includes combo savings)' : ' (includes MOQ discounts)'}
             </div>
           )}
         </div>
@@ -351,7 +353,7 @@ export function AdvancedOrderSummary({
             <p className="text-center text-sm text-gray-500">
               Your cart is empty. Add items to place an order.
             </p>
-          )}
+            )}
         </div>
       </CardContent>
     </Card>

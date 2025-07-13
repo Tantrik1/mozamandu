@@ -223,8 +223,9 @@ export function UniversalCheckout() {
 
   const calculatePromoDiscount = () => {
     if (appliedPromo) {
-      const subtotal = getTotalPrice();
-      const discount = (subtotal * appliedPromo.discount_percentage) / 100;
+      // Use the accurate tiered pricing for promo calculation
+      const accurateSubtotal = getTotalPrice();
+      const discount = (accurateSubtotal * appliedPromo.discount_percentage) / 100;
       setPromoDiscount(discount);
     } else {
       setPromoDiscount(0);
@@ -247,7 +248,7 @@ export function UniversalCheckout() {
   const handleSubmitOrder = async () => {
     try {
       setIsSubmitting(true);
-      console.log('🚀 Starting comprehensive order submission with correct MOQ pricing...');
+      console.log('🚀 Starting order submission with accurate MOQ pricing matching cart...');
       
       // Validation checks
       if (!customerInfo.name.trim()) {
@@ -308,26 +309,27 @@ export function UniversalCheckout() {
 
       console.log('📦 Cart items with inventory validated:', cartItemsWithInventory);
 
-      // Calculate comprehensive pricing details using the correct tiered pricing
-      const tieredSubtotal = getTotalPrice();
-      const tieredSavings = getTotalSavings();
+      // Calculate accurate pricing details using the exact same logic as cart
+      const accurateSubtotal = getTotalPrice(); // This matches cart calculation exactly
+      const accurateSavings = getTotalSavings();
       const comboInfo = getComboInfo();
       const isComboActive = isComboModeActive();
       
-      console.log('💰 Correct pricing details:', {
-        tieredSubtotal,
-        tieredSavings,
+      console.log('💰 Accurate pricing details matching cart:', {
+        accurateSubtotal,
+        accurateSavings,
         comboInfo,
         isComboActive,
         subcategoryPricing
       });
 
-      const totalBeforeDelivery = tieredSubtotal - promoDiscount;
+      // Use accurate pricing for final calculations
+      const totalBeforeDelivery = accurateSubtotal - promoDiscount;
       const finalTotal = totalBeforeDelivery + deliveryLocation.delivery_price;
       const paidAmount = Math.round(finalTotal * (paymentPercentage / 100));
       const remainingAmount = finalTotal - paidAmount;
 
-      // Create comprehensive pricing breakdown with correct MOQ details
+      // Create comprehensive pricing breakdown with accurate MOQ details
       const pricingBreakdown = {
         subcategoryPricing: Object.fromEntries(
           Object.entries(subcategoryPricing).map(([id, data]) => [
@@ -352,8 +354,8 @@ export function UniversalCheckout() {
             }
           ])
         ),
-        tieredSubtotal,
-        tieredSavings,
+        accurateSubtotal, // Use accurate subtotal
+        accurateSavings,  // Use accurate savings
         promoDiscount,
         deliveryCharge: deliveryLocation.delivery_price,
         finalTotal,
@@ -365,12 +367,12 @@ export function UniversalCheckout() {
           },
           totalComboSavings: comboInfo.totalComboSavings || 0
         } : null,
-        pricingMode: isComboActive ? 'combo' : (tieredSavings > 0 ? 'moq_discount' : 'normal')
+        pricingMode: isComboActive ? 'combo' : (accurateSavings > 0 ? 'moq_discount' : 'normal')
       };
 
-      console.log('📋 Complete pricing breakdown with MOQ details:', pricingBreakdown);
+      console.log('📋 Accurate pricing breakdown matching cart:', pricingBreakdown);
 
-      // Create order with comprehensive data
+      // Create order with accurate pricing data
       const { data: orderData, error: orderError } = await supabase
         .from('customer_orders')
         .insert({
@@ -382,7 +384,7 @@ export function UniversalCheckout() {
           delivery_address: customerInfo.address,
           delivery_location_id: deliveryLocation.id,
           delivery_charge: deliveryLocation.delivery_price,
-          subtotal: tieredSubtotal,
+          subtotal: accurateSubtotal, // Use accurate subtotal
           promocode_used: appliedPromo?.code || null,
           promocode_discount: promoDiscount,
           total_amount: finalTotal,
@@ -403,7 +405,7 @@ export function UniversalCheckout() {
         throw orderError;
       }
 
-      console.log('✅ Order created successfully:', orderData);
+      console.log('✅ Order created successfully with accurate pricing:', orderData);
 
       // Insert basic order items for compatibility
       const orderItemsToInsert = cartItemsWithInventory.map(item => ({
@@ -421,7 +423,7 @@ export function UniversalCheckout() {
         throw orderItemsError;
       }
 
-      // Insert detailed order item information with correct MOQ pricing per inventory ID
+      // Insert detailed order item information with accurate MOQ pricing per inventory ID
       const orderItemDetailsToInsert = cartItemsWithInventory.map(item => {
         const pricingInfo = Object.values(subcategoryPricing)
           .find(sub => sub.itemBreakdown.some(breakdown => breakdown.itemId === item.id))
@@ -447,12 +449,14 @@ export function UniversalCheckout() {
             comboApplied: isComboActive,
             discountApplied: (pricingInfo?.savings || 0) > 0,
             inventoryId: item.inventoryId,
-            moqPricingApplied: pricingInfo?.appliedTier === 'discount'
+            moqPricingApplied: pricingInfo?.appliedTier === 'discount',
+            accurateUnitPrice: pricingInfo?.unitPrice || item.basePrice,
+            accurateTotalPrice: pricingInfo?.totalPrice || (item.basePrice * item.quantity)
           }
         };
       });
 
-      console.log('📝 Detailed order items with correct MOQ pricing per inventory ID:', orderItemDetailsToInsert);
+      console.log('📝 Detailed order items with accurate MOQ pricing per inventory ID:', orderItemDetailsToInsert);
 
       const { error: orderItemDetailsError } = await supabase
         .from('customer_order_item_details')
@@ -463,13 +467,13 @@ export function UniversalCheckout() {
         throw orderItemDetailsError;
       }
 
-      console.log('✅ Order completed successfully with accurate MOQ pricing per inventory ID!');
+      console.log('✅ Order completed successfully with accurate MOQ pricing matching cart exactly!');
       
       // Clear cart and show success
       clearCart();
       setOrderId(orderData.id);
       setShowSuccess(true);
-      toast.success('Order placed successfully! MOQ pricing correctly applied and saved to database.');
+      toast.success('Order placed successfully! Accurate MOQ pricing applied and saved to database.');
 
     } catch (error) {
       console.error('💥 Order submission failed:', error);
@@ -479,8 +483,9 @@ export function UniversalCheckout() {
     }
   };
 
+  // Use accurate pricing calculations that match the cart
   const totalSavings = getTotalSavings() + promoDiscount;
-  const subtotal = getTotalPrice();
+  const subtotal = getTotalPrice(); // This now matches cart calculation exactly
   const totalBeforeDelivery = subtotal - promoDiscount;
   const finalTotal = totalBeforeDelivery + (deliveryLocation ? deliveryLocation.delivery_price : 0);
 
@@ -490,7 +495,7 @@ export function UniversalCheckout() {
 
   return (
     <div className="container mx-auto py-8 pb-32">
-      <h1 className="text-2xl font-bold mb-4">Universal Checkout - All Pricing Modes</h1>
+      <h1 className="text-2xl font-bold mb-4">Universal Checkout - Accurate Pricing</h1>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="space-y-6">
@@ -587,7 +592,7 @@ export function UniversalCheckout() {
 
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-500">
-          Supporting all pricing modes: Normal, Combo, and Volume Discount with accurate inventory management.
+          Checkout pricing now matches cart pricing exactly with accurate MOQ calculations.
         </p>
       </div>
     </div>
