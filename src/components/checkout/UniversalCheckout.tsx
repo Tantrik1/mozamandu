@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -488,11 +487,14 @@ export function UniversalCheckout() {
 
   return (
     <div className="container mx-auto py-8 pb-32">
-      <h1 className="text-2xl font-bold mb-4">Checkout</h1>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
+        <p className="text-gray-600 mt-1">Complete your order below</p>
+      </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-2 gap-8">
         <div className="space-y-6">
-          <Card>
+          <Card className="shadow-sm border-gray-200">
             <CardContent className="p-6">
               <CustomerInfoForm
                 customerInfo={customerInfo}
@@ -504,7 +506,7 @@ export function UniversalCheckout() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm border-gray-200">
             <CardContent className="p-6">
               <PaymentMethodSection
                 paymentMethods={paymentMethods}
@@ -561,34 +563,42 @@ export function UniversalCheckout() {
         </div>
       </div>
 
-      {/* Fixed Bottom Checkout Button for Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 lg:hidden z-50">
+      {/* Enhanced Mobile Checkout Button */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 lg:hidden z-50 shadow-2xl">
         <div className="container mx-auto">
+          {/* Total and savings display */}
+          {(getTotalSavings() + promoDiscount) > 0 && (
+            <div className="text-center mb-3">
+              <div className="text-green-600 font-semibold text-sm">
+                🎉 You're saving Rs. {(getTotalSavings() + promoDiscount).toFixed(2)}!
+              </div>
+            </div>
+          )}
+          
           <Button
             onClick={handleSubmitOrder}
             disabled={isSubmitting || cartItems.length === 0}
-            className="w-full h-12 text-base font-semibold bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 transition-colors duration-200"
+            className="w-full h-14 text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
             size="lg"
           >
             {isSubmitting ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin" />
                 Processing Order...
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                Place Order - Rs. {finalTotal.toFixed(2)}
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Complete Order
+                </div>
+                <div className="bg-white/20 px-3 py-1 rounded-lg">
+                  Rs. {finalTotal.toFixed(2)}
+                </div>
               </div>
             )}
           </Button>
         </div>
-      </div>
-
-      <div className="mt-6 text-center">
-        <p className="text-sm text-gray-500">
-          Checkout pricing now uses EXACT same pricing hooks as cart for perfect consistency.
-        </p>
       </div>
     </div>
   );
