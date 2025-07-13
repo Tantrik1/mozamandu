@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,9 @@ interface CartItem {
   basePrice: number;
   imageUrl?: string;
   subcategoryId: string;
+  addedOrder: number;
+  sku?: string;
+  inventoryId?: string;
 }
 
 interface SubcategoryPricingInfo {
@@ -79,7 +83,7 @@ export function AdvancedOrderSummary({
   comboInfo
 }: AdvancedOrderSummaryProps) {
   const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>({});
-  const [showAllItems, setShowAllItems] = useState(true); // Show items by default
+  const [showAllItems, setShowAllItems] = useState(true);
 
   const toggleDetails = (subcategoryId: string) => {
     setShowDetails(prev => ({
@@ -109,6 +113,15 @@ export function AdvancedOrderSummary({
     sub.moqReached && !sub.comboActive && sub.totalSavings > 0
   );
 
+  // Get item pricing details
+  const getItemPricingDetails = (item: CartItem) => {
+    const pricingInfo = Object.values(subcategoryPricing)
+      .find(sub => sub.itemBreakdown.some(breakdown => breakdown.itemId === item.id))
+      ?.itemBreakdown.find(breakdown => breakdown.itemId === item.id);
+    
+    return pricingInfo;
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -137,6 +150,8 @@ export function AdvancedOrderSummary({
             {showAllItems ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
         </CardTitle>
+
+        {/* Combo/MOQ Banner */}
         {hasActualCombo && comboInfo && (
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mt-2">
             <div className="flex items-center space-x-2 mb-1">
@@ -159,7 +174,7 @@ export function AdvancedOrderSummary({
               You've reached the minimum order quantity for discounted pricing!
             </p>
             <p className="text-xs text-green-600 mt-1">
-              Total MOQ savings: Rs. {totalSavings.toFixed(2)}
+              Total volume savings: Rs. {totalSavings.toFixed(2)}
             </p>
           </div>
         )}
@@ -173,67 +188,93 @@ export function AdvancedOrderSummary({
           </h3>
           
           {cartItems.map((item) => {
-            const pricingInfo = Object.values(subcategoryPricing)
-              .find(sub => sub.itemBreakdown.some(breakdown => breakdown.itemId === item.id))
-              ?.itemBreakdown.find(breakdown => breakdown.itemId === item.id);
-            
+            const pricingInfo = getItemPricingDetails(item);
             const displaySku = generateDisplaySku(item);
+            const originalPrice = item.basePrice;
+            const currentPrice = pricingInfo?.unitPrice || item.unitPrice;
+            const totalItemPrice = pricingInfo?.totalPrice || (item.unitPrice * item.quantity);
+            const savings = pricingInfo?.savings || 0;
             
             return (
-              <div key={item.id} className="bg-gray-50 border rounded-lg p-4">
-                <div className="flex justify-between items-start">
+              <div key={item.id} className="border rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  {/* Product Image */}
+                  {item.imageUrl && (
+                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+                      <img 
+                        src={item.imageUrl} 
+                        alt={item.productName}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  
                   <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <h4 className="font-medium text-gray-900 text-sm">{item.productName}</h4>
-                      <Badge variant="outline" className="text-xs">{displaySku}</Badge>
-                      {pricingInfo?.appliedTier === 'combo' && (
-                        <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
-                          <Star className="h-3 w-3 mr-1" />
-                          Combo Price
-                        </Badge>
-                      )}
-                      {pricingInfo?.appliedTier === 'discount' && (
-                        <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                          <TrendingDown className="h-3 w-3 mr-1" />
-                          MOQ Discount
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    <div className="text-xs text-gray-600 space-x-4">
-                      {item.colorName && <span>Color: {item.colorName}</span>}
-                      {item.sizeName && <span>Size: {item.sizeName}</span>}
-                    </div>
-                    
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="text-sm">
-                        <span className="text-gray-600">Qty: {item.quantity}</span>
-                        <span className="mx-2">×</span>
-                        <span className="text-gray-900">Rs. {(pricingInfo?.unitPrice || item.unitPrice).toFixed(2)}</span>
+                    {/* Product Name and SKU */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900 text-sm mb-1">{item.productName}</h4>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline" className="text-xs">{displaySku}</Badge>
+                          {pricingInfo?.appliedTier === 'combo' && (
+                            <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
+                              <Star className="h-3 w-3 mr-1" />
+                              Combo Price
+                            </Badge>
+                          )}
+                          {pricingInfo?.appliedTier === 'discount' && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                              <TrendingDown className="h-3 w-3 mr-1" />
+                              Volume Discount
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {/* Variant Details */}
+                        <div className="text-xs text-gray-600 space-y-1">
+                          {item.colorName && <div>Color: {item.colorName}</div>}
+                          {item.sizeName && <div>Size: {item.sizeName}</div>}
+                        </div>
+                        
+                        {/* Pricing Details */}
+                        <div className="mt-2 space-y-1">
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-gray-600">Qty: {item.quantity}</span>
+                            <span className="text-gray-400">×</span>
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium text-gray-900">Rs. {currentPrice.toFixed(2)}</span>
+                              {savings > 0 && originalPrice !== currentPrice && (
+                                <span className="text-xs text-gray-500 line-through">Rs. {originalPrice.toFixed(2)}</span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Pricing Tier Info */}
+                          {pricingInfo?.tierInfo && (
+                            <p className={`text-xs ${
+                              pricingInfo.appliedTier === 'combo' ? 'text-purple-600' : 
+                              pricingInfo.appliedTier === 'discount' ? 'text-green-600' : 'text-blue-600'
+                            }`}>
+                              {pricingInfo.tierInfo}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Price and Savings */}
+                      <div className="text-right ml-4">
+                        <p className="font-semibold text-sm text-gray-900">
+                          Rs. {totalItemPrice.toFixed(2)}
+                        </p>
+                        {savings > 0 && (
+                          <p className={`text-xs ${
+                            pricingInfo?.appliedTier === 'combo' ? 'text-purple-600' : 'text-green-600'
+                          }`}>
+                            Save Rs. {savings.toFixed(2)}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    
-                    {pricingInfo?.tierInfo && (
-                      <p className={`text-xs mt-1 ${
-                        pricingInfo.appliedTier === 'combo' ? 'text-purple-600' : 
-                        pricingInfo.appliedTier === 'discount' ? 'text-green-600' : 'text-blue-600'
-                      }`}>
-                        {pricingInfo.tierInfo}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="text-right ml-4">
-                    <p className="font-semibold text-sm text-gray-900">
-                      Rs. {(pricingInfo?.totalPrice || (item.unitPrice * item.quantity)).toFixed(2)}
-                    </p>
-                    {pricingInfo?.savings && pricingInfo.savings > 0 && (
-                      <p className={`text-xs ${
-                        pricingInfo.appliedTier === 'combo' ? 'text-purple-600' : 'text-green-600'
-                      }`}>
-                        Save Rs. {pricingInfo.savings.toFixed(2)}
-                      </p>
-                    )}
                   </div>
                 </div>
               </div>
@@ -278,7 +319,7 @@ export function AdvancedOrderSummary({
                     ) : subcategory.moqReached && subcategory.totalSavings > 0 ? (
                       <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
                         <TrendingDown className="h-3 w-3 mr-1" />
-                        MOQ Discount
+                        Volume Discount
                       </Badge>
                     ) : subcategory.moqReached ? (
                       <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
@@ -313,7 +354,7 @@ export function AdvancedOrderSummary({
                     subcategory.comboActive ? 'text-purple-600' : 'text-green-600'
                   }`}>
                     <span>
-                      {subcategory.comboActive ? 'Combo Savings:' : 'MOQ Discount Savings:'}
+                      {subcategory.comboActive ? 'Combo Savings:' : 'Volume Discount Savings:'}
                     </span>
                     <span>-Rs. {subcategory.totalSavings.toFixed(2)}</span>
                   </div>
