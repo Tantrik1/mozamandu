@@ -437,13 +437,13 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
       
       <CardContent className="p-4 flex-1 flex flex-col bg-gradient-to-b from-card to-card/90">
         {/* Enhanced Product Name */}
-        <h3 className="font-bold text-foreground text-sm mb-3 line-clamp-2 leading-tight group-hover:text-primary transition-colors duration-300">
+        <h3 className="font-bold text-foreground text-sm mb-2 line-clamp-2 leading-tight group-hover:text-primary transition-colors duration-300">
           {product.name}
         </h3>
         
         {/* Enhanced Description */}
         {product.description && (
-          <p className="text-xs text-muted-foreground mb-4 line-clamp-2 leading-relaxed">
+          <p className="text-xs text-muted-foreground mb-2 line-clamp-2 leading-relaxed">
             {product.description}
           </p>
         )}
