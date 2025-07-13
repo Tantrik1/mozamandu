@@ -105,12 +105,12 @@ export function useInventoryManager() {
 
   const reserveStock = async (orderId: string) => {
     try {
-      console.log('🔒 Reserving stock using enhanced function for order:', orderId);
+      console.log('🔒 Reserving stock directly for order:', orderId);
       
-      // First, let's check what order item details exist for this order
+      // Get all order items for this order
       const { data: orderItems, error: itemsError } = await supabase
         .from('customer_order_item_details')
-        .select('*')
+        .select('product_inventory_id, sku, quantity, product_name')
         .eq('order_id', orderId);
       
       if (itemsError) {
@@ -118,26 +118,80 @@ export function useInventoryManager() {
         throw itemsError;
       }
       
+      if (!orderItems || orderItems.length === 0) {
+        throw new Error('No order items found for reservation');
+      }
+      
       console.log('📋 Order items to reserve:', orderItems);
       
-      const { data, error } = await supabase.rpc('reserve_order_stock_enhanced', {
-        p_order_id: orderId
-      });
-
-      if (error) {
-        console.error('❌ Database function error:', error);
-        throw error;
+      // Reserve stock for each item
+      for (const item of orderItems) {
+        console.log(`🔒 Reserving ${item.quantity} units for SKU: ${item.sku}`);
+        
+        // Get current inventory state
+        const { data: inventory, error: inventoryError } = await supabase
+          .from('product_inventory')
+          .select('id, stock_quantity, reserved_stock, available_stock, sku')
+          .eq('id', item.product_inventory_id)
+          .single();
+        
+        if (inventoryError) {
+          console.error(`❌ Error fetching inventory for ${item.sku}:`, inventoryError);
+          throw new Error(`Failed to fetch inventory for ${item.sku}: ${inventoryError.message}`);
+        }
+        
+        if (!inventory) {
+          throw new Error(`Inventory record not found for ${item.sku}`);
+        }
+        
+        console.log(`📊 Current inventory for ${item.sku}:`, inventory);
+        
+        // Check if we have enough available stock
+        if (inventory.available_stock < item.quantity) {
+          throw new Error(`Insufficient stock for ${item.sku}. Available: ${inventory.available_stock}, Required: ${item.quantity}`);
+        }
+        
+        // Update reserved stock
+        const newReservedStock = inventory.reserved_stock + item.quantity;
+        
+        const { error: updateError } = await supabase
+          .from('product_inventory')
+          .update({ 
+            reserved_stock: newReservedStock,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', item.product_inventory_id);
+        
+        if (updateError) {
+          console.error(`❌ Error updating inventory for ${item.sku}:`, updateError);
+          throw new Error(`Failed to reserve stock for ${item.sku}: ${updateError.message}`);
+        }
+        
+        console.log(`✅ Successfully reserved ${item.quantity} units for SKU: ${item.sku}`);
+        
+        // Log the transaction
+        const { error: transactionError } = await supabase
+          .from('inventory_transactions')
+          .insert({
+            inventory_id: item.product_inventory_id,
+            transaction_type: 'reserve',
+            quantity_change: 0,
+            order_id: orderId,
+            reason: `Stock reservation for order - SKU: ${item.sku}`,
+            previous_stock: inventory.stock_quantity,
+            previous_reserved: inventory.reserved_stock,
+            new_stock: inventory.stock_quantity,
+            new_reserved: newReservedStock
+          });
+        
+        if (transactionError) {
+          console.warn(`⚠️ Failed to log transaction for ${item.sku}:`, transactionError);
+          // Don't throw here, just warn as the main operation succeeded
+        }
       }
-
-      console.log('📊 Reserve stock function returned:', data);
-
-      // The function returns a boolean: true for success, false for failure
-      if (data === false) {
-        throw new Error('Failed to reserve stock for some items');
-      }
-
-      console.log('✅ Stock reserved successfully for order:', orderId);
-      return data;
+      
+      console.log('✅ Stock reserved successfully for all items in order:', orderId);
+      return true;
     } catch (error) {
       console.error('❌ Error reserving stock:', error);
       throw error;
@@ -146,15 +200,87 @@ export function useInventoryManager() {
 
   const releaseStock = async (orderId: string) => {
     try {
-      console.log('🔓 Releasing stock using enhanced function for order:', orderId);
-      const { data, error } = await supabase.rpc('release_order_stock_enhanced', {
-        p_order_id: orderId
-      });
-
-      if (error) throw error;
-
-      console.log('✅ Stock released successfully for order:', orderId);
-      return data;
+      console.log('🔓 Releasing stock directly for order:', orderId);
+      
+      // Get all order items for this order
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('customer_order_item_details')
+        .select('product_inventory_id, sku, quantity, product_name')
+        .eq('order_id', orderId);
+      
+      if (itemsError) {
+        console.error('❌ Error fetching order items:', itemsError);
+        throw itemsError;
+      }
+      
+      if (!orderItems || orderItems.length === 0) {
+        console.log('⚠️ No order items found for release');
+        return true;
+      }
+      
+      console.log('📋 Order items to release:', orderItems);
+      
+      // Release stock for each item
+      for (const item of orderItems) {
+        console.log(`🔓 Releasing ${item.quantity} units for SKU: ${item.sku}`);
+        
+        // Get current inventory state
+        const { data: inventory, error: inventoryError } = await supabase
+          .from('product_inventory')
+          .select('id, stock_quantity, reserved_stock, sku')
+          .eq('id', item.product_inventory_id)
+          .single();
+        
+        if (inventoryError) {
+          console.error(`❌ Error fetching inventory for ${item.sku}:`, inventoryError);
+          throw new Error(`Failed to fetch inventory for ${item.sku}: ${inventoryError.message}`);
+        }
+        
+        if (!inventory) {
+          console.warn(`⚠️ Inventory record not found for ${item.sku}, skipping`);
+          continue;
+        }
+        
+        // Calculate new reserved stock (don't go below 0)
+        const newReservedStock = Math.max(0, inventory.reserved_stock - item.quantity);
+        
+        const { error: updateError } = await supabase
+          .from('product_inventory')
+          .update({ 
+            reserved_stock: newReservedStock,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', item.product_inventory_id);
+        
+        if (updateError) {
+          console.error(`❌ Error updating inventory for ${item.sku}:`, updateError);
+          throw new Error(`Failed to release stock for ${item.sku}: ${updateError.message}`);
+        }
+        
+        console.log(`✅ Successfully released ${item.quantity} units for SKU: ${item.sku}`);
+        
+        // Log the transaction
+        const { error: transactionError } = await supabase
+          .from('inventory_transactions')
+          .insert({
+            inventory_id: item.product_inventory_id,
+            transaction_type: 'release',
+            quantity_change: 0,
+            order_id: orderId,
+            reason: `Stock release for cancelled order - SKU: ${item.sku}`,
+            previous_stock: inventory.stock_quantity,
+            previous_reserved: inventory.reserved_stock,
+            new_stock: inventory.stock_quantity,
+            new_reserved: newReservedStock
+          });
+        
+        if (transactionError) {
+          console.warn(`⚠️ Failed to log transaction for ${item.sku}:`, transactionError);
+        }
+      }
+      
+      console.log('✅ Stock released successfully for all items in order:', orderId);
+      return true;
     } catch (error) {
       console.error('❌ Error releasing stock:', error);
       throw error;
@@ -163,15 +289,90 @@ export function useInventoryManager() {
 
   const fulfillStock = async (orderId: string) => {
     try {
-      console.log('📦 Fulfilling stock using enhanced function for order:', orderId);
-      const { data, error } = await supabase.rpc('fulfill_order_stock_enhanced', {
-        p_order_id: orderId
-      });
-
-      if (error) throw error;
-
-      console.log('✅ Stock fulfilled successfully for order:', orderId);
-      return data;
+      console.log('📦 Fulfilling stock directly for order:', orderId);
+      
+      // Get all order items for this order
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('customer_order_item_details')
+        .select('product_inventory_id, sku, quantity, product_name')
+        .eq('order_id', orderId);
+      
+      if (itemsError) {
+        console.error('❌ Error fetching order items:', itemsError);
+        throw itemsError;
+      }
+      
+      if (!orderItems || orderItems.length === 0) {
+        console.log('⚠️ No order items found for fulfillment');
+        return true;
+      }
+      
+      console.log('📋 Order items to fulfill:', orderItems);
+      
+      // Fulfill stock for each item (reduce both total and reserved stock)
+      for (const item of orderItems) {
+        console.log(`📦 Fulfilling ${item.quantity} units for SKU: ${item.sku}`);
+        
+        // Get current inventory state
+        const { data: inventory, error: inventoryError } = await supabase
+          .from('product_inventory')
+          .select('id, stock_quantity, reserved_stock, sku')
+          .eq('id', item.product_inventory_id)
+          .single();
+        
+        if (inventoryError) {
+          console.error(`❌ Error fetching inventory for ${item.sku}:`, inventoryError);
+          throw new Error(`Failed to fetch inventory for ${item.sku}: ${inventoryError.message}`);
+        }
+        
+        if (!inventory) {
+          console.warn(`⚠️ Inventory record not found for ${item.sku}, skipping`);
+          continue;
+        }
+        
+        // Calculate new stock levels
+        const actualFulfillQuantity = Math.min(item.quantity, inventory.reserved_stock);
+        const newStockQuantity = Math.max(0, inventory.stock_quantity - actualFulfillQuantity);
+        const newReservedStock = Math.max(0, inventory.reserved_stock - actualFulfillQuantity);
+        
+        const { error: updateError } = await supabase
+          .from('product_inventory')
+          .update({ 
+            stock_quantity: newStockQuantity,
+            reserved_stock: newReservedStock,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', item.product_inventory_id);
+        
+        if (updateError) {
+          console.error(`❌ Error updating inventory for ${item.sku}:`, updateError);
+          throw new Error(`Failed to fulfill stock for ${item.sku}: ${updateError.message}`);
+        }
+        
+        console.log(`✅ Successfully fulfilled ${actualFulfillQuantity} units for SKU: ${item.sku}`);
+        
+        // Log the transaction
+        const { error: transactionError } = await supabase
+          .from('inventory_transactions')
+          .insert({
+            inventory_id: item.product_inventory_id,
+            transaction_type: 'fulfill',
+            quantity_change: -actualFulfillQuantity,
+            order_id: orderId,
+            reason: `Stock fulfillment for delivered order - SKU: ${item.sku}`,
+            previous_stock: inventory.stock_quantity,
+            previous_reserved: inventory.reserved_stock,
+            new_stock: newStockQuantity,
+            new_reserved: newReservedStock
+          });
+        
+        if (transactionError) {
+          console.warn(`⚠️ Failed to log transaction for ${item.sku}:`, transactionError);
+        }
+      }
+      
+      console.log('✅ Stock fulfilled successfully for all items in order:', orderId);
+      return true;
     } catch (error) {
       console.error('❌ Error fulfilling stock:', error);
       throw error;
