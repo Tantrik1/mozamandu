@@ -2,16 +2,22 @@
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface PaymentScreenshotUploadProps {
   onUploadComplete: (url: string) => void;
+  currentImageUrl?: string;
+  onRemove?: () => void;
 }
 
-export function PaymentScreenshotUpload({ onUploadComplete }: PaymentScreenshotUploadProps) {
+export function PaymentScreenshotUpload({ 
+  onUploadComplete, 
+  currentImageUrl,
+  onRemove 
+}: PaymentScreenshotUploadProps) {
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
@@ -73,32 +79,47 @@ export function PaymentScreenshotUpload({ onUploadComplete }: PaymentScreenshotU
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Payment Screenshot</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div>
-          <Label htmlFor="payment-screenshot">Upload Payment Proof *</Label>
-          <Input
-            id="payment-screenshot"
-            type="file"
-            accept="image/*"
-            onChange={handleFileUpload}
-            disabled={uploading}
-            required
+    <div className="space-y-4">
+      <div>
+        <Label htmlFor="payment-screenshot">Upload Payment Proof *</Label>
+        <Input
+          id="payment-screenshot"
+          type="file"
+          accept="image/*"
+          onChange={handleFileUpload}
+          disabled={uploading}
+          required
+        />
+        <p className="text-xs text-red-500 mt-1">
+          Payment screenshot is required to complete your order
+        </p>
+        {uploading && (
+          <div className="flex items-center mt-2 text-sm text-blue-600">
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            Uploading screenshot...
+          </div>
+        )}
+      </div>
+
+      {currentImageUrl && (
+        <div className="relative">
+          <img 
+            src={currentImageUrl} 
+            alt="Payment screenshot" 
+            className="max-w-xs rounded-lg border"
           />
-          <p className="text-xs text-red-500 mt-1">
-            Payment screenshot is required to complete your order
-          </p>
-          {uploading && (
-            <div className="flex items-center mt-2 text-sm text-blue-600">
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Uploading screenshot...
-            </div>
+          {onRemove && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="absolute top-2 right-2"
+              onClick={onRemove}
+            >
+              <X className="h-4 w-4" />
+            </Button>
           )}
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 }

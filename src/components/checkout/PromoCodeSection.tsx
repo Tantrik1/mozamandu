@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -17,19 +17,42 @@ interface PromoCodeSectionProps {
   onDiscountApplied: (discount: number) => void;
   onPromoCodeUsed: (code: string) => void;
   orderTotal: number;
+  promoCode?: string;
+  setPromoCode?: (code: string) => void;
+  appliedPromo?: PromoCode | null;
+  isPromoApplied?: boolean;
+  onApplyPromo?: () => void;
+  onRemovePromo?: () => void;
 }
 
 export function PromoCodeSection({
   onDiscountApplied,
   onPromoCodeUsed,
-  orderTotal
+  orderTotal,
+  promoCode: externalPromoCode,
+  setPromoCode: externalSetPromoCode,
+  appliedPromo: externalAppliedPromo,
+  isPromoApplied: externalIsPromoApplied,
+  onApplyPromo: externalOnApplyPromo,
+  onRemovePromo: externalOnRemovePromo
 }: PromoCodeSectionProps) {
-  const [promoCode, setPromoCode] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState<PromoCode | null>(null);
+  const [internalPromoCode, setInternalPromoCode] = useState('');
+  const [internalAppliedPromo, setInternalAppliedPromo] = useState<PromoCode | null>(null);
   const [isApplying, setIsApplying] = useState(false);
   const { toast } = useToast();
 
+  // Use external state if provided, otherwise use internal state
+  const promoCode = externalPromoCode !== undefined ? externalPromoCode : internalPromoCode;
+  const setPromoCode = externalSetPromoCode || setInternalPromoCode;
+  const appliedPromo = externalAppliedPromo !== undefined ? externalAppliedPromo : internalAppliedPromo;
+  const isPromoApplied = externalIsPromoApplied !== undefined ? externalIsPromoApplied : !!internalAppliedPromo;
+
   const applyPromoCode = async () => {
+    if (externalOnApplyPromo) {
+      externalOnApplyPromo();
+      return;
+    }
+
     if (!promoCode.trim()) return;
 
     setIsApplying(true);
@@ -60,7 +83,7 @@ export function PromoCodeSection({
       }
 
       const discount = (orderTotal * data.discount_percentage) / 100;
-      setAppliedPromo(data);
+      setInternalAppliedPromo(data);
       onDiscountApplied(discount);
       onPromoCodeUsed(data.code);
       
@@ -81,7 +104,12 @@ export function PromoCodeSection({
   };
 
   const removePromoCode = () => {
-    setAppliedPromo(null);
+    if (externalOnRemovePromo) {
+      externalOnRemovePromo();
+      return;
+    }
+
+    setInternalAppliedPromo(null);
     setPromoCode('');
     onDiscountApplied(0);
     onPromoCodeUsed('');
@@ -103,9 +131,9 @@ export function PromoCodeSection({
             value={promoCode}
             onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
             placeholder="Enter promo code"
-            disabled={!!appliedPromo || isApplying}
+            disabled={isPromoApplied || isApplying}
           />
-          {!appliedPromo ? (
+          {!isPromoApplied ? (
             <Button 
               onClick={applyPromoCode} 
               disabled={!promoCode.trim() || isApplying}

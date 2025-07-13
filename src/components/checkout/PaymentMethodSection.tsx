@@ -14,24 +14,56 @@ interface PaymentMethod {
 }
 
 interface PaymentMethodSectionProps {
-  selectedMethodId: string;
-  onMethodChange: (methodId: string) => void;
-  paymentPercentage: number;
-  onPercentageChange: (percentage: number) => void;
+  selectedMethodId?: string;
+  onMethodChange?: (methodId: string) => void;
+  paymentPercentage?: number;
+  onPercentageChange?: (percentage: number) => void;
+  // Additional props for UniversalCheckout compatibility
+  paymentMethods?: PaymentMethod[];
+  selectedPayment?: string;
+  setSelectedPayment?: (value: string) => void;
+  paymentType?: string;
+  onPaymentTypeChange?: (type: string) => void;
+  paidAmount?: string;
+  setPaidAmount?: (amount: string) => void;
+  paymentScreenshot?: any;
+  setPaymentScreenshot?: (screenshot: any) => void;
+  finalTotal?: number;
+  minimumPayment?: number;
+  formErrors?: any;
+  uploadingScreenshot?: boolean;
 }
 
 export function PaymentMethodSection({
   selectedMethodId,
   onMethodChange,
-  paymentPercentage,
-  onPercentageChange
+  paymentPercentage = 100,
+  onPercentageChange,
+  paymentMethods: externalPaymentMethods,
+  selectedPayment,
+  setSelectedPayment,
+  paymentType,
+  onPaymentTypeChange,
+  paidAmount,
+  setPaidAmount,
+  finalTotal,
+  minimumPayment
 }: PaymentMethodSectionProps) {
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [internalPaymentMethods, setInternalPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Use external payment methods if provided, otherwise fetch them
+  const paymentMethods = externalPaymentMethods || internalPaymentMethods;
+  const currentSelectedId = selectedMethodId || selectedPayment || '';
+  const handleMethodChange = onMethodChange || setSelectedPayment || (() => {});
+
   useEffect(() => {
-    fetchPaymentMethods();
-  }, []);
+    if (!externalPaymentMethods) {
+      fetchPaymentMethods();
+    } else {
+      setLoading(false);
+    }
+  }, [externalPaymentMethods]);
 
   const fetchPaymentMethods = async () => {
     try {
@@ -42,7 +74,7 @@ export function PaymentMethodSection({
         .order('name');
 
       if (error) throw error;
-      setPaymentMethods(data || []);
+      setInternalPaymentMethods(data || []);
     } catch (error) {
       console.error('Error fetching payment methods:', error);
     } finally {
@@ -50,7 +82,25 @@ export function PaymentMethodSection({
     }
   };
 
-  const selectedPaymentMethod = paymentMethods.find(p => p.id === selectedMethodId);
+  const selectedPaymentMethod = paymentMethods.find(p => p.id === currentSelectedId);
+
+  const handlePaymentTypeChange = (type: string) => {
+    if (onPaymentTypeChange) {
+      onPaymentTypeChange(type);
+    } else if (onPercentageChange) {
+      onPercentageChange(type === 'full' ? 100 : 20);
+    }
+  };
+
+  const handlePaidAmountChange = (value: string) => {
+    if (setPaidAmount) {
+      setPaidAmount(value);
+    } else if (onPercentageChange && finalTotal) {
+      const amount = parseFloat(value);
+      const percentage = (amount / finalTotal) * 100;
+      onPercentageChange(Math.min(100, Math.max(20, percentage)));
+    }
+  };
 
   return (
     <Card>
@@ -59,7 +109,7 @@ export function PaymentMethodSection({
         <CardDescription>Choose your preferred payment method</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Select value={selectedMethodId} onValueChange={onMethodChange} disabled={loading}>
+        <Select value={currentSelectedId} onValueChange={handleMethodChange} disabled={loading}>
           <SelectTrigger>
             <SelectValue placeholder={loading ? "Loading..." : "Select payment method"} />
           </SelectTrigger>
@@ -89,7 +139,7 @@ export function PaymentMethodSection({
           <Label>Payment Amount</Label>
           <RadioGroup
             value={paymentPercentage === 100 ? 'full' : 'partial'}
-            onValueChange={(value) => onPercentageChange(value === 'full' ? 100 : 20)}
+            onValueChange={handlePaymentTypeChange}
             className="mt-2"
           >
             <div className="flex items-center space-x-2">
@@ -104,16 +154,28 @@ export function PaymentMethodSection({
 
           {paymentPercentage < 100 && (
             <div className="mt-3">
-              <Input
-                type="number"
-                min={20}
-                max={100}
-                value={paymentPercentage}
-                onChange={(e) => onPercentageChange(Number(e.target.value))}
-                placeholder="Enter percentage (20-100)"
-              />
+              {paidAmount !== undefined ? (
+                <Input
+                  type="number"
+                  value={paidAmount}
+                  onChange={(e) => handlePaidAmountChange(e.target.value)}
+                  placeholder="Enter amount"
+                />
+              ) : (
+                <Input
+                  type="number"
+                  min={20}
+                  max={100}
+                  value={paymentPercentage}
+                  onChange={(e) => onPercentageChange?.(Number(e.target.value))}
+                  placeholder="Enter percentage (20-100)"
+                />
+              )}
               <p className="text-sm text-gray-600 mt-1">
-                Enter percentage between 20% and 100%
+                {paidAmount !== undefined ? 
+                  `Minimum payment: Rs. ${minimumPayment?.toFixed(2) || '0.00'}` :
+                  'Enter percentage between 20% and 100%'
+                }
               </p>
             </div>
           )}
