@@ -6,7 +6,7 @@ import { Eye, RefreshCw, CheckCircle, Truck, Package, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { useEnhancedInventoryManager } from '@/hooks/useEnhancedInventoryManager';
+import { useInventoryManager } from '@/hooks/useInventoryManager';
 
 interface Order {
   id: string;
@@ -64,7 +64,7 @@ export function AdminOrdersTable({
     }
   };
 
-  const { fulfillStock, releaseStock } = useEnhancedInventoryManager();
+  const { reserveStock, releaseStock, fulfillStock } = useInventoryManager();
 
   const handleInventoryUpdate = async (orderId: string, newStatus: string, oldStatus: string) => {
     try {
@@ -87,35 +87,11 @@ export function AdminOrdersTable({
       if (newStatus === 'delivered' && oldStatus !== 'delivered') {
         // Fulfill stock: reduce both reserved and total stock
         console.log('📦 Fulfilling stock for delivery...');
-        for (const item of orderItems) {
-          if (item.product_inventory_id) {
-            const success = await fulfillStock(
-              item.product_inventory_id,
-              item.quantity,
-              orderId,
-              `Order delivered - ${item.sku}`
-            );
-            if (!success) {
-              throw new Error(`Failed to fulfill stock for ${item.sku}`);
-            }
-          }
-        }
+        await fulfillStock(orderId);
       } else if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
         // Release stock: only reduce reserved stock, keep total stock
         console.log('🔓 Releasing reserved stock for cancellation...');
-        for (const item of orderItems) {
-          if (item.product_inventory_id) {
-            const success = await releaseStock(
-              item.product_inventory_id,
-              item.quantity,
-              orderId,
-              `Order cancelled - ${item.sku}`
-            );
-            if (!success) {
-              throw new Error(`Failed to release stock for ${item.sku}`);
-            }
-          }
-        }
+        await releaseStock(orderId);
       }
 
       console.log('✅ Inventory update completed successfully');
