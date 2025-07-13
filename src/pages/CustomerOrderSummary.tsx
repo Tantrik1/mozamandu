@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,6 +29,7 @@ interface CustomerOrderDetails {
   promocode_used?: string;
   combo_applied?: boolean;
   created_at: string;
+  pricing_breakdown?: any;
   payment_method?: {
     name: string;
   };
@@ -103,7 +105,10 @@ export default function CustomerOrderSummary() {
       console.log('✅ Order items fetched:', itemsData);
 
       setOrderDetails(orderData);
-      setOrderItems(itemsData || []);
+      setOrderItems((itemsData || []).map(item => ({
+        ...item,
+        pricing_details: item.pricing_details as any || { savings: 0 }
+      })));
     } catch (error) {
       console.error('💥 Error fetching customer order details:', error);
       setError('Failed to load order details');
@@ -232,13 +237,15 @@ export default function CustomerOrderSummary() {
                           {item.sku && (
                             <p className="text-sm text-gray-500">SKU: {item.sku}</p>
                           )}
-                          <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                          <p className="text-sm text-gray-600">
+                            Qty: {item.quantity} × Rs. {item.unit_price.toFixed(2)}
+                          </p>
                           
                           <div className="flex items-center gap-2 mt-2">
                             <Badge variant="secondary" className={pricingMode.color}>
                               {pricingMode.text}
                             </Badge>
-                            {item.pricing_details?.savings > 0 && (
+                            {item.pricing_details?.savings && item.pricing_details.savings > 0 && (
                               <span className="text-sm text-green-600">
                                 Saved Rs. {item.pricing_details.savings.toFixed(2)}
                               </span>

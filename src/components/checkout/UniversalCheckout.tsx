@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ interface DeliveryLocation {
 interface PaymentMethod {
   id: string;
   name: string;
+  qr_code_url: string;
 }
 
 interface PromoCode {
@@ -114,7 +116,10 @@ export function UniversalCheckout() {
   });
 
   const {
-    appliedPromoCode,
+    promoCode,
+    setPromoCode,
+    appliedPromo,
+    isPromoApplied,
     applyPromoCode,
     removePromoCode
   } = usePromoCode();
@@ -127,12 +132,12 @@ export function UniversalCheckout() {
   }, []);
 
   useEffect(() => {
-    if (appliedPromoCode) {
+    if (appliedPromo) {
       calculatePromoDiscount();
     } else {
       setPromoDiscount(0);
     }
-  }, [appliedPromoCode, cartItems]);
+  }, [appliedPromo, cartItems]);
 
   const fetchDeliveryLocations = async () => {
     try {
@@ -214,9 +219,9 @@ export function UniversalCheckout() {
   };
 
   const calculatePromoDiscount = () => {
-    if (appliedPromoCode) {
+    if (appliedPromo) {
       const subtotal = getTotalPrice();
-      const discount = (subtotal * appliedPromoCode.discount_percentage) / 100;
+      const discount = (subtotal * appliedPromo.discount_percentage) / 100;
       setPromoDiscount(discount);
     } else {
       setPromoDiscount(0);
@@ -224,7 +229,8 @@ export function UniversalCheckout() {
   };
 
   const handlePromoCodeApplied = (promoCode: PromoCode) => {
-    applyPromoCode(promoCode);
+    const totalWithDelivery = getTotalPrice() + (deliveryLocation ? deliveryLocation.delivery_price : 0);
+    applyPromoCode(totalWithDelivery);
   };
 
   const handlePromoCodeRemoved = () => {
@@ -268,16 +274,27 @@ export function UniversalCheckout() {
       const paidAmount = Math.round(finalTotal * (paymentPercentage / 100));
       const remainingAmount = finalTotal - paidAmount;
 
-      // Prepare comprehensive pricing breakdown
+      // Prepare simplified pricing breakdown for JSON storage
       const pricingBreakdown = {
         subcategoryPricing: Object.fromEntries(
           Object.entries(subcategoryPricing).map(([id, data]) => [
             id,
             {
-              ...data,
+              subcategoryId: data.subcategoryId,
+              totalQuantity: data.totalQuantity,
+              moqReached: data.moqReached,
+              moqRequired: data.moqRequired,
+              comboActive: data.comboActive,
+              comboPrice: data.comboPrice,
+              totalSavings: data.totalSavings,
+              description: data.description,
               itemBreakdown: data.itemBreakdown.map(item => ({
-                ...item,
-                cartItemDetails: cartItems.find(ci => ci.id === item.itemId)
+                itemId: item.itemId,
+                unitPrice: item.unitPrice,
+                totalPrice: item.totalPrice,
+                appliedTier: item.appliedTier,
+                tierInfo: item.tierInfo,
+                savings: item.savings
               }))
             }
           ])
@@ -287,7 +304,10 @@ export function UniversalCheckout() {
         promoDiscount,
         deliveryCharge: deliveryLocation.delivery_price,
         finalTotal,
-        comboInfo: isComboActive ? comboInfo : null,
+        comboInfo: isComboActive ? {
+          combo: comboInfo?.combo,
+          totalComboSavings: comboInfo?.totalComboSavings || 0
+        } : null,
         pricingMode: isComboActive ? 'combo' : (tieredSavings > 0 ? 'moq_discount' : 'normal')
       };
 
@@ -306,7 +326,7 @@ export function UniversalCheckout() {
           delivery_location_id: deliveryLocation.id,
           delivery_charge: deliveryLocation.delivery_price,
           subtotal: tieredSubtotal,
-          promocode_used: appliedPromoCode?.code || null,
+          promocode_used: appliedPromo?.code || null,
           promocode_discount: promoDiscount,
           total_amount: finalTotal,
           paid_amount: paidAmount,
@@ -432,22 +452,24 @@ export function UniversalCheckout() {
       </Card>
 
       <PromoCodeSection
-        appliedPromoCode={appliedPromoCode}
-        onPromoCodeApplied={handlePromoCodeApplied}
-        onPromoCodeRemoved={handlePromoCodeRemoved}
+        promoCode={promoCode}
+        setPromoCode={setPromoCode}
+        appliedPromo={appliedPromo}
+        isPromoApplied={isPromoApplied}
+        onApplyPromo={() => handlePromoCodeApplied(appliedPromo!)}
+        onRemovePromo={handlePromoCodeRemoved}
       />
 
       <AdvancedOrderSummary
         cartItems={cartItems}
         subcategoryPricing={subcategoryPricing}
         deliveryCharge={deliveryLocation ? deliveryLocation.delivery_price : 0}
-        promoCode={appliedPromoCode}
+        promoCode={appliedPromo}
         promoDiscount={promoDiscount}
         totalSavings={totalSavings}
         finalTotal={finalTotal}
         isSubmitting={isSubmitting}
         onSubmitOrder={handleSubmitOrder}
-        paymentScreenshotUrl={paymentScreenshotUrl}
         comboInfo={getComboInfo()}
       />
 
