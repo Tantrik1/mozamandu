@@ -322,7 +322,7 @@ export type Database = {
           subtotal: number
           total_amount: number
           updated_at: string | null
-          user_id: string
+          user_id: string | null
           whatsapp_number: string | null
         }
         Insert: {
@@ -348,7 +348,7 @@ export type Database = {
           subtotal?: number
           total_amount?: number
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
           whatsapp_number?: string | null
         }
         Update: {
@@ -374,7 +374,7 @@ export type Database = {
           subtotal?: number
           total_amount?: number
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
           whatsapp_number?: string | null
         }
         Relationships: [

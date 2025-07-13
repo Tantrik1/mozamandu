@@ -402,7 +402,7 @@ export function UniversalCheckout() {
       // Create order with enhanced error handling - CRITICAL FIX for guest orders
       console.log('📝 Creating order with validated inventory data...');
       
-      // Prepare order data with proper user_id handling
+      // Prepare order data with proper user_id handling and status typing
       const orderData = {
         // CRITICAL: Set user_id to null for guest orders explicitly
         user_id: user?.id || null,
@@ -424,7 +424,7 @@ export function UniversalCheckout() {
         payment_screenshot_url: paymentScreenshotUrl,
         combo_applied: isComboActive,
         pricing_breakdown: pricingBreakdown,
-        status: 'pending_payment'
+        status: 'pending_payment' as const
       };
 
       console.log('📋 Order data being sent:', orderData);
