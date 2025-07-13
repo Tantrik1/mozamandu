@@ -45,25 +45,8 @@ interface PromoCode {
 
 export function UniversalCheckout() {
   const { user } = useAuth();
-  const { getInventoryRecord } = useInventoryManager();
-  const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    whatsapp: ''
-  });
-  const [deliveryLocations, setDeliveryLocations] = useState<DeliveryLocation[]>([]);
-  const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocation | null>(null);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [paymentPercentage, setPaymentPercentage] = useState(100);
-  const [paymentScreenshotUrl, setPaymentScreenshotUrl] = useState<string | null>(null);
-  const [discountTiers, setDiscountTiers] = useState<{ [key: string]: any[] }>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [orderId, setOrderId] = useState<string | null>(null);
-
+  const { getInventoryRecord, validateStockAvailability } = useInventoryManager();
+  
   const {
     cartItems,
     clearCart
@@ -100,6 +83,23 @@ export function UniversalCheckout() {
     removePromoCode
   } = usePromoCode();
 
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    whatsapp: ''
+  });
+  const [deliveryLocations, setDeliveryLocations] = useState<DeliveryLocation[]>([]);
+  const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocation | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [paymentPercentage, setPaymentPercentage] = useState(100);
+  const [paymentScreenshotUrl, setPaymentScreenshotUrl] = useState<string | null>(null);
+  const [discountTiers, setDiscountTiers] = useState<{ [key: string]: any[] }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [orderId, setOrderId] = useState<string | null>(null);
   const [promoDiscount, setPromoDiscount] = useState(0);
 
   useEffect(() => {
@@ -227,9 +227,9 @@ export function UniversalCheckout() {
   const handleSubmitOrder = async () => {
     try {
       setIsSubmitting(true);
-      console.log('🚀 Starting order submission with EXACT cart pricing matching...');
+      console.log('🚀 Starting enhanced order submission with inventory management...');
       
-      // Validation checks
+      // Enhanced validation checks
       if (!customerInfo.name.trim()) {
         toast.error('Please enter your name');
         return;
@@ -260,7 +260,11 @@ export function UniversalCheckout() {
         return;
       }
 
-      // Get inventory records for all cart items with enhanced validation
+      // Enhanced stock validation before proceeding
+      console.log('🔍 Validating stock availability for all items...');
+      await validateStockAvailability(cartItems);
+
+      // Get inventory records with enhanced validation
       const cartItemsWithInventory = await Promise.all(
         cartItems.map(async (item) => {
           const inventoryRecord = await getInventoryRecord(
@@ -273,7 +277,7 @@ export function UniversalCheckout() {
             throw new Error(`Inventory record not found for ${item.productName}`);
           }
 
-          // Validate stock availability before proceeding
+          // Double-check stock availability
           if (inventoryRecord.available_stock < item.quantity) {
             throw new Error(`Insufficient stock for ${item.productName}. Available: ${inventoryRecord.available_stock}, Required: ${item.quantity}`);
           }
@@ -286,15 +290,15 @@ export function UniversalCheckout() {
         })
       );
 
-      console.log('📦 Cart items with inventory validated:', cartItemsWithInventory);
+      console.log('✅ All inventory records validated:', cartItemsWithInventory);
 
-      // Calculate EXACT same pricing as cart using the SAME pricing hook
-      const accurateSubtotal = getTieredTotalPrice(); // This matches cart calculation exactly
+      // Calculate pricing using the same hooks as cart
+      const accurateSubtotal = getTieredTotalPrice();
       const accurateSavings = getTotalSavings();
       const comboInfo = getComboInfo();
       const isComboActive = isComboModeActive();
       
-      console.log('💰 EXACT cart pricing details:', {
+      console.log('💰 Pricing details:', {
         accurateSubtotal,
         accurateSavings,
         comboInfo,
@@ -302,13 +306,12 @@ export function UniversalCheckout() {
         subcategoryPricing
       });
 
-      // Use EXACT same pricing for final calculations
       const totalBeforeDelivery = accurateSubtotal - promoDiscount;
       const finalTotal = totalBeforeDelivery + deliveryLocation.delivery_price;
       const paidAmount = Math.round(finalTotal * (paymentPercentage / 100));
       const remainingAmount = finalTotal - paidAmount;
 
-      // Create comprehensive pricing breakdown with EXACT cart details using SAME pricing hook
+      // Create comprehensive pricing breakdown
       const pricingBreakdown = {
         subcategoryPricing: Object.fromEntries(
           Object.entries(subcategoryPricing).map(([id, data]) => [
@@ -349,13 +352,13 @@ export function UniversalCheckout() {
         pricingMode: isComboActive ? 'combo' : (accurateSavings > 0 ? 'moq_discount' : 'normal')
       };
 
-      console.log('📋 EXACT cart pricing breakdown for database:', pricingBreakdown);
+      console.log('📋 Enhanced pricing breakdown:', pricingBreakdown);
 
-      // Create order with EXACT cart pricing data
+      // Create order with proper user handling for all user types
       const { data: orderData, error: orderError } = await supabase
         .from('customer_orders')
         .insert({
-          user_id: user?.id || '',
+          user_id: user?.id || null, // Handle guest checkouts
           customer_name: customerInfo.name,
           customer_email: customerInfo.email,
           contact_number: customerInfo.phone,
@@ -363,7 +366,7 @@ export function UniversalCheckout() {
           delivery_address: customerInfo.address,
           delivery_location_id: deliveryLocation.id,
           delivery_charge: deliveryLocation.delivery_price,
-          subtotal: accurateSubtotal, // EXACT cart subtotal using SAME pricing hook
+          subtotal: accurateSubtotal,
           promocode_used: appliedPromo?.code || null,
           promocode_discount: promoDiscount,
           total_amount: finalTotal,
@@ -384,7 +387,7 @@ export function UniversalCheckout() {
         throw orderError;
       }
 
-      console.log('✅ Order created successfully with EXACT cart pricing:', orderData);
+      console.log('✅ Order created successfully:', orderData);
 
       // Insert basic order items for compatibility
       const orderItemsToInsert = cartItemsWithInventory.map(item => ({
@@ -402,9 +405,9 @@ export function UniversalCheckout() {
         throw orderItemsError;
       }
 
-      // Insert detailed order item information with EXACT cart pricing per inventory ID using SAME pricing hook
+      // Insert detailed order item information with proper inventory IDs
       const orderItemDetailsToInsert = cartItemsWithInventory.map(item => {
-        const pricingResult = getTieredItemPricing(item.id); // Use EXACT same method as CartSidebar
+        const pricingResult = getTieredItemPricing(item.id);
         const pricingInfo = pricingResult || {
           unitPrice: item.basePrice,
           totalPrice: item.basePrice * item.quantity,
@@ -416,14 +419,14 @@ export function UniversalCheckout() {
 
         return {
           order_id: orderData.id,
-          product_inventory_id: item.inventoryId,
+          product_inventory_id: item.inventoryId, // Ensure inventory ID is properly set
           product_name: item.productName,
           color_name: item.colorName || null,
           size_name: item.sizeName || null,
           sku: item.sku,
           quantity: item.quantity,
-          unit_price: pricingInfo.unitPrice, // EXACT same pricing as cart
-          total_price: pricingInfo.totalPrice, // EXACT same pricing as cart
+          unit_price: pricingInfo.unitPrice,
+          total_price: pricingInfo.totalPrice,
           pricing_mode: pricingInfo.appliedTier || 'normal',
           pricing_details: {
             appliedTier: pricingInfo.appliedTier || 'normal',
@@ -441,7 +444,7 @@ export function UniversalCheckout() {
         };
       });
 
-      console.log('📝 Detailed order items with EXACT cart pricing per inventory ID using SAME pricing hook:', orderItemDetailsToInsert);
+      console.log('📝 Enhanced order item details with inventory IDs:', orderItemDetailsToInsert);
 
       const { error: orderItemDetailsError } = await supabase
         .from('customer_order_item_details')
@@ -452,16 +455,16 @@ export function UniversalCheckout() {
         throw orderItemDetailsError;
       }
 
-      console.log('✅ Order completed successfully with EXACT cart pricing matching perfectly using SAME pricing hooks!');
+      console.log('🎉 Enhanced order completed successfully with inventory management!');
       
       // Clear cart and show success
       clearCart();
       setOrderId(orderData.id);
       setShowSuccess(true);
-      toast.success('Order placed successfully! Exact cart pricing applied and saved to database using same pricing logic as cart.');
+      toast.success('Order placed successfully! Inventory has been reserved and order tracking is now active.');
 
     } catch (error) {
-      console.error('💥 Order submission failed:', error);
+      console.error('💥 Enhanced order submission failed:', error);
       toast.error(`Failed to place order: ${error.message}`);
     } finally {
       setIsSubmitting(false);
@@ -470,11 +473,11 @@ export function UniversalCheckout() {
 
   // Use EXACT cart pricing calculations using SAME pricing hooks
   const totalSavings = getTotalSavings() + promoDiscount;
-  const subtotal = getTieredTotalPrice(); // This matches cart calculation exactly using SAME hook
+  const subtotal = getTieredTotalPrice();
   const totalBeforeDelivery = subtotal - promoDiscount;
   const finalTotal = totalBeforeDelivery + (deliveryLocation ? deliveryLocation.delivery_price : 0);
 
-  console.log('🎯 Final checkout calculations using SAME pricing hooks as cart:', {
+  console.log('🎯 Final checkout calculations:', {
     subtotal,
     totalSavings: getTotalSavings(),
     promoDiscount,
