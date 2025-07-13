@@ -24,14 +24,7 @@ export function CheckoutSuccess({ orderId }: CheckoutSuccessProps) {
     });
   }, [toast]);
 
-  // Auto-redirect to order summary after 3 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      window.location.href = `/orders/${orderId}`;
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [orderId]);
+  // Remove auto-redirect - show thank you page instead
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -116,14 +109,14 @@ export function CheckoutSuccess({ orderId }: CheckoutSuccessProps) {
               <div className="mx-auto mb-4 p-3 bg-green-100 rounded-full w-fit">
                 <CheckCircle className="h-12 w-12 text-green-600" />
               </div>
-              <CardTitle className="text-2xl font-bold text-green-600">
-                Order Placed Successfully!
+              <CardTitle className="text-3xl font-bold text-green-600">
+                Thank You!
               </CardTitle>
-              <p className="text-gray-600 mt-2">
-                Thank you for your order. We'll process it shortly.
+              <p className="text-lg text-gray-700 mt-4 leading-relaxed">
+                Your order has been successfully placed and we're excited to fulfill it for you.
               </p>
-              <p className="text-sm text-blue-600 mt-2">
-                Redirecting to order details in 3 seconds...
+              <p className="text-gray-600 mt-3">
+                We've reserved your items and will begin processing your order immediately. You'll receive updates as your order progresses through each stage.
               </p>
             </CardHeader>
 
@@ -168,7 +161,7 @@ export function CheckoutSuccess({ orderId }: CheckoutSuccessProps) {
                   Continue Shopping
                 </Button>
                 <Button 
-                  onClick={() => window.location.href = `/orders/${orderId}`}
+                  onClick={() => window.location.href = `/order-summary/${orderId}`}
                   className="flex-1"
                 >
                   View Order Details
