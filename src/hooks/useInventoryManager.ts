@@ -169,25 +169,7 @@ export function useInventoryManager() {
         
         console.log(`✅ Successfully reserved ${item.quantity} units for SKU: ${item.sku}`);
         
-        // Log the transaction
-        const { error: transactionError } = await supabase
-          .from('inventory_transactions')
-          .insert({
-            inventory_id: item.product_inventory_id,
-            transaction_type: 'reserve',
-            quantity_change: 0,
-            order_id: orderId,
-            reason: `Stock reservation for order - SKU: ${item.sku}`,
-            previous_stock: inventory.stock_quantity,
-            previous_reserved: inventory.reserved_stock,
-            new_stock: inventory.stock_quantity,
-            new_reserved: newReservedStock
-          });
-        
-        if (transactionError) {
-          console.warn(`⚠️ Failed to log transaction for ${item.sku}:`, transactionError);
-          // Don't throw here, just warn as the main operation succeeded
-        }
+        console.log(`📝 Frontend transaction log: Reserved ${item.quantity} units for SKU: ${item.sku}`);
       }
       
       console.log('✅ Stock reserved successfully for all items in order:', orderId);
@@ -259,24 +241,7 @@ export function useInventoryManager() {
         
         console.log(`✅ Successfully released ${item.quantity} units for SKU: ${item.sku}`);
         
-        // Log the transaction
-        const { error: transactionError } = await supabase
-          .from('inventory_transactions')
-          .insert({
-            inventory_id: item.product_inventory_id,
-            transaction_type: 'release',
-            quantity_change: 0,
-            order_id: orderId,
-            reason: `Stock release for cancelled order - SKU: ${item.sku}`,
-            previous_stock: inventory.stock_quantity,
-            previous_reserved: inventory.reserved_stock,
-            new_stock: inventory.stock_quantity,
-            new_reserved: newReservedStock
-          });
-        
-        if (transactionError) {
-          console.warn(`⚠️ Failed to log transaction for ${item.sku}:`, transactionError);
-        }
+        console.log(`📝 Frontend transaction log: Released ${item.quantity} units for SKU: ${item.sku}`);
       }
       
       console.log('✅ Stock released successfully for all items in order:', orderId);
@@ -351,24 +316,7 @@ export function useInventoryManager() {
         
         console.log(`✅ Successfully fulfilled ${actualFulfillQuantity} units for SKU: ${item.sku}`);
         
-        // Log the transaction
-        const { error: transactionError } = await supabase
-          .from('inventory_transactions')
-          .insert({
-            inventory_id: item.product_inventory_id,
-            transaction_type: 'fulfill',
-            quantity_change: -actualFulfillQuantity,
-            order_id: orderId,
-            reason: `Stock fulfillment for delivered order - SKU: ${item.sku}`,
-            previous_stock: inventory.stock_quantity,
-            previous_reserved: inventory.reserved_stock,
-            new_stock: newStockQuantity,
-            new_reserved: newReservedStock
-          });
-        
-        if (transactionError) {
-          console.warn(`⚠️ Failed to log transaction for ${item.sku}:`, transactionError);
-        }
+        console.log(`📝 Frontend transaction log: Fulfilled ${actualFulfillQuantity} units for SKU: ${item.sku}`);
       }
       
       console.log('✅ Stock fulfilled successfully for all items in order:', orderId);
