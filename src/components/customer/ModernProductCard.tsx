@@ -60,20 +60,31 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
   const [sizeVariants, setSizeVariants] = useState<SizeVariant[]>([]);
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [selectedSize, setSelectedSize] = useState<string>('');
-  const [quantity, setQuantity] = useState<number>(1);
   const [loading, setLoading] = useState(false);
   const [productStock, setProductStock] = useState<number>(0);
   const [discountTiers, setDiscountTiers] = useState<{ [key: string]: DiscountTier[] }>({});
   const [realtimeSubcategoryPrice, setRealtimeSubcategoryPrice] = useState<number>(subcategorySellingPrice);
   
-  const { addToCart, cartItems } = useRobustCart();
+  const { addToCart, cartItems, updateQuantity, removeFromCart } = useRobustCart();
   
-  // Create mock cart item for pricing calculation
+  // Get current cart quantity for this product
+  const getCartQuantity = () => {
+    const cartItem = cartItems.find(item => 
+      item.productId === product.id &&
+      item.colorVariantId === (selectedColor || null) &&
+      item.sizeVariantId === (selectedSize || null)
+    );
+    return cartItem?.quantity || 0;
+  };
+  
+  const currentCartQuantity = getCartQuantity();
+  
+  // Create mock cart item for pricing calculation using current cart quantity
   const mockCartItem = {
     id: 'mock',
     productId: product.id,
     productName: product.name,
-    quantity: quantity,
+    quantity: currentCartQuantity || 1,
     basePrice: product.selling_price || realtimeSubcategoryPrice,
     subcategoryId: product.subcategory_id,
     colorVariantId: selectedColor || null,
@@ -208,31 +219,59 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
   const hasVolumeDiscount = currentPricing.appliedTier === 'discount';
   const hasComboPrice = currentPricing.appliedTier === 'combo';
 
-  const handleQuantityChange = (newQuantity: number) => {
-    if (newQuantity >= 1 && newQuantity <= productStock) {
-      setQuantity(newQuantity);
-    }
-  };
-
-  const handleAddToCart = async () => {
-    if (productStock === 0) return;
+  const handleQuantityIncrease = async () => {
+    if (currentCartQuantity >= productStock) return;
     
     setLoading(true);
     try {
-      const success = await addToCart({
-        productId: product.id,
-        productName: product.name,
-        quantity: quantity,
-        colorVariantId: selectedColor || undefined,
-        sizeVariantId: selectedSize || undefined,
-        unitPrice: product.selling_price || realtimeSubcategoryPrice,
-      });
-      
-      if (success) {
-        setQuantity(1);
+      if (currentCartQuantity === 0) {
+        // Add new item to cart
+        await addToCart({
+          productId: product.id,
+          productName: product.name,
+          quantity: 1,
+          colorVariantId: selectedColor || undefined,
+          sizeVariantId: selectedSize || undefined,
+          unitPrice: product.selling_price || realtimeSubcategoryPrice,
+        });
+      } else {
+        // Update existing cart item
+        const cartItem = cartItems.find(item => 
+          item.productId === product.id &&
+          item.colorVariantId === (selectedColor || null) &&
+          item.sizeVariantId === (selectedSize || null)
+        );
+        if (cartItem) {
+          await updateQuantity(cartItem.id, currentCartQuantity + 1);
+        }
       }
     } catch (error) {
-      console.error('Error adding to cart:', error);
+      console.error('Error updating quantity:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuantityDecrease = async () => {
+    if (currentCartQuantity <= 0) return;
+    
+    setLoading(true);
+    try {
+      const cartItem = cartItems.find(item => 
+        item.productId === product.id &&
+        item.colorVariantId === (selectedColor || null) &&
+        item.sizeVariantId === (selectedSize || null)
+      );
+      
+      if (cartItem) {
+        if (currentCartQuantity === 1) {
+          await removeFromCart(cartItem.id);
+        } else {
+          await updateQuantity(cartItem.id, currentCartQuantity - 1);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating quantity:', error);
     } finally {
       setLoading(false);
     }
@@ -354,7 +393,7 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
           </div>
         )}
 
-        {/* Enhanced Quantity Controls */}
+        {/* Enhanced Real-time Quantity Controls */}
         {productStock > 0 && (
           <div className="mb-4">
             <label className="text-xs font-semibold text-foreground mb-2 block">Quantity</label>
@@ -363,18 +402,18 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
                 variant="outline"
                 size="sm"
                 className="h-8 w-8 p-0 border-2 border-border/60 hover:border-primary/50 hover:bg-primary/10 transition-all duration-300"
-                onClick={() => handleQuantityChange(quantity - 1)}
-                disabled={quantity <= 1}
+                onClick={handleQuantityDecrease}
+                disabled={currentCartQuantity <= 0 || loading}
               >
                 <Minus className="h-3 w-3" />
               </Button>
-              <span className="font-bold text-sm w-8 text-center bg-background rounded px-2 py-1">{quantity}</span>
+              <span className="font-bold text-sm w-8 text-center bg-background rounded px-2 py-1">{currentCartQuantity}</span>
               <Button
                 variant="outline"
                 size="sm"
                 className="h-8 w-8 p-0 border-2 border-border/60 hover:border-primary/50 hover:bg-primary/10 transition-all duration-300"
-                onClick={() => handleQuantityChange(quantity + 1)}
-                disabled={quantity >= productStock}
+                onClick={handleQuantityIncrease}
+                disabled={currentCartQuantity >= productStock || loading}
               >
                 <Plus className="h-3 w-3" />
               </Button>
@@ -397,7 +436,7 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
                     </span>
                   )}
                 </div>
-                {quantity > 1 && (
+                {currentCartQuantity > 1 && (
                   <span className="text-xs text-muted-foreground font-medium">
                     Total: Rs. {currentPricing.totalPrice.toFixed(0)}
                   </span>
@@ -410,54 +449,14 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
               )}
             </div>
 
-            {/* Enhanced Pricing Mode Indicators */}
-            {hasComboPrice && (
-              <div className="text-xs p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200 shadow-sm">
-                <div className="text-purple-700">
-                  <span className="font-bold flex items-center gap-1">
-                    <Zap className="w-3 h-3" />
-                    Combo pricing active!
-                  </span>
-                  <br />
-                  <span className="text-purple-600">{currentPricing.tierInfo}</span>
-                </div>
-              </div>
-            )}
-
-            {hasVolumeDiscount && !hasComboPrice && (
-              <div className="text-xs p-3 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200 shadow-sm">
-                <div className="text-green-700">
-                  <span className="font-bold flex items-center gap-1">
-                    <Target className="w-3 h-3" />
-                    Volume discount active!
-                  </span>
-                  <br />
-                  <span className="text-green-600">{currentPricing.tierInfo}</span>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Enhanced Add to Cart Button */}
-          <Button
-            onClick={handleAddToCart}
-            disabled={loading || productStock === 0}
-            className="w-full h-10 text-sm font-bold transition-all duration-300 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
-          >
-            {loading ? (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Adding...
-              </div>
-            ) : productStock === 0 ? (
-              'Out of Stock'
-            ) : (
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4" />
-                Add to Cart
-              </div>
-            )}
-          </Button>
+          {/* Product Actions - No add to cart button needed */}
+          {productStock === 0 && (
+            <div className="w-full h-10 flex items-center justify-center bg-gradient-to-r from-muted to-muted/80 rounded-lg">
+              <span className="text-sm text-muted-foreground font-medium">Out of Stock</span>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
