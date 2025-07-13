@@ -105,6 +105,7 @@ export function useInventoryManager() {
 
   const reserveStock = async (orderId: string) => {
     try {
+      console.log('🔒 Reserving stock using enhanced function for order:', orderId);
       const { data, error } = await supabase.rpc('reserve_order_stock_enhanced', {
         p_order_id: orderId
       });
@@ -115,50 +116,57 @@ export function useInventoryManager() {
         throw new Error('Failed to reserve stock for some items');
       }
 
+      console.log('✅ Stock reserved successfully for order:', orderId);
       return data;
     } catch (error) {
-      console.error('Error reserving stock:', error);
+      console.error('❌ Error reserving stock:', error);
       throw error;
     }
   };
 
   const releaseStock = async (orderId: string) => {
     try {
+      console.log('🔓 Releasing stock using enhanced function for order:', orderId);
       const { data, error } = await supabase.rpc('release_order_stock_enhanced', {
         p_order_id: orderId
       });
 
       if (error) throw error;
 
+      console.log('✅ Stock released successfully for order:', orderId);
       return data;
     } catch (error) {
-      console.error('Error releasing stock:', error);
+      console.error('❌ Error releasing stock:', error);
       throw error;
     }
   };
 
   const fulfillStock = async (orderId: string) => {
     try {
-      const { data, error } = await supabase.rpc('fulfill_order_stock', {
+      console.log('📦 Fulfilling stock using enhanced function for order:', orderId);
+      const { data, error } = await supabase.rpc('fulfill_order_stock_enhanced', {
         p_order_id: orderId
       });
 
       if (error) throw error;
 
+      console.log('✅ Stock fulfilled successfully for order:', orderId);
       return data;
     } catch (error) {
-      console.error('Error fulfilling stock:', error);
+      console.error('❌ Error fulfilling stock:', error);
       throw error;
     }
   };
 
-  // New function to get inventory record for cart items
+  // Enhanced function to get inventory record for cart items with validation
   const getInventoryRecord = async (
     productId: string,
     colorVariantId?: string,
     sizeVariantId?: string
   ) => {
     try {
+      console.log('🔍 Getting inventory record for:', { productId, colorVariantId, sizeVariantId });
+      
       const { data, error } = await supabase
         .from('product_inventory')
         .select('*')
@@ -167,11 +175,75 @@ export function useInventoryManager() {
         .eq('size_variant_id', sizeVariantId || null)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error getting inventory record:', error);
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error('Inventory record not found');
+      }
+
+      console.log('✅ Inventory record found:', data);
       return data;
     } catch (error) {
-      console.error('Error getting inventory record:', error);
+      console.error('❌ Error getting inventory record:', error);
       return null;
+    }
+  };
+
+  // Enhanced function to validate stock availability for all pricing modes
+  const validateStockAvailability = async (cartItems: any[]) => {
+    try {
+      console.log('🔍 Validating stock availability for all items...');
+      
+      const validationResults = await Promise.all(
+        cartItems.map(async (item) => {
+          const inventoryRecord = await getInventoryRecord(
+            item.productId,
+            item.colorVariantId,
+            item.sizeVariantId
+          );
+          
+          if (!inventoryRecord) {
+            return {
+              item,
+              valid: false,
+              error: `Inventory record not found for ${item.productName}`
+            };
+          }
+
+          const available = inventoryRecord.available_stock || 0;
+          const required = item.quantity;
+
+          if (available < required) {
+            return {
+              item,
+              valid: false,
+              error: `Insufficient stock for ${item.productName}. Available: ${available}, Required: ${required}`
+            };
+          }
+
+          return {
+            item,
+            valid: true,
+            inventoryRecord
+          };
+        })
+      );
+
+      const invalidItems = validationResults.filter(result => !result.valid);
+      
+      if (invalidItems.length > 0) {
+        const errorMessages = invalidItems.map(result => result.error).join(', ');
+        throw new Error(`Stock validation failed: ${errorMessages}`);
+      }
+
+      console.log('✅ All items have sufficient stock');
+      return validationResults.map(result => result.inventoryRecord);
+    } catch (error) {
+      console.error('❌ Stock validation failed:', error);
+      throw error;
     }
   };
 
@@ -182,6 +254,7 @@ export function useInventoryManager() {
     releaseStock,
     fulfillStock,
     getInventoryRecord,
+    validateStockAvailability,
   };
 }
 

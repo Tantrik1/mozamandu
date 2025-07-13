@@ -1440,6 +1440,10 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: boolean
       }
+      fulfill_order_stock_enhanced: {
+        Args: { p_order_id: string }
+        Returns: boolean
+      }
       generate_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1533,6 +1537,10 @@ export type Database = {
           p_order_number?: string
           p_transaction_type?: string
         }
+        Returns: boolean
+      }
+      validate_pricing_breakdown: {
+        Args: { breakdown: Json }
         Returns: boolean
       }
     }

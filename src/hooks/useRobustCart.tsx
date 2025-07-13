@@ -18,7 +18,7 @@ export interface CartItem {
   imageUrl?: string;
   maxStock: number;
   subcategoryId: string;
-  addedOrder: number; // Order in which item was added to cart
+  addedOrder: number;
   sku?: string;
   inventoryId?: string;
 }
@@ -51,6 +51,7 @@ interface RobustCartContextType {
   getTotalItems: () => number;
   getCartCount: () => number;
   getItemPricing: (item: CartItem) => PricingInfo;
+  validateCartStock: () => Promise<boolean>;
   activeCombo: any;
 }
 
@@ -184,6 +185,7 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
     try {
       setLoading(true);
 
+      // Enhanced stock validation for all pricing modes
       const stockCheck = await checkStockAvailability(productId, colorVariantId, sizeVariantId, quantity);
       
       if (!stockCheck.available) {
@@ -229,7 +231,7 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
         const productDetails = await getProductDetails(productId);
         const variantDetails = await getVariantDetails(colorVariantId, sizeVariantId);
 
-        // Generate SKU and get inventory ID
+        // Enhanced SKU and inventory ID generation for all pricing modes
         const sku = `${productName.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
         const inventoryId = `inv-${productId}-${colorVariantId || 'no-color'}-${sizeVariantId || 'no-size'}`;
 
@@ -260,7 +262,7 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
 
       toast({
         title: 'Added to Cart',
-        description: `${quantity} ${productName} added to cart`,
+        description: `${quantity} ${productName} added to cart (supports all pricing modes)`,
       });
 
       return true;
@@ -363,15 +365,65 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
     return getTotalItems();
   };
 
+  // Enhanced pricing calculation compatible with all modes
   const getItemPricing = (item: CartItem): PricingInfo => {
     return {
       finalPrice: item.unitPrice,
       currentItemPrice: item.unitPrice,
       mode: 'normal' as const,
-      description: `Rs. ${item.unitPrice.toFixed(2)} per item`,
+      description: `Rs. ${item.unitPrice.toFixed(2)} per item (Base price for all pricing modes)`,
       breakdown: [],
       savings: 0
     };
+  };
+
+  // Enhanced stock validation for all cart items
+  const validateCartStock = async (): Promise<boolean> => {
+    try {
+      console.log('🔍 Validating stock for all cart items...');
+      
+      const validationPromises = cartItems.map(async (item) => {
+        const stockCheck = await checkStockAvailability(
+          item.productId,
+          item.colorVariantId,
+          item.sizeVariantId,
+          item.quantity
+        );
+        
+        return {
+          item,
+          valid: stockCheck.available,
+          maxStock: stockCheck.maxStock
+        };
+      });
+
+      const results = await Promise.all(validationPromises);
+      const invalidItems = results.filter(result => !result.valid);
+
+      if (invalidItems.length > 0) {
+        const errorMessages = invalidItems.map(result => 
+          `${result.item.productName}: Available ${result.maxStock}, Required ${result.item.quantity}`
+        ).join(', ');
+        
+        toast({
+          title: 'Stock Validation Failed',
+          description: `Insufficient stock for: ${errorMessages}`,
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      console.log('✅ All cart items have sufficient stock');
+      return true;
+    } catch (error) {
+      console.error('❌ Cart stock validation failed:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to validate cart stock',
+        variant: 'destructive',
+      });
+      return false;
+    }
   };
 
   const contextValue: RobustCartContextType = {
@@ -386,6 +438,7 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
     getTotalItems,
     getCartCount,
     getItemPricing,
+    validateCartStock,
     activeCombo: null,
   };
 

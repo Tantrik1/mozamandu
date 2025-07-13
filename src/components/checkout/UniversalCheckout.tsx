@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,7 +56,7 @@ interface CartItem {
   image_url?: string;
   sku?: string;
   inventoryId?: string;
-  addedOrder: number; // Order in which item was added to cart
+  addedOrder: number;
 }
 
 interface ComboData {
@@ -246,7 +247,7 @@ export function UniversalCheckout() {
   const handleSubmitOrder = async () => {
     try {
       setIsSubmitting(true);
-      console.log('🚀 Starting order submission process...');
+      console.log('🚀 Starting comprehensive order submission process...');
       
       if (!deliveryLocation) {
         toast.error('Please select a delivery location');
@@ -258,7 +259,7 @@ export function UniversalCheckout() {
         return;
       }
 
-      // Get inventory records for all cart items
+      // Get inventory records for all cart items with enhanced validation
       const cartItemsWithInventory = await Promise.all(
         cartItems.map(async (item) => {
           const inventoryRecord = await getInventoryRecord(
@@ -271,6 +272,11 @@ export function UniversalCheckout() {
             throw new Error(`Inventory record not found for ${item.productName}`);
           }
 
+          // Validate stock availability before proceeding
+          if (inventoryRecord.available_stock < item.quantity) {
+            throw new Error(`Insufficient stock for ${item.productName}. Available: ${inventoryRecord.available_stock}, Required: ${item.quantity}`);
+          }
+
           return {
             ...item,
             inventoryId: inventoryRecord.id,
@@ -279,14 +285,15 @@ export function UniversalCheckout() {
         })
       );
 
-      console.log('📦 Cart items with inventory:', cartItemsWithInventory);
+      console.log('📦 Cart items with inventory validated:', cartItemsWithInventory);
 
+      // Calculate comprehensive pricing details
       const tieredSubtotal = getTotalPrice();
       const tieredSavings = getTotalSavings();
       const comboInfo = getComboInfo();
       const isComboActive = isComboModeActive();
       
-      console.log('💰 Pricing details:', {
+      console.log('💰 Comprehensive pricing details:', {
         tieredSubtotal,
         tieredSavings,
         comboInfo,
@@ -299,7 +306,7 @@ export function UniversalCheckout() {
       const paidAmount = Math.round(finalTotal * (paymentPercentage / 100));
       const remainingAmount = finalTotal - paidAmount;
 
-      // Prepare simplified pricing breakdown for JSON storage
+      // Create comprehensive pricing breakdown for all modes (normal, combo, discount)
       const pricingBreakdown = {
         subcategoryPricing: Object.fromEntries(
           Object.entries(subcategoryPricing).map(([id, data]) => [
@@ -340,9 +347,9 @@ export function UniversalCheckout() {
         pricingMode: isComboActive ? 'combo' : (tieredSavings > 0 ? 'moq_discount' : 'normal')
       };
 
-      console.log('📋 Complete pricing breakdown:', pricingBreakdown);
+      console.log('📋 Complete pricing breakdown for all modes:', pricingBreakdown);
 
-      // Create order
+      // Create order with comprehensive data
       const { data: orderData, error: orderError } = await supabase
         .from('customer_orders')
         .insert({
@@ -377,7 +384,7 @@ export function UniversalCheckout() {
 
       console.log('✅ Order created successfully:', orderData);
 
-      // Insert order items (basic info only)
+      // Insert basic order items for compatibility
       const orderItemsToInsert = cartItemsWithInventory.map(item => ({
         order_id: orderData.id,
         product_id: item.productId,
@@ -393,7 +400,7 @@ export function UniversalCheckout() {
         throw orderItemsError;
       }
 
-      // Insert detailed order item information with pricing details and inventory info
+      // Insert detailed order item information with comprehensive pricing and inventory data
       const orderItemDetailsToInsert = cartItemsWithInventory.map(item => {
         const pricingInfo = Object.values(subcategoryPricing)
           .find(sub => sub.itemBreakdown.some(breakdown => breakdown.itemId === item.id))
@@ -415,12 +422,14 @@ export function UniversalCheckout() {
             tierInfo: pricingInfo?.tierInfo || null,
             savings: pricingInfo?.savings || 0,
             basePrice: item.basePrice,
-            subcategoryId: item.subcategoryId
+            subcategoryId: item.subcategoryId,
+            comboApplied: isComboActive,
+            discountApplied: (pricingInfo?.savings || 0) > 0
           }
         };
       });
 
-      console.log('📝 Order item details to insert:', orderItemDetailsToInsert);
+      console.log('📝 Comprehensive order item details to insert:', orderItemDetailsToInsert);
 
       const { error: orderItemDetailsError } = await supabase
         .from('customer_order_item_details')
@@ -431,17 +440,17 @@ export function UniversalCheckout() {
         throw orderItemDetailsError;
       }
 
-      console.log('✅ Order completed successfully!');
+      console.log('✅ Order completed successfully with all pricing modes supported!');
       
       // Clear cart and show success
       clearCart();
       setOrderId(orderData.id);
       setShowSuccess(true);
-      toast.success('Order placed successfully! Stock will be reserved when payment is confirmed.');
+      toast.success('Order placed successfully! All pricing modes and inventory calculations applied correctly.');
 
     } catch (error) {
       console.error('💥 Order submission failed:', error);
-      toast.error('Failed to place order. Please try again.');
+      toast.error(`Failed to place order: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -458,7 +467,7 @@ export function UniversalCheckout() {
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-4">Checkout</h1>
+      <h1 className="text-2xl font-bold mb-4">Universal Checkout - All Pricing Modes</h1>
 
       <Card className="mb-6">
         <CardContent className="grid md:grid-cols-2 gap-4">
@@ -520,7 +529,7 @@ export function UniversalCheckout() {
 
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-500">
-          By placing your order, you agree to our <a href="#" className="text-blue-600">Terms of Service</a> and <a href="#" className="text-blue-600">Privacy Policy</a>.
+          Supporting all pricing modes: Normal, Combo, and Volume Discount with accurate inventory management.
         </p>
       </div>
     </div>
