@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,7 +45,7 @@ interface PromoCode {
 
 export function UniversalCheckout() {
   const { user } = useAuth();
-  const { getInventoryRecord, validateStockAvailability } = useInventoryManager();
+  const { getInventoryRecord, validateStockAvailability, reserveStock } = useInventoryManager();
   
   const {
     cartItems,
@@ -230,7 +229,7 @@ export function UniversalCheckout() {
   const handleSubmitOrder = async () => {
     try {
       setIsSubmitting(true);
-      console.log('🚀 Starting enhanced order submission with inventory management...');
+      console.log('🚀 Starting enhanced order submission with immediate stock reservation...');
       console.log('🔍 User status:', { isAuthenticated: !!user, userId: user?.id });
       
       // Enhanced validation checks
@@ -509,13 +508,25 @@ export function UniversalCheckout() {
         throw new Error(`Failed to create order item details: ${orderItemDetailsError.message}`);
       }
 
-      console.log('🎉 Enhanced order completed successfully with inventory management!');
+      // CRITICAL FIX: Reserve stock immediately after order creation
+      console.log('🔒 Reserving stock immediately for order:', createdOrder.id);
+      try {
+        await reserveStock(createdOrder.id);
+        console.log('✅ Stock reserved successfully for order:', createdOrder.id);
+        toast.success('Stock has been reserved for your order!');
+      } catch (reserveError) {
+        console.error('❌ Failed to reserve stock:', reserveError);
+        // Don't fail the entire order, but log the issue
+        toast.error('Order created but stock reservation failed. Please contact support.');
+      }
+
+      console.log('🎉 Enhanced order completed successfully with immediate stock reservation!');
       
       // Clear cart and show success
       clearCart();
       setOrderId(createdOrder.id);
       setShowSuccess(true);
-      toast.success('Order placed successfully! Inventory has been reserved and order tracking is now active.');
+      toast.success('Order placed successfully! Stock has been reserved and order tracking is now active.');
 
     } catch (error) {
       console.error('💥 Enhanced order submission failed:', error);
