@@ -1,20 +1,13 @@
-
 import { Link } from 'react-router-dom';
 import { Facebook, Instagram, Mail, Phone, MapPin } from 'lucide-react';
-
 export function Footer() {
-  return (
-    <footer className="bg-gray-900 text-white">
+  return <footer className="bg-gray-900 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Company Info */}
           <div className="space-y-4">
             <div className="flex items-center space-x-3">
-              <img 
-                src="/lovable-uploads/2d98ffef-154e-49c8-9c1c-39e09f1ea5ae.png" 
-                alt="Mozamandu Logo" 
-                className="h-10 w-auto"
-              />
+              <img alt="Mozamandu Logo" className="h-10 w-auto" src="/lovable-uploads/84f1077a-8761-4272-88fd-ec35838bbd2b.png" />
               <div className="flex flex-col">
                 <span className="text-xl font-bold">Mozamandu</span>
                 <span className="text-sm text-gray-400">Gentle on feet</span>
@@ -91,6 +84,5 @@ export function Footer() {
           </div>
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 }
