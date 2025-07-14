@@ -100,34 +100,34 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
     <TooltipProvider>
       <form onSubmit={handleSubmit} className="space-y-6">
         {errors.form && (
-          <div className="p-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg animate-fade-in">
+          <div className="p-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg animate-fade-in backdrop-blur-sm">
             {errors.form}
           </div>
         )}
 
         <div className="space-y-2">
-          <Label htmlFor="signup-name" className="text-sm font-medium">Full Name</Label>
+          <Label htmlFor="signup-name" className="text-sm font-medium text-gray-700">Full Name</Label>
           <Input
             id="signup-name"
             type="text"
             value={signUpData.fullName}
             onChange={(e) => setSignUpData({ ...signUpData, fullName: e.target.value })}
             placeholder="Enter your full name"
-            className="h-12 border-2 focus:border-red-500 transition-all duration-300"
+            className="h-12 border-2 focus:border-red-500 transition-all duration-300 bg-white/50 backdrop-blur-sm"
             disabled={isLoading}
           />
           {errors.fullName && <p className="text-sm text-red-600 mt-1">{errors.fullName}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="signup-email" className="text-sm font-medium">Email Address</Label>
+          <Label htmlFor="signup-email" className="text-sm font-medium text-gray-700">Email Address</Label>
           <Input
             id="signup-email"
             type="email"
             value={signUpData.email}
             onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
             placeholder="Enter your email"
-            className="h-12 border-2 focus:border-red-500 transition-all duration-300"
+            className="h-12 border-2 focus:border-red-500 transition-all duration-300 bg-white/50 backdrop-blur-sm"
             disabled={isLoading}
           />
           {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
@@ -135,7 +135,7 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
 
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label htmlFor="signup-password" className="text-sm font-medium">Password</Label>
+            <Label htmlFor="signup-password" className="text-sm font-medium text-gray-700">Password</Label>
             {signUpData.password && !isPasswordStrong(signUpData.password) && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -154,7 +154,7 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
               value={signUpData.password}
               onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
               placeholder="Create a password"
-              className="h-12 pr-12 border-2 focus:border-red-500 transition-all duration-300"
+              className="h-12 pr-12 border-2 focus:border-red-500 transition-all duration-300 bg-white/50 backdrop-blur-sm"
               disabled={isLoading}
             />
             <button
@@ -169,28 +169,28 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="signup-confirm" className="text-sm font-medium">Confirm Password</Label>
+          <Label htmlFor="signup-confirm" className="text-sm font-medium text-gray-700">Confirm Password</Label>
           <Input
             id="signup-confirm"
             type="password"
             value={signUpData.confirmPassword}
             onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
             placeholder="Confirm your password"
-            className="h-12 border-2 focus:border-red-500 transition-all duration-300"
+            className="h-12 border-2 focus:border-red-500 transition-all duration-300 bg-white/50 backdrop-blur-sm"
             disabled={isLoading}
           />
           {errors.confirmPassword && <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>}
         </div>
 
-        <div className="flex items-start space-x-3 p-4 rounded-lg bg-muted/30">
+        <div className="flex items-start space-x-3 p-4 rounded-lg bg-muted/20 backdrop-blur-sm border border-muted/50">
           <Checkbox
             id="terms"
             checked={agreeToTerms}
             onCheckedChange={(checked) => setAgreeToTerms(checked as boolean)}
             disabled={isLoading}
-            className="mt-0.5"
+            className="mt-0.5 flex-shrink-0"
           />
-          <Label htmlFor="terms" className="text-sm leading-relaxed">
+          <Label htmlFor="terms" className="text-sm leading-relaxed min-w-0 flex-1">
             I agree to the{' '}
             <a href="/terms" target="_blank" className="text-red-600 hover:text-red-700 font-medium hover:underline transition-colors">
               Terms and Conditions
