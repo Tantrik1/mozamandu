@@ -8,7 +8,8 @@ import { useToast } from '@/hooks/use-toast';
 import { CreateProductForm } from './CreateProductForm';
 import { EditProductForm } from './EditProductForm';
 import { ProductDetailView } from './ProductDetailView';
-import { Pencil, Trash2, Plus, Search, Package, Eye } from 'lucide-react';
+import { Pencil, Trash2, Plus, Search, Package, Eye, Filter } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getProductStockSummary } from '@/utils/stockCalculation';
 
 interface Product {
@@ -32,6 +33,10 @@ export function ProductManagement() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [subcategoryFilter, setSubcategoryFilter] = useState('');
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [subcategories, setSubcategories] = useState<{ id: string; name: string; category_id: string }[]>([]);
   const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [viewingProductId, setViewingProductId] = useState<string | null>(null);
@@ -40,6 +45,8 @@ export function ProductManagement() {
 
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
+    fetchSubcategories();
   }, []);
 
   useEffect(() => {
@@ -47,6 +54,36 @@ export function ProductManagement() {
       calculateProductStocks();
     }
   }, [products]);
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, name')
+        .eq('status', 'on')
+        .order('name');
+
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const fetchSubcategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('subcategories')
+        .select('id, name, category_id')
+        .eq('status', 'on')
+        .order('name');
+
+      if (error) throw error;
+      setSubcategories(data || []);
+    } catch (error) {
+      console.error('Error fetching subcategories:', error);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -158,11 +195,21 @@ export function ProductManagement() {
     setViewingProductId(null);
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.categories?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.subcategories?.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter(product => {
+    // Search filter
+    const matchesSearch = 
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.categories?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.subcategories?.name.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Category filter
+    const matchesCategory = !categoryFilter || product.category_id === categoryFilter;
+    
+    // Subcategory filter
+    const matchesSubcategory = !subcategoryFilter || product.subcategory_id === subcategoryFilter;
+    
+    return matchesSearch && matchesCategory && matchesSubcategory;
+  });
 
   if (loading) {
     return <div className="flex justify-center p-8">Loading products...</div>;
@@ -208,7 +255,7 @@ export function ProductManagement() {
         </Button>
       </div>
 
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-4 flex-wrap gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
@@ -217,6 +264,56 @@ export function ProductManagement() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-gray-500" />
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Categories</SelectItem>
+              {categories.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <Select 
+            value={subcategoryFilter} 
+            onValueChange={setSubcategoryFilter}
+            disabled={!categoryFilter}
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All Subcategories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Subcategories</SelectItem>
+              {subcategories
+                .filter(sub => !categoryFilter || sub.category_id === categoryFilter)
+                .map((subcategory) => (
+                  <SelectItem key={subcategory.id} value={subcategory.id}>
+                    {subcategory.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          
+          {(categoryFilter || subcategoryFilter) && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                setCategoryFilter('');
+                setSubcategoryFilter('');
+              }}
+            >
+              Clear Filters
+            </Button>
+          )}
         </div>
       </div>
 

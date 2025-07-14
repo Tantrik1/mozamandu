@@ -22,6 +22,7 @@ interface InventoryItem {
   low_stock_threshold: number;
   color_variant_id?: string;
   size_variant_id?: string;
+  is_active?: boolean;
 }
 
 interface InventoryManagementPopupProps {
@@ -62,20 +63,47 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
 
       console.log('Product info:', product);
 
-      // Generate inventory items based on product variants
-      if (product.has_color_variants) {
-        await generateVariantInventory(product);
+      // First, fetch existing inventory items
+      const { data: existingInventory, error: inventoryError } = await supabase
+        .from('product_inventory')
+        .select('*')
+        .eq('product_id', productId);
+
+      if (inventoryError) throw inventoryError;
+
+      // If we have existing inventory, use it
+      if (existingInventory && existingInventory.length > 0) {
+        setInventoryItems(existingInventory.map(item => ({
+          id: item.id,
+          sku: item.sku,
+          product_name: item.product_name,
+          color_name: item.color_name,
+          size_name: item.size_name,
+          stock_quantity: item.stock_quantity,
+          cost_price: item.cost_price,
+          selling_price: item.selling_price || item.cost_price,
+          low_stock_threshold: item.low_stock_threshold || 10,
+          color_variant_id: item.color_variant_id,
+          size_variant_id: item.size_variant_id,
+          is_active: item.is_active,
+        })));
       } else {
-        // Simple product - single inventory item
-        const simpleItem: InventoryItem = {
-          sku: generateSKU(product.name),
-          product_name: product.name,
-          stock_quantity: 0,
-          cost_price: product.cost_price,
-          selling_price: product.selling_price || product.cost_price,
-          low_stock_threshold: 10,
-        };
-        setInventoryItems([simpleItem]);
+        // Generate new inventory items based on product variants
+        if (product.has_color_variants) {
+          await generateVariantInventory(product);
+        } else {
+          // Simple product - single inventory item
+          const simpleItem: InventoryItem = {
+            sku: generateSKU(product.name),
+            product_name: product.name,
+            stock_quantity: 0,
+            cost_price: product.cost_price,
+            selling_price: product.selling_price || product.cost_price,
+            low_stock_threshold: 10,
+            is_active: true,
+          };
+          setInventoryItems([simpleItem]);
+        }
       }
     } catch (error) {
       console.error('Error fetching product and inventory:', error);
@@ -208,24 +236,38 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
           cost_price: item.cost_price,
           selling_price: item.selling_price,
           low_stock_threshold: item.low_stock_threshold,
-          is_active: true,
+          is_active: item.is_active !== false,
         };
 
-        console.log('Inserting inventory record:', inventoryData);
+        console.log('Saving inventory record:', inventoryData);
 
-        const { error } = await supabase
-          .from('product_inventory')
-          .insert(inventoryData);
+        if (item.id) {
+          // Update existing record
+          const { error } = await supabase
+            .from('product_inventory')
+            .update(inventoryData)
+            .eq('id', item.id);
 
-        if (error) {
-          console.error('Error inserting inventory item:', error);
-          throw error;
+          if (error) {
+            console.error('Error updating inventory item:', error);
+            throw error;
+          }
+        } else {
+          // Insert new record
+          const { error } = await supabase
+            .from('product_inventory')
+            .insert(inventoryData);
+
+          if (error) {
+            console.error('Error inserting inventory item:', error);
+            throw error;
+          }
         }
       }
 
       toast({
         title: 'Success',
-        description: 'Inventory records created successfully',
+        description: 'Inventory records saved successfully',
       });
 
       onClose();

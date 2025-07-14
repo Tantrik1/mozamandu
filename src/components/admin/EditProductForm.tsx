@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, Eye, X, Settings } from 'lucide-react';
-import { SmartProductVariantForm } from './SmartProductVariantForm';
+import { EnhancedProductVariantForm } from './EnhancedProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 
 const productSchema = z.object({
@@ -577,12 +577,12 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         </Card>
 
         {(watchedHasColorVariants || watchedHasSizeVariants) && (
-          <SmartProductVariantForm
+          <EnhancedProductVariantForm
             productId={productId}
             hasColorVariants={watchedHasColorVariants}
             hasSizeVariants={watchedHasSizeVariants}
-            onVariantsChange={() => {}}
-            hideStockFields={true}
+            onSave={() => setShowInventoryPopup(true)}
+            onCancel={() => {}}
           />
         )}
 
