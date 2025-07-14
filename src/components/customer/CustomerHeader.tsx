@@ -133,7 +133,7 @@ export function CustomerHeader() {
           <ChevronDown className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" />
         </button>
         
-        {openMegaMenu === category.id && <div className="fixed left-1/2 transform -translate-x-1/2 top-16 w-full max-w-4xl bg-white shadow-2xl border-t-4 border-red-500 z-50 transition-all duration-300">
+        {openMegaMenu === category.id && <div className="fixed left-1/2 transform -translate-x-1/2 top-20 w-full max-w-4xl bg-white shadow-2xl border-t-4 border-red-500 z-50 transition-all duration-300">
             <div className="p-8 mt-2 ">
               <div className="mb-6">
                 <h3 className="text-2xl font-bold text-gray-800 mb-2">{category.name}</h3>
