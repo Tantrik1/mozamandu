@@ -33,8 +33,8 @@ export function ProductManagement() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [subcategoryFilter, setSubcategoryFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [subcategoryFilter, setSubcategoryFilter] = useState('all');
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [subcategories, setSubcategories] = useState<{ id: string; name: string; category_id: string }[]>([]);
   const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
@@ -203,10 +203,10 @@ export function ProductManagement() {
       product.subcategories?.name.toLowerCase().includes(searchTerm.toLowerCase());
     
     // Category filter
-    const matchesCategory = !categoryFilter || product.category_id === categoryFilter;
+    const matchesCategory = !categoryFilter || categoryFilter === 'all' || product.category_id === categoryFilter;
     
     // Subcategory filter
-    const matchesSubcategory = !subcategoryFilter || product.subcategory_id === subcategoryFilter;
+    const matchesSubcategory = !subcategoryFilter || subcategoryFilter === 'all' || product.subcategory_id === subcategoryFilter;
     
     return matchesSearch && matchesCategory && matchesSubcategory;
   });
@@ -273,7 +273,7 @@ export function ProductManagement() {
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Categories</SelectItem>
+              <SelectItem value="all">All Categories</SelectItem>
               {categories.map((category) => (
                 <SelectItem key={category.id} value={category.id}>
                   {category.name}
@@ -291,9 +291,9 @@ export function ProductManagement() {
               <SelectValue placeholder="All Subcategories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Subcategories</SelectItem>
+              <SelectItem value="all">All Subcategories</SelectItem>
               {subcategories
-                .filter(sub => !categoryFilter || sub.category_id === categoryFilter)
+                .filter(sub => !categoryFilter || categoryFilter === 'all' || sub.category_id === categoryFilter)
                 .map((subcategory) => (
                   <SelectItem key={subcategory.id} value={subcategory.id}>
                     {subcategory.name}
@@ -302,13 +302,13 @@ export function ProductManagement() {
             </SelectContent>
           </Select>
           
-          {(categoryFilter || subcategoryFilter) && (
+          {(categoryFilter && categoryFilter !== 'all') || (subcategoryFilter && subcategoryFilter !== 'all') && (
             <Button 
               variant="outline" 
               size="sm" 
               onClick={() => {
-                setCategoryFilter('');
-                setSubcategoryFilter('');
+                setCategoryFilter('all');
+                setSubcategoryFilter('all');
               }}
             >
               Clear Filters
