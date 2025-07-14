@@ -71,39 +71,25 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
 
       if (inventoryError) throw inventoryError;
 
-      // If we have existing inventory, use it
-      if (existingInventory && existingInventory.length > 0) {
-        setInventoryItems(existingInventory.map(item => ({
-          id: item.id,
-          sku: item.sku,
-          product_name: item.product_name,
-          color_name: item.color_name,
-          size_name: item.size_name,
-          stock_quantity: item.stock_quantity,
-          cost_price: item.cost_price,
-          selling_price: item.selling_price || item.cost_price,
-          low_stock_threshold: item.low_stock_threshold || 10,
-          color_variant_id: item.color_variant_id,
-          size_variant_id: item.size_variant_id,
-          is_active: item.is_active,
-        })));
+      // Always regenerate inventory items based on current variants
+      // but preserve existing data where applicable
+      if (product.has_color_variants) {
+        await generateVariantInventory(product, existingInventory || []);
       } else {
-        // Generate new inventory items based on product variants
-        if (product.has_color_variants) {
-          await generateVariantInventory(product);
-        } else {
-          // Simple product - single inventory item
-          const simpleItem: InventoryItem = {
-            sku: generateSKU(product.name),
-            product_name: product.name,
-            stock_quantity: 0,
-            cost_price: product.cost_price,
-            selling_price: product.selling_price || product.cost_price,
-            low_stock_threshold: 10,
-            is_active: true,
-          };
-          setInventoryItems([simpleItem]);
-        }
+        // Simple product - single inventory item
+        const existingItem = existingInventory?.find(item => !item.color_variant_id && !item.size_variant_id);
+        
+        const simpleItem: InventoryItem = {
+          id: existingItem?.id,
+          sku: existingItem?.sku || generateSKU(product.name),
+          product_name: product.name,
+          stock_quantity: existingItem?.stock_quantity || 0,
+          cost_price: existingItem?.cost_price || product.cost_price,
+          selling_price: existingItem?.selling_price || product.selling_price || product.cost_price,
+          low_stock_threshold: existingItem?.low_stock_threshold || 10,
+          is_active: existingItem?.is_active ?? true,
+        };
+        setInventoryItems([simpleItem]);
       }
     } catch (error) {
       console.error('Error fetching product and inventory:', error);
@@ -117,7 +103,7 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
     }
   };
 
-  const generateVariantInventory = async (product: any) => {
+  const generateVariantInventory = async (product: any, existingInventory: any[] = []) => {
     try {
       const items: InventoryItem[] = [];
 
@@ -144,30 +130,45 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
           console.log('Size variants for color', colorVariant.color_name, ':', sizeVariants);
 
           for (const sizeVariant of sizeVariants || []) {
+            // Find existing inventory for this color+size combination
+            const existingItem = existingInventory.find(item => 
+              item.color_variant_id === colorVariant.id && 
+              item.size_variant_id === sizeVariant.id
+            );
+
             items.push({
-              sku: generateSKU(product.name, colorVariant.color_name, sizeVariant.size_name),
+              id: existingItem?.id,
+              sku: existingItem?.sku || generateSKU(product.name, colorVariant.color_name, sizeVariant.size_name),
               product_name: product.name,
               color_name: colorVariant.color_name,
               size_name: sizeVariant.size_name,
-              stock_quantity: 0,
-              cost_price: product.cost_price,
-              selling_price: product.selling_price || product.cost_price,
-              low_stock_threshold: 10,
+              stock_quantity: existingItem?.stock_quantity || 0,
+              cost_price: existingItem?.cost_price || product.cost_price,
+              selling_price: existingItem?.selling_price || product.selling_price || product.cost_price,
+              low_stock_threshold: existingItem?.low_stock_threshold || 10,
               color_variant_id: colorVariant.id,
               size_variant_id: sizeVariant.id,
+              is_active: existingItem?.is_active ?? true,
             });
           }
         } else {
           // Color variant without sizes
+          // Find existing inventory for this color
+          const existingItem = existingInventory.find(item => 
+            item.color_variant_id === colorVariant.id && !item.size_variant_id
+          );
+
           items.push({
-            sku: generateSKU(product.name, colorVariant.color_name),
+            id: existingItem?.id,
+            sku: existingItem?.sku || generateSKU(product.name, colorVariant.color_name),
             product_name: product.name,
             color_name: colorVariant.color_name,
-            stock_quantity: 0,
-            cost_price: product.cost_price,
-            selling_price: product.selling_price || product.cost_price,
-            low_stock_threshold: 10,
+            stock_quantity: existingItem?.stock_quantity || 0,
+            cost_price: existingItem?.cost_price || product.cost_price,
+            selling_price: existingItem?.selling_price || product.selling_price || product.cost_price,
+            low_stock_threshold: existingItem?.low_stock_threshold || 10,
             color_variant_id: colorVariant.id,
+            is_active: existingItem?.is_active ?? true,
           });
         }
       }
