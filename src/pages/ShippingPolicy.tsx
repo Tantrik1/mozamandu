@@ -23,17 +23,10 @@ export default function ShippingPolicy() {
                 Our delivery hours are from <strong>12:00 PM to 6:00 PM</strong>, Monday through Sunday.
               </p>
 
-              <h3 className="text-xl font-semibold text-gray-800 mb-3">Delivery Areas</h3>
+              <h3 className="text-xl font-semibold text-gray-800 mb-3">Delivery Areas & Timeline</h3>
               <p className="text-gray-700 mb-4">
-                We currently deliver within Kathmandu Valley and surrounding areas. Delivery charges vary by location and will be calculated at checkout.
+                We deliver within <strong>2 days</strong> in Kathmandu, Nepal. Delivery charges vary by location and will be calculated at checkout.
               </p>
-
-              <h3 className="text-xl font-semibold text-gray-800 mb-3">Processing Time</h3>
-              <ul className="list-disc list-inside text-gray-700 mb-4 ml-4">
-                <li>In-stock items: 1-2 business days</li>
-                <li>Custom orders: 3-5 business days</li>
-                <li>Bulk orders: 5-7 business days</li>
-              </ul>
 
               <h3 className="text-xl font-semibold text-gray-800 mb-3">Shipping Methods</h3>
               <ul className="list-disc list-inside text-gray-700 mb-4 ml-4">
@@ -44,9 +37,9 @@ export default function ShippingPolicy() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Return Policy</h2>
               
-              <h3 className="text-xl font-semibold text-gray-800 mb-3">Return Window</h3>
+              <h3 className="text-xl font-semibold text-gray-800 mb-3">Return/Exchange Window</h3>
               <p className="text-gray-700 mb-4">
-                You may return items within <strong>2 days</strong> of delivery on your own expense. No refunds will be provided.
+                You may exchange items within <strong>2 days</strong> of delivery at your own expense. <strong>No refunds will be provided.</strong>
               </p>
 
               <h3 className="text-xl font-semibold text-gray-800 mb-3">Return Conditions</h3>
@@ -57,11 +50,11 @@ export default function ShippingPolicy() {
                 <li>Custom or personalized items cannot be returned unless defective</li>
               </ul>
 
-              <h3 className="text-xl font-semibold text-gray-800 mb-3">Non-Returnable Items</h3>
+              <h3 className="text-xl font-semibold text-gray-800 mb-3">Non-Exchangeable Items</h3>
               <ul className="list-disc list-inside text-gray-700 mb-4 ml-4">
                 <li>Undergarments and intimate apparel</li>
                 <li>Items damaged by misuse or normal wear</li>
-                <li>Items returned after 7 days</li>
+                <li>Items returned after 2 days</li>
                 <li>Items without original packaging or tags</li>
               </ul>
             </section>
@@ -69,34 +62,24 @@ export default function ShippingPolicy() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Refund Policy</h2>
               
-              <h3 className="text-xl font-semibold text-gray-800 mb-3">Refund Processing</h3>
-              <ul className="list-disc list-inside text-gray-700 mb-4 ml-4">
-                <li>Refunds are processed within 3-5 business days after we receive the returned item</li>
-                <li>Refunds will be issued to the original payment method</li>
-                <li>Shipping charges are non-refundable unless the return is due to our error</li>
-                <li>Customer is responsible for return shipping costs unless the item is defective</li>
-              </ul>
-
-              <h3 className="text-xl font-semibold text-gray-800 mb-3">Partial Refunds</h3>
-              <p className="text-gray-700 mb-4">
-                Partial refunds may be granted for:
-              </p>
-              <ul className="list-disc list-inside text-gray-700 mb-4 ml-4">
-                <li>Items returned with minor damage or signs of use</li>
-                <li>Items returned without original packaging</li>
-                <li>Items returned after 7 days but within 14 days</li>
-              </ul>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+                <h3 className="text-xl font-semibold text-red-800 mb-3">Important: No Refunds Policy</h3>
+                <p className="text-red-700 font-medium">
+                  <strong>No refunds are provided under any circumstances.</strong> We only offer exchanges at the customer's cost within 2 days of delivery.
+                </p>
+              </div>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Exchange Policy</h2>
               <p className="text-gray-700 mb-4">
-                We accept exchanges for different sizes or colors within 7 days of delivery, subject to availability. The item must meet all return conditions mentioned above.
+                We accept exchanges for different sizes or colors within <strong>2 days of delivery</strong>, subject to availability. The item must meet all return conditions mentioned above.
               </p>
               <ul className="list-disc list-inside text-gray-700 mb-4 ml-4">
-                <li>Exchanges are free if the item is defective or we sent the wrong item</li>
-                <li>Size/color exchanges may inc ur additional shipping charges</li>
-                <li>Exchange processing takes 3-5 business days</li>
+                <li><strong>Customer pays for all shipping costs</strong> (return shipping + new delivery)</li>
+                <li>Exchanges are only free if the item is defective or we sent the wrong item</li>
+                <li>Exchange processing takes 2-3 business days after we receive the returned item</li>
+                <li>Exchanges are subject to product availability</li>
               </ul>
             </section>
 
@@ -116,11 +99,12 @@ export default function ShippingPolicy() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">How to Initiate a Return</h2>
               <ol className="list-decimal list-inside text-gray-700 mb-4 ml-4">
-                <li>Contact our customer service team at info@mozamandu.com or +977 9761691727</li>
-                <li>Provide your order number and reason for return</li>
+                <li>Contact our customer service team at info@mozamandu.com or +977 9761691276</li>
+                <li>Provide your order number and reason for exchange</li>
                 <li>We will provide you with return instructions and authorization</li>
                 <li>Package the item securely in original packaging</li>
-                <li>Ship the item back to us using a trackable shipping method</li>
+                <li>Ship the item back to us using a trackable shipping method at your expense</li>
+                <li>Pay for return shipping and new delivery charges</li>
               </ol>
             </section>
 

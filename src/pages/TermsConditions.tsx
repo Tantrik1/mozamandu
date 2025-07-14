@@ -76,19 +76,23 @@ export default function TermsConditions() {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">5. Return Policy</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">5. Delivery and Return Policy</h2>
+              <h3 className="text-xl font-semibold text-gray-800 mb-3">Delivery</h3>
               <p className="text-gray-700 mb-4">
-                Returns are accepted within 7 days of delivery, subject to our return policy conditions. Items must be:
+                We deliver within <strong>2 days</strong> in Kathmandu, Nepal.
+              </p>
+              
+              <h3 className="text-xl font-semibold text-gray-800 mb-3">Returns and Exchanges</h3>
+              <p className="text-gray-700 mb-4">
+                <strong>No refunds are provided.</strong> However, exchanges will be provided at the customer's cost within 2 days of delivery, subject to the following conditions:
               </p>
               <ul className="list-disc list-inside text-gray-700 mb-4 ml-4">
-                <li>In original, unused condition</li>
-                <li>In original packaging with all tags attached</li>
+                <li>Items must be in original, unused condition</li>
+                <li>Original packaging and all tags must be attached</li>
                 <li>Accompanied by proof of purchase</li>
-                <li>Free from damage not caused by defect</li>
+                <li>Customer pays for return shipping and exchange shipping costs</li>
+                <li>Exchange subject to product availability</li>
               </ul>
-              <p className="text-gray-700 mb-4">
-                Refunds will be processed within 3-5 business days after we receive and inspect the returned items. Custom or personalized items cannot be returned unless defective.
-              </p>
             </section>
 
             <section className="mb-8">
@@ -191,7 +195,7 @@ export default function TermsConditions() {
                 <p className="text-gray-700">
                   <strong>Mozamandu</strong><br />
                   Email: info@mozamandu.com<br />
-                  Phone: +977 9761691727<br />
+                  Phone: +977 9761691276<br />
                   Address: Kathmandu, Nepal
                 </p>
               </div>

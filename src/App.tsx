@@ -53,7 +53,9 @@ function App() {
               <Route path="/faq" element={<FAQ />} />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
-              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsConditions />} />
+              <Route path="/shipping" element={<ShippingPolicy />} />
               <Route path="/thank-you/:orderId" element={<ThankYou />} />
               <Route path="/order-summary/:orderId" element={<OrderSummary />} />
               <Route path="/customer-order-summary/:orderId" element={
@@ -72,8 +74,6 @@ function App() {
                 </RouteGuard>
               } />
               <Route path="/checkout" element={<Checkout />} />
-              <Route path="/shipping-policy" element={<ShippingPolicy />} />
-              <Route path="/terms-conditions" element={<TermsConditions />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
