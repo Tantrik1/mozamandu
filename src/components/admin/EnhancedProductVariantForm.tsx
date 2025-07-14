@@ -410,12 +410,8 @@ export function EnhancedProductVariantForm({
   };
 
   const manageInventoryRecords = async () => {
-    // For now, we'll refresh the inventory management popup
-    // The actual inventory creation will be handled by the InventoryManagementPopup
-    toast({
-      title: 'Info',
-      description: 'Please configure inventory for your product variants',
-    });
+    // After saving variants, automatically trigger inventory management
+    // This will be called after variants are saved successfully
   };
 
   if (loading) {
@@ -595,9 +591,8 @@ export function EnhancedProductVariantForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button onClick={handleSave} disabled={loading}>
-          <Save className="h-4 w-4 mr-2" />
-          {loading ? 'Saving...' : 'Save Variants'}
+        <Button type="button" onClick={handleSave} disabled={loading}>
+          {loading ? 'Saving Variants...' : 'Save Variants & Manage Inventory'}
         </Button>
       </div>
     </div>

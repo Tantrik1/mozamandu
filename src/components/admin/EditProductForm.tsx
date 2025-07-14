@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Upload, Eye, X, Settings } from 'lucide-react';
+import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { EnhancedProductVariantForm } from './EnhancedProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 
@@ -298,7 +298,13 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         description: 'Product updated successfully',
       });
 
-      setShowInventoryPopup(true);
+      // Only show inventory popup if product doesn't have variants
+      if (!data.has_color_variants && !data.has_size_variants) {
+        setShowInventoryPopup(true);
+      } else {
+        // If it has variants, user will manage inventory through variant form
+        onSave();
+      }
     } catch (error) {
       console.error('Error updating product:', error);
       toast({
@@ -337,13 +343,6 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
           </Button>
           <h2 className="text-2xl font-bold">Edit Product</h2>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => setShowInventoryPopup(true)}
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          Manage Inventory
-        </Button>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -581,19 +580,25 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             productId={productId}
             hasColorVariants={watchedHasColorVariants}
             hasSizeVariants={watchedHasSizeVariants}
-            onSave={() => setShowInventoryPopup(true)}
+            onSave={() => {
+              // Fetch fresh data and open inventory popup
+              fetchProduct();
+              setShowInventoryPopup(true);
+            }}
             onCancel={() => {}}
           />
         )}
 
-        <div className="flex justify-end space-x-4">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Updating...' : 'Update Product'}
-          </Button>
-        </div>
+        {!(watchedHasColorVariants || watchedHasSizeVariants) && (
+          <div className="flex justify-end space-x-4">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Updating...' : 'Update Product'}
+            </Button>
+          </div>
+        )}
       </form>
 
       {showInventoryPopup && (
