@@ -34,6 +34,17 @@ export function usePromoCode() {
       return;
     }
 
+    // Check expiration date
+    const now = new Date();
+    if (promo.valid_until && new Date(promo.valid_until) < now) {
+      toast({
+        title: "Invalid Promo Code",
+        description: "Promo code has expired",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (promo.minimum_order_amount && totalWithDelivery < promo.minimum_order_amount) {
       toast({
         title: "Invalid Promo Code",
