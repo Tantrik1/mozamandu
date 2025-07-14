@@ -132,14 +132,12 @@ export function CustomerHeader() {
     }
     setOpenMegaMenu(categoryId);
   };
-
   const handleMegaMenuLeave = () => {
     const timeout = setTimeout(() => {
       setOpenMegaMenu(null);
     }, 1500);
     setMegaMenuTimeout(timeout);
   };
-
   const renderCategoryItem = (item: NavbarItem) => {
     const category = item.category;
     if (!category) return null;
@@ -184,7 +182,7 @@ export function CustomerHeader() {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-2 group">
-              <img src="/lovable-uploads/fd4fd25e-ccf5-42d0-a176-49b63583881b.png" alt="Mozamandu" className="h-10 w-auto group-hover:scale-105 transition-transform duration-300" />
+              <img alt="Mozamandu" className="h-10 w-auto group-hover:scale-105 transition-transform duration-300" src="/lovable-uploads/275eacee-9393-4919-a575-7341c6d73ab3.png" />
             </Link>
             
             {/* Desktop Navigation */}
