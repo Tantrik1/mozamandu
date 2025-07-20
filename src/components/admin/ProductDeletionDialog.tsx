@@ -233,7 +233,19 @@ export function ProductDeletionDialog({
         if (transactionsError) throw transactionsError;
       }
 
-      // 3. Delete product inventory
+      // 3. Delete customer order item details that reference this product's inventory
+      if (inventoryIds && inventoryIds.length > 0) {
+        const inventoryIdList = inventoryIds.map(item => item.id);
+        
+        const { error: orderItemDetailsError } = await supabase
+          .from('customer_order_item_details')
+          .delete()
+          .in('product_inventory_id', inventoryIdList);
+        
+        if (orderItemDetailsError) throw orderItemDetailsError;
+      }
+
+      // 4. Delete product inventory
       const { error: inventoryError } = await supabase
         .from('product_inventory')
         .delete()
