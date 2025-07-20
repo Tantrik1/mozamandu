@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { AlertTriangle, Package, Calendar, User, Phone, Mail, MapPin } from 'lucide-react';
+import { AlertTriangle, Package, Calendar, User, Phone, Mail, MapPin, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface RelatedOrder {
   id: string;
@@ -44,7 +45,8 @@ export function ProductDeletionDialog({
 }: ProductDeletionDialogProps) {
   const [relatedOrders, setRelatedOrders] = useState<RelatedOrder[]>([]);
   const [loading, setLoading] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [canDeleteDirectly, setCanDeleteDirectly] = useState(false);
   const { toast } = useToast();
 
@@ -156,54 +158,53 @@ export function ProductDeletionDialog({
     }
   };
 
-  const handleCancelAllAndDelete = async () => {
-    setCancelling(true);
+  const updateOrderStatus = async (orderId: string, newStatus: 'delivered' | 'cancelled') => {
+    setUpdatingOrderId(orderId);
     try {
-      // Cancel all non-completed orders
-      const ordersToCancel = relatedOrders.filter(
+      const { error } = await supabase
+        .from('customer_orders')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Update local state
+      setRelatedOrders(prev => prev.map(order => 
+        order.id === orderId 
+          ? { ...order, status: newStatus }
+          : order
+      ));
+
+      // Check if all orders are now completed
+      const updatedOrders = relatedOrders.map(order => 
+        order.id === orderId ? { ...order, status: newStatus } : order
+      );
+      const nonCompletedOrders = updatedOrders.filter(
         order => order.status !== 'delivered' && order.status !== 'cancelled'
       );
-
-      for (const order of ordersToCancel) {
-        const { error } = await supabase
-          .from('customer_orders')
-          .update({ 
-            status: 'cancelled',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', order.id);
-
-        if (error) throw error;
-      }
-
-      // Now delete the product
-      const { error: deleteError } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productId);
-
-      if (deleteError) throw deleteError;
+      setCanDeleteDirectly(nonCompletedOrders.length === 0);
 
       toast({
         title: 'Success',
-        description: `Cancelled ${ordersToCancel.length} orders and deleted product "${productName}" successfully`,
+        description: `Order status updated to ${newStatus}`,
       });
-
-      onConfirm();
-      onClose();
     } catch (error) {
-      console.error('Error cancelling orders and deleting product:', error);
+      console.error('Error updating order status:', error);
       toast({
         title: 'Error',
-        description: 'Failed to cancel orders and delete product',
+        description: 'Failed to update order status',
         variant: 'destructive',
       });
     } finally {
-      setCancelling(false);
+      setUpdatingOrderId(null);
     }
   };
 
   const handleDirectDelete = async () => {
+    setDeleting(true);
     try {
       const { error } = await supabase
         .from('products')
@@ -226,6 +227,8 @@ export function ProductDeletionDialog({
         description: 'Failed to delete product',
         variant: 'destructive',
       });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -292,63 +295,87 @@ export function ProductDeletionDialog({
                   <div className="space-y-3">
                     {relatedOrders.map((order) => (
                       <Card key={order.id} className="border">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
-                            <CardTitle className="text-base">{order.order_number}</CardTitle>
-                            <Badge className={getStatusColor(order.status)}>
-                              {order.status.replace('_', ' ').toUpperCase()}
-                            </Badge>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                            <div className="flex items-center space-x-2">
-                              <User className="h-4 w-4 text-gray-400" />
-                              <span>{order.customer_name}</span>
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h3 className="font-semibold text-lg">{order.order_number}</h3>
+                              <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
+                                <div className="flex items-center space-x-1">
+                                  <User className="h-3 w-3" />
+                                  <span>{order.customer_name}</span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  <Calendar className="h-3 w-3" />
+                                  <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  <span className="font-medium">Rs {order.total_amount}</span>
+                                </div>
+                              </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <Mail className="h-4 w-4 text-gray-400" />
-                              <span>{order.customer_email}</span>
+                              <Badge className={getStatusColor(order.status)}>
+                                {order.status.replace('_', ' ').toUpperCase()}
+                              </Badge>
+                              {order.status !== 'delivered' && order.status !== 'cancelled' && (
+                                <Select
+                                  value={order.status}
+                                  onValueChange={(value: 'delivered' | 'cancelled') => 
+                                    updateOrderStatus(order.id, value)
+                                  }
+                                  disabled={updatingOrderId === order.id}
+                                >
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="delivered">Delivered</SelectItem>
+                                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
+                              {updatingOrderId === order.id && (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              )}
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <Phone className="h-4 w-4 text-gray-400" />
-                              <span>{order.contact_number}</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Calendar className="h-4 w-4 text-gray-400" />
-                              <span>{new Date(order.created_at).toLocaleDateString()}</span>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-3">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <MapPin className="h-4 w-4 text-gray-400" />
-                              <span className="text-sm font-medium">Delivery Address:</span>
-                            </div>
-                            <p className="text-sm text-gray-600 ml-6">{order.delivery_address}</p>
                           </div>
 
-                          <div className="mt-3">
-                            <h4 className="text-sm font-medium mb-2">Product Items:</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
+                            <div className="flex items-center space-x-1">
+                              <Mail className="h-3 w-3" />
+                              <span>{order.customer_email}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Phone className="h-3 w-3" />
+                              <span>{order.contact_number}</span>
+                            </div>
+                          </div>
+
+                          <div className="mb-3">
+                            <div className="flex items-center space-x-1 mb-1">
+                              <MapPin className="h-3 w-3 text-gray-400" />
+                              <span className="text-xs font-medium">Address:</span>
+                            </div>
+                            <p className="text-xs text-gray-600 ml-4">{order.delivery_address}</p>
+                          </div>
+
+                          <div>
+                            <h4 className="text-xs font-medium mb-2">Product Items ({order.items.length}):</h4>
                             <div className="space-y-1">
                               {order.items.map((item, index) => (
-                                <div key={index} className="text-sm bg-gray-50 p-2 rounded">
-                                  <div className="flex justify-between">
+                                <div key={index} className="text-xs bg-gray-50 p-2 rounded flex justify-between">
+                                  <div>
                                     <span className="font-medium">{item.product_name}</span>
-                                    <span>Qty: {item.quantity}</span>
+                                    <div className="text-gray-600">
+                                      {item.color_name && `Color: ${item.color_name}`}
+                                      {item.size_name && ` | Size: ${item.size_name}`}
+                                      {item.sku && ` | SKU: ${item.sku}`}
+                                    </div>
                                   </div>
-                                  <div className="text-gray-600 text-xs">
-                                    {item.color_name && `Color: ${item.color_name}`}
-                                    {item.size_name && ` | Size: ${item.size_name}`}
-                                    {item.sku && ` | SKU: ${item.sku}`}
-                                  </div>
+                                  <span className="font-medium">Qty: {item.quantity}</span>
                                 </div>
                               ))}
                             </div>
-                          </div>
-
-                          <div className="mt-3 text-right">
-                            <span className="text-sm font-medium">Total: Rs {order.total_amount}</span>
                           </div>
                         </CardContent>
                       </Card>
@@ -361,29 +388,18 @@ export function ProductDeletionDialog({
         )}
 
         <DialogFooter className="space-x-2">
-          <Button variant="outline" onClick={onClose} disabled={cancelling}>
+          <Button variant="outline" onClick={onClose} disabled={deleting || updatingOrderId !== null}>
             Cancel
           </Button>
           
-          {relatedOrders.length === 0 || canDeleteDirectly ? (
-            <Button 
-              variant="destructive" 
-              onClick={handleDirectDelete}
-              disabled={loading}
-            >
-              <Package className="h-4 w-4 mr-2" />
-              Delete Product
-            </Button>
-          ) : (
-            <Button 
-              variant="destructive" 
-              onClick={handleCancelAllAndDelete}
-              disabled={loading || cancelling}
-            >
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              {cancelling ? 'Processing...' : `Cancel ${relatedOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled').length} Orders & Delete Product`}
-            </Button>
-          )}
+          <Button 
+            variant="destructive" 
+            onClick={handleDirectDelete}
+            disabled={loading || !canDeleteDirectly || deleting || updatingOrderId !== null}
+          >
+            <Package className="h-4 w-4 mr-2" />
+            {deleting ? 'Deleting...' : 'Delete Product'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
