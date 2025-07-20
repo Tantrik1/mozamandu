@@ -206,12 +206,73 @@ export function ProductDeletionDialog({
   const handleDirectDelete = async () => {
     setDeleting(true);
     try {
-      const { error } = await supabase
+      // Delete in the correct order to handle foreign key constraints
+      
+      // 1. Delete product images
+      const { error: imagesError } = await supabase
+        .from('product_images')
+        .delete()
+        .eq('product_id', productId);
+      
+      if (imagesError) throw imagesError;
+
+      // 2. Delete inventory transactions related to this product's inventory
+      const { data: inventoryIds } = await supabase
+        .from('product_inventory')
+        .select('id')
+        .eq('product_id', productId);
+
+      if (inventoryIds && inventoryIds.length > 0) {
+        const inventoryIdList = inventoryIds.map(item => item.id);
+        
+        const { error: transactionsError } = await supabase
+          .from('inventory_transactions')
+          .delete()
+          .in('inventory_id', inventoryIdList);
+        
+        if (transactionsError) throw transactionsError;
+      }
+
+      // 3. Delete product inventory
+      const { error: inventoryError } = await supabase
+        .from('product_inventory')
+        .delete()
+        .eq('product_id', productId);
+      
+      if (inventoryError) throw inventoryError;
+
+      // 4. Delete size variants related to color variants of this product
+      const { data: colorVariants } = await supabase
+        .from('color_variants')
+        .select('id')
+        .eq('product_id', productId);
+
+      if (colorVariants && colorVariants.length > 0) {
+        const colorVariantIds = colorVariants.map(cv => cv.id);
+        
+        const { error: sizeVariantsError } = await supabase
+          .from('size_variants')
+          .delete()
+          .in('color_variant_id', colorVariantIds);
+        
+        if (sizeVariantsError) throw sizeVariantsError;
+      }
+
+      // 5. Delete color variants
+      const { error: colorVariantsError } = await supabase
+        .from('color_variants')
+        .delete()
+        .eq('product_id', productId);
+      
+      if (colorVariantsError) throw colorVariantsError;
+
+      // 6. Finally, delete the product
+      const { error: productError } = await supabase
         .from('products')
         .delete()
         .eq('id', productId);
 
-      if (error) throw error;
+      if (productError) throw productError;
 
       toast({
         title: 'Success',
