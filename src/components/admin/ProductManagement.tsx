@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CreateProductForm } from './CreateProductForm';
 import { EditProductForm } from './EditProductForm';
 import { ProductDetailView } from './ProductDetailView';
+import { ProductDeletionDialog } from './ProductDeletionDialog';
 import { Pencil, Trash2, Plus, Search, Package, Eye, Filter } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getProductStockSummary } from '@/utils/stockCalculation';
@@ -41,6 +42,7 @@ export function ProductManagement() {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [viewingProductId, setViewingProductId] = useState<string | null>(null);
   const [productStocks, setProductStocks] = useState<Record<string, number>>({});
+  const [deletingProduct, setDeletingProduct] = useState<{ id: string; name: string } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -134,31 +136,17 @@ export function ProductManagement() {
     setEditingProductId(productId);
   };
 
-  const handleDelete = async (productId: string, productName: string) => {
-    if (!confirm(`Are you sure you want to delete "${productName}"?`)) return;
+  const handleDelete = (productId: string, productName: string) => {
+    setDeletingProduct({ id: productId, name: productName });
+  };
 
-    try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productId);
+  const handleDeleteConfirm = () => {
+    fetchProducts();
+    setDeletingProduct(null);
+  };
 
-      if (error) throw error;
-      
-      toast({
-        title: 'Success',
-        description: 'Product deleted successfully',
-      });
-      
-      fetchProducts();
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete product',
-        variant: 'destructive',
-      });
-    }
+  const handleDeleteCancel = () => {
+    setDeletingProduct(null);
   };
 
   const handleCreateSave = () => {
@@ -422,6 +410,14 @@ export function ProductManagement() {
           ))
         )}
       </div>
+
+      <ProductDeletionDialog
+        isOpen={!!deletingProduct}
+        onClose={handleDeleteCancel}
+        productId={deletingProduct?.id || ''}
+        productName={deletingProduct?.name || ''}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   );
 }

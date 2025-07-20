@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Edit, Trash2, Package, Palette, Ruler } from 'lucide-react';
 import { calculateProductStock, StockCalculationResult } from '@/utils/stockCalculation';
+import { ProductDeletionDialog } from './ProductDeletionDialog';
 
 interface Product {
   id: string;
@@ -36,6 +37,7 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
   const [product, setProduct] = useState<Product | null>(null);
   const [stockDetails, setStockDetails] = useState<StockCalculationResult>({ totalStock: 0 });
   const [loading, setLoading] = useState(true);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -84,35 +86,17 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
     }
   };
 
-  const handleDelete = async () => {
-    if (!product) return;
-    
-    if (!confirm(`Are you sure you want to delete "${product.name}"? This action cannot be undone.`)) {
-      return;
-    }
+  const handleDelete = () => {
+    setShowDeleteDialog(true);
+  };
 
-    try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productId);
+  const handleDeleteConfirm = () => {
+    setShowDeleteDialog(false);
+    onDelete();
+  };
 
-      if (error) throw error;
-      
-      toast({
-        title: 'Success',
-        description: 'Product deleted successfully',
-      });
-      
-      onDelete();
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete product',
-        variant: 'destructive',
-      });
-    }
+  const handleDeleteCancel = () => {
+    setShowDeleteDialog(false);
   };
 
   if (loading) {
@@ -311,6 +295,14 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
           )}
         </div>
       </div>
+
+      <ProductDeletionDialog
+        isOpen={showDeleteDialog}
+        onClose={handleDeleteCancel}
+        productId={productId}
+        productName={product?.name || ''}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   );
 }
