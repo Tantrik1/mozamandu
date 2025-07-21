@@ -40,6 +40,27 @@ export function CustomerHeader() {
   const [megaMenuTimeout, setMegaMenuTimeout] = useState<NodeJS.Timeout | null>(null);
   useEffect(() => {
     fetchNavbarItems();
+
+    // Set up real-time subscription for navbar items
+    const channel = supabase
+      .channel('navbar-items-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'navbar_items'
+        },
+        () => {
+          console.log('Navbar items changed, refetching...');
+          fetchNavbarItems();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Close mobile menu on route change
