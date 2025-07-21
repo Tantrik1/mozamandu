@@ -85,6 +85,7 @@ export function PaymentMethodSection({
   const selectedPaymentMethod = paymentMethods.find(p => p.id === currentSelectedId);
 
   const handlePaymentTypeChange = (type: string) => {
+    console.log('Payment type changed to:', type);
     if (onPaymentTypeChange) {
       onPaymentTypeChange(type);
     } else if (onPercentageChange) {
@@ -152,7 +153,7 @@ export function PaymentMethodSection({
             </div>
           </RadioGroup>
 
-          {((paymentType === 'partial') || (paymentPercentage < 100)) && (
+          {((paymentType === 'partial') || (!paymentType && paymentPercentage < 100)) && (
             <div className="mt-3">
               {paidAmount !== undefined ? (
                 <Input
