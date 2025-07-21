@@ -138,7 +138,7 @@ export function PaymentMethodSection({
         <div>
           <Label>Payment Amount</Label>
           <RadioGroup
-            value={paymentPercentage === 100 ? 'full' : 'partial'}
+            value={paymentType || (paymentPercentage === 100 ? 'full' : 'partial')}
             onValueChange={handlePaymentTypeChange}
             className="mt-2"
           >
@@ -152,7 +152,7 @@ export function PaymentMethodSection({
             </div>
           </RadioGroup>
 
-          {paymentPercentage < 100 && (
+          {((paymentType === 'partial') || (paymentPercentage < 100)) && (
             <div className="mt-3">
               {paidAmount !== undefined ? (
                 <Input
