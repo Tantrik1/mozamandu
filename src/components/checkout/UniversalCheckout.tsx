@@ -572,6 +572,31 @@ export function UniversalCheckout() {
 
       console.log('🎉 Enhanced order completed successfully with immediate stock reservation!');
       
+      // Send order confirmation email
+      console.log('📧 Sending order confirmation email...');
+      try {
+        const { error: emailError } = await supabase.functions.invoke('send-order-email', {
+          body: {
+            type: 'order_created',
+            orderId: createdOrder.id,
+            isCustomerOrder: true
+          }
+        });
+
+        if (emailError) {
+          console.error('❌ Email sending failed:', emailError);
+          toast({
+            title: 'Order Created!',
+            description: 'Order placed successfully, but email notification failed.',
+            variant: 'default',
+          });
+        } else {
+          console.log('✅ Order confirmation email sent successfully');
+        }
+      } catch (emailError) {
+        console.error('❌ Email function error:', emailError);
+      }
+      
       // Clear cart after successful order
       clearCart();
       
