@@ -514,7 +514,7 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
           </div>
         )}
 
-        {/* Enhanced Real-time Pricing - Shows price for current cart quantity */}
+        {/* Enhanced Real-time Pricing - Shows mode and price per item */}
         <div className="mt-auto">
           <div className="space-y-3 mb-4">
             <div className="flex items-center justify-between">
@@ -529,11 +529,24 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
                     </span>
                   )}
                 </div>
-                {currentCartQuantity > 1 && (
-                  <span className="text-xs text-muted-foreground font-medium">
-                    Total: Rs. {marginalTotalPrice.toFixed(0)}
-                  </span>
-                )}
+                {/* Show pricing mode instead of total */}
+                <div className="flex items-center gap-2 mt-1">
+                  {hasComboPrice && (
+                    <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 border-purple-300">
+                      Combo Price
+                    </Badge>
+                  )}
+                  {hasVolumeDiscount && !hasComboPrice && (
+                    <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-green-100 text-green-700 border-green-300">
+                      Volume Discount
+                    </Badge>
+                  )}
+                  {!hasComboPrice && !hasVolumeDiscount && (
+                    <Badge variant="outline" className="text-xs px-2 py-0.5 bg-gray-50 text-gray-600 border-gray-300">
+                      Normal Price
+                    </Badge>
+                  )}
+                </div>
               </div>
               {hasDiscount && (
                 <Badge variant="outline" className="text-xs text-green-600 border-green-300 bg-green-50 animate-pulse">
