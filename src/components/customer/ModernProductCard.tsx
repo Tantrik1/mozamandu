@@ -548,11 +548,6 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
                   )}
                 </div>
               </div>
-              {hasDiscount && (
-                <Badge variant="outline" className="text-xs text-green-600 border-green-300 bg-green-50 animate-pulse">
-                  Save Rs. {savings.toFixed(0)}
-                </Badge>
-              )}
             </div>
 
           </div>
