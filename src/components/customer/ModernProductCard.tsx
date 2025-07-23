@@ -242,10 +242,6 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
       .filter(item => item.subcategoryId === product.subcategory_id)
       .reduce((total, item) => total + item.quantity, 0);
     
-    if (totalSubcategoryQuantity === 0) {
-      return basePrice; // Show base price when no items from this subcategory in cart
-    }
-    
     // Find the discount tier that applies to the total subcategory quantity
     const tiers = discountTiers[product.subcategory_id] || [];
     const sortedTiers = tiers.sort((a, b) => a.min_quantity - b.min_quantity);
@@ -259,10 +255,10 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
       return comboSubcategory.price;
     }
     
-    // Find the tier that applies to the total subcategory quantity
+    // Only apply discount if quantity exceeds MOQ (MOQ + 1)
     let applicableTier = null;
     for (const tier of sortedTiers) {
-      if (totalSubcategoryQuantity >= tier.min_quantity && 
+      if (totalSubcategoryQuantity > tier.min_quantity && 
           (tier.max_quantity === null || totalSubcategoryQuantity <= tier.max_quantity)) {
         applicableTier = tier;
       }
@@ -527,24 +523,6 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
                     <span className="text-sm text-muted-foreground line-through">
                       Rs. {basePrice.toFixed(0)}
                     </span>
-                  )}
-                </div>
-                {/* Show pricing mode instead of total */}
-                <div className="flex items-center gap-2 mt-1">
-                  {hasComboPrice && (
-                    <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 border-purple-300">
-                      Combo Price
-                    </Badge>
-                  )}
-                  {hasVolumeDiscount && !hasComboPrice && (
-                    <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-green-100 text-green-700 border-green-300">
-                      Volume Discount
-                    </Badge>
-                  )}
-                  {!hasComboPrice && !hasVolumeDiscount && (
-                    <Badge variant="outline" className="text-xs px-2 py-0.5 bg-gray-50 text-gray-600 border-gray-300">
-                      Normal Price
-                    </Badge>
                   )}
                 </div>
               </div>

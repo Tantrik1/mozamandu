@@ -148,11 +148,45 @@ export default function SubcategoryPage() {
       <div className="container mx-auto px-4 py-6">
         {/* Breadcrumb Navigation */}
         <Breadcrumb className="mb-6">
-          
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/" className="flex items-center gap-1">
+                  <Home className="h-4 w-4" />
+                  Home
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator>
+              <ChevronRight className="h-4 w-4" />
+            </BreadcrumbSeparator>
+            {subcategory?.categories && (
+              <>
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link to={`/categories/${subcategory.categories.id}`}>
+                      {subcategory.categories.name}
+                    </Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator>
+                  <ChevronRight className="h-4 w-4" />
+                </BreadcrumbSeparator>
+              </>
+            )}
+            <BreadcrumbItem>
+              <BreadcrumbPage>{subcategory?.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
         </Breadcrumb>
 
         {/* Subcategory Header */}
-        
+        <div className="bg-white rounded-xl p-6 shadow-sm mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">{subcategory.name}</h1>
+          {subcategory.description && (
+            <p className="text-gray-600 text-lg leading-relaxed">{subcategory.description}</p>
+          )}
+        </div>
 
         {/* Sort Options */}
         {products.length > 0 && <div className="flex items-center gap-4 mb-6">
