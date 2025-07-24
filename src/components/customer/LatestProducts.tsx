@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ModernProductCard } from './ModernProductCard';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel';
@@ -24,16 +24,12 @@ interface Product {
   } | null;
 }
 
-export function LatestProducts() {
+const LatestProducts = memo(() => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const isMobile = useIsMobile();
 
-  useEffect(() => {
-    fetchLatestProducts();
-  }, []);
-
-  const fetchLatestProducts = async () => {
+  const fetchLatestProducts = useMemo(() => async () => {
     try {
       const { data, error } = await supabase
         .from('products')
@@ -43,35 +39,24 @@ export function LatestProducts() {
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
-        .limit(12);
+        .limit(8); // Reduced from 12 to 8
 
       if (error) throw error;
 
       if (data) {
-        // Calculate stock for each product using the inventory system
-        const productsWithStock = await Promise.all(
-          data.map(async (product) => {
-            try {
-              const stock = await getProductStockSummary(product.id);
-              return {
-                ...product,
-                selling_price: product.selling_price,
-                cost_price: product.cost_price,
-                is_featured: product.is_featured,
-                has_color_variants: product.has_color_variants,
-                color_has_size_variants: product.color_has_size_variants,
-                stock_quantity: stock,
-                subcategories: product.subcategories,
-              };
-            } catch (error) {
-              console.error('Error calculating stock for product:', product.id, error);
-              return {
-                ...product,
-                stock_quantity: 0,
-              };
-            }
-          })
+        // Batch stock calculation
+        const stockPromises = data.map(product => 
+          getProductStockSummary(product.id).catch(() => 0)
         );
+        
+        const stockResults = await Promise.all(stockPromises);
+        
+        const productsWithStock = data.map((product, index) => ({
+          ...product,
+          stock_quantity: stockResults[index],
+          subcategories: product.subcategories,
+        }));
+        
         setProducts(productsWithStock);
       }
     } catch (error) {
@@ -79,7 +64,11 @@ export function LatestProducts() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchLatestProducts();
+  }, [fetchLatestProducts]);
 
   if (loading) {
     return (
@@ -155,4 +144,8 @@ export function LatestProducts() {
       </div>
     </div>
   );
-}
+});
+
+LatestProducts.displayName = 'LatestProducts';
+
+export { LatestProducts };

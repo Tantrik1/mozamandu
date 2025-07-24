@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing
 import { useComboManager } from '@/hooks/useComboManager';
 import { Star, ShoppingCart, Plus, Minus, Zap, Target } from 'lucide-react';
 import { getProductStockSummary } from '@/utils/stockCalculation';
+import { OptimizedImage } from '@/components/ui/optimized-image';
 
 interface ColorVariant {
   id: string;
@@ -55,7 +56,7 @@ interface ModernProductCardProps {
   subcategorySellingPrice: number;
 }
 
-export function ModernProductCard({ product, subcategorySellingPrice }: ModernProductCardProps) {
+export const ModernProductCard = memo(function ModernProductCard({ product, subcategorySellingPrice }: ModernProductCardProps) {
   const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
   const [sizeVariants, setSizeVariants] = useState<SizeVariant[]>([]);
   const [selectedColor, setSelectedColor] = useState<string>('');
@@ -374,13 +375,13 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
       {/* Product Image - Enhanced 16:9 Aspect Ratio */}
       <div className="relative overflow-hidden bg-gradient-to-br from-muted/30 to-muted/60 rounded-t-xl h-48" style={{ aspectRatio: '16/9' }}>
         {currentImage ? (
-          <img
+          <OptimizedImage
             src={currentImage}
             alt={product.name}
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 filter group-hover:brightness-110"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
+            loading="lazy"
+            width={300}
+            height={192}
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-muted to-muted/60 flex items-center justify-center">
@@ -540,4 +541,4 @@ export function ModernProductCard({ product, subcategorySellingPrice }: ModernPr
       </CardContent>
     </Card>
   );
-}
+});

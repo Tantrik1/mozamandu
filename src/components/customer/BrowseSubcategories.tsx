@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { SubcategoryCard } from './SubcategoryCard';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel';
@@ -18,62 +18,50 @@ interface Subcategory {
   };
 }
 
-export function BrowseSubcategories() {
+const BrowseSubcategories = memo(() => {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const isMobile = useIsMobile();
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchSubcategories = useMemo(() => async () => {
+    try {
+      console.log('🔄 BrowseSubcategories: Starting data fetch');
 
-    const fetchSubcategories = async () => {
-      try {
-        console.log('🔄 BrowseSubcategories: Starting data fetch');
+      const { data, error } = await supabase
+        .from('subcategories')
+        .select(`
+          id,
+          name,
+          description,
+          image_url,
+          category_id,
+          selling_price,
+          minimum_quantity,
+          category:categories(name)
+        `)
+        .eq('status', 'on')
+        .order('name');
 
-        const { data, error } = await supabase
-          .from('subcategories')
-          .select(`
-            id,
-            name,
-            description,
-            image_url,
-            category_id,
-            selling_price,
-            minimum_quantity,
-            category:categories(name)
-          `)
-          .eq('status', 'on')
-          .order('name');
-
-        if (!isMounted) return;
-
-        if (error) {
-          console.error('❌ BrowseSubcategories: Fetch error:', error);
-          setSubcategories([]);
-        } else {
-          console.log('✅ BrowseSubcategories: Subcategories loaded:', data?.length || 0);
-          setSubcategories(data || []);
-        }
-
-      } catch (error) {
-        console.error('❌ BrowseSubcategories: Unexpected error:', error);
-        if (isMounted) {
-          setSubcategories([]);
-        }
-      } finally {
-        if (isMounted) {
-          console.log('✅ BrowseSubcategories: Data fetch complete');
-          setLoading(false);
-        }
+      if (error) {
+        console.error('❌ BrowseSubcategories: Fetch error:', error);
+        setSubcategories([]);
+      } else {
+        console.log('✅ BrowseSubcategories: Subcategories loaded:', data?.length || 0);
+        setSubcategories(data || []);
       }
-    };
 
-    fetchSubcategories();
-
-    return () => {
-      isMounted = false;
-    };
+    } catch (error) {
+      console.error('❌ BrowseSubcategories: Unexpected error:', error);
+      setSubcategories([]);
+    } finally {
+      console.log('✅ BrowseSubcategories: Data fetch complete');
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchSubcategories();
+  }, [fetchSubcategories]);
 
   if (loading) {
     return (
@@ -170,4 +158,8 @@ export function BrowseSubcategories() {
       </div>
     </section>
   );
-}
+});
+
+BrowseSubcategories.displayName = 'BrowseSubcategories';
+
+export { BrowseSubcategories };
