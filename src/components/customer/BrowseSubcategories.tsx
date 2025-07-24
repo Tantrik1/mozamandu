@@ -162,4 +162,4 @@ const BrowseSubcategories = memo(() => {
 
 BrowseSubcategories.displayName = 'BrowseSubcategories';
 
-export { BrowseSubcategories };
+export default BrowseSubcategories;

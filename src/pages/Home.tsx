@@ -1,9 +1,9 @@
 
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { HeroSection } from '@/components/customer/HeroSection';
-import { BrowseSubcategories } from '@/components/customer/BrowseSubcategories';
-import { EnhancedFeaturedProducts } from '@/components/customer/EnhancedFeaturedProducts';
-import { LatestProducts } from '@/components/customer/LatestProducts';
+import BrowseSubcategories from '@/components/customer/BrowseSubcategories';
+import EnhancedFeaturedProducts from '@/components/customer/EnhancedFeaturedProducts';
+import LatestProducts from '@/components/customer/LatestProducts';
 import { FAQSection } from '@/components/customer/FAQSection';
 import { SubcategoryProductTabs } from '@/components/customer/SubcategoryProductTabs';
 import { Footer } from '@/components/layout/Footer';

@@ -148,4 +148,4 @@ const LatestProducts = memo(() => {
 
 LatestProducts.displayName = 'LatestProducts';
 
-export { LatestProducts };
+export default LatestProducts;

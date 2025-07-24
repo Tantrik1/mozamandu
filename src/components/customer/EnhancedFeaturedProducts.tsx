@@ -155,4 +155,4 @@ const EnhancedFeaturedProducts = memo(() => {
 
 EnhancedFeaturedProducts.displayName = 'EnhancedFeaturedProducts';
 
-export { EnhancedFeaturedProducts };
+export default EnhancedFeaturedProducts;
