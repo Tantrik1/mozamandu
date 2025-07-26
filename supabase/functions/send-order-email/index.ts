@@ -7,7 +7,14 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { OrderCreatedEmail } from './_templates/order-created.tsx'
 import { OrderStatusUpdatedEmail } from './_templates/order-status-updated.tsx'
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const resendApiKey = Deno.env.get("RESEND_API_KEY");
+console.log('RESEND_API_KEY configured:', !!resendApiKey);
+
+if (!resendApiKey) {
+  console.error('RESEND_API_KEY is not configured');
+}
+
+const resend = new Resend(resendApiKey);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,6 +45,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { type, orderId, isCustomerOrder = false, oldStatus, newStatus }: OrderEmailRequest = await req.json();
 
     console.log('Email request received:', { type, orderId, isCustomerOrder });
+    console.log('Function environment check - RESEND_API_KEY exists:', !!Deno.env.get("RESEND_API_KEY"));
 
     // Fetch order details from appropriate table
     const tableName = isCustomerOrder ? 'customer_orders' : 'orders';
@@ -92,6 +100,9 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Send email
+    console.log('Attempting to send email to:', order.customer_email);
+    console.log('Email subject:', subject);
+    
     const emailResponse = await resend.emails.send({
       from: "Mozamandu <orders@resend.dev>",
       to: [order.customer_email],
