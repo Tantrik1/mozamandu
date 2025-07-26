@@ -15,28 +15,9 @@ export function HeroSection() {
   const [currentImage, setCurrentImage] = useState(0);
   const [imagesLoaded, setImagesLoaded] = useState(false);
 
-  // Preload images for better performance
+  // Skip preloading for faster initial load
   useEffect(() => {
-    const preloadImages = async () => {
-      const promises = sockImages.map((src) => {
-        return new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = resolve;
-          img.onerror = reject;
-          img.src = src;
-        });
-      });
-      
-      try {
-        await Promise.all(promises);
-        setImagesLoaded(true);
-      } catch (error) {
-        console.warn('Some images failed to preload:', error);
-        setImagesLoaded(true); // Still show the component
-      }
-    };
-
-    preloadImages();
+    setImagesLoaded(true);
   }, []);
 
   useEffect(() => {
@@ -102,6 +83,8 @@ export function HeroSection() {
                         src={image} 
                         alt={`Premium Sock ${index + 1}`}
                         loading={index === 0 ? "eager" : "lazy"}
+                        decoding="async"
+                        fetchPriority={index === 0 ? "high" : "low"}
                         className="w-80 h-80 sm:w-96 sm:h-96 lg:w-[450px] lg:h-[450px] xl:w-[550px] xl:h-[550px] object-contain drop-shadow-2xl filter brightness-110 transition-transform duration-300 hover:scale-105" 
                       />
                     </div>

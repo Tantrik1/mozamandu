@@ -79,11 +79,12 @@ export function OptimizedImage({
           onLoad={handleLoad}
           onError={handleError}
           className={cn(
-            "transition-opacity duration-300",
+            "transition-opacity duration-200",
             isLoaded ? "opacity-100" : "opacity-0",
             className
           )}
           decoding="async"
+          fetchPriority={loading === 'eager' ? 'high' : 'low'}
         />
       )}
     </div>

@@ -378,7 +378,7 @@ export const ModernProductCard = memo(function ModernProductCard({ product, subc
           <OptimizedImage
             src={currentImage}
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 filter group-hover:brightness-110"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 filter group-hover:brightness-110"
             loading="lazy"
             width={300}
             height={192}
