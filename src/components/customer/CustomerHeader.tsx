@@ -298,7 +298,7 @@ export function CustomerHeader() {
                             </button>
                             
                             {/* Subcategories */}
-                            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                            <div className={`transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-96 opacity-100 overflow-y-auto' : 'max-h-0 opacity-0 overflow-hidden'}`}>
                               <div className="bg-gray-50 border-t border-gray-100">
                                 {category.subcategories?.map(subcategory => <Link key={subcategory.id} to={`/subcategories/${subcategory.id}`} className="flex items-center space-x-3 p-4 hover:bg-white transition-colors duration-200" onClick={closeMobileMenu}>
                                     <div className="flex-shrink-0">
