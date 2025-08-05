@@ -27,9 +27,6 @@ export default defineConfig(({ mode }) => ({
           'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-tabs'],
           'vendor-supabase': ['@supabase/supabase-js'],
           'vendor-query': ['@tanstack/react-query'],
-          'vendor-utils': ['clsx', 'tailwind-merge', 'class-variance-authority'],
-          'vendor-forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
-          'vendor-compression': ['browser-image-compression'],
         },
       },
     },
@@ -38,16 +35,6 @@ export default defineConfig(({ mode }) => ({
     cssMinify: true,
     reportCompressedSize: false,
     chunkSizeWarningLimit: 1000,
-    sourcemap: false,
-    // Optimize assets
-    assetsInlineLimit: 4096,
-    // Enable compression
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-      },
-    },
   },
   optimizeDeps: {
     include: [
