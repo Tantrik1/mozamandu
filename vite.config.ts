@@ -1,3 +1,4 @@
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -27,6 +28,8 @@ export default defineConfig(({ mode }) => ({
           'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-tabs'],
           'vendor-supabase': ['@supabase/supabase-js'],
           'vendor-query': ['@tanstack/react-query'],
+          'vendor-icons': ['lucide-react'],
+          'vendor-utils': ['clsx', 'tailwind-merge', 'date-fns'],
         },
       },
     },
@@ -35,6 +38,8 @@ export default defineConfig(({ mode }) => ({
     cssMinify: true,
     reportCompressedSize: false,
     chunkSizeWarningLimit: 1000,
+    sourcemap: false, // Disable sourcemaps in production for faster builds
+    assetsInlineLimit: 8192, // Inline smaller assets
   },
   optimizeDeps: {
     include: [
@@ -43,6 +48,12 @@ export default defineConfig(({ mode }) => ({
       'react-router-dom',
       '@supabase/supabase-js',
       '@tanstack/react-query',
+      'lucide-react',
     ],
+    force: true, // Force re-optimization on every startup
+  },
+  esbuild: {
+    // Drop console and debugger in production
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
   },
 }));

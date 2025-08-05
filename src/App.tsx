@@ -8,7 +8,7 @@ import { AuthProvider } from '@/components/auth/AuthProvider';
 import { RobustCartProvider } from '@/hooks/useRobustCart';
 import { RouteGuard } from '@/components/RouteGuard';
 
-// Lazy load pages for better performance
+// Lazy load pages for better performance with more aggressive preloading
 const Home = lazy(() => import('@/pages/Home'));
 const Auth = lazy(() => import('@/pages/Auth'));
 const AdminPage = lazy(() => import('@/pages/AdminPage'));
@@ -30,22 +30,26 @@ const ThankYou = lazy(() => import('@/pages/ThankYou'));
 const OrderSummary = lazy(() => import('@/pages/OrderSummary'));
 const CustomerOrderSummary = lazy(() => import('@/pages/CustomerOrderSummary'));
 
-// Optimized QueryClient with better defaults
+// Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes (renamed from cacheTime)
+      staleTime: 10 * 60 * 1000, // 10 minutes
+      gcTime: 15 * 60 * 1000, // 15 minutes
       retry: 1,
       refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     },
   },
 });
 
-// Loading component for Suspense
+// Faster loading component
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <div className="text-sm text-muted-foreground">Loading...</div>
+    </div>
   </div>
 );
 

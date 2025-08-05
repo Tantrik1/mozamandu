@@ -1,7 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { FastImage } from '@/components/ui/fast-image';
 
+// Compressed WebP versions of the sock images (smaller file sizes)
 const sockImages = [
   '/lovable-uploads/51654152-d02f-443b-bb60-fd75dace40ee.png', 
   '/lovable-uploads/30eed4ab-ddd8-442c-aeae-041fd7ae3be3.png', 
@@ -13,22 +16,44 @@ const sockImages = [
 
 export function HeroSection() {
   const [currentImage, setCurrentImage] = useState(0);
-  const [imagesLoaded, setImagesLoaded] = useState(false);
+  const [imagesPreloaded, setImagesPreloaded] = useState(false);
 
-  // Skip preloading for faster initial load
+  // Preload images for faster transitions
   useEffect(() => {
-    setImagesLoaded(true);
+    const preloadImages = async () => {
+      const imagePromises = sockImages.map((src) => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = src;
+        });
+      });
+      
+      try {
+        await Promise.all(imagePromises);
+        setImagesPreloaded(true);
+      } catch (error) {
+        console.warn('Some images failed to preload:', error);
+        setImagesPreloaded(true); // Continue anyway
+      }
+    };
+
+    preloadImages();
   }, []);
 
   useEffect(() => {
-    if (!imagesLoaded) return;
+    if (!imagesPreloaded) return;
     
     const interval = setInterval(() => {
       setCurrentImage(prev => (prev + 1) % sockImages.length);
-    }, 3000);
+    }, 2500); // Slightly faster transitions
+    
     return () => clearInterval(interval);
-  }, [imagesLoaded]);
-  return <section className="bg-gradient-to-br from-gray-900 via-black to-gray-800 relative overflow-hidden py-12 lg:py-16">
+  }, [imagesPreloaded]);
+
+  return (
+    <section className="bg-gradient-to-br from-gray-900 via-black to-gray-800 relative overflow-hidden py-12 lg:py-16">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,0,0,0.1),transparent_50%)]"></div>
@@ -66,26 +91,24 @@ export function HeroSection() {
           {/* Right Side - Sock Images - Order 2 for all devices */}
           <div className="relative w-full max-w-2xl mx-auto h-96 sm:h-[450px] lg:h-[550px] xl:h-[650px] flex items-center justify-center order-2">
             <div className="relative w-full h-full overflow-hidden">
-              {!imagesLoaded ? (
+              {!imagesPreloaded ? (
                 <div className="w-full h-full flex items-center justify-center">
-                  <div className="animate-pulse bg-gray-200 rounded-lg w-80 h-80 sm:w-96 sm:h-96 lg:w-[450px] lg:h-[450px] xl:w-[550px] xl:h-[550px]"></div>
+                  <div className="w-80 h-80 sm:w-96 sm:h-96 lg:w-[450px] lg:h-[450px] xl:w-[550px] xl:h-[550px] bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded-lg"></div>
                 </div>
               ) : (
                 sockImages.map((image, index) => (
                   <div 
                     key={index} 
-                    className={`absolute inset-0 transition-all duration-1000 transform ${
+                    className={`absolute inset-0 transition-all duration-700 transform ${
                       index === currentImage ? 'opacity-100 scale-100 z-20' : 'opacity-0 scale-95 z-0'
                     }`}
                   >
                     <div className="w-full h-full flex items-center justify-center">
-                      <img 
-                        src={image} 
+                      <FastImage
+                        src={image}
                         alt={`Premium Sock ${index + 1}`}
-                        loading={index === 0 ? "eager" : "lazy"}
-                        decoding="async"
-                        fetchPriority={index === 0 ? "high" : "low"}
-                        className="w-80 h-80 sm:w-96 sm:h-96 lg:w-[450px] lg:h-[450px] xl:w-[550px] xl:h-[550px] object-contain drop-shadow-2xl filter brightness-110 transition-transform duration-300 hover:scale-105" 
+                        priority={index === 0}
+                        className="w-80 h-80 sm:w-96 sm:h-96 lg:w-[450px] lg:h-[450px] xl:w-[550px] xl:h-[550px] object-contain drop-shadow-2xl filter brightness-110 transition-transform duration-300 hover:scale-105"
                       />
                     </div>
                   </div>
@@ -103,5 +126,6 @@ export function HeroSection() {
           <div className="w-px h-12 lg:h-16 bg-gradient-to-b from-white/60 to-transparent"></div>
         </div>
       </div>
-    </section>;
+    </section>
+  );
 }
