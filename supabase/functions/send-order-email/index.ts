@@ -104,7 +104,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Email subject:', subject);
     
     const emailResponse = await resend.emails.send({
-      from: "Mozamandu <orders@resend.dev>",
+      from: "Mozamandu <onboarding@resend.dev>",
       to: [order.customer_email],
       subject,
       html: emailHtml,
