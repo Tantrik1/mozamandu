@@ -28,14 +28,14 @@ export function Footer() {
 
           {/* Quick Links */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Quick Links</h3>
-            <ul className="space-y-2 text-sm">
-              <li><Link to="/" className="text-gray-300 hover:text-white transition-colors">Home</Link></li>
-              <li><Link to="/faq" className="text-gray-300 hover:text-white transition-colors">FAQ</Link></li>
-              <li><Link to="/subcategories/full-socks" className="text-gray-300 hover:text-white transition-colors">Full Socks</Link></li>
-              <li><Link to="/subcategories/half-socks" className="text-gray-300 hover:text-white transition-colors">Half Socks</Link></li>
-              <li><Link to="/subcategories/ankle-socks" className="text-gray-300 hover:text-white transition-colors">Ankle Socks</Link></li>
-            </ul>
+            <h3 className="text-lg font-semibold">कम्पनी दर्ता विवरण</h3>
+            <div className="text-sm text-gray-300 space-y-2">
+              <p>विधुतीय प्लेटफर्ममा कम्पनी/फर्मको नाम - मोजामान्डु</p>
+              <p>दर्ता नं-: १६३</p>
+              <p>प्यान नम्बर: १०८६२४५९५</p>
+              <p>गुनासो सुन्ने व्यक्तीको नाम: रोजल लामा</p>
+              <p>फोन नम्बर: ९७६१६९१२७६</p>
+            </div>
           </div>
 
           {/* Company */}
