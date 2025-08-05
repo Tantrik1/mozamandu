@@ -46,9 +46,9 @@ const queryClient = new QueryClient({
 // Faster loading component
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
-    <div className="flex flex-col items-center gap-4">
-      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-      <div className="text-sm text-muted-foreground">Loading...</div>
+    <div className="flex flex-col items-center gap-2">
+      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <div className="text-xs text-muted-foreground">Loading...</div>
     </div>
   </div>
 );

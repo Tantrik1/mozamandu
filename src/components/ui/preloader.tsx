@@ -14,12 +14,12 @@ export function Preloader({ onComplete }: PreloaderProps) {
         if (prev >= 100) {
           clearInterval(timer);
           setIsComplete(true);
-          setTimeout(() => onComplete?.(), 500);
+          setTimeout(() => onComplete?.(), 50);
           return 100;
         }
-        return prev + 10;
+        return prev + 25;
       });
-    }, 100);
+    }, 30);
 
     return () => clearInterval(timer);
   }, [onComplete]);

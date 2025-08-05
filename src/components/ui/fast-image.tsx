@@ -26,9 +26,9 @@ export function FastImage({ src, alt, className, priority = false }: FastImagePr
           alt={alt}
           loading={priority ? "eager" : "lazy"}
           decoding="async"
-          fetchPriority={priority ? "high" : "low"}
+          {...(priority && { fetchpriority: "high" })}
           className={cn(
-            "transition-all duration-300",
+            "transition-all duration-150",
             isLoaded ? "opacity-100 scale-100" : "opacity-0 scale-95",
             className
           )}
