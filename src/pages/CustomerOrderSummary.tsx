@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
 import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
+import { useAuth } from '@/hooks/useAuth';
 
 interface CustomerOrderDetails {
   id: string;
@@ -57,10 +58,14 @@ interface OrderItem {
 
 export default function CustomerOrderSummary() {
   const { orderId } = useParams();
+  const { userProfile } = useAuth();
   const [orderDetails, setOrderDetails] = useState<CustomerOrderDetails | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Check if user is admin
+  const isAdminView = userProfile?.role === 'admin';
 
   useEffect(() => {
     if (orderId) {
@@ -165,9 +170,9 @@ export default function CustomerOrderSummary() {
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Order Not Found</h1>
             <p className="text-gray-600 mb-6">{error || 'The requested order could not be found.'}</p>
             <Button asChild>
-              <Link to="/dashboard">
+              <Link to={isAdminView ? "/admin" : "/dashboard"}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
+                {isAdminView ? "Back to Admin" : "Back to Dashboard"}
               </Link>
             </Button>
           </div>
@@ -184,9 +189,9 @@ export default function CustomerOrderSummary() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-6">
           <Button asChild variant="outline" className="mb-4">
-            <Link to="/dashboard">
+            <Link to={isAdminView ? "/admin" : "/dashboard"}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              {isAdminView ? "Back to Admin" : "Back to Dashboard"}
             </Link>
           </Button>
           
