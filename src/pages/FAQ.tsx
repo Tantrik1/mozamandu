@@ -108,10 +108,10 @@ export default function FAQ() {
           <p className="text-gray-600 mb-4">Can't find what you're looking for? Contact our customer support team.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <div>
-              <span className="font-medium">Email:</span> support@mozamandu.com
+              <span className="font-medium">Email:</span> info@mozamandu.com
             </div>
             <div>
-              <span className="font-medium">Phone:</span> +977-1-234-5678
+              <span className="font-medium">Phone:</span> +977 9761691276
             </div>
           </div>
         </div>
