@@ -237,9 +237,9 @@ export default function OrderSummary() {
 
   const handleBackNavigation = () => {
     if (isAdminView) {
-      navigate('/admin/orders');
+      navigate('/admin');
     } else {
-      navigate('/');
+      navigate('/dashboard');
     }
   };
 
