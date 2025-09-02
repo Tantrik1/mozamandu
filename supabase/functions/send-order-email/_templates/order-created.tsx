@@ -100,6 +100,20 @@ export const OrderCreatedEmail = ({
             </Link>
           </Section>
 
+          <Section style={deliverySection}>
+            <Text style={deliveryTitle}>Delivery Information</Text>
+            <Hr style={divider} />
+            
+            <Text style={deliveryText}>
+              <strong>Inside Kathmandu Valley:</strong><br />
+              • Orders placed before 12 PM → Same day delivery between 1 PM – 5 PM<br />
+              • Orders placed after 12 PM → Next day delivery between 1 PM – 5 PM<br /><br />
+              
+              <strong>Outside Valley:</strong><br />
+              • Delivery within 1–2 working days
+            </Text>
+          </Section>
+
           <Text style={text}>
             We'll keep you updated on your order status. If you have any questions, 
             feel free to contact our support team.
@@ -222,6 +236,28 @@ const button = {
 const footer = {
   padding: '0 48px',
   marginTop: '32px',
+}
+
+const deliverySection = {
+  backgroundColor: '#f0f9ff',
+  border: '2px solid #bae6fd',
+  borderRadius: '8px',
+  padding: '24px',
+  margin: '24px 0',
+}
+
+const deliveryTitle = {
+  color: '#0369a1',
+  fontSize: '18px',
+  fontWeight: '600',
+  margin: '0 0 16px 0',
+}
+
+const deliveryText = {
+  color: '#374151',
+  fontSize: '14px',
+  lineHeight: '20px',
+  margin: '0',
 }
 
 const footerText = {
