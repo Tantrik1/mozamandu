@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -1411,29 +1411,29 @@ export type Database = {
       bulk_update_inventory: {
         Args: { p_updates: Json }
         Returns: {
-          success_count: number
           error_count: number
           errors: Json
+          success_count: number
         }[]
       }
       export_inventory_data: {
         Args: { p_include_inactive?: boolean }
         Returns: {
-          product_id: string
-          sku: string
-          product_name: string
-          category_name: string
-          subcategory_name: string
-          color_name: string
-          size_name: string
-          stock_quantity: number
-          reserved_stock: number
           available_stock: number
-          low_stock_threshold: number
+          category_name: string
+          color_name: string
           cost_price: number
-          selling_price: number
-          stock_status: string
           last_updated: string
+          low_stock_threshold: number
+          product_id: string
+          product_name: string
+          reserved_stock: number
+          selling_price: number
+          size_name: string
+          sku: string
+          stock_quantity: number
+          stock_status: string
+          subcategory_name: string
         }[]
       }
       fulfill_order_stock_enhanced: {
@@ -1446,8 +1446,8 @@ export type Database = {
       }
       generate_product_sku: {
         Args: {
-          p_product_name: string
           p_color_name?: string
+          p_product_name: string
           p_size_name?: string
         }
         Returns: string
@@ -1459,9 +1459,9 @@ export type Database = {
       get_detailed_inventory_analytics: {
         Args: Record<PropertyKey, never>
         Returns: {
+          description: string
           metric_name: string
           metric_value: number
-          description: string
         }[]
       }
       get_product_colors: {
@@ -1475,30 +1475,30 @@ export type Database = {
         }[]
       }
       get_product_sizes: {
-        Args: { p_product_id: string; p_color_name: string }
+        Args: { p_color_name: string; p_product_id: string }
         Returns: {
+          available_stock: number
+          size_code: string
           size_id: string
           size_name: string
-          size_code: string
-          stock_quantity: number
-          available_stock: number
-          variant_id: string
           sku: string
+          stock_quantity: number
+          variant_id: string
         }[]
       }
       get_product_variants: {
         Args: { p_product_id: string }
         Returns: {
-          variant_id: string
-          sku: string
-          product_name: string
-          color_name: string
-          size_name: string
-          stock_quantity: number
           available_stock: number
-          price: number
-          color_image_url: string
           color_hex: string
+          color_image_url: string
+          color_name: string
+          price: number
+          product_name: string
+          size_name: string
+          sku: string
+          stock_quantity: number
+          variant_id: string
         }[]
       }
       is_admin: {
@@ -1515,14 +1515,14 @@ export type Database = {
       }
       safe_update_stock: {
         Args: {
-          p_product_id: string
-          p_stock_change: number
           p_color_variant_id?: string
-          p_size_variant_id?: string
-          p_reservation_change?: number
-          p_reason?: string
           p_order_id?: string
           p_order_number?: string
+          p_product_id: string
+          p_reason?: string
+          p_reservation_change?: number
+          p_size_variant_id?: string
+          p_stock_change: number
           p_transaction_type?: string
         }
         Returns: boolean
