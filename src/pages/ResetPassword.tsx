@@ -120,9 +120,9 @@ export default function ResetPassword() {
           description: "Your password has been successfully updated. You can now sign in with your new password.",
         });
         
-        // Redirect to auth page after 3 seconds
+        // Redirect to home page after 3 seconds
         setTimeout(() => {
-          navigate('/auth');
+          navigate('/');
         }, 3000);
       }
     } catch (error: any) {
@@ -199,9 +199,9 @@ export default function ResetPassword() {
               </p>
             </CardHeader>
             <CardContent className="px-6 pb-6">
-              <Link to="/auth">
+              <Link to="/">
                 <Button className="w-full h-12 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300">
-                  Sign In Now
+                  Go to Home
                 </Button>
               </Link>
             </CardContent>
