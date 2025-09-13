@@ -15,13 +15,15 @@ import { ProfileAutoFill } from './ProfileAutoFill';
 import { PromoCodeSection } from './PromoCodeSection';
 import { PaymentScreenshotUpload } from './PaymentScreenshotUpload';
 import { EnhancedCheckoutInfo } from './EnhancedCheckoutInfo';
-import { AlertCircle, ShoppingCart, Loader2 } from 'lucide-react';
+import { AlertCircle, ShoppingCart, Loader2, Home } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface CheckoutFormData {
   customerName: string;
   customerEmail: string;
   contactNumber: string;
   whatsappNumber: string;
+  whatsappSameAsContact: boolean;
   deliveryAddress: string;
   deliveryLocationId: string;
   paymentMethodId: string;
@@ -46,6 +48,7 @@ export function EnhancedUniversalCheckout() {
     customerEmail: '',
     contactNumber: '',
     whatsappNumber: '',
+    whatsappSameAsContact: false,
     deliveryAddress: '',
     deliveryLocationId: '',
     paymentMethodId: '',
@@ -98,7 +101,10 @@ export function EnhancedUniversalCheckout() {
 
     if (!formData.customerName.trim()) errors.push('Customer name is required');
     if (!formData.customerEmail.trim()) errors.push('Email is required');
+    if (!/\S+@\S+\.\S+/.test(formData.customerEmail)) errors.push('Valid email address is required');
     if (!formData.contactNumber.trim()) errors.push('Contact number is required');
+    if (!/^[0-9]{10}$/.test(formData.contactNumber.replace(/\D/g, ''))) errors.push('Contact number must be 10 digits');
+    if (formData.whatsappNumber && !/^[0-9]{10}$/.test(formData.whatsappNumber.replace(/\D/g, ''))) errors.push('WhatsApp number must be 10 digits');
     if (!formData.deliveryAddress.trim()) errors.push('Delivery address is required');
     if (!formData.deliveryLocationId) errors.push('Delivery location is required');
     if (!formData.paymentMethodId) errors.push('Payment method is required');
@@ -293,6 +299,30 @@ export function EnhancedUniversalCheckout() {
           <p className="text-gray-600 mt-2">Complete your order with real-time inventory management</p>
         </div>
 
+        {/* Cart Modification Warning */}
+        <Card className="border-orange-200 bg-orange-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <AlertCircle className="h-5 w-5 text-orange-500" />
+              <div className="flex-1">
+                <h3 className="font-medium text-orange-800">Cart Locked for Checkout</h3>
+                <p className="text-sm text-orange-700 mt-1">
+                  To modify your cart items, please return to the home page. Cart changes are not allowed during checkout to ensure order accuracy.
+                </p>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.location.href = '/'}
+                className="text-orange-700 border-orange-300 hover:bg-orange-100"
+              >
+                <Home className="h-4 w-4 mr-2" />
+                Return Home
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {validationErrors.length > 0 && (
           <Card className="border-red-200 bg-red-50">
             <CardContent className="p-4">
@@ -349,20 +379,53 @@ export function EnhancedUniversalCheckout() {
                     <Input
                       id="contactNumber"
                       value={formData.contactNumber}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contactNumber: e.target.value }))}
-                      placeholder="Enter your contact number"
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        if (value.length <= 10) {
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            contactNumber: value,
+                            whatsappNumber: prev.whatsappSameAsContact ? value : prev.whatsappNumber
+                          }));
+                        }
+                      }}
+                      placeholder="Enter your 10-digit contact number"
                       required
                     />
                   </div>
                   
                   <div>
                     <Label htmlFor="whatsappNumber">WhatsApp Number</Label>
-                    <Input
-                      id="whatsappNumber"
-                      value={formData.whatsappNumber}
-                      onChange={(e) => setFormData(prev => ({ ...prev, whatsappNumber: e.target.value }))}
-                      placeholder="Enter your WhatsApp number"
-                    />
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="whatsappSameAsContact"
+                          checked={formData.whatsappSameAsContact}
+                          onCheckedChange={(checked) => 
+                            setFormData(prev => ({ 
+                              ...prev, 
+                              whatsappSameAsContact: checked as boolean,
+                              whatsappNumber: checked ? prev.contactNumber : prev.whatsappNumber
+                            }))
+                          }
+                        />
+                        <Label htmlFor="whatsappSameAsContact" className="text-sm">
+                          Same as contact number
+                        </Label>
+                      </div>
+                      <Input
+                        id="whatsappNumber"
+                        value={formData.whatsappNumber}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          if (value.length <= 10) {
+                            setFormData(prev => ({ ...prev, whatsappNumber: value }));
+                          }
+                        }}
+                        placeholder="Enter your 10-digit WhatsApp number"
+                        disabled={formData.whatsappSameAsContact}
+                      />
+                    </div>
                   </div>
                   
                   <div>

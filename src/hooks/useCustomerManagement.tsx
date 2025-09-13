@@ -70,17 +70,30 @@ export function useCustomerManagement() {
           try {
             console.log(`Fetching orders for customer ${profile.id}...`);
             
-            const { data: orders, error: ordersError } = await supabase
-              .from('orders')
-              .select('total_amount')
-              .eq('user_id', profile.id);
+            // Check both customer_orders and orders tables
+            const [customerOrdersResult, ordersResult] = await Promise.all([
+              supabase
+                .from('customer_orders')
+                .select('total_amount')
+                .eq('user_id', profile.id),
+              supabase
+                .from('orders')
+                .select('total_amount')
+                .eq('user_id', profile.id)
+            ]);
 
-            if (ordersError) {
-              console.error('Orders fetch error for customer', profile.id, ':', ordersError);
+            let allOrders: any[] = [];
+            
+            if (!customerOrdersResult.error && customerOrdersResult.data) {
+              allOrders = [...allOrders, ...customerOrdersResult.data];
+            }
+            
+            if (!ordersResult.error && ordersResult.data) {
+              allOrders = [...allOrders, ...ordersResult.data];
             }
 
-            const totalOrders = orders?.length || 0;
-            const totalSpent = orders?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
+            const totalOrders = allOrders.length;
+            const totalSpent = allOrders.reduce((sum, order) => sum + Number(order.total_amount), 0);
 
             console.log(`Customer ${profile.email}: ${totalOrders} orders, Rs. ${totalSpent} spent`);
 
@@ -130,17 +143,35 @@ export function useCustomerManagement() {
   const fetchCustomerOrders = async (customerId: string) => {
     console.log('Fetching orders for customer:', customerId);
     
-    const { data, error } = await supabase
-      .from('orders')
-      .select('id, order_number, total_amount, status, created_at')
-      .eq('user_id', customerId)
-      .order('created_at', { ascending: false });
+    // Try both tables - customer_orders and orders
+    const [customerOrdersResult, ordersResult] = await Promise.all([
+      supabase
+        .from('customer_orders')
+        .select('id, order_number, total_amount, status, created_at')
+        .eq('user_id', customerId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('orders')
+        .select('id, order_number, total_amount, status, created_at')
+        .eq('user_id', customerId)
+        .order('created_at', { ascending: false })
+    ]);
 
-    if (error) {
-      console.error('Customer orders fetch error:', error);
+    let allOrders: any[] = [];
+    
+    if (!customerOrdersResult.error && customerOrdersResult.data) {
+      allOrders = [...allOrders, ...customerOrdersResult.data];
+    }
+    
+    if (!ordersResult.error && ordersResult.data) {
+      allOrders = [...allOrders, ...ordersResult.data];
+    }
+
+    if (customerOrdersResult.error && ordersResult.error) {
+      console.error('Customer orders fetch error:', customerOrdersResult.error, ordersResult.error);
     } else {
-      console.log('Customer orders:', data);
-      setCustomerOrders(data || []);
+      console.log('Customer orders:', allOrders);
+      setCustomerOrders(allOrders);
     }
   };
 

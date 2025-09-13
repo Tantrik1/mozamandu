@@ -370,6 +370,11 @@ export const ModernProductCard = memo(function ModernProductCard({ product, subc
   const selectedColorVariant = colorVariants.find(cv => cv.id === selectedColor);
   const currentImage = selectedColorVariant?.image_url || product.image_url;
 
+  // Don't render if product is out of stock
+  if (productStock === 0) {
+    return null;
+  }
+
   return (
     <Card className="group h-full flex flex-col overflow-hidden bg-gradient-to-br from-card via-card to-card/80 shadow-lg hover:shadow-xl transition-all duration-500 border border-border/50 hover:border-primary/20 rounded-xl backdrop-blur-sm">
       {/* Product Image - Enhanced 16:9 Aspect Ratio */}
@@ -419,11 +424,11 @@ export const ModernProductCard = memo(function ModernProductCard({ product, subc
             </Badge>
           ) : productStock <= 5 ? (
             <Badge variant="outline" className="text-xs bg-gradient-to-r from-orange-100 to-orange-200 text-orange-700 border-orange-300 shadow-lg">
-              Low Stock
+              Low Stock ({productStock})
             </Badge>
           ) : (
             <Badge variant="outline" className="text-xs bg-gradient-to-r from-green-100 to-green-200 text-green-700 border-green-300 shadow-lg">
-              In Stock
+              In Stock ({productStock})
             </Badge>
           )}
         </div>

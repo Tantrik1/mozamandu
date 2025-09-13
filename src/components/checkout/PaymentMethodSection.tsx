@@ -62,8 +62,19 @@ export function PaymentMethodSection({
       fetchPaymentMethods();
     } else {
       setLoading(false);
+      // Auto-select first payment method if none selected
+      if (externalPaymentMethods.length > 0 && !currentSelectedId) {
+        handleMethodChange(externalPaymentMethods[0].id);
+      }
     }
   }, [externalPaymentMethods]);
+
+  useEffect(() => {
+    // Auto-select first payment method when internal methods are loaded
+    if (internalPaymentMethods.length > 0 && !currentSelectedId) {
+      handleMethodChange(internalPaymentMethods[0].id);
+    }
+  }, [internalPaymentMethods, currentSelectedId]);
 
   const fetchPaymentMethods = async () => {
     try {
@@ -110,18 +121,21 @@ export function PaymentMethodSection({
         <CardDescription>Choose your preferred payment method</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Select value={currentSelectedId} onValueChange={handleMethodChange} disabled={loading}>
-          <SelectTrigger>
-            <SelectValue placeholder={loading ? "Loading..." : "Select payment method"} />
-          </SelectTrigger>
-          <SelectContent>
-            {paymentMethods.map((method) => (
-              <SelectItem key={method.id} value={method.id}>
+        <RadioGroup 
+          value={currentSelectedId} 
+          onValueChange={handleMethodChange} 
+          disabled={loading}
+          defaultValue={paymentMethods.length > 0 ? paymentMethods[0].id : ''}
+        >
+          {paymentMethods.map((method) => (
+            <div key={method.id} className="flex items-center space-x-2">
+              <RadioGroupItem value={method.id} id={method.id} />
+              <Label htmlFor={method.id} className="cursor-pointer">
                 {method.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              </Label>
+            </div>
+          ))}
+        </RadioGroup>
 
         {selectedPaymentMethod && (
           <div className="text-center">
