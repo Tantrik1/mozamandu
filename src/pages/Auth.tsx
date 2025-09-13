@@ -105,7 +105,7 @@ export default function Auth() {
     try {
       console.log('🔄 Sending password reset email to:', resetEmail);
       
-      // Use only Supabase's built-in password reset (which sends the proper tokens)
+      // First, trigger Supabase's password reset to generate the reset link
       const { error: supabaseError } = await supabase.auth.resetPasswordForEmail(resetEmail, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -117,11 +117,30 @@ export default function Auth() {
           description: supabaseError.message,
           variant: "destructive",
         });
+        setResetLoading(false);
+        return;
+      }
+
+      // Then send our custom email via edge function
+      const { error: emailError } = await supabase.functions.invoke('send-password-reset', {
+        body: {
+          email: resetEmail,
+          resetLink: `${window.location.origin}/reset-password`
+        }
+      });
+
+      if (emailError) {
+        console.error('❌ Email sending error:', emailError);
+        toast({
+          title: "Email Send Failed", 
+          description: "Password reset initiated but email notification failed. Please check your email or try again.",
+          variant: "destructive",
+        });
       } else {
-        console.log('✅ Password reset email sent successfully via Supabase');
+        console.log('✅ Password reset email sent successfully');
         toast({
           title: "Reset Email Sent!",
-          description: "Check your email for a password reset link from Supabase.",
+          description: "Check your email for a password reset link.",
         });
         setShowForgotPassword(false);
         setResetEmail('');
