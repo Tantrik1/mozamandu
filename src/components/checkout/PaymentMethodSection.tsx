@@ -164,39 +164,33 @@ export function PaymentMethodSection({
             </div>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="partial" id="partial" />
-              <Label htmlFor="partial">Pay Partial Amount (Minimum 20%)</Label>
+              <Label htmlFor="partial">Pay Partial Amount (Minimum Rs. {minimumPayment?.toFixed(2) || '0.00'})</Label>
             </div>
           </RadioGroup>
 
           {((paymentType === 'partial') || (!paymentType && paymentPercentage < 100)) && (
             <div className="mt-3">
-              {paidAmount !== undefined ? (
-                <Input
-                  type="number"
-                  value={paidAmount}
-                  onChange={(e) => handlePaidAmountChange(e.target.value)}
-                  placeholder="Enter amount"
-                  min={minimumPayment || 0}
-                  max={finalTotal || undefined}
-                  step="0.01"
-                />
-              ) : (
-                <Input
-                  type="number"
-                  min={20}
-                  max={100}
-                  value={paymentPercentage}
-                  onChange={(e) => onPercentageChange?.(Number(e.target.value))}
-                  placeholder="Enter percentage (20-100)"
-                  step="1"
-                />
-              )}
-              <p className="text-sm text-gray-600 mt-1">
-                {paidAmount !== undefined ? 
-                  `Minimum payment: Rs. ${minimumPayment?.toFixed(2) || '0.00'}` :
-                  'Enter percentage between 20% and 100%'
-                }
-              </p>
+              <Label htmlFor="payment-amount" className="text-sm font-medium">Enter Amount (Rs.)</Label>
+              <Input
+                id="payment-amount"
+                type="number"
+                value={paidAmount}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '' || (parseFloat(value) >= (minimumPayment || 0) && parseFloat(value) <= (finalTotal || Infinity))) {
+                    handlePaidAmountChange(value);
+                  }
+                }}
+                placeholder={`Enter amount (Min: Rs. ${minimumPayment?.toFixed(2) || '0.00'})`}
+                min={minimumPayment || 0}
+                max={finalTotal || undefined}
+                step="1"
+                className="mt-1"
+              />
+              <div className="flex justify-between text-sm text-gray-600 mt-1">
+                <span>Minimum: Rs. {minimumPayment?.toFixed(2) || '0.00'}</span>
+                <span>Maximum: Rs. {finalTotal?.toFixed(2) || '0.00'}</span>
+              </div>
             </div>
           )}
         </div>

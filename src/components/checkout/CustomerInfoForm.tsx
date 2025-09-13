@@ -56,19 +56,35 @@ export function CustomerInfoForm({
             id="email"
             type="email"
             value={customerInfo.email}
-            onChange={(e) => setCustomerInfo(prev => ({ ...prev, email: e.target.value }))}
+            onChange={(e) => {
+              const email = e.target.value;
+              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+              setCustomerInfo(prev => ({ ...prev, email }));
+            }}
             required
+            className={customerInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email) ? 'border-red-500' : ''}
           />
+          {customerInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email) && (
+            <p className="text-red-500 text-sm mt-1">Please enter a valid email address</p>
+          )}
         </div>
 
         <div>
-          <Label htmlFor="phone">Contact Number *</Label>
+          <Label htmlFor="phone">Contact Number * (Max 10 digits)</Label>
           <Input
             id="phone"
             value={customerInfo.phone}
-            onChange={(e) => setCustomerInfo(prev => ({ ...prev, phone: e.target.value }))}
+            onChange={(e) => {
+              const phone = e.target.value.replace(/\D/g, '').slice(0, 10);
+              setCustomerInfo(prev => ({ ...prev, phone }));
+            }}
             required
+            maxLength={10}
+            className={customerInfo.phone && (customerInfo.phone.length < 10 || !/^\d{10}$/.test(customerInfo.phone)) ? 'border-red-500' : ''}
           />
+          {customerInfo.phone && (customerInfo.phone.length < 10 || !/^\d{10}$/.test(customerInfo.phone)) && (
+            <p className="text-red-500 text-sm mt-1">Please enter a valid 10-digit phone number</p>
+          )}
         </div>
 
         <div>

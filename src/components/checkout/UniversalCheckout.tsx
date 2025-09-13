@@ -267,10 +267,28 @@ export function UniversalCheckout() {
         return;
       }
 
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email)) {
+        toast({
+          title: 'Validation Error',
+          description: 'Please enter a valid email address',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       if (!customerInfo.phone.trim()) {
         toast({
           title: 'Validation Error',
           description: 'Please enter your phone number',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (!/^\d{10}$/.test(customerInfo.phone)) {
+        toast({
+          title: 'Validation Error',
+          description: 'Please enter a valid 10-digit phone number',
           variant: 'destructive',
         });
         return;
@@ -650,6 +668,18 @@ export function UniversalCheckout() {
             </CardContent>
           </Card>
 
+          <PromoCodeSection
+            onDiscountApplied={setPromoDiscount}
+            onPromoCodeUsed={(code) => {}}
+            orderTotal={getTieredTotalPrice() + (deliveryLocation ? deliveryLocation.delivery_price : 0)}
+            promoCode={promoCode}
+            setPromoCode={setPromoCode}
+            appliedPromo={appliedPromo}
+            isPromoApplied={isPromoApplied}
+            onApplyPromo={() => handlePromoCodeApplied(appliedPromo!)}
+            onRemovePromo={handlePromoCodeRemoved}
+          />
+
           <Card className="shadow-sm border-gray-200">
             <CardContent className="p-6">
               <PaymentMethodSection
@@ -689,18 +719,6 @@ export function UniversalCheckout() {
               />
             </CardContent>
           </Card>
-
-          <PromoCodeSection
-            onDiscountApplied={setPromoDiscount}
-            onPromoCodeUsed={(code) => {}}
-            orderTotal={getTieredTotalPrice() + (deliveryLocation ? deliveryLocation.delivery_price : 0)}
-            promoCode={promoCode}
-            setPromoCode={setPromoCode}
-            appliedPromo={appliedPromo}
-            isPromoApplied={isPromoApplied}
-            onApplyPromo={() => handlePromoCodeApplied(appliedPromo!)}
-            onRemovePromo={handlePromoCodeRemoved}
-          />
         </div>
 
         <div className="space-y-6">
