@@ -424,6 +424,29 @@ export function UniversalCheckout() {
       const paidAmount = Math.round(finalTotal * (paymentPercentage / 100));
       const remainingAmount = finalTotal - paidAmount;
 
+      // Validate payment amount for partial payments
+      if (paymentPercentage < 100) {
+        const minimumAmount = Math.round(finalTotal * 0.2);
+        
+        if (paidAmount < minimumAmount) {
+          toast({
+            title: 'Validation Error',
+            description: `Minimum payment amount is Rs. ${minimumAmount.toFixed(2)}`,
+            variant: 'destructive',
+          });
+          return;
+        }
+        
+        if (paidAmount > finalTotal) {
+          toast({
+            title: 'Validation Error',
+            description: `Payment amount cannot exceed total amount of Rs. ${finalTotal.toFixed(2)}`,
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+
       const pricingBreakdown = {
         subcategoryPricing: Object.fromEntries(
           Object.entries(subcategoryPricing).map(([id, data]) => [

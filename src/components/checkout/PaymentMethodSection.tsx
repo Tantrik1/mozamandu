@@ -173,18 +173,10 @@ export function PaymentMethodSection({
               <Label htmlFor="payment-amount" className="text-sm font-medium">Enter Amount (Rs.)</Label>
               <Input
                 id="payment-amount"
-                type="number"
+                type="text"
                 value={paidAmount}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value === '' || (parseFloat(value) >= (minimumPayment || 0) && parseFloat(value) <= (finalTotal || Infinity))) {
-                    handlePaidAmountChange(value);
-                  }
-                }}
+                onChange={(e) => handlePaidAmountChange(e.target.value)}
                 placeholder={`Enter amount (Min: Rs. ${minimumPayment?.toFixed(2) || '0.00'})`}
-                min={minimumPayment || 0}
-                max={finalTotal || undefined}
-                step="1"
                 className="mt-1"
               />
               <div className="flex justify-between text-sm text-gray-600 mt-1">
