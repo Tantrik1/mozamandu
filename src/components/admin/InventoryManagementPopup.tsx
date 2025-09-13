@@ -38,10 +38,7 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
   const [productInfo, setProductInfo] = useState<any>(null);
   const { toast } = useToast();
 
-  console.log('InventoryManagementPopup render - isOpen:', isOpen, 'productId:', productId);
-
   useEffect(() => {
-    console.log('InventoryManagementPopup useEffect triggered - isOpen:', isOpen, 'productId:', productId);
     if (isOpen && productId) {
       fetchProductAndInventory();
     }

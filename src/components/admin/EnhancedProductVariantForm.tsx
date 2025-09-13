@@ -45,7 +45,6 @@ interface EnhancedProductVariantFormProps {
   hasSizeVariants: boolean;
   onSave: () => void;
   onCancel: () => void;
-  onUpdateProduct?: () => Promise<void>;
 }
 
 export function EnhancedProductVariantForm({
@@ -54,7 +53,6 @@ export function EnhancedProductVariantForm({
   hasSizeVariants,
   onSave,
   onCancel,
-  onUpdateProduct,
 }: EnhancedProductVariantFormProps) {
   const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
   const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>([]);
@@ -280,12 +278,7 @@ export function EnhancedProductVariantForm({
   const handleSave = async () => {
     setLoading(true);
     try {
-      // First, update the product information if the function is provided
-      if (onUpdateProduct) {
-        await onUpdateProduct();
-      }
-
-      // Then, handle deletions
+      // First, handle deletions
       await handleDeletions();
 
       // Then handle updates and creates
@@ -296,7 +289,7 @@ export function EnhancedProductVariantForm({
 
       toast({
         title: 'Success',
-        description: 'Product information and variants updated successfully',
+        description: 'Product variants and inventory updated successfully',
       });
 
       onSave();
