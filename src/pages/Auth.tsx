@@ -103,44 +103,57 @@ export default function Auth() {
     setResetLoading(true);
 
     try {
-      console.log('🔄 Sending password reset email to:', resetEmail);
+      console.log('🔄 Checking if user exists for:', resetEmail);
       
-      // First, trigger Supabase's password reset to generate the reset link
-      const { error: supabaseError } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      // First check if user exists in our profiles table
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', resetEmail)
+        .single();
 
-      if (supabaseError) {
-        console.error('❌ Supabase password reset error:', supabaseError);
+      if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows returned
+        console.error('❌ Error checking profile:', profileError);
         toast({
-          title: "Reset Failed",
-          description: supabaseError.message,
+          title: "Error",
+          description: "An error occurred while checking your account. Please try again.",
           variant: "destructive",
         });
         setResetLoading(false);
         return;
       }
 
-      // Then send our custom email via edge function
-      const { error: emailError } = await supabase.functions.invoke('send-password-reset', {
-        body: {
-          email: resetEmail,
-          resetLink: `${window.location.origin}/reset-password`
-        }
+      // If no profile found, user doesn't exist
+      if (!profileData) {
+        console.log('❌ User not found in profiles');
+        toast({
+          title: "Account Not Found",
+          description: "No account found with this email address. Please sign up for a new account.",
+          variant: "destructive",
+        });
+        setResetLoading(false);
+        return;
+      }
+
+      console.log('✅ User found, sending password reset email');
+      
+      // User exists, send reset email using Supabase's built-in system
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
-      if (emailError) {
-        console.error('❌ Email sending error:', emailError);
+      if (resetError) {
+        console.error('❌ Supabase password reset error:', resetError);
         toast({
-          title: "Email Send Failed", 
-          description: "Password reset initiated but email notification failed. Please check your email or try again.",
+          title: "Reset Failed",
+          description: resetError.message,
           variant: "destructive",
         });
       } else {
-        console.log('✅ Password reset email sent successfully');
+        console.log('✅ Password reset email sent successfully via Supabase');
         toast({
           title: "Reset Email Sent!",
-          description: "Check your email for a password reset link.",
+          description: "Check your email for a password reset link. If you don't see it, check your spam folder.",
         });
         setShowForgotPassword(false);
         setResetEmail('');
