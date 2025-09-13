@@ -580,12 +580,15 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             productId={productId}
             hasColorVariants={watchedHasColorVariants}
             hasSizeVariants={watchedHasSizeVariants}
+            productData={form.getValues()}
+            imageFile={imageFile}
+            imagePreview={imagePreview}
             onSave={() => {
-              // Fetch fresh data and open inventory popup
-              fetchProduct();
+              // After successful save, open inventory popup
               setShowInventoryPopup(true);
+              onSave();
             }}
-            onCancel={() => {}}
+            onCancel={onCancel}
           />
         )}
 

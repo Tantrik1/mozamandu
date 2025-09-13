@@ -39,10 +39,26 @@ interface InventoryRecord {
   is_active: boolean;
 }
 
+interface ProductData {
+  name?: string;
+  description?: string;
+  cost_price?: number;
+  selling_price?: number;
+  category_id?: string;
+  subcategory_id?: string;
+  is_featured?: boolean;
+  has_color_variants?: boolean;
+  has_size_variants?: boolean;
+  status?: 'active' | 'inactive';
+}
+
 interface EnhancedProductVariantFormProps {
   productId: string;
   hasColorVariants: boolean;
   hasSizeVariants: boolean;
+  productData: ProductData;
+  imageFile: File | null;
+  imagePreview: string | null;
   onSave: () => void;
   onCancel: () => void;
 }
@@ -51,6 +67,9 @@ export function EnhancedProductVariantForm({
   productId,
   hasColorVariants,
   hasSizeVariants,
+  productData,
+  imageFile,
+  imagePreview,
   onSave,
   onCancel,
 }: EnhancedProductVariantFormProps) {
@@ -275,29 +294,101 @@ export function EnhancedProductVariantForm({
     updateColorVariant(colorIndex, 'image_url', null);
   };
 
+  const uploadImageAndGetUrl = async (): Promise<string | null> => {
+    if (!imageFile) return null;
+
+    try {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `product-${Date.now()}.${fileExt}`;
+
+      const { data, error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, imageFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to upload image',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
+
+  const updateProductInformation = async () => {
+    try {
+      let imageUrl = imagePreview;
+      if (imageFile) {
+        const newImageUrl = await uploadImageAndGetUrl();
+        if (newImageUrl) {
+          imageUrl = newImageUrl;
+        }
+      }
+
+      const updateData = {
+        name: productData.name || '',
+        description: productData.description || null,
+        cost_price: productData.cost_price || 0,
+        selling_price: productData.selling_price || null,
+        category_id: productData.category_id || '',
+        subcategory_id: productData.subcategory_id || '',
+        is_featured: productData.is_featured || false,
+        has_color_variants: productData.has_color_variants || false,
+        color_has_size_variants: productData.has_size_variants || false,
+        status: productData.status || 'active',
+        image_url: imageUrl,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('products')
+        .update(updateData)
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      console.log('Product information updated successfully');
+    } catch (error) {
+      console.error('Error updating product information:', error);
+      throw error;
+    }
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
-      // First, handle deletions
+      // Step 1: Update product information first
+      console.log('Updating product information...');
+      await updateProductInformation();
+
+      // Step 2: Handle variant deletions
+      console.log('Handling variant deletions...');
       await handleDeletions();
 
-      // Then handle updates and creates
+      // Step 3: Handle variant updates and creates
+      console.log('Handling variant upserts...');
       await handleUpserts();
-
-      // Finally, manage inventory records
-      await manageInventoryRecords();
 
       toast({
         title: 'Success',
-        description: 'Product variants and inventory updated successfully',
+        description: 'Product information and variants updated successfully',
       });
 
+      console.log('Triggering inventory management...');
       onSave();
     } catch (error) {
-      console.error('Error saving variants:', error);
+      console.error('Error saving product and variants:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save product variants',
+        description: 'Failed to save product information and variants',
         variant: 'destructive',
       });
     } finally {
