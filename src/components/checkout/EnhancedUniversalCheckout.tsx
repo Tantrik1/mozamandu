@@ -498,9 +498,9 @@ export function EnhancedUniversalCheckout() {
                   </div>
                   
                   <div>
-                    <Label htmlFor="whatsappNumber">WhatsApp Number</Label>
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
+                    <Label htmlFor="whatsappNumber">WhatsApp Number (Optional)</Label>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2 p-2 bg-gray-50 rounded-md">
                         <Checkbox
                           id="whatsappSameAsContact"
                           checked={formData.whatsappSameAsContact}
@@ -511,8 +511,9 @@ export function EnhancedUniversalCheckout() {
                               whatsappNumber: checked ? prev.contactNumber : prev.whatsappNumber
                             }))
                           }
+                          className="border-2 border-primary"
                         />
-                        <Label htmlFor="whatsappSameAsContact" className="text-sm">
+                        <Label htmlFor="whatsappSameAsContact" className="text-sm font-medium cursor-pointer">
                           Same as contact number
                         </Label>
                       </div>
@@ -527,6 +528,7 @@ export function EnhancedUniversalCheckout() {
                         }}
                         placeholder="Enter your 10-digit WhatsApp number"
                         disabled={formData.whatsappSameAsContact}
+                        className={formData.whatsappSameAsContact ? 'bg-gray-100' : ''}
                       />
                     </div>
                   </div>
