@@ -44,10 +44,22 @@ export default function Auth() {
     }
   }, [searchParams]);
 
-  // Redirect authenticated users based on role
+  // Redirect authenticated users based on role (but not during password reset)
   useEffect(() => {
     if (user && userProfile && !isLoading) {
-      // Only redirect if email is confirmed
+      // Skip redirection if user is on password reset page or came from reset link
+      const currentPath = window.location.pathname;
+      const urlParams = new URLSearchParams(window.location.search);
+      const isPasswordResetFlow = currentPath === '/reset-password' || 
+                                  urlParams.get('type') === 'recovery' || 
+                                  urlParams.has('access_token');
+      
+      if (isPasswordResetFlow) {
+        console.log('🔄 Auth: Skipping redirection - user is in password reset flow');
+        return;
+      }
+      
+      // Only redirect if email is confirmed and not in reset flow
       if (user.email_confirmed_at) {
         console.log('🔄 Auth: Redirecting authenticated user with role:', userProfile.role);
         
