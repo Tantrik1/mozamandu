@@ -21,6 +21,8 @@ interface CustomerOrder {
   total_amount: number;
   status: string;
   created_at: string;
+  promocode_used?: string;
+  source?: string;
 }
 
 interface CustomerDialogProps {
@@ -68,7 +70,7 @@ export function CustomerDialog({ isOpen, onClose, customer, customerOrders }: Cu
           {/* Customer Orders */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Order History</CardTitle>
+              <CardTitle className="text-lg">Order History ({customerOrders.length} orders)</CardTitle>
             </CardHeader>
             <CardContent>
               {customerOrders.length > 0 ? (
@@ -78,12 +80,14 @@ export function CustomerDialog({ isOpen, onClose, customer, customerOrders }: Cu
                       <TableHead>Order #</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Promo Used</TableHead>
                       <TableHead>Date</TableHead>
+                      <TableHead>Source</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {customerOrders.map((order) => (
-                      <TableRow key={order.id}>
+                      <TableRow key={`${order.id}-${order.source || 'unknown'}`}>
                         <TableCell className="font-medium">
                           {order.order_number}
                         </TableCell>
@@ -100,14 +104,38 @@ export function CustomerDialog({ isOpen, onClose, customer, customerOrders }: Cu
                           </span>
                         </TableCell>
                         <TableCell>
+                          {order.promocode_used ? (
+                            <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-medium">
+                              {order.promocode_used}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">None</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           {new Date(order.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            order.source === 'customer_orders' 
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {order.source === 'customer_orders' ? 'Customer Orders' : 'Orders'}
+                          </span>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-gray-500">No orders found for this customer.</p>
+                <div className="text-center py-8">
+                  <div className="text-gray-400 mb-2">📦</div>
+                  <p className="text-gray-500">No orders found for this customer.</p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    This customer may not have placed any orders yet, or orders may be associated with different contact details.
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>

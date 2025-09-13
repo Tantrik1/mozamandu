@@ -30,6 +30,8 @@ export function PromocodeManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPromocode, setEditingPromocode] = useState<Promocode | null>(null);
+  const [promoUsageData, setPromoUsageData] = useState<{ [key: string]: number }>({});
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     code: '',
     description: '',
@@ -40,31 +42,93 @@ export function PromocodeManagement() {
     valid_until: '',
   });
 
-  // Stats
+  // Calculate accurate stats using frontend data
   const activePromocodes = promocodes.filter(p => p.is_active).length;
-  const totalUsage = promocodes.reduce((sum, p) => sum + (p.used_count || 0), 0);
+  const totalUsage = Object.values(promoUsageData).reduce((sum, count) => sum + count, 0);
   const averageDiscount = promocodes.length > 0 
     ? promocodes.reduce((sum, p) => sum + p.discount_percentage, 0) / promocodes.length 
     : 0;
 
   useEffect(() => {
-    fetchPromocodes();
+    fetchPromocodesAndUsage();
   }, []);
 
-  const fetchPromocodes = async () => {
-    const { data, error } = await supabase
-      .from('promocodes')
-      .select('*')
-      .order('created_at', { ascending: false });
+  const fetchPromocodesAndUsage = async () => {
+    setLoading(true);
+    console.log('🔍 Fetching promocodes and calculating usage...');
+    
+    try {
+      // Fetch promocodes
+      const { data: promoData, error: promoError } = await supabase
+        .from('promocodes')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (error) {
+      if (promoError) {
+        console.error('❌ Promocode fetch error:', promoError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch promocodes: " + promoError.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const promocodesList = promoData || [];
+      console.log(`📋 Fetched ${promocodesList.length} promocodes`);
+
+      // Fetch ALL orders from both tables to calculate promo usage
+      console.log('📊 Fetching all orders for promo usage calculation...');
+      const [customerOrdersResult, ordersResult] = await Promise.all([
+        supabase
+          .from('customer_orders')
+          .select('promocode_used')
+          .not('promocode_used', 'is', null)
+          .neq('promocode_used', ''),
+        supabase
+          .from('orders')
+          .select('promocode_used')
+          .not('promocode_used', 'is', null)
+          .neq('promocode_used', '')
+      ]);
+
+      let allPromosUsed: string[] = [];
+      
+      if (!customerOrdersResult.error && customerOrdersResult.data) {
+        allPromosUsed = [...allPromosUsed, ...customerOrdersResult.data.map(order => order.promocode_used).filter(Boolean)];
+      }
+      
+      if (!ordersResult.error && ordersResult.data) {
+        allPromosUsed = [...allPromosUsed, ...ordersResult.data.map(order => order.promocode_used).filter(Boolean)];
+      }
+
+      console.log(`💰 Found ${allPromosUsed.length} total promo code usages`);
+
+      // Calculate usage count for each promo code
+      const usageMap: { [key: string]: number } = {};
+      promocodesList.forEach(promo => {
+        const usageCount = allPromosUsed.filter(usedCode => 
+          usedCode && usedCode.toUpperCase() === promo.code.toUpperCase()
+        ).length;
+        usageMap[promo.code] = usageCount;
+        
+        console.log(`📈 Promo "${promo.code}": ${usageCount} uses`);
+      });
+
+      console.log('✅ Promo usage calculation complete:', usageMap);
+      
+      setPromocodes(promocodesList);
+      setPromoUsageData(usageMap);
+      
+    } catch (error) {
+      console.error('❌ Error in fetchPromocodesAndUsage:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch promocodes",
+        description: "Failed to fetch data: " + (error as Error).message,
         variant: "destructive",
       });
-    } else {
-      setPromocodes(data || []);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -110,7 +174,7 @@ export function PromocodeManagement() {
     
     resetForm();
     setIsCreateModalOpen(false);
-    fetchPromocodes();
+    fetchPromocodesAndUsage(); // Refresh data with usage calculation
   };
 
   const handleEdit = (promocode: Promocode) => {
@@ -146,7 +210,7 @@ export function PromocodeManagement() {
         title: "Success",
         description: "Promocode deleted successfully",
       });
-      fetchPromocodes();
+      fetchPromocodesAndUsage(); // Refresh data with usage calculation
     }
   };
 
@@ -172,13 +236,24 @@ export function PromocodeManagement() {
     return validUntil && new Date(validUntil) < new Date();
   };
 
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-32">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-4"></div>
+          <span>Loading promocodes and calculating usage...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold text-gray-900">Promocode Management</h2>
-          <p className="text-gray-600 mt-1">Manage discount codes and promotional offers</p>
+          <p className="text-gray-600 mt-1">Manage discount codes and promotional offers (Usage calculated from all orders)</p>
         </div>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
@@ -444,7 +519,7 @@ export function PromocodeManagement() {
                   )}
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
-                    <span>Used: {promocode.used_count || 0} times</span>
+                    <span>Used: {promoUsageData[promocode.code] || 0} times</span>
                   </div>
                 </div>
 

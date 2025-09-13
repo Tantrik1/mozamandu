@@ -31,7 +31,7 @@ export function useCustomerManagement() {
   const fetchCustomers = async () => {
     setLoading(true);
     
-    console.log('Fetching customers...');
+    console.log('🔍 Fetching customers with comprehensive order data...');
     
     try {
       // Fetch all profiles (both admin and customer roles)
@@ -60,42 +60,74 @@ export function useCustomerManagement() {
         return;
       }
 
-      // Filter for customers only in the component, not in the query
+      // Filter for customers only
       const customerProfiles = profiles.filter(profile => profile.role === 'customer');
       console.log('Filtered customer profiles:', customerProfiles);
 
-      // Get order statistics for each customer profile
+      // Fetch ALL orders from both tables to properly associate with customers
+      console.log('📊 Fetching all order data...');
+      const [allCustomerOrders, allOrders] = await Promise.all([
+        supabase
+          .from('customer_orders')
+          .select('user_id, customer_email, contact_number, total_amount, promocode_used')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('orders')
+          .select('user_id, customer_email, contact_number, total_amount, promocode_used')
+          .order('created_at', { ascending: false })
+      ]);
+
+      let allOrdersData: any[] = [];
+      
+      if (!allCustomerOrders.error && allCustomerOrders.data) {
+        allOrdersData = [...allOrdersData, ...allCustomerOrders.data.map(order => ({ ...order, source: 'customer_orders' }))];
+      }
+      
+      if (!allOrders.error && allOrders.data) {
+        allOrdersData = [...allOrdersData, ...allOrders.data.map(order => ({ ...order, source: 'orders' }))];
+      }
+
+      console.log(`📈 Total orders found: ${allOrdersData.length}`);
+
+      // Get comprehensive statistics for each customer profile
       const customersWithStats = await Promise.all(
         customerProfiles.map(async (profile) => {
           try {
-            console.log(`Fetching orders for customer ${profile.id}...`);
+            console.log(`🔍 Processing customer ${profile.email} (${profile.id})...`);
             
-            // Check both customer_orders and orders tables
-            const [customerOrdersResult, ordersResult] = await Promise.all([
-              supabase
-                .from('customer_orders')
-                .select('total_amount')
-                .eq('user_id', profile.id),
-              supabase
-                .from('orders')
-                .select('total_amount')
-                .eq('user_id', profile.id)
-            ]);
+            // Find orders associated with this customer by multiple methods:
+            // 1. Direct user_id match
+            // 2. Email match (for guest orders)
+            // 3. Phone number match (for guest orders)
+            const customerOrders = allOrdersData.filter(order => {
+              // Direct user ID match
+              if (order.user_id === profile.id) {
+                return true;
+              }
+              
+              // Email match for guest orders
+              if (order.user_id === null && order.customer_email && profile.email) {
+                return order.customer_email.toLowerCase() === profile.email.toLowerCase();
+              }
+              
+              // Phone number match for guest orders
+              if (order.user_id === null && order.contact_number && profile.contact_number) {
+                // Clean phone numbers for comparison
+                const orderPhone = order.contact_number.replace(/\D/g, '');
+                const profilePhone = profile.contact_number.replace(/\D/g, '');
+                return orderPhone === profilePhone;
+              }
+              
+              return false;
+            });
 
-            let allOrders: any[] = [];
-            
-            if (!customerOrdersResult.error && customerOrdersResult.data) {
-              allOrders = [...allOrders, ...customerOrdersResult.data];
-            }
-            
-            if (!ordersResult.error && ordersResult.data) {
-              allOrders = [...allOrders, ...ordersResult.data];
-            }
+            const totalOrders = customerOrders.length;
+            const totalSpent = customerOrders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
 
-            const totalOrders = allOrders.length;
-            const totalSpent = allOrders.reduce((sum, order) => sum + Number(order.total_amount), 0);
-
-            console.log(`Customer ${profile.email}: ${totalOrders} orders, Rs. ${totalSpent} spent`);
+            console.log(`✅ Customer ${profile.email}: ${totalOrders} orders, Rs. ${totalSpent.toFixed(2)} spent`);
+            console.log(`   - Direct user_id matches: ${customerOrders.filter(o => o.user_id === profile.id).length}`);
+            console.log(`   - Email matches: ${customerOrders.filter(o => o.user_id === null && o.customer_email?.toLowerCase() === profile.email?.toLowerCase()).length}`);
+            console.log(`   - Phone matches: ${customerOrders.filter(o => o.user_id === null && o.contact_number && profile.contact_number && o.contact_number.replace(/\D/g, '') === profile.contact_number.replace(/\D/g, '')).length}`);
 
             return {
               id: profile.id,
@@ -109,7 +141,7 @@ export function useCustomerManagement() {
               total_spent: totalSpent,
             };
           } catch (error) {
-            console.error('Error processing customer profile', profile.id, ':', error);
+            console.error('❌ Error processing customer profile', profile.id, ':', error);
             return {
               id: profile.id,
               email: profile.email,
@@ -125,11 +157,14 @@ export function useCustomerManagement() {
         })
       );
 
-      console.log('Final customers with stats:', customersWithStats);
+      console.log('✅ Final customers with comprehensive stats:', customersWithStats);
+      console.log(`📊 Summary: ${customersWithStats.length} customers processed`);
+      console.log(`💰 Total revenue: Rs. ${customersWithStats.reduce((sum, c) => sum + c.total_spent, 0).toFixed(2)}`);
+      
       setCustomers(customersWithStats);
       
     } catch (error) {
-      console.error('Error in fetchCustomers:', error);
+      console.error('❌ Error in fetchCustomers:', error);
       toast({
         title: "Error",
         description: "Failed to fetch customers: " + (error as Error).message,
@@ -141,38 +176,97 @@ export function useCustomerManagement() {
   };
 
   const fetchCustomerOrders = async (customerId: string) => {
-    console.log('Fetching orders for customer:', customerId);
+    console.log('🔍 Fetching comprehensive orders for customer:', customerId);
     
-    // Try both tables - customer_orders and orders
+    // Get customer profile for email/phone matching
+    const { data: customerProfile } = await supabase
+      .from('profiles')
+      .select('email, contact_number')
+      .eq('id', customerId)
+      .single();
+
+    if (!customerProfile) {
+      console.error('Customer profile not found');
+      setCustomerOrders([]);
+      return;
+    }
+
+    // Try both tables with comprehensive matching
     const [customerOrdersResult, ordersResult] = await Promise.all([
       supabase
         .from('customer_orders')
-        .select('id, order_number, total_amount, status, created_at')
-        .eq('user_id', customerId)
+        .select('id, order_number, total_amount, status, created_at, user_id, customer_email, contact_number, promocode_used')
         .order('created_at', { ascending: false }),
       supabase
         .from('orders')
-        .select('id, order_number, total_amount, status, created_at')
-        .eq('user_id', customerId)
+        .select('id, order_number, total_amount, status, created_at, user_id, customer_email, contact_number, promocode_used')
         .order('created_at', { ascending: false })
     ]);
 
     let allOrders: any[] = [];
     
+    // Process customer_orders
     if (!customerOrdersResult.error && customerOrdersResult.data) {
-      allOrders = [...allOrders, ...customerOrdersResult.data];
+      const matchingOrders = customerOrdersResult.data.filter(order => {
+        // Direct user_id match
+        if (order.user_id === customerId) return true;
+        
+        // Email match for guest orders
+        if (order.user_id === null && order.customer_email && customerProfile.email) {
+          return order.customer_email.toLowerCase() === customerProfile.email.toLowerCase();
+        }
+        
+        // Phone number match for guest orders
+        if (order.user_id === null && order.contact_number && customerProfile.contact_number) {
+          const orderPhone = order.contact_number.replace(/\D/g, '');
+          const profilePhone = customerProfile.contact_number.replace(/\D/g, '');
+          return orderPhone === profilePhone;
+        }
+        
+        return false;
+      });
+      
+      allOrders = [...allOrders, ...matchingOrders.map(order => ({ ...order, source: 'customer_orders' }))];
     }
     
+    // Process orders
     if (!ordersResult.error && ordersResult.data) {
-      allOrders = [...allOrders, ...ordersResult.data];
+      const matchingOrders = ordersResult.data.filter(order => {
+        // Direct user_id match
+        if (order.user_id === customerId) return true;
+        
+        // Email match for guest orders
+        if (order.user_id === null && order.customer_email && customerProfile.email) {
+          return order.customer_email.toLowerCase() === customerProfile.email.toLowerCase();
+        }
+        
+        // Phone number match for guest orders
+        if (order.user_id === null && order.contact_number && customerProfile.contact_number) {
+          const orderPhone = order.contact_number.replace(/\D/g, '');
+          const profilePhone = customerProfile.contact_number.replace(/\D/g, '');
+          return orderPhone === profilePhone;
+        }
+        
+        return false;
+      });
+      
+      allOrders = [...allOrders, ...matchingOrders.map(order => ({ ...order, source: 'orders' }))];
     }
 
-    if (customerOrdersResult.error && ordersResult.error) {
-      console.error('Customer orders fetch error:', customerOrdersResult.error, ordersResult.error);
-    } else {
-      console.log('Customer orders:', allOrders);
-      setCustomerOrders(allOrders);
-    }
+    // Remove duplicates based on order_number and total_amount
+    const uniqueOrders = allOrders.filter((order, index, self) => 
+      index === self.findIndex(o => 
+        o.order_number === order.order_number && 
+        o.total_amount === order.total_amount &&
+        o.created_at === order.created_at
+      )
+    );
+
+    console.log(`✅ Found ${uniqueOrders.length} orders for customer ${customerProfile.email}`);
+    console.log(`   - From customer_orders: ${uniqueOrders.filter(o => o.source === 'customer_orders').length}`);
+    console.log(`   - From orders: ${uniqueOrders.filter(o => o.source === 'orders').length}`);
+    
+    setCustomerOrders(uniqueOrders);
   };
 
   useEffect(() => {
