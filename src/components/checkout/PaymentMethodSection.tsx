@@ -105,10 +105,11 @@ export function PaymentMethodSection({
   };
 
   const handlePaidAmountChange = (value: string) => {
+    console.log('Paid amount changed to:', value);
     if (setPaidAmount) {
       setPaidAmount(value);
     } else if (onPercentageChange && finalTotal) {
-      const amount = parseFloat(value);
+      const amount = parseFloat(value) || 0;
       const percentage = (amount / finalTotal) * 100;
       onPercentageChange(Math.min(100, Math.max(20, percentage)));
     }
@@ -175,6 +176,9 @@ export function PaymentMethodSection({
                   value={paidAmount}
                   onChange={(e) => handlePaidAmountChange(e.target.value)}
                   placeholder="Enter amount"
+                  min={minimumPayment || 0}
+                  max={finalTotal || undefined}
+                  step="0.01"
                 />
               ) : (
                 <Input
@@ -184,6 +188,7 @@ export function PaymentMethodSection({
                   value={paymentPercentage}
                   onChange={(e) => onPercentageChange?.(Number(e.target.value))}
                   placeholder="Enter percentage (20-100)"
+                  step="1"
                 />
               )}
               <p className="text-sm text-gray-600 mt-1">
