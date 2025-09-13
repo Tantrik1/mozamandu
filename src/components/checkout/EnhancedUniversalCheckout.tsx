@@ -374,7 +374,10 @@ export function EnhancedUniversalCheckout() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => window.location.href = '/'}
+                onClick={() => {
+                  clearCart();
+                  window.location.href = '/';
+                }}
                 className="text-orange-700 border-orange-300 hover:bg-orange-100"
               >
                 <Home className="h-4 w-4 mr-2" />
@@ -426,7 +429,10 @@ export function EnhancedUniversalCheckout() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => window.location.href = '/'}
+                    onClick={() => {
+                      clearCart();
+                      window.location.href = '/';
+                    }}
                     className="mt-3 text-red-700 border-red-300 hover:bg-red-100"
                   >
                     <Home className="h-4 w-4 mr-2" />

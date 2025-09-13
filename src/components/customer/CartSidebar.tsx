@@ -154,11 +154,8 @@ export function CartSidebar({ disableModifications = false }: { disableModificat
     }
 
     if (disableModifications) {
-      toast({
-        title: "Already in checkout",
-        description: "You are already in the checkout process. Complete your order or return to home to modify your cart.",
-        variant: "destructive",
-      });
+      // Clear cart and navigate to home
+      navigate('/');
       return;
     }
 
