@@ -298,9 +298,13 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         description: 'Product updated successfully',
       });
 
-      // For products with variants, don't show inventory popup automatically
-      // Users will manage inventory through the variant form
-      onSave();
+      // Only show inventory popup if product doesn't have variants
+      if (!data.has_color_variants && !data.has_size_variants) {
+        setShowInventoryPopup(true);
+      } else {
+        // If it has variants, user will manage inventory through variant form
+        onSave();
+      }
     } catch (error) {
       console.error('Error updating product:', error);
       toast({
@@ -577,21 +581,24 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             hasColorVariants={watchedHasColorVariants}
             hasSizeVariants={watchedHasSizeVariants}
             onSave={() => {
-              // Fetch fresh data after variant changes
+              // Fetch fresh data and open inventory popup
               fetchProduct();
+              setShowInventoryPopup(true);
             }}
             onCancel={() => {}}
           />
         )}
 
-        <div className="flex justify-end space-x-4">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Updating...' : 'Update Product'}
-          </Button>
-        </div>
+        {!(watchedHasColorVariants || watchedHasSizeVariants) && (
+          <div className="flex justify-end space-x-4">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Updating...' : 'Update Product'}
+            </Button>
+          </div>
+        )}
       </form>
 
       {showInventoryPopup && (
