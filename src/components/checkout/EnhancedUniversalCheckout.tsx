@@ -61,10 +61,61 @@ export function EnhancedUniversalCheckout() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [subcategoryRequirements, setSubcategoryRequirements] = useState<any[]>([]);
 
   useEffect(() => {
     validateInitialStock();
   }, []);
+  
+  // Check MOQ requirements
+  const checkSubcategoryRequirements = async () => {
+    try {
+      const { data: categories } = await supabase
+        .from('categories')
+        .select(`
+          id,
+          name,
+          subcategories!inner (
+            id,
+            name,
+            minimum_order_quantity
+          )
+        `);
+
+      if (categories) {
+        const requirements: any[] = [];
+        
+        categories.forEach(category => {
+          category.subcategories?.forEach((subcategory: any) => {
+            if (subcategory.minimum_order_quantity > 0) {
+              const itemsInSubcategory = cartItems.filter(item => item.subcategoryId === subcategory.id);
+              const currentQuantity = itemsInSubcategory.reduce((sum, item) => sum + item.quantity, 0);
+              
+              requirements.push({
+                subcategoryId: subcategory.id,
+                subcategoryName: subcategory.name,
+                minimumQuantity: subcategory.minimum_order_quantity,
+                currentQuantity,
+                fulfilled: currentQuantity >= subcategory.minimum_order_quantity
+              });
+            }
+          });
+        });
+
+        setSubcategoryRequirements(requirements);
+      }
+    } catch (error) {
+      console.error('Error checking subcategory requirements:', error);
+    }
+  };
+
+  const canProceedToCheckout = subcategoryRequirements.every(req => req.fulfilled);
+
+  useEffect(() => {
+    if (cartItems.length > 0) {
+      checkSubcategoryRequirements();
+    }
+  }, [cartItems]);
 
   const validateInitialStock = async () => {
     console.log('🔍 Validating initial stock for checkout...');
@@ -176,6 +227,16 @@ export function EnhancedUniversalCheckout() {
         toast({
           title: 'Stock Unavailable',
           description: 'Some items are no longer available. Please review your cart.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Check MOQ requirements before proceeding
+      if (!canProceedToCheckout) {
+        toast({
+          title: 'Minimum Order Requirements Not Met',
+          description: 'Please return to home and add more items to meet minimum quantity requirements.',
           variant: 'destructive',
         });
         return;
@@ -341,6 +402,42 @@ export function EnhancedUniversalCheckout() {
           </Card>
         )}
 
+        {/* MOQ Requirements Warning */}
+        {subcategoryRequirements.length > 0 && !canProceedToCheckout && (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-4">
+              <div className="flex items-start space-x-3">
+                <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-medium text-red-800">Minimum Order Requirements Not Met</h3>
+                  <p className="text-sm text-red-700 mt-1">
+                    You must meet the minimum quantity requirements for each product category before proceeding.
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {subcategoryRequirements.filter(req => !req.fulfilled).map((req) => (
+                      <div key={req.subcategoryId} className="flex items-center justify-between text-sm">
+                        <span className="text-red-700">{req.subcategoryName}</span>
+                        <span className="text-red-600 font-medium">
+                          {req.currentQuantity}/{req.minimumQuantity} (Need {req.minimumQuantity - req.currentQuantity} more)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.location.href = '/'}
+                    className="mt-3 text-red-700 border-red-300 hover:bg-red-100"
+                  >
+                    <Home className="h-4 w-4 mr-2" />
+                    Return to Shopping
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid md:grid-cols-2 gap-6">
           {/* Customer Information */}
           <div className="space-y-6">
@@ -480,7 +577,7 @@ export function EnhancedUniversalCheckout() {
 
             <Button
               onClick={handleSubmitOrder}
-              disabled={isSubmitting || cartItems.length === 0}
+              disabled={isSubmitting || cartItems.length === 0 || !canProceedToCheckout}
               className="w-full"
               size="lg"
             >
@@ -489,6 +586,8 @@ export function EnhancedUniversalCheckout() {
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Processing Order...
                 </>
+              ) : !canProceedToCheckout ? (
+                'Minimum Requirements Not Met'
               ) : (
                 `Place Order (${calculateTotals().total.toFixed(2)} Rs)`
               )}

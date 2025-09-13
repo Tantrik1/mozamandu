@@ -20,7 +20,7 @@ interface SubcategoryRequirement {
   fulfilled: boolean;
 }
 
-export function CartSidebar() {
+export function CartSidebar({ disableModifications = false }: { disableModifications?: boolean } = {}) {
   const { 
     cartItems, 
     updateQuantity, 
@@ -148,6 +148,15 @@ export function CartSidebar() {
       toast({
         title: "Minimum requirements not met",
         description: "Please add more items to meet minimum quantity requirements",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (disableModifications) {
+      toast({
+        title: "Already in checkout",
+        description: "You are already in the checkout process. Complete your order or return to home to modify your cart.",
         variant: "destructive",
       });
       return;
@@ -313,7 +322,7 @@ export function CartSidebar() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                disabled={item.quantity <= 1}
+                                disabled={item.quantity <= 1 || disableModifications}
                                 className="h-7 w-7 p-0"
                               >
                                 <Minus className="h-3 w-3" />
@@ -323,6 +332,7 @@ export function CartSidebar() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                disabled={disableModifications}
                                 className="h-7 w-7 p-0"
                               >
                                 <Plus className="h-3 w-3" />
@@ -333,7 +343,8 @@ export function CartSidebar() {
                               variant="ghost"
                               size="sm"
                               onClick={() => removeFromCart(item.id)}
-                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                              disabled={disableModifications}
+                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 disabled:opacity-50"
                             >
                               <X className="h-3 w-3" />
                             </Button>
@@ -398,10 +409,11 @@ export function CartSidebar() {
               {/* Checkout Button */}
               <Button 
                 className="w-full bg-red-600 hover:bg-red-700" 
-                disabled={!canCheckout}
+                disabled={!canCheckout || disableModifications}
                 onClick={handleCheckout}
               >
-                {canCheckout ? 'Proceed to Checkout' : 'Minimum Requirements Not Met'}
+                {disableModifications ? 'Return to Home to Modify Cart' : 
+                 canCheckout ? 'Proceed to Checkout' : 'Minimum Requirements Not Met'}
               </Button>
             </div>
           </>

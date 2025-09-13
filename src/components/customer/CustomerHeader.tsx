@@ -214,7 +214,7 @@ export function CustomerHeader() {
 
             {/* Right Side Actions */}
             <div className="flex items-center space-x-4">
-              <CartSidebar />
+              <CartSidebar disableModifications={location.pathname === '/checkout'} />
 
               {user ? <DropdownMenu>
                   <DropdownMenuTrigger asChild>
