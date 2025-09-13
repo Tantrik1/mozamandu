@@ -73,11 +73,30 @@ export function CustomerInfoForm({
 
         <div>
           <Label htmlFor="whatsapp">WhatsApp Number (Optional)</Label>
-          <Input
-            id="whatsapp"
-            value={customerInfo.whatsapp || ''}
-            onChange={(e) => setCustomerInfo(prev => ({ ...prev, whatsapp: e.target.value }))}
-          />
+          <div className="space-y-3">
+            <div className="flex items-center space-x-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="whatsappSameAsContact"
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setCustomerInfo(prev => ({
+                    ...prev,
+                    whatsapp: checked ? prev.phone : prev.whatsapp || ''
+                  }));
+                }}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <Label htmlFor="whatsappSameAsContact" className="text-sm font-medium cursor-pointer text-gray-700">
+                Same as contact number
+              </Label>
+            </div>
+            <Input
+              id="whatsapp"
+              value={customerInfo.whatsapp || ''}
+              onChange={(e) => setCustomerInfo(prev => ({ ...prev, whatsapp: e.target.value }))}
+            />
+          </div>
         </div>
 
         <div>
