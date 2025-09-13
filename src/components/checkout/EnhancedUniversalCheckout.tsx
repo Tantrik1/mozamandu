@@ -500,20 +500,22 @@ export function EnhancedUniversalCheckout() {
                   <div>
                     <Label htmlFor="whatsappNumber">WhatsApp Number (Optional)</Label>
                     <div className="space-y-3">
-                      <div className="flex items-center space-x-2 p-2 bg-gray-50 rounded-md">
-                        <Checkbox
+                      <div className="flex items-center space-x-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <input
+                          type="checkbox"
                           id="whatsappSameAsContact"
                           checked={formData.whatsappSameAsContact}
-                          onCheckedChange={(checked) => 
+                          onChange={(e) => {
+                            const checked = e.target.checked;
                             setFormData(prev => ({ 
                               ...prev, 
-                              whatsappSameAsContact: checked as boolean,
+                              whatsappSameAsContact: checked,
                               whatsappNumber: checked ? prev.contactNumber : prev.whatsappNumber
-                            }))
-                          }
-                          className="border-2 border-primary"
+                            }));
+                          }}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
-                        <Label htmlFor="whatsappSameAsContact" className="text-sm font-medium cursor-pointer">
+                        <Label htmlFor="whatsappSameAsContact" className="text-sm font-medium cursor-pointer text-gray-700">
                           Same as contact number
                         </Label>
                       </div>
