@@ -103,41 +103,9 @@ export default function Auth() {
     setResetLoading(true);
 
     try {
-      console.log('🔄 Checking if user exists for:', resetEmail);
+      console.log('🔄 Sending password reset email to:', resetEmail);
       
-      // First check if user exists in our profiles table
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('email', resetEmail)
-        .single();
-
-      if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows returned
-        console.error('❌ Error checking profile:', profileError);
-        toast({
-          title: "Error",
-          description: "An error occurred while checking your account. Please try again.",
-          variant: "destructive",
-        });
-        setResetLoading(false);
-        return;
-      }
-
-      // If no profile found, user doesn't exist
-      if (!profileData) {
-        console.log('❌ User not found in profiles');
-        toast({
-          title: "Account Not Found",
-          description: "No account found with this email address. Please sign up for a new account.",
-          variant: "destructive",
-        });
-        setResetLoading(false);
-        return;
-      }
-
-      console.log('✅ User found, sending password reset email');
-      
-      // User exists, send reset email using Supabase's built-in system
+      // Use Supabase's built-in user validation - it will only send emails to existing users
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(resetEmail, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
