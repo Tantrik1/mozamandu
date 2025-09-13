@@ -30,8 +30,10 @@ export default function ResetPassword() {
     const accessToken = searchParams.get('access_token');
     const refreshToken = searchParams.get('refresh_token');
     const type = searchParams.get('type');
-
-    console.log('Reset password params:', { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
+    
+    console.log('🔄 ResetPassword: Current URL:', window.location.href);
+    console.log('🔄 ResetPassword: URL params:', Object.fromEntries(searchParams.entries()));
+    console.log('🔄 ResetPassword: Reset password params:', { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
     
     if (type === 'recovery' && accessToken && refreshToken) {
       console.log('Valid recovery tokens found, setting session...');
