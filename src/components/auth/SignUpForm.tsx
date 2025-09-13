@@ -81,14 +81,14 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
     if (error) {
       setErrors({ form: error.message });
       toast({
-        title: "Error",
+        title: "Account Creation Failed",
         description: error.message,
         variant: "destructive",
       });
     } else {
       toast({
-        title: "Account Created!",
-        description: "We've sent you a verification email. Please check your inbox and verify your account before signing in.",
+        title: "🎉 Account Created Successfully!",
+        description: "We've sent a verification email to your inbox. Please click the verification link to activate your account before signing in.",
       });
       onSuccess();
     }
