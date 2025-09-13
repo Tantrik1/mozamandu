@@ -11,6 +11,7 @@ import { RouteGuard } from '@/components/RouteGuard';
 // Lazy load pages for better performance with more aggressive preloading
 const Home = lazy(() => import('@/pages/Home'));
 const Auth = lazy(() => import('@/pages/Auth'));
+const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
 const AdminPage = lazy(() => import('@/pages/AdminPage'));
 const CustomerDashboard = lazy(() => import('@/pages/CustomerDashboard'));
 const InventoryDashboard = lazy(() => import('@/pages/InventoryDashboard'));
@@ -64,6 +65,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/dashboard" element={
                   <RouteGuard requireAuth={true}>
                     <CustomerDashboard />
