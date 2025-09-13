@@ -183,8 +183,53 @@ export function PaymentMethodManagement() {
     setIsCreateModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this payment method?')) return;
+  const handleDelete = async (id: string, paymentMethodName: string) => {
+    // First check if this payment method is being used in any orders
+    const { data: ordersUsingPaymentMethod, error: checkError } = await supabase
+      .from('customer_orders')
+      .select('id')
+      .eq('payment_method_id', id)
+      .limit(1);
+
+    if (checkError) {
+      toast({
+        title: "Error",
+        description: "Failed to check payment method usage",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (ordersUsingPaymentMethod && ordersUsingPaymentMethod.length > 0) {
+      const shouldDeactivate = confirm(
+        `Cannot delete "${paymentMethodName}" because it's being used in existing orders.\n\nWould you like to deactivate it instead? This will hide it from new orders while preserving order history.`
+      );
+
+      if (shouldDeactivate) {
+        const { error } = await supabase
+          .from('payment_methods')
+          .update({ is_active: false })
+          .eq('id', id);
+
+        if (error) {
+          toast({
+            title: "Error",
+            description: error.message,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: "Payment method deactivated successfully",
+          });
+          fetchPaymentMethods();
+        }
+      }
+      return;
+    }
+
+    // If no orders are using this payment method, proceed with deletion
+    if (!confirm(`Are you sure you want to delete "${paymentMethodName}"? This action cannot be undone.`)) return;
 
     const { error } = await supabase
       .from('payment_methods')
@@ -428,7 +473,7 @@ export function PaymentMethodManagement() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDelete(paymentMethod.id)}
+                      onClick={() => handleDelete(paymentMethod.id, paymentMethod.name)}
                       className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
                       <Trash2 className="h-4 w-4" />
