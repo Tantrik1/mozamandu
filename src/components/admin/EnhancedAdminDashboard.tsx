@@ -73,7 +73,7 @@ export function EnhancedAdminDashboard() {
 
   useEffect(() => {
     fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 30000); // Refresh every 30 seconds
+    const interval = setInterval(fetchDashboardData, 300000); // Refresh every 5 minutes
     return () => clearInterval(interval);
   }, [revenuePeriod]);
 
@@ -93,11 +93,17 @@ export function EnhancedAdminDashboard() {
   };
 
   const fetchRevenueData = async () => {
+    // Only fetch recent data for performance
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
     const { data, error } = await supabase
       .from('customer_orders')
       .select('created_at, total_amount, status')
       .not('status', 'eq', 'cancelled')
-      .order('created_at', { ascending: true });
+      .gte('created_at', thirtyDaysAgo.toISOString())
+      .order('created_at', { ascending: true })
+      .limit(1000); // Limit to 1000 recent orders
 
     if (!error && data) {
       const groupedData = groupDataByPeriod(data, revenuePeriod);
@@ -111,7 +117,8 @@ export function EnhancedAdminDashboard() {
     const { data, error } = await supabase
       .from('customer_orders')
       .select('status')
-      .not('status', 'eq', 'cancelled');
+      .not('status', 'eq', 'cancelled')
+      .limit(500); // Limit for performance
 
     if (!error && data) {
       const statusCounts = data.reduce((acc: Record<string, number>, order) => {
@@ -132,7 +139,8 @@ export function EnhancedAdminDashboard() {
     const { data, error } = await supabase
       .from('customer_order_item_details')
       .select('product_name, quantity, total_price')
-      .order('quantity', { ascending: false });
+      .limit(200) // Limit to recent items
+      .order('created_at', { ascending: false });
 
     if (!error && data) {
       const productSales = data.reduce((acc, item) => {
@@ -157,7 +165,8 @@ export function EnhancedAdminDashboard() {
     const { data, error } = await supabase
       .from('customer_orders')
       .select('customer_name, customer_email, total_amount')
-      .not('status', 'eq', 'cancelled');
+      .not('status', 'eq', 'cancelled')
+      .limit(300); // Limit for performance
 
     if (!error && data) {
       const customerSales = data.reduce((acc, order) => {
@@ -179,11 +188,17 @@ export function EnhancedAdminDashboard() {
   };
 
   const fetchCustomerGrowth = async () => {
+    // Only fetch last 12 months for performance
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
     const { data, error } = await supabase
       .from('profiles')
       .select('created_at')
       .eq('role', 'customer')
-      .order('created_at', { ascending: true });
+      .gte('created_at', twelveMonthsAgo.toISOString())
+      .order('created_at', { ascending: true })
+      .limit(500); // Limit for performance
 
     if (!error && data) {
       const monthlyGrowth = data.reduce((acc: Record<string, number>, profile) => {
