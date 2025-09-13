@@ -40,6 +40,7 @@ const BrowseSubcategories = memo(() => {
           category:categories(name)
         `)
         .eq('status', 'on')
+        .limit(12) // Limit to 12 subcategories
         .order('name');
 
       if (error) {

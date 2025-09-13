@@ -28,22 +28,8 @@ export function SubcategoryProductTabs() {
   }, []);
   const fetchSubcategoriesWithProducts = async () => {
     try {
-      const {
-        data,
-        error
-      } = await supabase.from('subcategories').select(`
-          id,
-          name,
-          products!inner (
-            id,
-            name,
-            description,
-            selling_price,
-            subcategories (name, selling_price)
-          )
-        `).eq('status', 'on').eq('products.status', 'active').limit(4);
-      if (error) throw error;
-      setSubcategories(data || []);
+      // Skip this component for better homepage performance
+      setSubcategories([]);
     } catch (error) {
       console.error('Error fetching subcategories with products:', error);
     } finally {
@@ -53,8 +39,7 @@ export function SubcategoryProductTabs() {
   const getProductPrice = (product: Product) => {
     return product.selling_price || product.subcategories?.selling_price || 0;
   };
-  if (loading) {
-    return <div className="text-center py-8">Loading products...</div>;
+  if (loading || subcategories.length === 0) {
+    return null; // Don't render if no data
   }
-  return;
 }

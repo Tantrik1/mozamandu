@@ -39,21 +39,15 @@ const LatestProducts = memo(() => {
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
-        .limit(8); // Reduced from 12 to 8
+        .limit(6); // Reduced from 8 to 6
 
       if (error) throw error;
 
       if (data) {
-        // Batch stock calculation
-        const stockPromises = data.map(product => 
-          getProductStockSummary(product.id).catch(() => 0)
-        );
-        
-        const stockResults = await Promise.all(stockPromises);
-        
-        const productsWithStock = data.map((product, index) => ({
+        // Skip expensive stock calculations for homepage performance
+        const productsWithStock = data.map((product) => ({
           ...product,
-          stock_quantity: stockResults[index],
+          stock_quantity: 100, // Default stock for display
           subcategories: product.subcategories,
         }));
         
