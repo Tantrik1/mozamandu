@@ -295,7 +295,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
       toast({
         title: 'Success',
-        description: 'Product updated successfully',
+        description: 'Product information updated successfully',
       });
 
       // Only show inventory popup if product doesn't have variants
@@ -315,6 +315,11 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     } finally {
       setLoading(false);
     }
+  };
+
+  const updateProductInfo = async () => {
+    const formData = form.getValues();
+    await onSubmit(formData);
   };
 
   const handleInventoryClose = () => {
@@ -586,6 +591,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
               setShowInventoryPopup(true);
             }}
             onCancel={() => {}}
+            onUpdateProduct={updateProductInfo}
           />
         )}
 
