@@ -718,9 +718,9 @@ export function UniversalCheckout() {
                 }}
                 paidAmount={Math.round(finalTotal * (paymentPercentage / 100)).toString()}
                 setPaidAmount={(value) => {
-                  const amount = parseFloat(value);
+                  const amount = parseFloat(value) || 0;
                   const percentage = (amount / finalTotal) * 100;
-                  setPaymentPercentage(Math.min(100, Math.max(20, percentage)));
+                  setPaymentPercentage(percentage);
                 }}
                 paymentScreenshot={null}
                 setPaymentScreenshot={() => {}}

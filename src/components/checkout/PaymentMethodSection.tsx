@@ -111,7 +111,7 @@ export function PaymentMethodSection({
     } else if (onPercentageChange && finalTotal) {
       const amount = parseFloat(value) || 0;
       const percentage = (amount / finalTotal) * 100;
-      onPercentageChange(Math.min(100, Math.max(20, percentage)));
+      onPercentageChange(Math.min(100, Math.max(0, percentage)));
     }
   };
 
