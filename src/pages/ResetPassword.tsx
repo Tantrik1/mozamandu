@@ -25,7 +25,7 @@ export default function ResetPassword() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Check if we have valid reset parameters
+  // Check if we have valid reset parameters or if user is already authenticated via password recovery
   useEffect(() => {
     const accessToken = searchParams.get('access_token');
     const refreshToken = searchParams.get('refresh_token');
@@ -35,25 +35,46 @@ export default function ResetPassword() {
     console.log('🔄 ResetPassword: URL params:', Object.fromEntries(searchParams.entries()));
     console.log('🔄 ResetPassword: Reset password params:', { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
     
-    if (type === 'recovery' && accessToken && refreshToken) {
-      console.log('Valid recovery tokens found, setting session...');
-      // Set the session with the recovery tokens
-      supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      }).then(({ error }) => {
-        if (error) {
-          console.error('Session setup error:', error);
-          setIsValidToken(false);
-        } else {
-          console.log('Session setup successful');
+    const checkAuthState = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        console.log('🔄 ResetPassword: Current session:', { 
+          hasSession: !!session, 
+          hasUser: !!session?.user,
+          userEmail: session?.user?.email 
+        });
+        
+        if (session?.user) {
+          // User is authenticated, likely from password recovery flow
+          console.log('✅ User is authenticated, allowing password reset');
           setIsValidToken(true);
+        } else if (type === 'recovery' && accessToken && refreshToken) {
+          console.log('Valid recovery tokens found, setting session...');
+          // Set the session with the recovery tokens
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          
+          if (sessionError) {
+            console.error('Session setup error:', sessionError);
+            setIsValidToken(false);
+          } else {
+            console.log('Session setup successful');
+            setIsValidToken(true);
+          }
+        } else {
+          console.log('Invalid or missing recovery parameters and no active session');
+          setIsValidToken(false);
         }
-      });
-    } else {
-      console.log('Invalid or missing recovery parameters');
-      setIsValidToken(false);
-    }
+      } catch (error) {
+        console.error('Error checking auth state:', error);
+        setIsValidToken(false);
+      }
+    };
+    
+    checkAuthState();
   }, [searchParams]);
 
   const validateForm = () => {
