@@ -31,7 +31,10 @@ export default function ResetPassword() {
     const refreshToken = searchParams.get('refresh_token');
     const type = searchParams.get('type');
 
+    console.log('Reset password params:', { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
+    
     if (type === 'recovery' && accessToken && refreshToken) {
+      console.log('Valid recovery tokens found, setting session...');
       // Set the session with the recovery tokens
       supabase.auth.setSession({
         access_token: accessToken,
@@ -41,10 +44,12 @@ export default function ResetPassword() {
           console.error('Session setup error:', error);
           setIsValidToken(false);
         } else {
+          console.log('Session setup successful');
           setIsValidToken(true);
         }
       });
     } else {
+      console.log('Invalid or missing recovery parameters');
       setIsValidToken(false);
     }
   }, [searchParams]);
