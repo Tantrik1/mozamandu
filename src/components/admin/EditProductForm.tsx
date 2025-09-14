@@ -319,7 +319,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   const handleInventoryClose = () => {
     setShowInventoryPopup(false);
-    onSave();
+    onSave(); // Close the edit form after inventory management is done
   };
 
   if (loadingData) {
@@ -586,7 +586,6 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             onSave={() => {
               // After successful save, open inventory popup
               setShowInventoryPopup(true);
-              onSave();
             }}
             onCancel={onCancel}
           />
