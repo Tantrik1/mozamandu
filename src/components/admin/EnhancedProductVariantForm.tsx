@@ -56,7 +56,7 @@ interface EnhancedProductVariantFormProps {
   productId: string;
   hasColorVariants: boolean;
   hasSizeVariants: boolean;
-  productData: ProductData;
+  getProductData: () => ProductData;
   imageFile: File | null;
   imagePreview: string | null;
   onSave: () => void;
@@ -67,7 +67,7 @@ export function EnhancedProductVariantForm({
   productId,
   hasColorVariants,
   hasSizeVariants,
-  productData,
+  getProductData,
   imageFile,
   imagePreview,
   onSave,
@@ -325,6 +325,9 @@ export function EnhancedProductVariantForm({
 
   const updateProductInformation = async () => {
     try {
+      const productData = getProductData();
+      console.log('Product data received:', productData);
+      
       let imageUrl = imagePreview;
       if (imageFile) {
         const newImageUrl = await uploadImageAndGetUrl();
@@ -334,19 +337,21 @@ export function EnhancedProductVariantForm({
       }
 
       const updateData = {
-        name: productData.name || '',
-        description: productData.description || null,
-        cost_price: productData.cost_price || 0,
-        selling_price: productData.selling_price || null,
-        category_id: productData.category_id || '',
-        subcategory_id: productData.subcategory_id || '',
-        is_featured: productData.is_featured || false,
-        has_color_variants: productData.has_color_variants || false,
-        color_has_size_variants: productData.has_size_variants || false,
-        status: productData.status || 'active',
+        name: productData.name,
+        description: productData.description,
+        cost_price: productData.cost_price,
+        selling_price: productData.selling_price,
+        category_id: productData.category_id,
+        subcategory_id: productData.subcategory_id,
+        is_featured: productData.is_featured,
+        has_color_variants: productData.has_color_variants,
+        color_has_size_variants: productData.has_size_variants,
+        status: productData.status,
         image_url: imageUrl,
         updated_at: new Date().toISOString(),
       };
+
+      console.log('Update data being sent:', updateData);
 
       const { error } = await supabase
         .from('products')
