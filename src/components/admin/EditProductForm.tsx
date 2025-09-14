@@ -580,7 +580,18 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             productId={productId}
             hasColorVariants={watchedHasColorVariants}
             hasSizeVariants={watchedHasSizeVariants}
-            productData={form.getValues()}
+            productData={{
+              name: form.getValues('name'),
+              description: form.getValues('description'),
+              cost_price: form.getValues('cost_price'),
+              selling_price: form.getValues('selling_price'),
+              category_id: form.getValues('category_id'),
+              subcategory_id: form.getValues('subcategory_id'),
+              is_featured: form.getValues('is_featured'),
+              has_color_variants: form.getValues('has_color_variants'),
+              has_size_variants: form.getValues('has_size_variants'),
+              status: form.getValues('status'),
+            }}
             imageFile={imageFile}
             imagePreview={imagePreview}
             onSave={() => {
