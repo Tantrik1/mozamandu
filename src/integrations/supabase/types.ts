@@ -1440,10 +1440,7 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: boolean
       }
-      generate_order_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_order_number: { Args: never; Returns: string }
       generate_product_sku: {
         Args: {
           p_color_name?: string
@@ -1452,12 +1449,9 @@ export type Database = {
         }
         Returns: string
       }
-      get_current_user_role: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_current_user_role: { Args: never; Returns: string }
       get_detailed_inventory_analytics: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           description: string
           metric_name: string
@@ -1501,10 +1495,7 @@ export type Database = {
           variant_id: string
         }[]
       }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      is_admin: { Args: never; Returns: boolean }
       release_order_stock_enhanced: {
         Args: { p_order_id: string }
         Returns: boolean
