@@ -1,129 +1,68 @@
-
-import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { FastImage } from '@/components/ui/fast-image';
-
-// Compressed WebP versions of the sock images (smaller file sizes)
-const sockImages = [
-  '/lovable-uploads/51654152-d02f-443b-bb60-fd75dace40ee.png', 
-  '/lovable-uploads/30eed4ab-ddd8-442c-aeae-041fd7ae3be3.png', 
-  '/lovable-uploads/e02f8f14-3960-44fa-87db-499a23b30f02.png', 
-  '/lovable-uploads/9e1dcca9-44bc-44a8-aa02-56cef600abbb.png', 
-  '/lovable-uploads/1f8de054-b4a8-4e66-9281-8ae01c64eca1.png', 
-  '/lovable-uploads/e4515907-f434-4c37-8328-ea5930a9c2e6.png'
-];
+import { ArrowRight, Sparkles } from 'lucide-react';
 
 export function HeroSection() {
-  const [currentImage, setCurrentImage] = useState(0);
-  const [imagesPreloaded, setImagesPreloaded] = useState(false);
-
-  // Preload images for faster transitions
-  useEffect(() => {
-    const preloadImages = async () => {
-      const imagePromises = sockImages.map((src) => {
-        return new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = resolve;
-          img.onerror = reject;
-          img.src = src;
-        });
-      });
-      
-      try {
-        await Promise.all(imagePromises);
-        setImagesPreloaded(true);
-      } catch (error) {
-        console.warn('Some images failed to preload:', error);
-        setImagesPreloaded(true); // Continue anyway
-      }
-    };
-
-    preloadImages();
-  }, []);
-
-  useEffect(() => {
-    if (!imagesPreloaded) return;
-    
-    const interval = setInterval(() => {
-      setCurrentImage(prev => (prev + 1) % sockImages.length);
-    }, 2500); // Slightly faster transitions
-    
-    return () => clearInterval(interval);
-  }, [imagesPreloaded]);
-
   return (
-    <section className="bg-gradient-to-br from-gray-900 via-black to-gray-800 relative overflow-hidden py-12 lg:py-16">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,0,0,0.1),transparent_50%)]"></div>
-      </div>
+    <section className="relative bg-background overflow-hidden">
+      {/* Subtle gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
+      
+      {/* Decorative elements */}
+      <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-10 right-10 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
-          
-          {/* Left Side Content - Order 1 for all devices */}
-          <div className="text-center lg:text-left order-1">
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold text-white mb-8 leading-tight">
-              Premium
-              <span className="block text-red-500">Sock Collection</span>
-            </h1>
-            
-            <p className="text-gray-300 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal text-xl md:text-2xl mb-6">
-              Discover our exclusive range of comfortable, stylish socks crafted with premium materials for everyday luxury.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-6 justify-center lg:justify-start">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 lg:py-32">
+        <div className="text-center max-w-4xl mx-auto">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6 animate-fade-in">
+            <Sparkles className="w-4 h-4" />
+            <span>Premium Quality Socks</span>
+          </div>
+
+          {/* Main heading */}
+          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-foreground tracking-tight mb-6">
+            Step Into
+            <span className="block text-primary mt-2">Comfort & Style</span>
+          </h1>
+
+          {/* Subheading */}
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+            Discover Mozamandu's exclusive collection of premium socks. 
+            Crafted for comfort, designed for style, made to last.
+          </p>
+
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Button asChild size="lg" className="text-lg px-8 py-6 group">
               <Link to="/categories">
-                <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white px-10 py-5 text-xl font-semibold rounded-lg transition-all duration-300 hover:scale-105">
-                  Shop Now
-                </Button>
+                Shop Collection
+                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
-              
+            </Button>
+            
+            <Button asChild variant="outline" size="lg" className="text-lg px-8 py-6">
               <Link to="/about">
-                <Button variant="outline" size="lg" className="border-white hover:bg-white px-10 py-5 text-xl font-semibold rounded-lg transition-all duration-300 text-zinc-950">
-                  Learn More
-                </Button>
+                Learn More
               </Link>
-            </div>
+            </Button>
           </div>
 
-          {/* Right Side - Sock Images - Order 2 for all devices */}
-          <div className="relative w-full max-w-2xl mx-auto h-96 sm:h-[450px] lg:h-[550px] xl:h-[650px] flex items-center justify-center order-2">
-            <div className="relative w-full h-full overflow-hidden">
-              {!imagesPreloaded ? (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="w-80 h-80 sm:w-96 sm:h-96 lg:w-[450px] lg:h-[450px] xl:w-[550px] xl:h-[550px] bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded-lg"></div>
-                </div>
-              ) : (
-                sockImages.map((image, index) => (
-                  <div 
-                    key={index} 
-                    className={`absolute inset-0 transition-all duration-700 transform ${
-                      index === currentImage ? 'opacity-100 scale-100 z-20' : 'opacity-0 scale-95 z-0'
-                    }`}
-                  >
-                    <div className="w-full h-full flex items-center justify-center">
-                      <FastImage
-                        src={image}
-                        alt={`Premium Sock ${index + 1}`}
-                        priority={index === 0}
-                        className="w-80 h-80 sm:w-96 sm:h-96 lg:w-[450px] lg:h-[450px] xl:w-[550px] xl:h-[550px] object-contain drop-shadow-2xl filter brightness-110 transition-transform duration-300 hover:scale-105"
-                      />
-                    </div>
-                  </div>
-                ))
-              )}
+          {/* Trust indicators */}
+          <div className="mt-16 flex flex-wrap justify-center gap-8 text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-sm">Premium Materials</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-sm">Fast Delivery</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-sm">100% Satisfaction</span>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Scroll Indicator */}
-      <div className="absolute bottom-4 lg:bottom-8 left-4 lg:left-8 hidden sm:block">
-        <div className="flex flex-col items-center text-white/60">
-          <span className="text-xs lg:text-sm mb-2 rotate-90 origin-center">Scroll</span>
-          <div className="w-px h-12 lg:h-16 bg-gradient-to-b from-white/60 to-transparent"></div>
         </div>
       </div>
     </section>
