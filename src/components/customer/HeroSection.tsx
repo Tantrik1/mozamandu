@@ -1,110 +1,91 @@
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Star } from 'lucide-react';
+import { ArrowRight, Plus } from 'lucide-react';
+
+const featuredProducts = [
+  { id: 1, name: 'Classic Red', price: 299, image: '/lovable-uploads/51654152-d02f-443b-bb60-fd75dace40ee.png' },
+  { id: 2, name: 'Navy Blue', price: 349, image: '/lovable-uploads/30eed4ab-ddd8-442c-aeae-041fd7ae3be3.png' },
+  { id: 3, name: 'Sport Pro', price: 399, image: '/lovable-uploads/e02f8f14-3960-44fa-87db-499a23b30f02.png' },
+];
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-[90vh] bg-zinc-950 overflow-hidden flex items-center">
-      {/* Animated gradient orbs */}
-      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-red-500/30 rounded-full blur-[120px] animate-pulse" />
-      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-orange-500/20 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-red-600/10 rounded-full blur-[150px]" />
-      
-      {/* Grid pattern overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
-      
-      {/* Floating geometric shapes */}
-      <div className="absolute top-20 right-[15%] w-20 h-20 border border-red-500/20 rotate-45 animate-float" />
-      <div className="absolute bottom-32 left-[10%] w-16 h-16 border border-white/10 rounded-full animate-float" style={{ animationDelay: '0.5s' }} />
-      <div className="absolute top-1/3 right-[25%] w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-      <div className="absolute bottom-1/3 left-[20%] w-2 h-2 bg-white/50 rounded-full animate-pulse" style={{ animationDelay: '0.7s' }} />
+    <section className="relative min-h-[85vh] overflow-hidden bg-gradient-to-br from-rose-100 via-purple-200 to-indigo-300">
+      {/* Large faded brand text in background */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
+        <span className="text-[20vw] font-black text-white/20 tracking-wider whitespace-nowrap">
+          MOZAMANDU
+        </span>
+      </div>
 
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+      {/* Decorative curved shape */}
+      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[60%] h-[120%] bg-white/10 rounded-l-full blur-sm" />
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
+        <div className="grid lg:grid-cols-2 gap-8 items-center min-h-[60vh]">
           {/* Left content */}
-          <div className="text-center lg:text-left">
-            {/* Rating badge */}
-            <div className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 px-4 py-2 rounded-full mb-8">
-              <div className="flex">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-                ))}
-              </div>
-              <span className="text-white/70 text-sm">Trusted by 10,000+ customers</span>
-            </div>
-
-            {/* Main heading */}
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-black text-white leading-[0.9] tracking-tight mb-6">
-              REDEFINE
-              <span className="block bg-gradient-to-r from-red-500 via-orange-500 to-red-400 bg-clip-text text-transparent">
-                YOUR STEP
-              </span>
+          <div className="text-left">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-zinc-800 leading-tight mb-6">
+              <span className="italic font-light">Are you ready to</span>
+              <span className="block text-rose-600 italic">step in style</span>
             </h1>
 
-            <p className="text-lg sm:text-xl text-zinc-400 max-w-xl mx-auto lg:mx-0 mb-10 leading-relaxed">
-              Premium socks engineered for the modern lifestyle. 
-              Where comfort meets bold design.
+            <p className="text-zinc-600 text-lg max-w-md mb-8 leading-relaxed">
+              Premium quality socks crafted with care. Experience unmatched comfort 
+              and bold designs for every occasion.
             </p>
 
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <Button asChild size="lg" className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white text-lg px-8 py-7 rounded-full group shadow-lg shadow-red-500/25">
-                <Link to="/categories">
-                  Explore Collection
-                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </Button>
-              
-              <Button asChild variant="ghost" size="lg" className="text-white hover:bg-white/10 text-lg px-8 py-7 rounded-full border border-white/20">
-                <Link to="/about">
-                  Our Story
-                </Link>
-              </Button>
-            </div>
+            <Button 
+              asChild 
+              size="lg" 
+              className="bg-zinc-100 hover:bg-white text-zinc-900 rounded-full px-8 py-6 text-base font-semibold shadow-lg hover:shadow-xl transition-all group"
+            >
+              <Link to="/categories">
+                BUY NOW
+                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </Button>
           </div>
 
-          {/* Right side - Abstract sock visual */}
-          <div className="hidden lg:flex items-center justify-center">
-            <div className="relative">
-              {/* Outer ring */}
-              <div className="w-[400px] h-[400px] xl:w-[500px] xl:h-[500px] rounded-full border border-white/10 flex items-center justify-center animate-[spin_30s_linear_infinite]">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-4 bg-red-500 rounded-full" />
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-white/50 rounded-full" />
-              </div>
-              
-              {/* Inner ring */}
-              <div className="absolute inset-12 rounded-full border border-white/5 animate-[spin_20s_linear_infinite_reverse]">
-                <div className="absolute top-1/2 right-0 translate-x-1/2 w-2 h-2 bg-orange-500 rounded-full" />
-              </div>
-              
-              {/* Center content */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-8xl xl:text-9xl font-black bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent">
-                    M
-                  </div>
-                  <div className="text-sm tracking-[0.5em] text-white/50 uppercase mt-2">
-                    Mozamandu
-                  </div>
-                </div>
-              </div>
+          {/* Right - Hero product image */}
+          <div className="relative flex items-center justify-center lg:justify-end">
+            <div className="relative w-full max-w-lg">
+              <img
+                src="/lovable-uploads/9e1dcca9-44bc-44a8-aa02-56cef600abbb.png"
+                alt="Premium Mozamandu Socks"
+                className="w-full h-auto object-contain drop-shadow-2xl transform hover:scale-105 transition-transform duration-500"
+                loading="eager"
+              />
             </div>
           </div>
         </div>
 
-        {/* Bottom stats */}
-        <div className="mt-20 pt-10 border-t border-white/10 grid grid-cols-3 gap-8 max-w-2xl mx-auto lg:mx-0">
-          <div className="text-center lg:text-left">
-            <div className="text-3xl sm:text-4xl font-bold text-white">50+</div>
-            <div className="text-sm text-zinc-500 mt-1">Unique Designs</div>
-          </div>
-          <div className="text-center lg:text-left">
-            <div className="text-3xl sm:text-4xl font-bold text-white">24h</div>
-            <div className="text-sm text-zinc-500 mt-1">Fast Delivery</div>
-          </div>
-          <div className="text-center lg:text-left">
-            <div className="text-3xl sm:text-4xl font-bold text-white">100%</div>
-            <div className="text-sm text-zinc-500 mt-1">Premium Cotton</div>
+        {/* Bottom product cards */}
+        <div className="relative z-20 mt-8 lg:mt-0">
+          <div className="flex flex-wrap justify-center gap-4 lg:gap-6">
+            {featuredProducts.map((product) => (
+              <Link 
+                key={product.id} 
+                to="/categories"
+                className="flex items-center gap-4 bg-white/90 backdrop-blur-sm rounded-2xl px-4 py-3 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 min-w-[200px]"
+              >
+                <div className="w-16 h-16 flex-shrink-0">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-full h-full object-contain"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-zinc-800 text-sm">{product.name}</h3>
+                  <p className="text-rose-600 font-bold">Rs. {product.price}</p>
+                </div>
+                <button className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors">
+                  <Plus className="w-4 h-4" />
+                </button>
+              </Link>
+            ))}
           </div>
         </div>
       </div>
