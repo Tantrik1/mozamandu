@@ -84,7 +84,8 @@ export function UniversalCheckout() {
   const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocation | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [paymentPercentage, setPaymentPercentage] = useState(100);
+  const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
+  const [customPaidAmount, setCustomPaidAmount] = useState<string>('');
   const [paymentScreenshotUrl, setPaymentScreenshotUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -384,14 +385,22 @@ export function UniversalCheckout() {
       });
 
       const totalBeforeDelivery = accurateSubtotal - promoDiscount;
-      const finalTotal = totalBeforeDelivery + deliveryLocation.delivery_price;
-      const paidAmount = Math.round(finalTotal * (paymentPercentage / 100));
-      const remainingAmount = finalTotal - paidAmount;
-
-      // Validate payment amount for partial payments
-      if (paymentPercentage < 100) {
-        const minimumAmount = Math.round(finalTotal * 0.2);
+      const orderFinalTotal = totalBeforeDelivery + deliveryLocation.delivery_price;
+      const minimumAmount = Math.round(orderFinalTotal * 0.2);
+      
+      // Calculate paid amount based on payment type
+      let paidAmount: number;
+      let paymentPercentageValue: number;
+      
+      if (paymentType === 'full') {
+        paidAmount = orderFinalTotal;
+        paymentPercentageValue = 100;
+      } else {
+        // For partial payment, use the custom amount entered by user
+        paidAmount = parseFloat(customPaidAmount) || 0;
+        paymentPercentageValue = Math.round((paidAmount / orderFinalTotal) * 100);
         
+        // Validate minimum amount for partial payments
         if (paidAmount < minimumAmount) {
           toast({
             title: 'Validation Error',
@@ -401,15 +410,17 @@ export function UniversalCheckout() {
           return;
         }
         
-        if (paidAmount > finalTotal) {
+        if (paidAmount > orderFinalTotal) {
           toast({
             title: 'Validation Error',
-            description: `Payment amount cannot exceed total amount of Rs. ${finalTotal.toFixed(2)}`,
+            description: `Payment amount cannot exceed total amount of Rs. ${orderFinalTotal.toFixed(2)}`,
             variant: 'destructive',
           });
           return;
         }
       }
+      
+      const remainingAmount = orderFinalTotal - paidAmount;
 
       const pricingBreakdown = {
         subcategoryPricing: Object.fromEntries(
@@ -437,7 +448,7 @@ export function UniversalCheckout() {
         accurateSavings,
         promoDiscount,
         deliveryCharge: deliveryLocation.delivery_price,
-        finalTotal,
+        finalTotal: orderFinalTotal,
         pricingMode: accurateSavings > 0 ? 'moq_discount' : 'normal'
       };
 
@@ -457,10 +468,10 @@ export function UniversalCheckout() {
         subtotal: accurateSubtotal,
         promocode_used: appliedPromo?.code || null,
         promocode_discount: promoDiscount,
-        total_amount: finalTotal,
+        total_amount: orderFinalTotal,
         paid_amount: paidAmount,
         remaining_amount: remainingAmount,
-        payment_percentage: paymentPercentage,
+        payment_percentage: paymentPercentageValue,
         payment_method_id: paymentMethod.id,
         payment_screenshot_url: paymentScreenshotUrl,
         pricing_breakdown: pricingBreakdown,
@@ -665,15 +676,19 @@ export function UniversalCheckout() {
                   const method = paymentMethods.find(m => m.id === value);
                   setPaymentMethod(method || null);
                 }}
-                paymentType={paymentPercentage === 100 ? 'full' : 'partial'}
+                paymentType={paymentType}
                 onPaymentTypeChange={(type) => {
-                  setPaymentPercentage(type === 'full' ? 100 : 20);
+                  setPaymentType(type as 'full' | 'partial');
+                  if (type === 'full') {
+                    setCustomPaidAmount('');
+                  } else {
+                    // Set default to minimum amount when switching to partial
+                    setCustomPaidAmount(Math.round(finalTotal * 0.2).toString());
+                  }
                 }}
-                paidAmount={Math.round(finalTotal * (paymentPercentage / 100)).toString()}
+                paidAmount={paymentType === 'full' ? finalTotal.toString() : customPaidAmount}
                 setPaidAmount={(value) => {
-                  const amount = parseFloat(value) || 0;
-                  const percentage = (amount / finalTotal) * 100;
-                  setPaymentPercentage(percentage);
+                  setCustomPaidAmount(value);
                 }}
                 paymentScreenshot={null}
                 setPaymentScreenshot={() => {}}
