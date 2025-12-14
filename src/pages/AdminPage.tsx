@@ -13,7 +13,6 @@ import { EnhancedOrderManagement } from '@/components/admin/EnhancedOrderManagem
 import { CustomerManagement } from '@/components/admin/CustomerManagement';
 import { CategoryManagement } from '@/components/admin/CategoryManagement';
 import { SubcategoryManagement } from '@/components/admin/SubcategoryManagement';
-import { ComboManagement } from '@/components/admin/ComboManagement';
 import { DeliveryChargeManagement } from '@/components/admin/DeliveryChargeManagement';
 import { PaymentMethodManagement } from '@/components/admin/PaymentMethodManagement';
 import { FAQManagement } from '@/components/admin/FAQManagement';
@@ -103,7 +102,6 @@ export default function AdminPage() {
               <Route path="customers" element={<CustomerManagement />} />
               <Route path="categories" element={<CategoryManagement />} />
               <Route path="subcategories" element={<SubcategoryManagement />} />
-              <Route path="combos" element={<ComboManagement />} />
               <Route path="delivery-charges" element={<DeliveryChargeManagement />} />
               <Route path="payments" element={<PaymentMethodManagement />} />
               <Route path="promocodes" element={<PromocodeManagement />} />

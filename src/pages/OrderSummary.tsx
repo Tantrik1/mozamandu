@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle, Package, Phone, Mail, Download, ArrowLeft, Printer, Gift, Tag } from 'lucide-react';
+import { CheckCircle, Package, Phone, Mail, Download, ArrowLeft, Printer, Tag } from 'lucide-react';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { Footer } from '@/components/layout/Footer';
 import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
@@ -28,7 +28,6 @@ interface OrderDetails {
   status: string;
   created_at: string;
   updated_at: string;
-  combo_applied: boolean;
   promocode_used: string | null;
   promocode_discount: number;
   payment_screenshot_url: string | null;
@@ -81,7 +80,25 @@ export default function OrderSummary() {
       const { data: order, error: orderError } = await supabase
         .from('customer_orders')
         .select(`
-          *,
+          id,
+          order_number,
+          customer_name,
+          customer_email,
+          contact_number,
+          whatsapp_number,
+          delivery_address,
+          total_amount,
+          paid_amount,
+          remaining_amount,
+          subtotal,
+          delivery_charge,
+          status,
+          created_at,
+          updated_at,
+          promocode_used,
+          promocode_discount,
+          payment_screenshot_url,
+          pricing_breakdown,
           payment_method:payment_methods(name),
           delivery_location:delivery_charges(place_name)
         `)
@@ -196,12 +213,6 @@ export default function OrderSummary() {
             <div key={index} className="flex justify-between items-center p-2 bg-white rounded border">
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  {item.pricing_mode === 'combo' && (
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                      <Gift className="w-2 h-2 mr-1" />
-                      Combo
-                    </Badge>
-                  )}
                   {item.pricing_mode === 'discount' && (
                     <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
                       <Tag className="w-2 h-2 mr-1" />

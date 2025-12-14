@@ -1,7 +1,8 @@
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { Home, Package, Users, Gift, Tag, CreditCard, Truck, Bell, Type, Settings, ShoppingCart, UserCheck, LogOut, HelpCircle, Warehouse } from "lucide-react";
+import { Home, Package, Users, Tag, CreditCard, Truck, Bell, Type, Settings, ShoppingCart, UserCheck, LogOut, HelpCircle, Warehouse } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+
 const menuItems = [{
   title: "Dashboard",
   url: "/admin",
@@ -30,10 +31,6 @@ const menuItems = [{
   title: "Customers",
   url: "/admin/customers",
   icon: UserCheck
-}, {
-  title: "Combos",
-  url: "/admin/combos",
-  icon: Gift
 }, {
   title: "Promo Codes",
   url: "/admin/promocodes",
@@ -67,6 +64,7 @@ const menuItems = [{
   url: "/admin/settings",
   icon: Settings
 }];
+
 export function AdminSidebar() {
   const location = useLocation();
   const {
