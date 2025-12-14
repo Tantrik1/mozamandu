@@ -30,6 +30,7 @@ const NotFound = lazy(() => import('@/pages/NotFound'));
 const ThankYou = lazy(() => import('@/pages/ThankYou'));
 const OrderSummary = lazy(() => import('@/pages/OrderSummary'));
 const CustomerOrderSummary = lazy(() => import('@/pages/CustomerOrderSummary'));
+const ProductDetail = lazy(() => import('@/pages/ProductDetail'));
 
 // Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
@@ -72,6 +73,7 @@ function App() {
                   </RouteGuard>
                 } />
                 <Route path="/products" element={<Products />} />
+                <Route path="/product/:productId" element={<ProductDetail />} />
                 <Route path="/subcategory/:subcategoryId" element={<SubcategoryPage />} />
                 <Route path="/subcategories/:subcategoryId" element={<SubcategoryPage />} />
                 <Route path="/categories" element={<Categories />} />
