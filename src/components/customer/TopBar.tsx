@@ -46,23 +46,37 @@ export function TopBar() {
   if (!topBarText || !isVisible) return null;
 
   return (
-    <div className="bg-red-600 text-white py-2 relative z-50 sticky top-0 overflow-hidden">
-      <div className="flex items-center">
-        {/* Marquee container */}
-        <div className="flex-1 overflow-hidden">
-          <div className="animate-marquee whitespace-nowrap">
-            <span className="text-sm font-medium mx-8">{topBarText.text}</span>
-            <span className="text-sm font-medium mx-8">{topBarText.text}</span>
-            <span className="text-sm font-medium mx-8">{topBarText.text}</span>
-          </div>
-        </div>
+    <div className="bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white py-2.5 relative z-50 sticky top-0 overflow-hidden">
+      {/* Subtle shimmer overlay */}
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+      
+      <div className="relative flex items-center justify-center px-12">
+        <p 
+          className="text-sm font-medium text-center animate-bounce-x"
+          style={{
+            animation: 'bounceX 8s ease-in-out infinite',
+          }}
+        >
+          ✨ {topBarText.text} ✨
+        </p>
         <button
           onClick={handleClose}
-          className="absolute right-2 bg-red-700/50 hover:bg-red-700 rounded p-1 transition-colors z-10"
+          className="absolute right-3 bg-white/10 hover:bg-white/20 rounded-full p-1.5 transition-all duration-200 hover:scale-110"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
+      
+      <style>{`
+        @keyframes bounceX {
+          0%, 100% {
+            transform: translateX(-30%);
+          }
+          50% {
+            transform: translateX(30%);
+          }
+        }
+      `}</style>
     </div>
   );
 }
