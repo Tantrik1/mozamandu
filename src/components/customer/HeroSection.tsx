@@ -1,12 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Plus } from 'lucide-react';
-
-const featuredProducts = [
-  { id: 1, name: 'Classic Red', price: 299, image: '/lovable-uploads/51654152-d02f-443b-bb60-fd75dace40ee.png' },
-  { id: 2, name: 'Navy Blue', price: 349, image: '/lovable-uploads/30eed4ab-ddd8-442c-aeae-041fd7ae3be3.png' },
-  { id: 3, name: 'Sport Pro', price: 399, image: '/lovable-uploads/e02f8f14-3960-44fa-87db-499a23b30f02.png' },
-];
+import { ArrowRight } from 'lucide-react';
 
 export function HeroSection() {
   return (
@@ -60,34 +54,6 @@ export function HeroSection() {
           </div>
         </div>
 
-        {/* Bottom product cards */}
-        <div className="relative z-20 mt-8 lg:mt-0">
-          <div className="flex flex-wrap justify-center gap-4 lg:gap-6">
-            {featuredProducts.map((product) => (
-              <Link 
-                key={product.id} 
-                to="/categories"
-                className="flex items-center gap-4 bg-white/90 backdrop-blur-sm rounded-2xl px-4 py-3 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 min-w-[200px]"
-              >
-                <div className="w-16 h-16 flex-shrink-0">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-full h-full object-contain"
-                    loading="lazy"
-                  />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-medium text-zinc-800 text-sm">{product.name}</h3>
-                  <p className="text-rose-600 font-bold">Rs. {product.price}</p>
-                </div>
-                <button className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors">
-                  <Plus className="w-4 h-4" />
-                </button>
-              </Link>
-            ))}
-          </div>
-        </div>
       </div>
     </section>
   );
