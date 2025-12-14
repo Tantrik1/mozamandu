@@ -34,7 +34,7 @@ export function SubcategoryCard({ subcategory }: SubcategoryCardProps) {
       <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-0 bg-white">
         <div className="relative">
           {/* Image Section */}
-          <div className="aspect-[4/3] overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 relative">
+          <div className="aspect-square overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 relative">
             {subcategory.image_url ? (
               <>
                 <img

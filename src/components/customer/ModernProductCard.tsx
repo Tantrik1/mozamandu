@@ -288,7 +288,7 @@ export const ModernProductCard = memo(function ModernProductCard({ product, subc
 
   return (
     <Card className="group h-full flex flex-col overflow-hidden bg-gradient-to-br from-card via-card to-card/80 shadow-lg hover:shadow-xl transition-all duration-500 border border-border/50 hover:border-primary/20 rounded-xl backdrop-blur-sm">
-      <div className="relative overflow-hidden bg-gradient-to-br from-muted/30 to-muted/60 rounded-t-xl h-48">
+      <div className="relative overflow-hidden bg-gradient-to-br from-muted/30 to-muted/60 rounded-t-xl aspect-square">
         {currentImage ? (
           <OptimizedImage src={currentImage} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy" width={300} height={192} />
         ) : (
