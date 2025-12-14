@@ -206,7 +206,6 @@ export function CheckoutSuccess({ orderId }: CheckoutSuccessProps) {
                   subcategoryInfo: null
                 };
               }}
-              isComboModeActive={false}
             />
           ) : (
             <Card className="w-full shadow-lg border-0 bg-white">

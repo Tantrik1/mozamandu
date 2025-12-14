@@ -25,7 +25,7 @@ interface ItemPricingDetail {
   itemId: string;
   unitPrice: number;
   totalPrice: number;
-  appliedTier: 'normal' | 'discount' | 'combo';
+  appliedTier: 'normal' | 'discount';
   tierInfo?: string;
   savings: number;
 }
@@ -35,8 +35,6 @@ interface SubcategoryPricingInfo {
   totalQuantity: number;
   moqReached: boolean;
   moqRequired: number;
-  comboActive: boolean;
-  comboPrice?: number;
   itemBreakdown: ItemPricingDetail[];
   totalSavings: number;
   description: string;
@@ -46,16 +44,6 @@ interface PromoCode {
   id: string;
   code: string;
   discount_percentage: number;
-}
-
-interface ComboInfo {
-  combo: {
-    id: string;
-    name: string;
-    description: string;
-  };
-  affectedSubcategories: SubcategoryPricingInfo[];
-  totalComboSavings: number;
 }
 
 interface CleanOrderSummaryProps {
@@ -68,9 +56,7 @@ interface CleanOrderSummaryProps {
   finalTotal: number;
   isSubmitting: boolean;
   onSubmitOrder: () => void;
-  comboInfo?: ComboInfo | null;
   getTieredItemPricing: (itemId: string) => any;
-  isComboModeActive: boolean;
 }
 
 export function CleanOrderSummary({
