@@ -84,6 +84,7 @@ export default function ProductDetail() {
   const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
   const [sizeVariants, setSizeVariants] = useState<SizeVariant[]>([]);
   const [discountTiers, setDiscountTiers] = useState<{ [key: string]: DiscountTier[] }>({});
+  const [additionalImages, setAdditionalImages] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [productStock, setProductStock] = useState<number>(0);
@@ -95,9 +96,14 @@ export default function ProductDetail() {
 
   const { addToCart, cartItems, updateQuantity, removeFromCart } = useRobustCart();
 
-  // Build image gallery from color variants
+  // Build image gallery from main image, additional images, and color variants
   const images: string[] = [];
   if (product?.image_url) images.push(product.image_url);
+  // Add additional images
+  additionalImages.forEach(img => {
+    if (!images.includes(img)) images.push(img);
+  });
+  // Add color variant images
   colorVariants.forEach(cv => {
     if (cv.image_url && !images.includes(cv.image_url)) {
       images.push(cv.image_url);
@@ -215,6 +221,18 @@ export default function ProductDetail() {
           setColorVariants(colorsData);
           setSelectedColor(colorsData[0].id);
         }
+      }
+
+      // Fetch additional images
+      const { data: additionalImagesData } = await supabase
+        .from('product_images')
+        .select('image_url')
+        .eq('product_id', productId)
+        .eq('is_primary', false)
+        .order('created_at');
+
+      if (additionalImagesData) {
+        setAdditionalImages(additionalImagesData.map(img => img.image_url));
       }
 
       // Fetch stock
