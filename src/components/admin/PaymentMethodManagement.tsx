@@ -61,6 +61,17 @@ export function PaymentMethodManagement() {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Validate file size (max 2MB)
+      const maxSize = 2 * 1024 * 1024;
+      if (file.size > maxSize) {
+        toast({
+          title: "Error",
+          description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`,
+          variant: "destructive",
+        });
+        return;
+      }
+
       if (file.type.startsWith('image/')) {
         setQrCodeFile(file);
         const reader = new FileReader();
@@ -82,14 +93,25 @@ export function PaymentMethodManagement() {
     if (!qrCodeFile) return null;
 
     setUploading(true);
-    const fileExt = qrCodeFile.name.split('.').pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-    const filePath = `payment-qr-codes/${fileName}`;
 
     try {
+      const { prepareImageForUpload } = await import('@/utils/imageOptimizer');
+      
+      // Optimize image (converts to WebP and compresses)
+      const { file: optimizedFile } = await prepareImageForUpload(qrCodeFile, {
+        maxSizeMB: 0.5,
+        maxWidthOrHeight: 600,
+        quality: 0.9,
+      });
+
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.webp`;
+      const filePath = `payment-qr-codes/${fileName}`;
+
       const { error: uploadError } = await supabase.storage
         .from('uploads')
-        .upload(filePath, qrCodeFile);
+        .upload(filePath, optimizedFile, {
+          contentType: 'image/webp',
+        });
 
       if (uploadError) {
         throw uploadError;
@@ -104,7 +126,7 @@ export function PaymentMethodManagement() {
       console.error('Upload error:', error);
       toast({
         title: "Error",
-        description: "Failed to upload QR code image",
+        description: error instanceof Error ? error.message : "Failed to upload QR code image",
         variant: "destructive",
       });
       return null;
