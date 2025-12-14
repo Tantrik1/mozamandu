@@ -6,13 +6,11 @@ import { PaymentMethodSection } from './PaymentMethodSection';
 import { PaymentScreenshotUpload } from './PaymentScreenshotUpload';
 import { PromoCodeSection } from './PromoCodeSection';
 import { CleanOrderSummary } from './CleanOrderSummary';
-import { CheckoutSuccess } from './CheckoutSuccess';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { usePromoCode } from '@/hooks/usePromoCode';
 import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
-import { useComboManager } from '@/hooks/useComboManager';
 import { useInventoryManager } from '@/hooks/useInventoryManager';
 import { useToast } from '@/hooks/use-toast';
 import { Package, Loader2 } from 'lucide-react';
@@ -56,23 +54,13 @@ export function UniversalCheckout() {
 
   const [discountTiers, setDiscountTiers] = useState<{ [key: string]: any[] }>({});
 
-  const { 
-    activeCombo, 
-    isComboActive, 
-    getComboPrice, 
-    shouldIgnoreMinimumQuantity 
-  } = useComboManager({ cartItems });
-
   const {
     getTotalPrice: getTieredTotalPrice,
     getItemPricing: getTieredItemPricing,
     subcategoryPricing,
-    getTotalSavings,
-    getComboInfo,
-    isComboModeActive
+    getTotalSavings
   } = useSubcategoryTieredPricing({
     cartItems,
-    activeCombo,
     discountTiers
   });
 
@@ -131,27 +119,6 @@ export function UniversalCheckout() {
     }
   }, [user, userProfile]);
 
-  useEffect(() => {
-    console.log('🎯 UniversalCheckout Debug - Combo Status:');
-    console.log('Active combo:', activeCombo);
-    console.log('Is combo mode active:', isComboModeActive());
-    console.log('Cart items count:', cartItems.length);
-    
-    if (activeCombo) {
-      console.log('Combo requirements:', activeCombo.combo_subcategories);
-      
-      const subcategoryCounts: { [key: string]: number } = {};
-      cartItems.forEach(item => {
-        subcategoryCounts[item.subcategoryId] = (subcategoryCounts[item.subcategoryId] || 0) + item.quantity;
-      });
-      console.log('Current subcategory quantities:', subcategoryCounts);
-      
-      activeCombo.combo_subcategories.forEach(req => {
-        const currentQty = subcategoryCounts[req.subcategory_id] || 0;
-        console.log(`Subcategory ${req.subcategory_id}: needs ${req.min_units}, has ${currentQty}`);
-      });
-    }
-  }, [activeCombo, cartItems, isComboModeActive]);
 
   const fetchDeliveryLocations = async () => {
     try {
@@ -409,14 +376,10 @@ export function UniversalCheckout() {
 
       const accurateSubtotal = getTieredTotalPrice();
       const accurateSavings = getTotalSavings();
-      const comboInfo = getComboInfo();
-      const isComboActive = isComboModeActive();
       
       console.log('💰 Pricing details:', {
         accurateSubtotal,
         accurateSavings,
-        comboInfo,
-        isComboActive,
         subcategoryPricing
       });
 
@@ -457,8 +420,6 @@ export function UniversalCheckout() {
               totalQuantity: data.totalQuantity,
               moqReached: data.moqReached,
               moqRequired: data.moqRequired,
-              comboActive: data.comboActive,
-              comboPrice: data.comboPrice || 0,
               totalSavings: data.totalSavings,
               description: data.description,
               itemBreakdown: data.itemBreakdown.map(item => ({
@@ -477,15 +438,7 @@ export function UniversalCheckout() {
         promoDiscount,
         deliveryCharge: deliveryLocation.delivery_price,
         finalTotal,
-        comboInfo: isComboActive && comboInfo ? {
-          combo: {
-            id: comboInfo.combo.id,
-            name: comboInfo.combo.name,
-            description: comboInfo.combo.description
-          },
-          totalComboSavings: comboInfo.totalComboSavings || 0
-        } : null,
-        pricingMode: isComboActive ? 'combo' : (accurateSavings > 0 ? 'moq_discount' : 'normal')
+        pricingMode: accurateSavings > 0 ? 'moq_discount' : 'normal'
       };
 
       console.log('📋 Enhanced pricing breakdown:', pricingBreakdown);
@@ -510,7 +463,6 @@ export function UniversalCheckout() {
         payment_percentage: paymentPercentage,
         payment_method_id: paymentMethod.id,
         payment_screenshot_url: paymentScreenshotUrl,
-        combo_applied: isComboActive,
         pricing_breakdown: pricingBreakdown,
         status: 'pending_payment' as const
       };
@@ -573,7 +525,7 @@ export function UniversalCheckout() {
             savings: pricingInfo.savings || 0,
             basePrice: item.basePrice,
             subcategoryId: item.subcategoryId,
-            comboApplied: isComboActive,
+            
             discountApplied: (pricingInfo.savings || 0) > 0,
             inventoryId: item.inventoryId,
             moqPricingApplied: pricingInfo.appliedTier === 'discount',
@@ -756,9 +708,7 @@ export function UniversalCheckout() {
             finalTotal={finalTotal}
             isSubmitting={isSubmitting}
             onSubmitOrder={handleSubmitOrder}
-            comboInfo={getComboInfo()}
             getTieredItemPricing={getTieredItemPricing}
-            isComboModeActive={isComboModeActive()}
           />
         </div>
       </div>
