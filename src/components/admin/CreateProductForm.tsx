@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -14,6 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { SmartProductVariantForm } from './SmartProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
+import { ProductAdditionalImages, type AdditionalImage } from './ProductAdditionalImages';
+import { prepareImageForUpload } from '@/utils/imageOptimizer';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -69,6 +71,8 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showInventoryPopup, setShowInventoryPopup] = useState(false);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
+  const [additionalImages, setAdditionalImages] = useState<AdditionalImage[]>([]);
+  const additionalImagesRef = useRef<{ uploadImages: (productId: string) => Promise<boolean> } | null>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -147,6 +151,27 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file size (max 2MB)
+    const maxSize = 2 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: 'Error',
+        description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate it's an image
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Error',
+        description: 'Please select a valid image file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setUploadingImage(true);
     
     try {
@@ -160,7 +185,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       
       toast({
         title: 'Success',
-        description: 'Image ready for upload',
+        description: 'Image ready for upload (will be optimized to WebP)',
       });
     } catch (error) {
       console.error('Error preparing image:', error);
@@ -183,12 +208,20 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     if (!imageFile) return null;
 
     try {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `product-${Date.now()}.${fileExt}`;
+      // Optimize image (converts to WebP and compresses)
+      const { file: optimizedFile } = await prepareImageForUpload(imageFile, {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1200,
+        quality: 0.85,
+      });
+
+      const fileName = `product-${Date.now()}.webp`;
 
       const { data, error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(fileName, imageFile);
+        .upload(fileName, optimizedFile, {
+          contentType: 'image/webp',
+        });
 
       if (uploadError) throw uploadError;
 
@@ -201,10 +234,53 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       console.error('Error uploading image:', error);
       toast({
         title: 'Error',
-        description: 'Failed to upload image',
+        description: error instanceof Error ? error.message : 'Failed to upload image',
         variant: 'destructive',
       });
       return null;
+    }
+  };
+
+  const uploadAdditionalImages = async (productId: string): Promise<void> => {
+    const newImages = additionalImages.filter(img => img.isNew && img.file);
+    
+    for (let i = 0; i < newImages.length; i++) {
+      const img = newImages[i];
+      if (!img.file) continue;
+
+      try {
+        const { file: optimizedFile } = await prepareImageForUpload(img.file, {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1200,
+          quality: 0.85,
+        });
+
+        const fileName = `product-additional-${productId}-${Date.now()}-${i}.webp`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(fileName, optimizedFile, {
+            contentType: 'image/webp',
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(fileName);
+
+        await supabase
+          .from('product_images')
+          .insert({
+            product_id: productId,
+            image_url: urlData.publicUrl,
+            storage_path: fileName,
+            is_primary: false,
+            image_type: 'additional',
+          });
+      } catch (error) {
+        console.error('Error uploading additional image:', error);
+      }
     }
   };
 
@@ -248,6 +324,11 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       // Create color variants and size variants first
       if (data.has_color_variants && colorVariants.length > 0) {
         await saveColorVariants(newProduct.id, data.has_size_variants);
+      }
+
+      // Upload additional images
+      if (additionalImages.some(img => img.isNew)) {
+        await uploadAdditionalImages(newProduct.id);
       }
 
       // Show inventory management popup
@@ -550,6 +631,14 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Additional Images Section */}
+                <div className="mt-6 pt-4 border-t border-border">
+                  <ProductAdditionalImages
+                    onImagesChange={setAdditionalImages}
+                    maxImages={3}
+                  />
                 </div>
               </div>
             </div>
