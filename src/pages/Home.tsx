@@ -1,4 +1,4 @@
-
+// Home page component
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { HeroSection } from '@/components/customer/HeroSection';
 import BrowseSubcategories from '@/components/customer/BrowseSubcategories';
