@@ -120,75 +120,6 @@ export type Database = {
         }
         Relationships: []
       }
-      combo_subcategories: {
-        Row: {
-          combo_id: string
-          created_at: string | null
-          id: string
-          min_units: number
-          price: number
-          subcategory_id: string
-        }
-        Insert: {
-          combo_id: string
-          created_at?: string | null
-          id?: string
-          min_units: number
-          price: number
-          subcategory_id: string
-        }
-        Update: {
-          combo_id?: string
-          created_at?: string | null
-          id?: string
-          min_units?: number
-          price?: number
-          subcategory_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "combo_subcategories_combo_id_fkey"
-            columns: ["combo_id"]
-            isOneToOne: false
-            referencedRelation: "combos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "combo_subcategories_subcategory_id_fkey"
-            columns: ["subcategory_id"]
-            isOneToOne: false
-            referencedRelation: "subcategories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      combos: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          id: string
-          name: string
-          status: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name: string
-          status?: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-          status?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       customer_order_item_details: {
         Row: {
           color_name: string | null
@@ -300,7 +231,6 @@ export type Database = {
       }
       customer_orders: {
         Row: {
-          combo_applied: boolean | null
           contact_number: string
           created_at: string | null
           customer_email: string
@@ -326,7 +256,6 @@ export type Database = {
           whatsapp_number: string | null
         }
         Insert: {
-          combo_applied?: boolean | null
           contact_number: string
           created_at?: string | null
           customer_email: string
@@ -352,7 +281,6 @@ export type Database = {
           whatsapp_number?: string | null
         }
         Update: {
-          combo_applied?: boolean | null
           contact_number?: string
           created_at?: string | null
           customer_email?: string
@@ -768,7 +696,6 @@ export type Database = {
       }
       orders: {
         Row: {
-          combo_applied: boolean | null
           contact_number: string
           created_at: string | null
           customer_email: string
@@ -794,7 +721,6 @@ export type Database = {
           whatsapp_number: string | null
         }
         Insert: {
-          combo_applied?: boolean | null
           contact_number: string
           created_at?: string | null
           customer_email: string
@@ -820,7 +746,6 @@ export type Database = {
           whatsapp_number?: string | null
         }
         Update: {
-          combo_applied?: boolean | null
           contact_number?: string
           created_at?: string | null
           customer_email?: string

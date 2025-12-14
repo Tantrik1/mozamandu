@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
@@ -55,7 +55,6 @@ export function TieredOrderSummaryCard({
   onSubmitOrder
 }: TieredOrderSummaryCardProps) {
   const [discountTiers, setDiscountTiers] = useState<{ [key: string]: any[] }>({});
-  const [activeCombo, setActiveCombo] = useState(null);
   const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>({});
   const [showScreenshot, setShowScreenshot] = useState(false);
 
@@ -65,13 +64,11 @@ export function TieredOrderSummaryCard({
     getTotalSavings
   } = useSubcategoryTieredPricing({
     cartItems,
-    activeCombo,
     discountTiers
   });
 
   useEffect(() => {
     fetchDiscountTiers();
-    fetchActiveCombo();
   }, []);
 
   const fetchDiscountTiers = async () => {
@@ -96,36 +93,6 @@ export function TieredOrderSummaryCard({
     }
   };
 
-  const fetchActiveCombo = async () => {
-    try {
-      const { data } = await supabase
-        .from('combos')
-        .select(`
-          *,
-          combo_subcategories (
-            subcategory_id,
-            min_units,
-            price
-          )
-        `)
-        .eq('status', 'active')
-        .maybeSingle();
-      
-      setActiveCombo(data);
-    } catch (error) {
-      console.error('Error fetching active combo:', error);
-    }
-  };
-
-  const getSubcategoryName = async (subcategoryId: string) => {
-    const { data } = await supabase
-      .from('subcategories')
-      .select('name')
-      .eq('id', subcategoryId)
-      .single();
-    return data?.name || 'Unknown Subcategory';
-  };
-
   const toggleDetails = (subcategoryId: string) => {
     setShowDetails(prev => ({
       ...prev,
@@ -138,12 +105,9 @@ export function TieredOrderSummaryCard({
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="text-xl font-bold text-gray-900">
-          Order Summary
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="p-6 space-y-6">
+        <h2 className="text-xl font-bold text-gray-900">Order Summary</h2>
+        
         {/* Tiered Pricing Breakdown by Subcategory */}
         <div className="space-y-4">
           {Object.values(subcategoryPricing).map((subcategory) => (

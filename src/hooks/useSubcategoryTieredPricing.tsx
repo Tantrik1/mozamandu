@@ -18,17 +18,6 @@ interface CartItem {
   addedOrder: number; // Order in which item was added to cart
 }
 
-interface ComboData {
-  id: string;
-  name: string;
-  description: string;
-  combo_subcategories: {
-    subcategory_id: string;
-    min_units: number;
-    price: number;
-  }[];
-}
-
 interface DiscountTier {
   min_quantity: number;
   max_quantity: number | null;
@@ -39,7 +28,7 @@ interface ItemPricingDetail {
   itemId: string;
   unitPrice: number;
   totalPrice: number;
-  appliedTier: 'normal' | 'discount' | 'combo';
+  appliedTier: 'normal' | 'discount';
   tierInfo?: string;
   savings: number;
 }
@@ -49,8 +38,6 @@ interface SubcategoryPricingInfo {
   totalQuantity: number;
   moqReached: boolean;
   moqRequired: number;
-  comboActive: boolean;
-  comboPrice?: number;
   itemBreakdown: ItemPricingDetail[];
   totalSavings: number;
   description: string;
@@ -58,17 +45,15 @@ interface SubcategoryPricingInfo {
 
 interface UseSubcategoryTieredPricingProps {
   cartItems: CartItem[];
-  activeCombo: ComboData | null;
   discountTiers: { [key: string]: DiscountTier[] };
 }
 
 export function useSubcategoryTieredPricing({ 
   cartItems, 
-  activeCombo, 
   discountTiers 
 }: UseSubcategoryTieredPricingProps) {
 
-  // Group items by subcategory and calculate FIFO pricing with combo support
+  // Group items by subcategory and calculate FIFO pricing
   const subcategoryPricing = useMemo(() => {
     const subcategoryGroups: { [key: string]: CartItem[] } = {};
     
@@ -86,39 +71,7 @@ export function useSubcategoryTieredPricing({
       const tiers = discountTiers[subcategoryId];
       const moqTier = tiers?.find(tier => tier.min_quantity > 1) || tiers?.[0];
       
-      // Check for active combo first - combo overrides everything
-      const comboSubcategory = activeCombo?.combo_subcategories.find(
-        cs => cs.subcategory_id === subcategoryId
-      );
-
-      if (comboSubcategory) {
-        // COMBO MODE: Combo pricing overrides MOQ and normal pricing
-        console.log(`🎯 Combo mode active for subcategory ${subcategoryId} with price ${comboSubcategory.price}`);
-        
-        const itemBreakdown: ItemPricingDetail[] = items.map(item => ({
-          itemId: item.id,
-          unitPrice: comboSubcategory.price,
-          totalPrice: comboSubcategory.price * item.quantity,
-          appliedTier: 'combo',
-          tierInfo: `Combo Price: Rs.${comboSubcategory.price} each (${activeCombo.name})`,
-          savings: Math.max(0, item.basePrice - comboSubcategory.price) * item.quantity
-        }));
-
-        pricingInfo[subcategoryId] = {
-          subcategoryId,
-          totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
-          moqReached: true, // Combo always satisfies MOQ
-          moqRequired: 0,
-          comboActive: true,
-          comboPrice: comboSubcategory.price,
-          itemBreakdown,
-          totalSavings: itemBreakdown.reduce((sum, item) => sum + item.savings, 0),
-          description: `Combo pricing active: ${activeCombo.name}`
-        };
-        return;
-      }
-
-      // NORMAL/MOQ MODE: Regular tiered pricing (existing functionality)
+      // NORMAL/MOQ MODE: Regular tiered pricing
       if (!moqTier) {
         // No discount tiers, all normal pricing
         const itemBreakdown: ItemPricingDetail[] = items.map(item => ({
@@ -134,7 +87,6 @@ export function useSubcategoryTieredPricing({
           totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
           moqReached: false,
           moqRequired: 0,
-          comboActive: false,
           itemBreakdown,
           totalSavings: 0,
           description: 'Normal pricing'
@@ -203,7 +155,6 @@ export function useSubcategoryTieredPricing({
         totalQuantity,
         moqReached,
         moqRequired: moqTier.min_quantity,
-        comboActive: false,
         itemBreakdown,
         totalSavings: itemBreakdown.reduce((sum, item) => sum + item.savings, 0),
         description: moqReached 
@@ -213,7 +164,7 @@ export function useSubcategoryTieredPricing({
     });
 
     return pricingInfo;
-  }, [cartItems, activeCombo, discountTiers]);
+  }, [cartItems, discountTiers]);
 
   const getItemPricing = useMemo(() => {
     return (itemId: string) => {
@@ -248,35 +199,10 @@ export function useSubcategoryTieredPricing({
     };
   }, [subcategoryPricing]);
 
-  // Additional combo-specific helper functions
-  const getComboInfo = useMemo(() => {
-    return () => {
-      if (!activeCombo) return null;
-      
-      const comboSubcategories = Object.values(subcategoryPricing).filter(
-        subcategory => subcategory.comboActive
-      );
-      
-      return {
-        combo: activeCombo,
-        affectedSubcategories: comboSubcategories,
-        totalComboSavings: comboSubcategories.reduce((sum, sub) => sum + sub.totalSavings, 0)
-      };
-    };
-  }, [subcategoryPricing, activeCombo]);
-
-  const isComboModeActive = useMemo(() => {
-    return (): boolean => {
-      return Object.values(subcategoryPricing).some(subcategory => subcategory.comboActive);
-    };
-  }, [subcategoryPricing]);
-
   return {
     subcategoryPricing,
     getItemPricing,
     getTotalPrice,
-    getTotalSavings,
-    getComboInfo,
-    isComboModeActive
+    getTotalSavings
   };
 }
