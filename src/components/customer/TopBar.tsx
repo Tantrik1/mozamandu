@@ -46,14 +46,19 @@ export function TopBar() {
   if (!topBarText || !isVisible) return null;
 
   return (
-    <div className="bg-red-600 text-white text-center py-2 px-4 relative z-50 sticky top-0">
-      <div className="flex items-center justify-center">
-        <p className="text-sm font-medium flex-1 text-center pr-8">
-          {topBarText.text}
-        </p>
+    <div className="bg-red-600 text-white py-2 relative z-50 sticky top-0 overflow-hidden">
+      <div className="flex items-center">
+        {/* Marquee container */}
+        <div className="flex-1 overflow-hidden">
+          <div className="animate-marquee whitespace-nowrap">
+            <span className="text-sm font-medium mx-8">{topBarText.text}</span>
+            <span className="text-sm font-medium mx-8">{topBarText.text}</span>
+            <span className="text-sm font-medium mx-8">{topBarText.text}</span>
+          </div>
+        </div>
         <button
           onClick={handleClose}
-          className="absolute right-4 hover:bg-red-700 rounded p-1 transition-colors"
+          className="absolute right-2 bg-red-700/50 hover:bg-red-700 rounded p-1 transition-colors z-10"
         >
           <X className="h-4 w-4" />
         </button>
