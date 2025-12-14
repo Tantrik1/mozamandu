@@ -59,9 +59,30 @@ export function NoticeManagement() {
     }
   };
 
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Validate file size (max 2MB)
+      const maxSize = 2 * 1024 * 1024;
+      if (file.size > maxSize) {
+        toast({
+          title: "Error",
+          description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate it's an image
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Error",
+          description: "Please select a valid image file",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setSelectedImage(file);
       const reader = new FileReader();
       reader.onload = () => {
@@ -72,12 +93,23 @@ export function NoticeManagement() {
   };
 
   const uploadImage = async (file: File): Promise<string> => {
-    const fileName = `${Date.now()}-${file.name}`;
+    const { prepareImageForUpload } = await import('@/utils/imageOptimizer');
+    
+    // Optimize image (converts to WebP and compresses)
+    const { file: optimizedFile } = await prepareImageForUpload(file, {
+      maxSizeMB: 1,
+      maxWidthOrHeight: 1200,
+      quality: 0.85,
+    });
+
+    const fileName = `${Date.now()}-notice.webp`;
     const filePath = `notices/${fileName}`;
 
     const { error } = await supabase.storage
       .from('notice-images')
-      .upload(filePath, file);
+      .upload(filePath, optimizedFile, {
+        contentType: 'image/webp',
+      });
 
     if (error) throw error;
 

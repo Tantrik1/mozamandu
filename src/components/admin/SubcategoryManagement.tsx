@@ -114,9 +114,30 @@ export function SubcategoryManagement() {
     return data || [];
   };
 
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Validate file size (max 2MB)
+      const maxSize = 2 * 1024 * 1024;
+      if (file.size > maxSize) {
+        toast({
+          title: "Error",
+          description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate it's an image
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Error",
+          description: "Please select a valid image file",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setSelectedImage(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -128,13 +149,23 @@ export function SubcategoryManagement() {
 
   const uploadImage = async (file: File): Promise<string | null> => {
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
+      const { prepareImageForUpload } = await import('@/utils/imageOptimizer');
+      
+      // Optimize image (converts to WebP and compresses)
+      const { file: optimizedFile } = await prepareImageForUpload(file, {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 800,
+        quality: 0.85,
+      });
+
+      const fileName = `${Math.random()}.webp`;
       const filePath = `${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('subcategory-images')
-        .upload(filePath, file);
+        .upload(filePath, optimizedFile, {
+          contentType: 'image/webp',
+        });
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
@@ -148,6 +179,11 @@ export function SubcategoryManagement() {
       return data.publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to upload image",
+        variant: "destructive",
+      });
       return null;
     }
   };

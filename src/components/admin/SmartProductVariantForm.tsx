@@ -129,15 +129,46 @@ export function SmartProductVariantForm({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Validate file size (max 2MB)
+    const maxSize = 2 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: 'Error',
+        description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate it's an image
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Error',
+        description: 'Please select a valid image file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setUploadingImages(prev => ({ ...prev, [colorIndex]: true }));
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `product-${productId}-${colorIndex}-${Date.now()}.${fileExt}`;
+      const { prepareImageForUpload } = await import('@/utils/imageOptimizer');
+      
+      // Optimize image (converts to WebP and compresses)
+      const { file: optimizedFile } = await prepareImageForUpload(file, {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1200,
+        quality: 0.85,
+      });
+
+      const fileName = `product-${productId}-${colorIndex}-${Date.now()}.webp`;
 
       const { data, error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(fileName, file);
+        .upload(fileName, optimizedFile, {
+          contentType: 'image/webp',
+        });
 
       if (uploadError) throw uploadError;
 
@@ -151,13 +182,13 @@ export function SmartProductVariantForm({
 
       toast({
         title: 'Success',
-        description: 'Image uploaded successfully',
+        description: 'Image optimized and uploaded successfully',
       });
     } catch (error) {
       console.error('Error uploading image:', error);
       toast({
         title: 'Error',
-        description: 'Failed to upload image',
+        description: error instanceof Error ? error.message : 'Failed to upload image',
         variant: 'destructive',
       });
     } finally {

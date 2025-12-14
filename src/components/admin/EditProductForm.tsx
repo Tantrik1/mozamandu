@@ -199,6 +199,27 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file size (max 2MB)
+    const maxSize = 2 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: 'Error',
+        description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate it's an image
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Error',
+        description: 'Please select a valid image file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setUploadingImage(true);
     
     try {
@@ -212,7 +233,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       
       toast({
         title: 'Success',
-        description: 'Image ready for upload',
+        description: 'Image ready for upload (will be optimized to WebP)',
       });
     } catch (error) {
       console.error('Error preparing image:', error);
@@ -235,12 +256,22 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     if (!imageFile) return null;
 
     try {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `product-${Date.now()}.${fileExt}`;
+      const { prepareImageForUpload } = await import('@/utils/imageOptimizer');
+      
+      // Optimize image (converts to WebP and compresses)
+      const { file: optimizedFile } = await prepareImageForUpload(imageFile, {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1200,
+        quality: 0.85,
+      });
+
+      const fileName = `product-${Date.now()}.webp`;
 
       const { data, error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(fileName, imageFile);
+        .upload(fileName, optimizedFile, {
+          contentType: 'image/webp',
+        });
 
       if (uploadError) throw uploadError;
 
@@ -253,7 +284,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       console.error('Error uploading image:', error);
       toast({
         title: 'Error',
-        description: 'Failed to upload image',
+        description: error instanceof Error ? error.message : 'Failed to upload image',
         variant: 'destructive',
       });
       return null;
