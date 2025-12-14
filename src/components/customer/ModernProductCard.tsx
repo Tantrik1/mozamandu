@@ -1,5 +1,6 @@
 
 import { useState, useEffect, memo, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
-import { Star, ShoppingCart, Plus, Minus, Target } from 'lucide-react';
+import { Star, ShoppingCart, Plus, Minus, Target, ExternalLink } from 'lucide-react';
 import { getProductStockSummary } from '@/utils/stockCalculation';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 
@@ -52,6 +53,7 @@ interface ModernProductCardProps {
 }
 
 export const ModernProductCard = memo(function ModernProductCard({ product, subcategorySellingPrice }: ModernProductCardProps) {
+  const navigate = useNavigate();
   const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
   const [sizeVariants, setSizeVariants] = useState<SizeVariant[]>([]);
   const [selectedColor, setSelectedColor] = useState<string>('');
@@ -62,6 +64,14 @@ export const ModernProductCard = memo(function ModernProductCard({ product, subc
   const [realtimeSubcategoryPrice, setRealtimeSubcategoryPrice] = useState<number>(subcategorySellingPrice);
   
   const { addToCart, cartItems, updateQuantity, removeFromCart } = useRobustCart();
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Prevent navigation when clicking on interactive elements
+    if ((e.target as HTMLElement).closest('button, select, [role="combobox"]')) {
+      return;
+    }
+    navigate(`/product/${product.id}`);
+  };
   
   const getCartQuantity = () => {
     const cartItem = cartItems.find(item => {
@@ -287,8 +297,18 @@ export const ModernProductCard = memo(function ModernProductCard({ product, subc
   if (productStock === 0) return null;
 
   return (
-    <Card className="group h-full flex flex-col overflow-hidden bg-gradient-to-br from-card via-card to-card/80 shadow-lg hover:shadow-xl transition-all duration-500 border border-border/50 hover:border-primary/20 rounded-xl backdrop-blur-sm">
+    <Card 
+      onClick={handleCardClick}
+      className="group h-full flex flex-col overflow-hidden bg-gradient-to-br from-card via-card to-card/80 shadow-lg hover:shadow-xl transition-all duration-500 border border-border/50 hover:border-primary/20 rounded-xl backdrop-blur-sm cursor-pointer"
+    >
       <div className="relative overflow-hidden bg-gradient-to-br from-muted/30 to-muted/60 rounded-t-xl aspect-square">
+        {/* View Details Overlay */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100 z-10">
+          <span className="bg-white/90 backdrop-blur-sm text-foreground px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+            <ExternalLink className="w-4 h-4" />
+            View Details
+          </span>
+        </div>
         {currentImage ? (
           <OptimizedImage src={currentImage} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy" width={300} height={192} />
         ) : (
