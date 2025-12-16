@@ -467,32 +467,81 @@ export function EnhancedAdminDashboard() {
   };
 
   const fetchRevenueChartData = async () => {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Calculate date range based on selected period
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let startDate: Date;
+    let groupBy: 'hour' | 'day' | 'week' | 'month' = 'day';
 
-    const { data: orders } = await supabase
+    switch (revenuePeriod) {
+      case 'today':
+        startDate = today;
+        groupBy = 'hour';
+        break;
+      case 'yesterday':
+        startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 1);
+        groupBy = 'hour';
+        break;
+      case 'week':
+        startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 7);
+        groupBy = 'day';
+        break;
+      case 'month':
+        startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 30);
+        groupBy = 'day';
+        break;
+      case '3months':
+        startDate = new Date(today);
+        startDate.setMonth(startDate.getMonth() - 3);
+        groupBy = 'week';
+        break;
+      case 'all':
+        startDate = new Date('2020-01-01'); // Start from beginning
+        groupBy = 'month';
+        break;
+      default:
+        startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 7);
+        groupBy = 'day';
+    }
+
+    // For yesterday, also set end date
+    let query = supabase
       .from('customer_orders')
       .select('created_at, total_amount, status')
       .not('status', 'eq', 'cancelled')
-      .gte('created_at', thirtyDaysAgo.toISOString())
+      .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: true })
-      .limit(2000);
+      .limit(5000);
+
+    if (revenuePeriod === 'yesterday') {
+      query = query.lt('created_at', today.toISOString());
+    }
+
+    const { data: orders } = await query;
 
     if (orders) {
       const grouped = orders.reduce((acc, order) => {
         let key: string;
         const date = new Date(order.created_at!);
         
-        switch (revenuePeriod) {
+        switch (groupBy) {
+          case 'hour':
+            key = `${date.getHours().toString().padStart(2, '0')}:00`;
+            break;
           case 'day':
-            key = date.toISOString().split('T')[0];
+            key = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             break;
           case 'week':
-            const weekStart = new Date(date.setDate(date.getDate() - date.getDay()));
-            key = weekStart.toISOString().split('T')[0];
+            const weekStart = new Date(date);
+            weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+            key = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             break;
           case 'month':
-            key = date.toISOString().slice(0, 7);
+            key = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
             break;
           default:
             key = date.toISOString().split('T')[0];
@@ -506,11 +555,13 @@ export function EnhancedAdminDashboard() {
         return acc;
       }, {} as Record<string, RevenueDataPoint>);
 
-      setRevenueChartData(
-        Object.values(grouped).sort((a, b) => 
-          new Date(a.period).getTime() - new Date(b.period).getTime()
-        )
-      );
+      // Sort properly based on groupBy type
+      const sortedData = Object.values(grouped);
+      if (groupBy === 'hour') {
+        sortedData.sort((a, b) => parseInt(a.period) - parseInt(b.period));
+      }
+
+      setRevenueChartData(sortedData);
     }
   };
 

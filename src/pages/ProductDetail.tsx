@@ -273,51 +273,45 @@ export default function ProductDetail() {
 
   const currentCartQuantity = getCartQuantity();
 
-  const mockCartItem = product ? {
-    id: 'mock',
-    productId: product.id,
-    productName: product.name,
-    quantity: Math.max(currentCartQuantity + quantity, 1),
-    basePrice: product.selling_price || subcategory?.selling_price || 0,
-    subcategoryId: product.subcategory_id,
-    colorVariantId: selectedColor || null,
-    sizeVariantId: selectedSize || null,
-    addedOrder: 999,
-  } : null;
-
-  const { getItemPricing } = useSubcategoryTieredPricing({
-    cartItems: mockCartItem ? [mockCartItem] : [],
-    discountTiers
-  });
-
+  // Base price from product or subcategory
   const basePrice = product?.selling_price || subcategory?.selling_price || 0;
-  
-  const getMarginalPrice = () => {
-    const totalSubcategoryQuantity = cartItems
+
+  // Calculate total quantity in cart for this subcategory (including current selection)
+  const getTotalSubcategoryQuantityWithCurrent = () => {
+    const existingQuantity = cartItems
       .filter(item => item.subcategoryId === product?.subcategory_id)
       .reduce((total, item) => total + item.quantity, 0);
-    
-    const tiers = discountTiers[product?.subcategory_id || ''] || [];
-    const sortedTiers = tiers.sort((a, b) => a.min_quantity - b.min_quantity);
-    
-    let applicableTier = null;
-    for (const tier of sortedTiers) {
-      if (totalSubcategoryQuantity + quantity >= tier.min_quantity && 
-          (tier.max_quantity === null || totalSubcategoryQuantity + quantity <= tier.max_quantity)) {
-        applicableTier = tier;
-      }
-    }
-    
-    if (applicableTier) {
-      return basePrice - applicableTier.discount_amount;
-    }
-    return basePrice;
+    return existingQuantity + quantity;
   };
 
-  const marginalPrice = getMarginalPrice();
+  // Get applicable discount tier based on total subcategory quantity
+  const getApplicableTier = (totalQty: number) => {
+    const tiers = discountTiers[product?.subcategory_id || ''] || [];
+    const sortedTiers = [...tiers].sort((a, b) => b.min_quantity - a.min_quantity);
+    
+    for (const tier of sortedTiers) {
+      if (totalQty >= tier.min_quantity && 
+          (tier.max_quantity === null || totalQty <= tier.max_quantity)) {
+        return tier;
+      }
+    }
+    return null;
+  };
+
+  const totalSubcategoryQuantityWithCurrent = getTotalSubcategoryQuantityWithCurrent();
+  const applicableTier = getApplicableTier(totalSubcategoryQuantityWithCurrent);
+  
+  // Calculate unit price after discount (marginalPrice for backward compatibility)
+  const marginalPrice = applicableTier 
+    ? basePrice - applicableTier.discount_amount 
+    : basePrice;
+  
+  // Total price for current quantity selection
   const totalPrice = marginalPrice * quantity;
-  const savings = basePrice > marginalPrice ? (basePrice - marginalPrice) * quantity : 0;
-  const discountPercent = basePrice > marginalPrice ? Math.round((1 - marginalPrice / basePrice) * 100) : 0;
+  const savings = applicableTier ? applicableTier.discount_amount * quantity : 0;
+  const discountPercent = applicableTier 
+    ? Math.round((applicableTier.discount_amount / basePrice) * 100) 
+    : 0;
 
 
   const handleAddToCart = async () => {
@@ -858,35 +852,6 @@ export default function ProductDetail() {
         />
       )}
 
-      {/* Mobile Sticky Add to Cart */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-lg border-t border-border p-4 lg:hidden z-50">
-        <div className="flex items-center gap-3 max-w-lg mx-auto">
-          <div className="flex-1 min-w-0">
-            <p className="text-lg font-bold text-foreground">Rs. {marginalPrice.toFixed(0)}</p>
-            {discountPercent > 0 && (
-              <p className="text-xs text-green-600">{discountPercent}% off</p>
-            )}
-          </div>
-          <Button 
-            onClick={handleAddToCart}
-            disabled={actionLoading || productStock === 0}
-            variant="outline"
-            className="h-11 px-4 rounded-xl font-semibold"
-          >
-            <ShoppingCart className="w-4 h-4" />
-          </Button>
-          <Button 
-            onClick={handleBuyNow}
-            disabled={actionLoading || productStock === 0}
-            className="h-11 px-6 rounded-xl font-semibold"
-          >
-            Buy Now
-          </Button>
-        </div>
-      </div>
-
-      {/* Spacer for mobile sticky bar */}
-      <div className="h-20 lg:hidden" />
 
       <Footer />
     </div>
