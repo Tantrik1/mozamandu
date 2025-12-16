@@ -12,7 +12,7 @@ import { z } from 'zod';
 
 const reviewSchema = z.object({
   name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),
-  email: z.string().trim().email('Invalid email address').max(255),
+  email: z.string().trim().email('Invalid email address').max(255).optional().or(z.literal('')),
   rating: z.number().min(1, 'Please select a rating').max(5),
   review: z.string().trim().max(1000, 'Review must be less than 1000 characters').optional()
 });
@@ -60,7 +60,7 @@ export const ReviewForm = memo(function ReviewForm({ productId, onReviewSubmitte
           product_id: productId,
           user_id: user?.id || null,
           reviewer_name: name.trim(),
-          reviewer_email: email.trim(),
+          reviewer_email: email.trim() || 'guest@anonymous.com',
           rating,
           review_text: reviewText.trim() || null,
           status: 'pending'
@@ -120,7 +120,9 @@ export const ReviewForm = memo(function ReviewForm({ productId, onReviewSubmitte
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="review-email" className="text-foreground font-medium">Email *</Label>
+          <Label htmlFor="review-email" className="text-foreground font-medium">
+            Email {!user && <span className="text-muted-foreground text-sm">(Optional)</span>}
+          </Label>
           <Input
             id="review-email"
             type="email"
@@ -128,7 +130,7 @@ export const ReviewForm = memo(function ReviewForm({ productId, onReviewSubmitte
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Your email"
             maxLength={255}
-            required
+            disabled={!!user}
             className="bg-background"
           />
         </div>
