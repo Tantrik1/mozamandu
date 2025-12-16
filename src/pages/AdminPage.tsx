@@ -18,7 +18,7 @@ import { PaymentMethodManagement } from '@/components/admin/PaymentMethodManagem
 import { FAQManagement } from '@/components/admin/FAQManagement';
 import { NoticeManagement } from '@/components/admin/NoticeManagement';
 import { TopBarTextManagement } from '@/components/admin/TopBarTextManagement';
-import { NavbarManagement } from '@/components/admin/NavbarManagement';
+
 import { PromocodeManagement } from '@/components/admin/PromocodeManagement';
 import { AdminSettings } from '@/components/admin/AdminSettings';
 import { ModernInventoryManagement } from '@/components/inventory/ModernInventoryManagement';
@@ -108,7 +108,6 @@ export default function AdminPage() {
               <Route path="faqs" element={<FAQManagement />} />
               <Route path="notices" element={<NoticeManagement />} />
               <Route path="top-bar-text" element={<TopBarTextManagement />} />
-              <Route path="navbar" element={<NavbarManagement />} />
               <Route path="settings" element={<AdminSettings />} />
               <Route path="*" element={<Navigate to="/admin" replace />} />
             </Routes>
