@@ -23,7 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export function ModernNavbar() {
   const { user, userProfile, signOut } = useAuth();
-  const { getTotalItems } = useRobustCart();
+  const { getTotalPrice } = useRobustCart();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -92,7 +92,7 @@ export function ModernNavbar() {
     return location.pathname.startsWith(path);
   };
 
-  const totalItems = getTotalItems();
+  const cartTotal = getTotalPrice();
 
   return (
     <>
@@ -157,16 +157,16 @@ export function ModernNavbar() {
                 {/* Cart Button */}
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="relative"
+                  size="default"
+                  className="relative gap-2"
                   onClick={() => setIsCartOpen(true)}
                 >
                   <ShoppingBag className="w-5 h-5" />
-                  {totalItems > 0 && (
+                  {cartTotal > 0 && (
                     <Badge 
-                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-destructive text-destructive-foreground"
+                      className="h-6 px-2 text-[11px] bg-primary text-primary-foreground"
                     >
-                      {totalItems > 99 ? '99+' : totalItems}
+                      Nrs. {cartTotal.toLocaleString()}
                     </Badge>
                   )}
                 </Button>
