@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
+import { SimilarProducts, MoreSubcategories } from '@/components/product';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -840,6 +841,22 @@ export default function ProductDetail() {
           </div>
         </div>
       </main>
+
+      {/* Similar Products Section */}
+      {product.category_id && (
+        <SimilarProducts 
+          categoryId={product.category_id} 
+          currentProductId={product.id} 
+        />
+      )}
+
+      {/* More Subcategories Section */}
+      {product.category_id && product.subcategory_id && (
+        <MoreSubcategories 
+          categoryId={product.category_id} 
+          currentSubcategoryId={product.subcategory_id} 
+        />
+      )}
 
       {/* Mobile Sticky Add to Cart */}
       <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-lg border-t border-border p-4 lg:hidden z-50">
