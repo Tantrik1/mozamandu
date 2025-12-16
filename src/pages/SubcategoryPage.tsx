@@ -116,7 +116,7 @@ export default function SubcategoryPage() {
   };
   if (loading) {
     return <div className="min-h-screen bg-gray-50">
-        <CustomerHeader />
+        <ModernNavbar />
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center min-h-64">
             <div className="flex items-center gap-2">
@@ -129,7 +129,7 @@ export default function SubcategoryPage() {
   }
   if (!subcategory) {
     return <div className="min-h-screen bg-gray-50">
-        <CustomerHeader />
+        <ModernNavbar />
         <div className="container mx-auto px-4 py-8">
           <div className="text-center py-12">
             <div className="bg-white rounded-xl p-8 shadow-sm max-w-md mx-auto">
@@ -144,7 +144,7 @@ export default function SubcategoryPage() {
       </div>;
   }
   return <div className="min-h-screen bg-gray-50">
-      <CustomerHeader />
+      <ModernNavbar />
       <div className="container mx-auto px-4 py-6">
         {/* Breadcrumb Navigation */}
         <Breadcrumb className="mb-6">
