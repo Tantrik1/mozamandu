@@ -69,27 +69,52 @@ serve(async (req) => {
     const propertyId = Deno.env.get('GOOGLE_ANALYTICS_PROPERTY_ID');
     const serviceAccountKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY');
 
+    console.log('GA4 Analytics: Starting request');
+    console.log('Property ID exists:', !!propertyId);
+    console.log('Service Account Key exists:', !!serviceAccountKey);
+
     if (!propertyId || !serviceAccountKey) {
-      throw new Error('Missing GA4 configuration');
+      throw new Error('Missing GA4 configuration - check GOOGLE_ANALYTICS_PROPERTY_ID and GOOGLE_SERVICE_ACCOUNT_KEY secrets');
     }
 
-    const serviceAccount = JSON.parse(serviceAccountKey);
+    // Clean the property ID - remove any "properties/" prefix if present
+    const cleanPropertyId = propertyId.replace(/^properties\//, '').replace(/^G-/, '').trim();
+    console.log('Clean Property ID:', cleanPropertyId);
+
+    // Parse service account - handle potential formatting issues
+    let serviceAccount;
+    try {
+      // Try parsing directly
+      serviceAccount = JSON.parse(serviceAccountKey);
+    } catch (parseError) {
+      console.error('Initial JSON parse failed:', parseError);
+      // Try removing potential escape issues
+      try {
+        const cleanedKey = serviceAccountKey
+          .replace(/\\n/g, '\n')
+          .replace(/\\"/g, '"')
+          .trim();
+        serviceAccount = JSON.parse(cleanedKey);
+      } catch (secondError) {
+        console.error('Second JSON parse attempt failed:', secondError);
+        throw new Error('Invalid service account JSON format. Please re-enter the service account key as a valid JSON string.');
+      }
+    }
+
+    console.log('Service account parsed successfully');
+    console.log('Client email:', serviceAccount.client_email);
+
     const accessToken = await getAccessToken(serviceAccount);
+    console.log('Access token obtained successfully');
 
     // Get date ranges
     const today = new Date();
     const formatDate = (d: Date) => d.toISOString().split('T')[0];
     
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    const last7Days = new Date(today);
-    last7Days.setDate(last7Days.getDate() - 7);
-    
     const last30Days = new Date(today);
     last30Days.setDate(last30Days.getDate() - 30);
 
-    // Fetch GA4 data
+    // Fetch GA4 data - using the numeric property ID
     const reportRequest = {
       dateRanges: [
         { startDate: formatDate(last30Days), endDate: formatDate(today) }
@@ -105,8 +130,10 @@ serve(async (req) => {
       ],
     };
 
+    console.log('Sending request to GA4 API for property:', cleanPropertyId);
+
     const response = await fetch(
-      `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
+      `https://analyticsdata.googleapis.com/v1beta/properties/${cleanPropertyId}:runReport`,
       {
         method: 'POST',
         headers: {
@@ -119,10 +146,12 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('GA4 API error:', response.status, errorText);
       throw new Error(`GA4 API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
+    console.log('GA4 API response received successfully');
     
     // Parse metrics from response
     const metrics = data.rows?.[0]?.metricValues || [];
@@ -139,6 +168,8 @@ serve(async (req) => {
     const returningUsers = totalUsers - newUsers;
     const engagementRate = sessions > 0 ? (engagedSessions / sessions) * 100 : 0;
 
+    console.log('Metrics parsed:', { totalUsers, sessions, bounceRate, pageViews });
+
     return new Response(JSON.stringify({
       success: true,
       data: {
@@ -151,7 +182,7 @@ serve(async (req) => {
         pageViews,
         avgSessionDuration: Math.round(avgSessionDuration),
         engagementRate: Math.round(engagementRate * 10) / 10,
-        // Simulated conversion rates (these would need e-commerce tracking setup in GA4)
+        // These would need e-commerce tracking setup in GA4
         addToCartRate: 0,
         checkoutInitiationRate: 0,
         cartAbandonmentRate: 0,
