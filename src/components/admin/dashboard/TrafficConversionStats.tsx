@@ -39,7 +39,7 @@ export function TrafficConversionStats({
         <CardTitle className="flex items-center gap-2 text-base">
           <Globe className="h-5 w-5 text-primary" />
           Traffic & Conversion
-          <span className="text-xs text-muted-foreground font-normal ml-auto">(Simulated)</span>
+          <span className="text-xs text-muted-foreground font-normal ml-auto">(Google Analytics)</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
