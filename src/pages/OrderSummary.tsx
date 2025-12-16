@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle, Package, Phone, Mail, Download, ArrowLeft, Printer, Tag } from 'lucide-react';
-import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
 import { toast } from '@/hooks/use-toast';
@@ -257,7 +257,7 @@ export default function OrderSummary() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <CustomerHeader />
+        <ModernNavbar />
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
@@ -271,7 +271,7 @@ export default function OrderSummary() {
   if (!orderDetails) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <CustomerHeader />
+        <ModernNavbar />
         <div className="text-center py-20">
           <p className="text-red-600 text-lg">Order not found</p>
           <Button onClick={handleBackNavigation} className="mt-4">
@@ -286,7 +286,7 @@ export default function OrderSummary() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <CustomerHeader />
+      <ModernNavbar />
       
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header Section */}

@@ -1,5 +1,4 @@
-import { CustomerHeader } from '@/components/customer/CustomerHeader';
-import { TopBar } from '@/components/customer/TopBar';
+import { ModernNavbar } from '@/components/navbar';
 import { HeroSection } from '@/components/customer/HeroSection';
 import { NoticePopup } from '@/components/notices/NoticePopup';
 import { Footer } from '@/components/layout/Footer';
@@ -24,8 +23,7 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopBar />
-      <CustomerHeader />
+      <ModernNavbar />
       <NoticePopup notice={notice} />
       <HeroSection />
       <Footer />
