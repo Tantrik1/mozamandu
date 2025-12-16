@@ -13,7 +13,7 @@ export function HeroSection() {
       }}
     >
       {/* Content */}
-      <div className="relative z-10 text-center px-6 sm:px-10 max-w-[75%] sm:max-w-3xl mx-auto py-8 sm:py-14 rounded-2xl border border-white/20 shadow-xl shadow-black/5">
+      <div className="relative z-10 text-center px-6 sm:px-10 max-w-[75%] sm:max-w-3xl mx-auto py-8 sm:py-14 bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 shadow-xl shadow-black/10">
         {/* H1 - CSS animated entrance */}
         <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-3 sm:mb-4 leading-tight tracking-tight animate-fade-in">
           Welcome To Mozamandu
