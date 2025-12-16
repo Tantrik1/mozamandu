@@ -1,9 +1,7 @@
-
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { memo, useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { X } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 interface Notice {
   id: string;
@@ -12,41 +10,21 @@ interface Notice {
   image_url: string | null;
 }
 
-export function NoticePopup() {
-  const [notice, setNotice] = useState<Notice | null>(null);
+interface NoticePopupProps {
+  notice: Notice | null | undefined;
+}
+
+export const NoticePopup = memo(function NoticePopup({ notice }: NoticePopupProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    fetchActiveNotice();
-  }, []);
-
-  const fetchActiveNotice = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('notices')
-        .select('id, title, description, image_url')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error) {
-        console.log('No active notice found');
-        return;
-      }
-
-      if (data) {
-        setNotice(data);
-        setIsOpen(true);
-      }
-    } catch (error) {
-      console.error('Error fetching active notice:', error);
+    if (notice) {
+      setIsOpen(true);
     }
-  };
+  }, [notice]);
 
   const handleClose = () => {
     setIsOpen(false);
-    setNotice(null);
   };
 
   if (!notice) return null;
@@ -54,6 +32,10 @@ export function NoticePopup() {
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="w-[95vw] max-w-4xl p-0 overflow-hidden [&>button]:hidden border-0">
+        <VisuallyHidden>
+          <DialogTitle>{notice.title}</DialogTitle>
+          <DialogDescription>{notice.description || 'Notice'}</DialogDescription>
+        </VisuallyHidden>
         <div className="relative aspect-video w-full">
           {/* Cross button on top right */}
           <button
@@ -69,6 +51,7 @@ export function NoticePopup() {
               src={notice.image_url}
               alt={notice.title}
               className="w-full h-full object-cover"
+              loading="eager"
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center">
@@ -100,4 +83,4 @@ export function NoticePopup() {
       </DialogContent>
     </Dialog>
   );
-}
+});

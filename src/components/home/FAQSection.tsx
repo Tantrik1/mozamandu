@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react';
+import { memo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { HelpCircle, ChevronDown } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface FAQ {
   id: string;
@@ -11,30 +9,15 @@ interface FAQ {
   answer: string;
 }
 
-export function FAQSection() {
-  const [faqs, setFaqs] = useState<FAQ[]>([]);
+interface FAQSectionProps {
+  faqs: FAQ[];
+  isLoading: boolean;
+}
+
+export const FAQSection = memo(function FAQSection({ faqs, isLoading }: FAQSectionProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchFAQs() {
-      const { data } = await supabase
-        .from('faqs')
-        .select('id, question, answer')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true })
-        .limit(5);
-
-      if (data) {
-        setFaqs(data);
-      }
-      setLoading(false);
-    }
-
-    fetchFAQs();
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <section className="py-16 lg:py-24 bg-muted/30">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -53,13 +36,7 @@ export function FAQSection() {
   return (
     <section className="py-16 lg:py-24 bg-muted/30">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div 
-          className="text-center mb-10"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
+        <div className="text-center mb-10 animate-fade-in">
           <div className="inline-flex items-center gap-2 text-primary text-sm font-medium mb-2">
             <HelpCircle className="w-4 h-4" />
             Got Questions?
@@ -70,15 +47,9 @@ export function FAQSection() {
           <p className="text-muted-foreground max-w-lg mx-auto">
             Find answers to common questions about our products, shipping, and policies.
           </p>
-        </motion.div>
+        </div>
 
-        <motion.div 
-          className="space-y-3"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
+        <div className="space-y-3 animate-fade-in" style={{ animationDelay: '0.1s' }}>
           {faqs.map((faq, index) => (
             <div
               key={faq.id}
@@ -95,37 +66,27 @@ export function FAQSection() {
                   }`}
                 />
               </button>
-              <AnimatePresence>
-                {openIndex === index && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3, ease: 'easeInOut' }}
-                    className="overflow-hidden"
-                  >
-                    <div className="px-5 pb-5 text-muted-foreground leading-relaxed">
-                      {faq.answer}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <div
+                className={`grid transition-all duration-300 ease-in-out ${
+                  openIndex === index ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="px-5 pb-5 text-muted-foreground leading-relaxed">
+                    {faq.answer}
+                  </div>
+                </div>
+              </div>
             </div>
           ))}
-        </motion.div>
+        </div>
 
-        <motion.div 
-          className="text-center mt-8"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-        >
+        <div className="text-center mt-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
           <Button asChild variant="outline" className="rounded-full">
             <Link to="/faq">View All FAQs</Link>
           </Button>
-        </motion.div>
+        </div>
       </div>
     </section>
   );
-}
+});

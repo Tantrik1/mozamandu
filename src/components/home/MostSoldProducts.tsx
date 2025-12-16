@@ -1,67 +1,24 @@
-import { useState, useEffect } from 'react';
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, TrendingUp, Flame } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 interface Product {
   id: string;
   name: string;
   selling_price: number | null;
   image_url: string | null;
-  subcategory: {
-    name: string;
-  } | null;
+  subcategory: { name: string } | null;
   order_count: number;
 }
 
-export function MostSoldProducts() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+interface MostSoldProductsProps {
+  products: Product[];
+  isLoading: boolean;
+}
 
-  useEffect(() => {
-    async function fetchMostSoldProducts() {
-      // Get products with their order counts
-      const { data: orderItems } = await supabase
-        .from('customer_order_item_details')
-        .select('product_name, quantity');
-
-      // Count orders per product name
-      const productOrderCounts: Record<string, number> = {};
-      orderItems?.forEach(item => {
-        productOrderCounts[item.product_name] = (productOrderCounts[item.product_name] || 0) + item.quantity;
-      });
-
-      // Get featured products as fallback, or products with highest order counts
-      const { data: productsData } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          selling_price,
-          image_url,
-          subcategory:subcategories(name)
-        `)
-        .eq('status', 'active')
-        .limit(8);
-
-      if (productsData) {
-        // Sort by order count
-        const productsWithCounts = productsData.map(p => ({
-          ...p,
-          order_count: productOrderCounts[p.name] || 0
-        })).sort((a, b) => b.order_count - a.order_count);
-
-        setProducts(productsWithCounts as Product[]);
-      }
-      setLoading(false);
-    }
-
-    fetchMostSoldProducts();
-  }, []);
-
-  if (loading) {
+export const MostSoldProducts = memo(function MostSoldProducts({ products, isLoading }: MostSoldProductsProps) {
+  if (isLoading) {
     return (
       <section className="py-16 lg:py-24 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -80,13 +37,7 @@ export function MostSoldProducts() {
   return (
     <section className="py-16 lg:py-24 bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div 
-          className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10 animate-fade-in">
           <div>
             <div className="inline-flex items-center gap-2 text-primary text-sm font-medium mb-2">
               <TrendingUp className="w-4 h-4" />
@@ -102,16 +53,14 @@ export function MostSoldProducts() {
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </Button>
-        </motion.div>
+        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
           {products.map((product, index) => (
-            <motion.div
+            <div
               key={product.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
+              className="animate-fade-in"
+              style={{ animationDelay: `${index * 50}ms` }}
             >
               <Link 
                 to={`/product/${product.id}`}
@@ -123,6 +72,7 @@ export function MostSoldProducts() {
                     alt={product.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     loading="lazy"
+                    decoding="async"
                     width={512}
                     height={512}
                   />
@@ -145,10 +95,10 @@ export function MostSoldProducts() {
                   </p>
                 </div>
               </Link>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>
     </section>
   );
-}
+});

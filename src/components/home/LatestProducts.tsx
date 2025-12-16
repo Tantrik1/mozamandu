@@ -1,49 +1,23 @@
-import { useState, useEffect } from 'react';
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Clock } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 interface Product {
   id: string;
   name: string;
   selling_price: number | null;
   image_url: string | null;
-  subcategory: {
-    name: string;
-  } | null;
+  subcategory: { name: string } | null;
 }
 
-export function LatestProducts() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+interface LatestProductsProps {
+  products: Product[];
+  isLoading: boolean;
+}
 
-  useEffect(() => {
-    async function fetchLatestProducts() {
-      const { data } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          selling_price,
-          image_url,
-          subcategory:subcategories(name)
-        `)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(8);
-
-      if (data) {
-        setProducts(data as Product[]);
-      }
-      setLoading(false);
-    }
-
-    fetchLatestProducts();
-  }, []);
-
-  if (loading) {
+export const LatestProducts = memo(function LatestProducts({ products, isLoading }: LatestProductsProps) {
+  if (isLoading) {
     return (
       <section className="py-16 lg:py-24 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -62,13 +36,7 @@ export function LatestProducts() {
   return (
     <section className="py-16 lg:py-24 bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div 
-          className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10 animate-fade-in">
           <div>
             <div className="inline-flex items-center gap-2 text-primary text-sm font-medium mb-2">
               <Clock className="w-4 h-4" />
@@ -84,16 +52,14 @@ export function LatestProducts() {
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </Button>
-        </motion.div>
+        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
           {products.map((product, index) => (
-            <motion.div
+            <div
               key={product.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
+              className="animate-fade-in"
+              style={{ animationDelay: `${index * 50}ms` }}
             >
               <Link 
                 to={`/product/${product.id}`}
@@ -105,6 +71,7 @@ export function LatestProducts() {
                     alt={product.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     loading="lazy"
+                    decoding="async"
                     width={512}
                     height={512}
                   />
@@ -126,10 +93,10 @@ export function LatestProducts() {
                   </p>
                 </div>
               </Link>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>
     </section>
   );
-}
+});

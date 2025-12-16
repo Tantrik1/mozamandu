@@ -1,6 +1,7 @@
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { NoticePopup } from '@/components/notices/NoticePopup';
+import { useHomepageData } from '@/hooks/useHomepageData';
 import {
   HeroSection,
   LatestProducts,
@@ -11,28 +12,42 @@ import {
 } from '@/components/home';
 
 export default function Home() {
+  const {
+    latestProducts,
+    mostSoldProducts,
+    categories,
+    faqs,
+    featuredProducts,
+    notice,
+    isLatestLoading,
+    isMostSoldLoading,
+    isCategoriesLoading,
+    isFAQsLoading,
+    isFeaturedLoading,
+  } = useHomepageData();
+
   return (
     <div className="min-h-screen bg-background">
       <ModernNavbar />
-      <NoticePopup />
+      <NoticePopup notice={notice} />
       
       {/* Hero Section */}
       <HeroSection />
 
       {/* Latest Products */}
-      <LatestProducts />
+      <LatestProducts products={latestProducts} isLoading={isLatestLoading} />
 
       {/* Shop by Category */}
-      <ShopByCategory />
+      <ShopByCategory categories={categories} isLoading={isCategoriesLoading} />
 
       {/* Most Sold Products */}
-      <MostSoldProducts />
+      <MostSoldProducts products={mostSoldProducts} isLoading={isMostSoldLoading} />
 
       {/* FAQ Section */}
-      <FAQSection />
+      <FAQSection faqs={faqs} isLoading={isFAQsLoading} />
 
       {/* Featured Deals */}
-      <FeaturedDeals />
+      <FeaturedDeals products={featuredProducts} isLoading={isFeaturedLoading} />
 
       {/* Footer */}
       <Footer />
