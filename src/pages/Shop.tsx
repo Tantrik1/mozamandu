@@ -27,14 +27,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 
 interface Category {
   id: string;
@@ -214,73 +206,12 @@ const Shop = memo(function Shop() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Build breadcrumb
-  const renderBreadcrumb = () => {
-    return (
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/">Home</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          
-          {searchQuery ? (
-            <BreadcrumbItem>
-              <BreadcrumbPage>Search: "{searchQuery}"</BreadcrumbPage>
-            </BreadcrumbItem>
-          ) : (
-            <>
-              <BreadcrumbItem>
-                <BreadcrumbLink 
-                  className={cn(!categoryId && "text-foreground font-medium")}
-                  asChild
-                >
-                  <Link to="/shop">Shop</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              
-              {selectedCategory && (
-                <>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbLink 
-                      className={cn(!subcategoryId && "text-foreground font-medium")}
-                      asChild
-                    >
-                      <Link to={`/shop?category=${selectedCategory.id}`}>
-                        {selectedCategory.name}
-                      </Link>
-                    </BreadcrumbLink>
-                  </BreadcrumbItem>
-                </>
-              )}
-              
-              {selectedSubcategory && (
-                <>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>{selectedSubcategory.name}</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </>
-              )}
-            </>
-          )}
-        </BreadcrumbList>
-      </Breadcrumb>
-    );
-  };
 
   return (
     <div className="min-h-screen bg-background">
       <ModernNavbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Breadcrumb */}
-        <div className="mb-6">
-          {renderBreadcrumb()}
-        </div>
 
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
