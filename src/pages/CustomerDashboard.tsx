@@ -2,8 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { ContactInfoForm } from '@/components/customer/ContactInfoForm';
-import { CustomerHeader } from '@/components/customer/CustomerHeader';
-import { TopBar } from '@/components/customer/TopBar';
+import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -119,7 +118,7 @@ export default function CustomerDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <CustomerHeader />
+      <ModernNavbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">

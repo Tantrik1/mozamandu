@@ -1,11 +1,11 @@
 
-import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 
 export default function ShippingPolicy() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <CustomerHeader />
+      <ModernNavbar />
       <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">Shipping & Refunds Policy</h1>

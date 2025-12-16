@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Package, Phone, Mail, MapPin, Calendar, CreditCard, Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
 import { useAuth } from '@/hooks/useAuth';
@@ -149,7 +149,7 @@ export default function CustomerOrderSummary() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <CustomerHeader />
+        <ModernNavbar />
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
@@ -164,7 +164,7 @@ export default function CustomerOrderSummary() {
   if (error || !orderDetails) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <CustomerHeader />
+        <ModernNavbar />
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Order Not Found</h1>
@@ -184,7 +184,7 @@ export default function CustomerOrderSummary() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <CustomerHeader />
+      <ModernNavbar />
       
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-6">
