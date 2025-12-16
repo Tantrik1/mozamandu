@@ -60,13 +60,13 @@ export function CoreBusinessStats({
     },
     {
       label: 'Conversion Rate',
-      value: `${conversionRate.toFixed(2)}%`,
+      value: conversionRate > 0 ? `${conversionRate.toFixed(2)}%` : 'N/A',
       icon: TrendingUp,
       color: 'text-cyan-600',
       bgColor: 'bg-cyan-50 dark:bg-cyan-950/30'
     },
     {
-      label: 'Refund Rate',
+      label: 'Cancellation Rate',
       value: `${refundRate.toFixed(2)}%`,
       icon: RotateCcw,
       color: 'text-amber-600',
@@ -74,7 +74,7 @@ export function CoreBusinessStats({
     },
     {
       label: 'Return Rate',
-      value: `${returnRate.toFixed(2)}%`,
+      value: returnRate > 0 ? `${returnRate.toFixed(2)}%` : 'N/A',
       icon: RotateCcw,
       color: 'text-rose-600',
       bgColor: 'bg-rose-50 dark:bg-rose-950/30'

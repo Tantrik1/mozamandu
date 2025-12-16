@@ -170,14 +170,30 @@ export function EnhancedAdminDashboard() {
     const totalOrders = nonCancelledOrders.length;
     const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
     
-    const estimatedCostOfGoods = totalSubtotal * 0.7;
+    // Fetch actual cost data from inventory
+    const { data: inventoryData } = await supabase
+      .from('product_inventory')
+      .select('cost_price, selling_price')
+      .limit(500);
+    
+    // Calculate actual gross margin from inventory data
+    const avgCostRatio = inventoryData && inventoryData.length > 0
+      ? inventoryData.reduce((sum, item) => {
+          const cost = Number(item.cost_price || 0);
+          const sell = Number(item.selling_price || item.cost_price || 1);
+          return sum + (cost / sell);
+        }, 0) / inventoryData.length
+      : 0.7;
+    
+    const estimatedCostOfGoods = totalSubtotal * avgCostRatio;
     const netProfit = totalSubtotal - estimatedCostOfGoods;
     const grossMargin = totalSubtotal > 0 ? ((totalSubtotal - estimatedCostOfGoods) / totalSubtotal) * 100 : 0;
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     
-    const refundRate = orders.length > 0 ? (cancelledOrders / orders.length) * 100 * 0.3 : 0;
-    const returnRate = orders.length > 0 ? (cancelledOrders / orders.length) * 100 * 0.2 : 0;
-    const conversionRate = 3.2 + Math.random() * 2;
+    // Calculate actual rates from order data
+    const refundRate = orders.length > 0 ? (cancelledOrders / orders.length) * 100 : 0;
+    const returnRate = 0; // No return status in system yet
+    const conversionRate = 0; // Requires website traffic data (GA removed)
 
     setCoreStats({
       totalRevenue,
