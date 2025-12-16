@@ -71,42 +71,7 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
     saveCartToStorage();
   }, [cartItems]);
 
-  useEffect(() => {
-    // Clean up out of stock items periodically
-    const cleanUpOutOfStockItems = async () => {
-      const itemsToRemove: string[] = [];
-      
-      for (const item of cartItems) {
-        try {
-          const stockAvailable = await checkStockAvailability(
-            item.productId, 
-            item.colorVariantId, 
-            item.sizeVariantId, 
-            item.quantity
-          );
-          
-          if (!stockAvailable.available) {
-            itemsToRemove.push(item.id);
-          }
-        } catch (error) {
-          console.error('Error checking stock for item:', item.id, error);
-        }
-      }
-      
-      if (itemsToRemove.length > 0) {
-        setCartItems(prev => prev.filter(item => !itemsToRemove.includes(item.id)));
-        toast({
-          title: "Cart Updated",
-          description: `${itemsToRemove.length} out of stock item(s) removed from cart`,
-          variant: "destructive",
-        });
-      }
-    };
-
-    if (cartItems.length > 0) {
-      cleanUpOutOfStockItems();
-    }
-  }, [cartItems.length]); // Only run when cart items length changes
+  // Stock cleanup moved to checkout page only - removed from here to improve performance
 
   const loadCartFromStorage = () => {
     try {

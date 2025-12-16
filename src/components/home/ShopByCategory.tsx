@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react';
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { ArrowRight, Grid3X3 } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 interface Category {
   id: string;
@@ -11,33 +9,13 @@ interface Category {
   subcategories: { image_url: string | null }[];
 }
 
-export function ShopByCategory() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+interface ShopByCategoryProps {
+  categories: Category[];
+  isLoading: boolean;
+}
 
-  useEffect(() => {
-    async function fetchCategories() {
-      const { data } = await supabase
-        .from('categories')
-        .select(`
-          id,
-          name,
-          description,
-          subcategories(image_url)
-        `)
-        .eq('status', 'on')
-        .limit(6);
-
-      if (data) {
-        setCategories(data as Category[]);
-      }
-      setLoading(false);
-    }
-
-    fetchCategories();
-  }, []);
-
-  if (loading) {
+export const ShopByCategory = memo(function ShopByCategory({ categories, isLoading }: ShopByCategoryProps) {
+  if (isLoading) {
     return (
       <section className="py-16 lg:py-24 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -56,13 +34,7 @@ export function ShopByCategory() {
   return (
     <section className="py-16 lg:py-24 bg-muted/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div 
-          className="text-center mb-10"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
+        <div className="text-center mb-10 animate-fade-in">
           <div className="inline-flex items-center gap-2 text-primary text-sm font-medium mb-2">
             <Grid3X3 className="w-4 h-4" />
             Browse Collection
@@ -70,19 +42,17 @@ export function ShopByCategory() {
           <h2 className="text-3xl lg:text-4xl font-bold text-foreground">
             Shop by Category
           </h2>
-        </motion.div>
+        </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
           {categories.map((category, index) => {
             const categoryImage = category.subcategories?.[0]?.image_url;
             
             return (
-              <motion.div
+              <div
                 key={category.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
+                className="animate-fade-in"
+                style={{ animationDelay: `${index * 50}ms` }}
               >
                 <Link 
                   to={`/shop?category=${category.id}`}
@@ -94,6 +64,7 @@ export function ShopByCategory() {
                       alt={category.name}
                       className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:opacity-30 group-hover:scale-105 transition-all duration-500"
                       loading="lazy"
+                      decoding="async"
                     />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/50 to-transparent" />
@@ -112,11 +83,11 @@ export function ShopByCategory() {
                     </div>
                   </div>
                 </Link>
-              </motion.div>
+              </div>
             );
           })}
         </div>
       </div>
     </section>
   );
-}
+});

@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react';
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Percent, Tag } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 interface Product {
   id: string;
@@ -11,41 +9,16 @@ interface Product {
   selling_price: number | null;
   cost_price: number;
   image_url: string | null;
-  subcategory: {
-    name: string;
-  } | null;
+  subcategory: { name: string } | null;
 }
 
-export function FeaturedDeals() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+interface FeaturedDealsProps {
+  products: Product[];
+  isLoading: boolean;
+}
 
-  useEffect(() => {
-    async function fetchFeaturedProducts() {
-      const { data } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          selling_price,
-          cost_price,
-          image_url,
-          subcategory:subcategories(name)
-        `)
-        .eq('status', 'active')
-        .eq('is_featured', true)
-        .limit(4);
-
-      if (data) {
-        setProducts(data as Product[]);
-      }
-      setLoading(false);
-    }
-
-    fetchFeaturedProducts();
-  }, []);
-
-  if (loading) {
+export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }: FeaturedDealsProps) {
+  if (isLoading) {
     return (
       <section className="py-16 lg:py-24 bg-primary/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -64,13 +37,7 @@ export function FeaturedDeals() {
   return (
     <section className="py-16 lg:py-24 bg-gradient-to-br from-primary/5 via-primary/10 to-accent/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div 
-          className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10 animate-fade-in">
           <div>
             <div className="inline-flex items-center gap-2 text-primary text-sm font-medium mb-2">
               <Tag className="w-4 h-4" />
@@ -89,7 +56,7 @@ export function FeaturedDeals() {
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </Button>
-        </motion.div>
+        </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
           {products.map((product, index) => {
@@ -98,12 +65,10 @@ export function FeaturedDeals() {
               : 0;
 
             return (
-              <motion.div
+              <div
                 key={product.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
+                className="animate-fade-in"
+                style={{ animationDelay: `${index * 50}ms` }}
               >
                 <Link 
                   to={`/product/${product.id}`}
@@ -115,6 +80,7 @@ export function FeaturedDeals() {
                       alt={product.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       loading="lazy"
+                      decoding="async"
                       width={512}
                       height={512}
                     />
@@ -146,11 +112,11 @@ export function FeaturedDeals() {
                     </div>
                   </div>
                 </Link>
-              </motion.div>
+              </div>
             );
           })}
         </div>
       </div>
     </section>
   );
-}
+});

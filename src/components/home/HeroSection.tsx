@@ -1,76 +1,37 @@
+import { memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Sparkles } from 'lucide-react';
-import { motion } from 'framer-motion';
 
-export function HeroSection() {
+export const HeroSection = memo(function HeroSection() {
   return (
     <section className="relative min-h-[90vh] overflow-hidden bg-gradient-to-br from-background via-muted/50 to-primary/5">
-      {/* Animated background elements */}
+      {/* Static background elements - no JS animations */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div 
-          className="absolute top-20 right-[10%] w-72 h-72 bg-primary/10 rounded-full blur-3xl"
-          animate={{ 
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3]
-          }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div 
-          className="absolute bottom-20 left-[5%] w-96 h-96 bg-accent/10 rounded-full blur-3xl"
-          animate={{ 
-            scale: [1.2, 1, 1.2],
-            opacity: [0.2, 0.4, 0.2]
-          }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        />
+        <div className="absolute top-20 right-[10%] w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-20 left-[5%] w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16 lg:pt-32 lg:pb-24">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center min-h-[70vh]">
-          {/* Left content */}
-          <motion.div 
-            className="text-center lg:text-left"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6"
-            >
+          {/* Left content - CSS animations only */}
+          <div className="text-center lg:text-left animate-fade-in">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
               <Sparkles className="w-4 h-4" />
               Premium Quality Socks
-            </motion.div>
+            </div>
 
-            <motion.h1 
-              className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-foreground leading-tight mb-6"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.6 }}
-            >
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-foreground leading-tight mb-6">
               Step Into
               <span className="block text-primary mt-2">Comfort & Style</span>
-            </motion.h1>
+            </h1>
 
-            <motion.p 
-              className="text-lg sm:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-8 leading-relaxed"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 0.6 }}
-            >
+            <p className="text-lg sm:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-8 leading-relaxed">
               Discover our curated collection of premium socks designed for ultimate comfort. 
               Every pair tells a story of quality craftsmanship.
-            </motion.p>
+            </p>
 
-            <motion.div 
-              className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.6 }}
-            >
+            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <Button 
                 asChild 
                 size="lg" 
@@ -91,46 +52,32 @@ export function HeroSection() {
                   Explore Categories
                 </Link>
               </Button>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
 
-          {/* Right - Hero visual */}
-          <motion.div 
-            className="relative flex items-center justify-center"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" }}
-          >
+          {/* Right - Hero visual with CSS animations */}
+          <div className="relative flex items-center justify-center animate-fade-in" style={{ animationDelay: '0.2s' }}>
             <div className="relative w-full max-w-lg">
-              {/* Floating circles */}
-              <motion.div 
-                className="absolute -top-8 -left-8 w-24 h-24 bg-primary/20 rounded-full"
-                animate={{ y: [0, -15, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              />
-              <motion.div 
-                className="absolute -bottom-4 -right-4 w-32 h-32 bg-accent/20 rounded-full"
-                animate={{ y: [0, 15, 0] }}
-                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-              />
+              {/* Floating circles - CSS only */}
+              <div className="absolute -top-8 -left-8 w-24 h-24 bg-primary/20 rounded-full animate-bounce" style={{ animationDuration: '3s' }} />
+              <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-accent/20 rounded-full animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.5s' }} />
               
               {/* Main image container */}
-              <motion.div 
-                className="relative bg-gradient-to-br from-muted to-muted/50 rounded-3xl p-8 shadow-2xl"
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-              >
+              <div className="relative bg-gradient-to-br from-muted to-muted/50 rounded-3xl p-8 shadow-2xl">
                 <img
                   src="/lovable-uploads/9e1dcca9-44bc-44a8-aa02-56cef600abbb.png"
                   alt="Premium Mozamandu Socks Collection"
                   className="w-full h-auto object-contain drop-shadow-xl"
                   loading="eager"
+                  fetchPriority="high"
+                  width={400}
+                  height={400}
                 />
-              </motion.div>
+              </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>
   );
-}
+});
