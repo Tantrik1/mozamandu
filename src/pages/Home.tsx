@@ -22,9 +22,7 @@ export default function Home() {
       <NoticePopup notice={notice} />
       
       {/* Hero Section */}
-      <HeroSection style={{
-      backgroundImage: "url(\"/lovable-uploads/952f8e2c-0d46-4060-bc59-a447a84eb299.png\")"
-    }} />
+      <HeroSection />
 
       {/* Latest Products */}
       <LatestProducts products={latestProducts} isLoading={isLatestLoading} />
