@@ -8,7 +8,7 @@ export function HeroSection() {
       {/* eslint-disable-next-line react/no-unknown-property */}
       <img src={heroBackground} alt="Mozamandu Premium Socks Collection"
     // @ts-ignore - fetchpriority is a valid HTML attribute
-    fetchpriority="high" decoding="sync" width={1920} height={1080} className="absolute inset-0 w-full h-full object-cover object-top" />
+    fetchpriority="high" decoding="sync" width={1920} height={1080} className="absolute inset-0 w-full h-full object-cover object-center md:object-center" />
       
       {/* Content */}
       <div className="relative z-10 text-center px-6 sm:px-10 max-w-[75%] sm:max-w-3xl mx-auto py-8 bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 shadow-xl shadow-black/10 sm:py-[37px]">
