@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Home, Store, Search, ShoppingBag, User, Menu, X, LogOut, LayoutDashboard } from 'lucide-react';
+import { Store, Search, ShoppingBag, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,12 +21,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
-export function ModernNavbar() {
+export const ModernNavbar = memo(function ModernNavbar() {
   const { user, userProfile, signOut } = useAuth();
   const { getTotalPrice } = useRobustCart();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -36,26 +35,9 @@ export function ModernNavbar() {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
     };
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
-  }, [location.pathname]);
-
-  // Lock body scroll when mobile menu is open
-  useEffect(() => {
-    if (isMobileMenuOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isMobileMenuOpen]);
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -82,16 +64,6 @@ export function ModernNavbar() {
     }
   };
 
-  const navItems = [
-    { name: 'Home', path: '/', icon: Home },
-    { name: 'Shop', path: '/shop', icon: Store },
-  ];
-
-  const isActive = (path: string) => {
-    if (path === '/') return location.pathname === '/';
-    return location.pathname.startsWith(path);
-  };
-
   const cartTotal = getTotalPrice();
 
   return (
@@ -114,28 +86,10 @@ export function ModernNavbar() {
                 <img 
                   alt="Mozamandu" 
                   className="h-9 w-auto transition-transform duration-300 group-hover:scale-105" 
-                  src="/lovable-uploads/275eacee-9393-4919-a575-7341c6d73ab3.png" 
+                  src="/lovable-uploads/275eacee-9393-4919-a575-7341c6d73ab3.png"
+                  loading="eager"
                 />
               </Link>
-
-              {/* Desktop Navigation */}
-              <nav className="hidden lg:flex items-center gap-1">
-                {navItems.map((item) => (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
-                      isActive(item.path)
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <item.icon className="w-4 h-4" />
-                    {item.name}
-                  </Link>
-                ))}
-              </nav>
 
               {/* Desktop Search Bar */}
               <div className="hidden lg:block flex-1 max-w-xl mx-8">
@@ -154,6 +108,19 @@ export function ModernNavbar() {
                   <Search className="w-5 h-5" />
                 </Button>
 
+                {/* Shop Button - visible on all screens */}
+                <Link to="/shop">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      location.pathname.startsWith('/shop') && "bg-primary text-primary-foreground"
+                    )}
+                  >
+                    <Store className="w-5 h-5" />
+                  </Button>
+                </Link>
+
                 {/* Cart Button */}
                 <Button
                   variant="ghost"
@@ -164,7 +131,7 @@ export function ModernNavbar() {
                   <ShoppingBag className="w-5 h-5" />
                   {cartTotal > 0 && (
                     <Badge 
-                      className="h-6 px-2 text-[11px] bg-primary text-primary-foreground"
+                      className="h-6 px-2 text-[11px] bg-primary text-primary-foreground hidden sm:flex"
                     >
                       Nrs. {cartTotal.toLocaleString()}
                     </Badge>
@@ -205,96 +172,16 @@ export function ModernNavbar() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
-                  <Link to="/auth" className="hidden sm:block">
-                    <Button size="sm" className="rounded-full px-6">
-                      Login
+                  <Link to="/auth">
+                    <Button variant="ghost" size="icon" className="rounded-full">
+                      <User className="w-5 h-5" />
                     </Button>
                   </Link>
                 )}
-
-                {/* Mobile Menu Button */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="lg:hidden"
-                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                >
-                  {isMobileMenuOpen ? (
-                    <X className="w-5 h-5" />
-                  ) : (
-                    <Menu className="w-5 h-5" />
-                  )}
-                </Button>
               </div>
             </div>
           </div>
         </header>
-
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <>
-            <div 
-              className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
-              onClick={() => setIsMobileMenuOpen(false)}
-            />
-            <div className="fixed inset-x-0 top-[calc(var(--topbar-height,40px)+64px)] bottom-0 bg-background z-50 lg:hidden animate-in slide-in-from-top-2 duration-200">
-              <nav className="flex flex-col p-4 gap-2">
-                {navItems.map((item) => (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={cn(
-                      "flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all duration-200",
-                      isActive(item.path)
-                        ? "bg-primary text-primary-foreground"
-                        : "text-foreground hover:bg-accent"
-                    )}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <item.icon className="w-5 h-5" />
-                    {item.name}
-                  </Link>
-                ))}
-                
-                <div className="border-t my-4" />
-                
-                {user ? (
-                  <>
-                    <button
-                      onClick={() => {
-                        handleDashboardClick();
-                        setIsMobileMenuOpen(false);
-                      }}
-                      className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-foreground hover:bg-accent transition-all duration-200"
-                    >
-                      <LayoutDashboard className="w-5 h-5" />
-                      {userProfile?.role === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleSignOut();
-                        setIsMobileMenuOpen(false);
-                      }}
-                      className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-destructive hover:bg-destructive/10 transition-all duration-200"
-                    >
-                      <LogOut className="w-5 h-5" />
-                      Sign Out
-                    </button>
-                  </>
-                ) : (
-                  <Link
-                    to="/auth"
-                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-base font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <User className="w-5 h-5" />
-                    Login
-                  </Link>
-                )}
-              </nav>
-            </div>
-          </>
-        )}
       </div>
 
       {/* Mobile Search Overlay */}
@@ -311,4 +198,4 @@ export function ModernNavbar() {
       />
     </>
   );
-}
+});

@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useCallback, memo } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { ShopFilters } from '@/components/shop/ShopFilters';
 import { ShopProductCard } from '@/components/shop/ShopProductCard';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -64,9 +65,8 @@ interface Product {
 
 type ViewMode = 'categories' | 'subcategories' | 'products';
 
-export default function Shop() {
+const Shop = memo(function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   
   // URL params
   const categoryId = searchParams.get('category');
@@ -539,4 +539,6 @@ export default function Shop() {
       <Footer />
     </div>
   );
-}
+});
+
+export default Shop;
