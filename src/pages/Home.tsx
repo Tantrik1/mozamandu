@@ -34,7 +34,7 @@ export default function Home() {
       <MostSoldProducts products={mostSoldProducts} isLoading={isMostSoldLoading} />
 
       {/* FAQ Section */}
-      <FAQSection faqs={faqs} isLoading={isFAQsLoading} />
+      <FAQSection faqs={faqs} isLoading={isFAQsLoading} className="py-[15px]" />
 
       {/* Mixed Products - Explore Collection */}
       <MixedProducts />
