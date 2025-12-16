@@ -129,6 +129,7 @@ const Shop = memo(function Shop() {
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const [gridCols, setGridCols] = useState<2 | 3 | 4>(4);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [priceRange, setPriceRange] = useState<[number, number]>([50, 10000]);
 
   // Determine view mode
   const viewMode: ViewMode = searchQuery 
@@ -175,6 +176,14 @@ const Shop = memo(function Shop() {
     enabled: !!subcategoryId || !!searchQuery,
     staleTime: 2 * 60 * 1000,
   });
+
+  // Filter products by price range
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const price = product.selling_price || product.cost_price;
+      return price >= priceRange[0] && price <= priceRange[1];
+    });
+  }, [products, priceRange]);
 
   const loading = useMemo(() => {
     if (viewMode === 'categories') return categoriesLoading;
@@ -229,7 +238,7 @@ const Shop = memo(function Shop() {
               <p className="text-muted-foreground mt-1">
                 {viewMode === 'categories' && `${categories.length} categories`}
                 {viewMode === 'subcategories' && `${subcategories.length} subcategories`}
-                {viewMode === 'products' && `${products.length} products`}
+                {viewMode === 'products' && `${filteredProducts.length} products`}
               </p>
             )}
           </div>
@@ -294,8 +303,11 @@ const Shop = memo(function Shop() {
                     }}
                     onClearFilters={() => {
                       clearFilters();
+                      setPriceRange([50, 10000]);
                       setMobileFiltersOpen(false);
                     }}
+                    priceRange={priceRange}
+                    onPriceRangeApply={setPriceRange}
                   />
                 </div>
               </SheetContent>
@@ -304,7 +316,7 @@ const Shop = memo(function Shop() {
         </div>
 
         {/* Active Filters */}
-        {(categoryId || subcategoryId || searchQuery) && (
+        {(categoryId || subcategoryId || searchQuery || priceRange[0] !== 50 || priceRange[1] !== 10000) && (
           <div className="flex flex-wrap items-center gap-2 mb-6">
             <span className="text-sm text-muted-foreground">Active filters:</span>
             {searchQuery && (
@@ -355,7 +367,26 @@ const Shop = memo(function Shop() {
                 </button>
               </div>
             )}
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-destructive hover:text-destructive">
+            {(priceRange[0] !== 50 || priceRange[1] !== 10000) && (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-medium">
+                <span>Rs. {priceRange[0]} - Rs. {priceRange[1].toLocaleString()}</span>
+                <button 
+                  onClick={() => setPriceRange([50, 10000])}
+                  className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                clearFilters();
+                setPriceRange([50, 10000]);
+              }} 
+              className="text-destructive hover:text-destructive"
+            >
               Clear all
             </Button>
           </div>
@@ -372,7 +403,12 @@ const Shop = memo(function Shop() {
                 selectedSubcategoryId={subcategoryId}
                 onCategorySelect={handleCategorySelect}
                 onSubcategorySelect={handleSubcategorySelect}
-                onClearFilters={clearFilters}
+                onClearFilters={() => {
+                  clearFilters();
+                  setPriceRange([50, 10000]);
+                }}
+                priceRange={priceRange}
+                onPriceRangeApply={setPriceRange}
               />
             </div>
           </aside>
@@ -467,12 +503,12 @@ const Shop = memo(function Shop() {
             ) : (
               /* Products Grid */
               <>
-                {products.length > 0 ? (
+                {filteredProducts.length > 0 ? (
                   <div className={cn(
                     "grid gap-4",
                     gridCols === 3 ? "grid-cols-2 lg:grid-cols-3" : "grid-cols-2 lg:grid-cols-4"
                   )}>
-                    {products.map((product) => (
+                    {filteredProducts.map((product) => (
                       <ShopProductCard key={product.id} product={product} />
                     ))}
                   </div>
