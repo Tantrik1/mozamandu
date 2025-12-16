@@ -5,7 +5,7 @@ import heroBackground from "@/assets/hero-background.webp";
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-[75vh] flex items-center justify-center overflow-hidden">
+    <section className="relative h-[50vh] min-h-[320px] max-h-[500px] md:h-[45vh] md:min-h-[350px] md:max-h-[480px] lg:h-[50vh] lg:max-h-[550px] flex items-center justify-center overflow-hidden">
       {/* Hero Background Image - Using img tag for better LCP optimization */}
       {/* eslint-disable-next-line react/no-unknown-property */}
       <img

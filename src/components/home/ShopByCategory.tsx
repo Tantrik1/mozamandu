@@ -18,11 +18,11 @@ interface ShopByCategoryProps {
 export const ShopByCategory = memo(function ShopByCategory({ categories, isLoading }: ShopByCategoryProps) {
   if (isLoading) {
     return (
-      <section className="py-16 lg:py-24 bg-background">
+      <section className="py-10 md:py-12 lg:py-16 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 lg:gap-6">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-muted rounded-3xl h-56 lg:h-72 animate-pulse" />
+              <div key={i} className="bg-muted rounded-2xl md:rounded-3xl h-40 md:h-52 lg:h-64 animate-pulse" />
             ))}
           </div>
         </div>
@@ -33,19 +33,19 @@ export const ShopByCategory = memo(function ShopByCategory({ categories, isLoadi
   if (categories.length === 0) return null;
 
   return (
-    <section className="py-16 lg:py-24 bg-background">
+    <section className="py-10 md:py-12 lg:py-16 bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12 animate-fade-in">
+        <div className="text-center mb-6 md:mb-8 animate-fade-in">
           <div className="inline-flex items-center gap-2 text-primary text-sm font-medium mb-3 bg-primary/10 px-4 py-1.5 rounded-full">
             <Grid3X3 className="w-4 h-4" />
             Browse Collection
           </div>
-          <h2 className="text-3xl lg:text-5xl font-bold text-foreground">
+          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground">
             Shop by Category
           </h2>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 lg:gap-6">
           {categories.map((category, index) => {
             const categoryImage = category.image_url || category.subcategories?.[0]?.image_url;
             
@@ -57,7 +57,7 @@ export const ShopByCategory = memo(function ShopByCategory({ categories, isLoadi
               >
                 <Link 
                   to={`/shop?category=${category.id}`}
-                  className="group relative block rounded-3xl overflow-hidden h-56 lg:h-72 shadow-lg hover:shadow-2xl transition-all duration-500"
+                  className="group relative block rounded-2xl md:rounded-3xl overflow-hidden h-40 md:h-52 lg:h-64 shadow-md hover:shadow-xl transition-all duration-500"
                 >
                   {/* Background Image */}
                   {categoryImage ? (
