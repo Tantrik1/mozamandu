@@ -12,10 +12,10 @@ export const HeroSection = memo(function HeroSection() {
       }} />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16 lg:pt-32 lg:pb-24 py-[27px]">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 lg:px-8 pt-20 pb-20 lg:pt-32 lg:pb-24 sm:px-0 py-[16px]">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Left content - CSS animations only */}
-          <div className="text-center lg:text-left animate-fade-in">
+          <div className="text-center lg:text-left animate-fade-in px-0">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
               <Sparkles className="w-4 h-4" />
               Premium Quality Socks
