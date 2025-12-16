@@ -144,9 +144,7 @@ function Auth() {
     setResetLoading(false);
   };
 
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
+  // Don't block render for auth loading - show page immediately
 
   if (showForgotPassword) {
     return (
