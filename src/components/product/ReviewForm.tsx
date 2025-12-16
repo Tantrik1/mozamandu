@@ -54,6 +54,13 @@ export const ReviewForm = memo(function ReviewForm({ productId, onReviewSubmitte
     setIsSubmitting(true);
     
     try {
+      // Get product name for notification
+      const { data: productData } = await supabase
+        .from('products')
+        .select('name')
+        .eq('id', productId)
+        .single();
+
       const { error } = await supabase
         .from('product_reviews')
         .insert({
@@ -67,6 +74,16 @@ export const ReviewForm = memo(function ReviewForm({ productId, onReviewSubmitte
         });
 
       if (error) throw error;
+
+      // Send admin notification (fire and forget)
+      supabase.functions.invoke('send-review-notification', {
+        body: {
+          productName: productData?.name || 'Unknown Product',
+          reviewerName: name.trim(),
+          rating,
+          reviewText: reviewText.trim() || null
+        }
+      }).catch(err => console.error('Failed to send notification:', err));
 
       toast({
         title: 'Review Submitted!',
