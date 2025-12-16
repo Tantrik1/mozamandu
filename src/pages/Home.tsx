@@ -1,5 +1,5 @@
 // Home page component
-import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { ModernNavbar } from '@/components/navbar';
 import { HeroSection } from '@/components/customer/HeroSection';
 import BrowseSubcategories from '@/components/customer/BrowseSubcategories';
 import EnhancedFeaturedProducts from '@/components/customer/EnhancedFeaturedProducts';
@@ -14,8 +14,8 @@ import { HelpCircle } from 'lucide-react';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <CustomerHeader />
+    <div className="min-h-screen bg-background">
+      <ModernNavbar />
       <NoticePopup />
       
       {/* Hero Section - Original Black Background */}
