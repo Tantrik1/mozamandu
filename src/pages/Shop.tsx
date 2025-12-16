@@ -130,6 +130,8 @@ const Shop = memo(function Shop() {
   const [gridCols, setGridCols] = useState<2 | 3 | 4>(4);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [priceRange, setPriceRange] = useState<[number, number]>([50, 10000]);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
 
   // Determine view mode
   const viewMode: ViewMode = searchQuery 
@@ -304,10 +306,16 @@ const Shop = memo(function Shop() {
                     onClearFilters={() => {
                       clearFilters();
                       setPriceRange([50, 10000]);
+                      setSelectedColors([]);
+                      setSelectedSizes([]);
                       setMobileFiltersOpen(false);
                     }}
                     priceRange={priceRange}
                     onPriceRangeApply={setPriceRange}
+                    selectedColors={selectedColors}
+                    onColorsChange={setSelectedColors}
+                    selectedSizes={selectedSizes}
+                    onSizesChange={setSelectedSizes}
                   />
                 </div>
               </SheetContent>
@@ -316,7 +324,7 @@ const Shop = memo(function Shop() {
         </div>
 
         {/* Active Filters */}
-        {(categoryId || subcategoryId || searchQuery || priceRange[0] !== 50 || priceRange[1] !== 10000) && (
+        {(categoryId || subcategoryId || searchQuery || priceRange[0] !== 50 || priceRange[1] !== 10000 || selectedColors.length > 0 || selectedSizes.length > 0) && (
           <div className="flex flex-wrap items-center gap-2 mb-6">
             <span className="text-sm text-muted-foreground">Active filters:</span>
             {searchQuery && (
@@ -378,12 +386,36 @@ const Shop = memo(function Shop() {
                 </button>
               </div>
             )}
+            {selectedColors.length > 0 && (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-medium">
+                <span>Colors: {selectedColors.join(', ')}</span>
+                <button 
+                  onClick={() => setSelectedColors([])}
+                  className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+            {selectedSizes.length > 0 && (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-medium">
+                <span>Sizes: {selectedSizes.join(', ')}</span>
+                <button 
+                  onClick={() => setSelectedSizes([])}
+                  className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
             <Button 
               variant="ghost" 
               size="sm" 
               onClick={() => {
                 clearFilters();
                 setPriceRange([50, 10000]);
+                setSelectedColors([]);
+                setSelectedSizes([]);
               }} 
               className="text-destructive hover:text-destructive"
             >
@@ -406,9 +438,15 @@ const Shop = memo(function Shop() {
                 onClearFilters={() => {
                   clearFilters();
                   setPriceRange([50, 10000]);
+                  setSelectedColors([]);
+                  setSelectedSizes([]);
                 }}
                 priceRange={priceRange}
                 onPriceRangeApply={setPriceRange}
+                selectedColors={selectedColors}
+                onColorsChange={setSelectedColors}
+                selectedSizes={selectedSizes}
+                onSizesChange={setSelectedSizes}
               />
             </div>
           </aside>
