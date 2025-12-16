@@ -52,7 +52,7 @@ const fetchFAQs = async () => {
     .select('id, question, answer')
     .eq('is_active', true)
     .order('display_order', { ascending: true })
-    .limit(5);
+    .limit(4);
   return data || [];
 };
 
