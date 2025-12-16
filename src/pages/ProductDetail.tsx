@@ -349,7 +349,53 @@ export default function ProductDetail() {
   };
 
   const handleBuyNow = async () => {
-    await handleAddToCart();
+    if (!product) return;
+    
+    // Add item to cart first
+    const added = await addToCart({
+      productId: product.id,
+      productName: product.name,
+      quantity,
+      colorVariantId: selectedColor || undefined,
+      sizeVariantId: selectedSize || undefined,
+      unitPrice: product.selling_price || subcategory?.selling_price || 0,
+    });
+    
+    if (!added) return;
+    
+    // Calculate the new cart total after adding
+    const currentCartTotal = cartItems.reduce((total, item) => total + item.totalPrice, 0);
+    const itemPrice = product.selling_price || subcategory?.selling_price || 0;
+    const newTotal = currentCartTotal + (itemPrice * quantity);
+    
+    // Check if MOQ is bypassed (total >= 1000)
+    if (newTotal >= 1000) {
+      navigate('/checkout');
+      return;
+    }
+    
+    // Check MOQ requirements
+    const { data: subcategoryData } = await supabase
+      .from('subcategories')
+      .select('minimum_quantity')
+      .eq('id', product.subcategory_id)
+      .single();
+    
+    if (subcategoryData) {
+      const subcategoryQuantity = cartItems
+        .filter(item => item.subcategoryId === product.subcategory_id)
+        .reduce((total, item) => total + item.quantity, 0) + quantity;
+      
+      if (subcategoryQuantity < subcategoryData.minimum_quantity) {
+        toast({
+          title: 'Minimum Order Not Met',
+          description: `You need at least ${subcategoryData.minimum_quantity} items from this category, or reach Rs. 1000 total`,
+          variant: 'destructive'
+        });
+        return;
+      }
+    }
+    
     navigate('/checkout');
   };
 

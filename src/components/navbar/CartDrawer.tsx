@@ -119,15 +119,18 @@ export function CartDrawer({ isOpen, onClose, disableModifications = false }: Ca
     }
   };
 
-  const canCheckout = subcategoryRequirements.every(req => req.fulfilled);
   const totalPrice = getTieredTotalPrice();
   const totalItems = getTotalItems();
+  
+  // MOQ bypass if total >= 1000
+  const moqBypass = totalPrice >= 1000;
+  const canCheckout = moqBypass || subcategoryRequirements.every(req => req.fulfilled);
 
   const handleCheckout = () => {
     if (!canCheckout) {
       toast({
         title: "Minimum requirements not met",
-        description: "Please add more items to meet minimum quantity requirements",
+        description: "Please add more items to meet minimum quantity requirements or reach Rs. 1000 total",
         variant: "destructive",
       });
       return;
@@ -287,7 +290,7 @@ export function CartDrawer({ isOpen, onClose, disableModifications = false }: Ca
               </div>
 
               {/* Requirements */}
-              {subcategoryRequirements.length > 0 && subcategoryRequirements.some(r => !r.fulfilled) && (
+              {subcategoryRequirements.length > 0 && subcategoryRequirements.some(r => !r.fulfilled) && !moqBypass && (
                 <div className="px-4 pb-4">
                   <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
                     <div className="flex items-center gap-2 mb-2">
@@ -310,6 +313,9 @@ export function CartDrawer({ isOpen, onClose, disableModifications = false }: Ca
                         </div>
                       ))}
                     </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Or reach Rs. 1000 total to bypass MOQ
+                    </p>
                   </div>
                 </div>
               )}
