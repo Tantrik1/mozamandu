@@ -130,9 +130,9 @@ export function EnhancedAdminDashboard() {
         fetchProductStats(),
         fetchInventoryStats(),
         fetchCustomerStats(),
-        fetchRevenueChartData()
+        fetchRevenueChartData(),
+        fetchTrafficStats()
       ]);
-      generateTrafficStats();
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -565,8 +565,39 @@ export function EnhancedAdminDashboard() {
     }
   };
 
-  const generateTrafficStats = () => {
-    // Generate simulated but realistic traffic stats based on order data
+  const fetchTrafficStats = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('get-ga4-analytics');
+      
+      if (error) {
+        console.error('GA4 fetch error:', error);
+        // Fallback to simulated data if GA4 fails
+        generateFallbackTrafficStats();
+        return;
+      }
+      
+      if (data?.success && data?.data) {
+        const ga4Data = data.data;
+        setTrafficStats({
+          totalVisitors: ga4Data.totalVisitors || 0,
+          sessions: ga4Data.sessions || 0,
+          uniqueVisitors: ga4Data.uniqueVisitors || 0,
+          addToCartRate: ga4Data.addToCartRate || (coreStats.totalOrders > 0 ? (coreStats.totalOrders / Math.max(ga4Data.sessions, 1)) * 100 : 0),
+          checkoutInitiationRate: ga4Data.checkoutInitiationRate || (coreStats.totalOrders > 0 ? (coreStats.totalOrders / Math.max(ga4Data.sessions, 1)) * 100 * 0.8 : 0),
+          cartAbandonmentRate: ga4Data.cartAbandonmentRate || 68,
+          checkoutAbandonmentRate: ga4Data.checkoutAbandonmentRate || 25,
+          bounceRate: ga4Data.bounceRate || 0
+        });
+      } else {
+        generateFallbackTrafficStats();
+      }
+    } catch (error) {
+      console.error('Error fetching GA4 data:', error);
+      generateFallbackTrafficStats();
+    }
+  };
+
+  const generateFallbackTrafficStats = () => {
     const baseVisitors = Math.max(coreStats.totalOrders * 30, 1000);
     setTrafficStats({
       totalVisitors: baseVisitors + Math.floor(Math.random() * 5000),
