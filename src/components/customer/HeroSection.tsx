@@ -13,7 +13,7 @@ export function HeroSection() {
       }}
     >
       {/* Glass + gradient overlay for premium feel */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/40 to-background/70" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/100 via-background/70 to-background/100" />
 
       {/* Content with glassmorphism */}
       <div className="relative z-10 text-center px-6 sm:px-10 max-w-[75%] sm:max-w-3xl mx-auto py-8 sm:py-14 bg-background/30 backdrop-blur-md rounded-2xl border border-white/20 shadow-xl shadow-black/5">
