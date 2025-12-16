@@ -7,7 +7,7 @@ export function Footer() {
           {/* Company Info */}
           <div className="space-y-4">
             <div className="flex items-center space-x-3">
-              <img alt="Mozamandu Logo" className="h-10 w-auto" src="/lovable-uploads/84f1077a-8761-4272-88fd-ec35838bbd2b.png" />
+              <img alt="Mozamandu Logo" className="h-10 w-auto" src="/lovable-uploads/84f1077a-8761-4272-88fd-ec35838bbd2b.png" width={40} height={40} loading="lazy" />
               <div className="flex flex-col">
                 <span className="text-xl font-bold">Mozamandu</span>
                 <span className="text-sm text-gray-400">Gentle on feet</span>
