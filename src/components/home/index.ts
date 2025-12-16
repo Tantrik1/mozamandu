@@ -4,3 +4,4 @@ export { ShopByCategory } from './ShopByCategory';
 export { MostSoldProducts } from './MostSoldProducts';
 export { FAQSection } from './FAQSection';
 export { FeaturedDeals } from './FeaturedDeals';
+export { SubcategoryTabs } from './SubcategoryTabs';

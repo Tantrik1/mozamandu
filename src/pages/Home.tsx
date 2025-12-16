@@ -2,7 +2,7 @@ import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { NoticePopup } from '@/components/notices/NoticePopup';
 import { useHomepageData } from '@/hooks/useHomepageData';
-import { HeroSection, LatestProducts, ShopByCategory, MostSoldProducts, FAQSection, FeaturedDeals } from '@/components/home';
+import { HeroSection, LatestProducts, ShopByCategory, MostSoldProducts, FAQSection, FeaturedDeals, SubcategoryTabs } from '@/components/home';
 export default function Home() {
   const {
     latestProducts,
@@ -35,6 +35,9 @@ export default function Home() {
 
       {/* FAQ Section */}
       <FAQSection faqs={faqs} isLoading={isFAQsLoading} />
+
+      {/* Subcategory Tabs */}
+      <SubcategoryTabs />
 
       {/* Featured Deals */}
       <FeaturedDeals products={featuredProducts} isLoading={isFeaturedLoading} />
