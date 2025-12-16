@@ -54,7 +54,7 @@ export default function Categories() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <CustomerHeader />
+        <ModernNavbar />
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
           <div className="text-center">Loading categories...</div>
         </div>
@@ -64,7 +64,7 @@ export default function Categories() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <CustomerHeader />
+      <ModernNavbar />
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Product Categories</h1>
