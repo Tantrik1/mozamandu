@@ -183,9 +183,12 @@ export function FAQManagement() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">FAQ Management</h1>
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">FAQ Management</h1>
+          <p className="text-muted-foreground mt-1">Manage frequently asked questions</p>
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
@@ -273,7 +276,7 @@ export function FAQManagement() {
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600 mb-4">{faq.answer}</p>
+              <p className="text-muted-foreground mb-4">{faq.answer}</p>
               <div className="flex justify-end space-x-2">
                 <Button
                   variant="outline"

@@ -116,9 +116,10 @@ export function TopBarTextManagement() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Top Bar Text Management</h1>
+    <div className="p-4 md:p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold">Top Bar Text</h1>
+        <p className="text-muted-foreground mt-1">Manage the announcement bar text</p>
       </div>
 
       <Card>
@@ -136,7 +137,7 @@ export function TopBarTextManagement() {
                 placeholder="Enter text to display in the top bar"
                 required
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 This text will be displayed at the top of your website
               </p>
             </div>
@@ -158,21 +159,21 @@ export function TopBarTextManagement() {
           </form>
 
           {topBarText && (
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+            <div className="mt-6 p-4 bg-muted rounded-lg">
               <h3 className="font-semibold mb-2">Current Top Bar Text:</h3>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="flex-1">{topBarText.text}</span>
                 <span
                   className={`px-2 py-1 text-xs rounded ${
                     topBarText.is_active
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+                      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
                   }`}
                 >
                   {topBarText.is_active ? 'Active' : 'Inactive'}
                 </span>
               </div>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-muted-foreground mt-2">
                 Last updated: {new Date(topBarText.updated_at).toLocaleString()}
               </p>
             </div>
