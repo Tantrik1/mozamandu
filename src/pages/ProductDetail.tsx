@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
-import { SimilarProducts, MoreSubcategories } from '@/components/product';
+import { SimilarProducts, MoreSubcategories, ProductReviews } from '@/components/product';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -852,6 +852,10 @@ export default function ProductDetail() {
         />
       )}
 
+      {/* Customer Reviews Section */}
+      <div className="max-w-7xl mx-auto px-4">
+        <ProductReviews productId={product.id} />
+      </div>
 
       <Footer />
     </div>

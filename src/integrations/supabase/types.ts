@@ -995,6 +995,56 @@ export type Database = {
           },
         ]
       }
+      product_reviews: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          id: string
+          product_id: string
+          rating: number
+          review_text: string | null
+          reviewer_email: string
+          reviewer_name: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          product_id: string
+          rating: number
+          review_text?: string | null
+          reviewer_email: string
+          reviewer_name: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          product_id?: string
+          rating?: number
+          review_text?: string | null
+          reviewer_email?: string
+          reviewer_name?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category_id: string
@@ -1394,6 +1444,13 @@ export type Database = {
           hex_code: string
           image_url: string
           total_stock: number
+        }[]
+      }
+      get_product_rating: {
+        Args: { p_product_id: string }
+        Returns: {
+          average_rating: number
+          review_count: number
         }[]
       }
       get_product_sizes: {

@@ -8,6 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Eye } from 'lucide-react';
 import { getProductStockSummary } from '@/utils/stockCalculation';
 import { OptimizedImage } from '@/components/ui/optimized-image';
+import { StarRating } from '@/components/product/StarRating';
+import { useProductRating } from '@/hooks/useProductRating';
 
 interface Product {
   id: string;
@@ -40,6 +42,7 @@ export const ModernProductCard = memo(function ModernProductCard({ product, subc
   const [productStock, setProductStock] = useState<number>(0);
   const [discountTiers, setDiscountTiers] = useState<DiscountTier[]>([]);
   const [realtimeSubcategoryPrice, setRealtimeSubcategoryPrice] = useState<number>(subcategorySellingPrice);
+  const { averageRating, reviewCount } = useProductRating(product.id);
 
   useEffect(() => {
     fetchProductStock();
@@ -145,7 +148,12 @@ export const ModernProductCard = memo(function ModernProductCard({ product, subc
       </div>
       
       <CardContent className="p-3 flex-1 flex flex-col">
-        <h3 className="font-bold text-foreground text-sm mb-2 line-clamp-2 leading-tight group-hover:text-primary transition-colors duration-300">{product.name}</h3>
+        <h3 className="font-bold text-foreground text-sm mb-1 line-clamp-2 leading-tight group-hover:text-primary transition-colors duration-300">{product.name}</h3>
+        
+        {/* Rating Display */}
+        {reviewCount > 0 && (
+          <StarRating rating={averageRating} size="sm" reviewCount={reviewCount} className="mb-2" />
+        )}
 
         <div className="mt-auto pt-2">
           <div className="flex items-center gap-2">

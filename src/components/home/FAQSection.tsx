@@ -56,7 +56,7 @@ export const FAQSection = memo(function FAQSection({
 
         {/* FAQ Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10 md:mb-12 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-          {faqs.slice(0, 6).map((faq, index) => (
+          {faqs.slice(0, 4).map((faq, index) => (
             <div
               key={faq.id}
               className="bg-card rounded-2xl border border-border/50 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
