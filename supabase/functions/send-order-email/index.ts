@@ -62,8 +62,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Order fetched successfully:', order.order_number);
 
-    // Determine the order summary URL
-    const baseUrl = Deno.env.get('SUPABASE_URL')?.replace('/supabase', '') || 'https://your-domain.com';
+    // Determine the order summary URL - use production domain
+    const baseUrl = 'https://mozamandu.com';
     const summaryPath = isCustomerOrder ? 'customer-order-summary' : 'order-summary';
     const orderSummaryUrl = `${baseUrl}/${summaryPath}/${orderId}`;
 

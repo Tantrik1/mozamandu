@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, ArrowRight, Package, Clock } from 'lucide-react';
 import { ModernNavbar } from '@/components/navbar';
+import { Footer } from '@/components/layout/Footer';
 
 export default function ThankYou() {
   const { orderId } = useParams();
@@ -116,6 +117,8 @@ export default function ThankYou() {
           </Card>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 }
