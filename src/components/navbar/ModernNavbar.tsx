@@ -12,18 +12,17 @@ import { TopBar } from '@/components/customer/TopBar';
 import { GlobalSearch } from './GlobalSearch';
 import { MobileSearch } from './MobileSearch';
 import { CartDrawer } from './CartDrawer';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-
 export const ModernNavbar = memo(function ModernNavbar() {
-  const { user, userProfile, signOut } = useAuth();
-  const { getTotalPrice } = useRobustCart();
+  const {
+    user,
+    userProfile,
+    signOut
+  } = useAuth();
+  const {
+    getTotalPrice
+  } = useRobustCart();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
@@ -35,12 +34,15 @@ export const ModernNavbar = memo(function ModernNavbar() {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScroll, {
+      passive: true
+    });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
   const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
+    const {
+      error
+    } = await supabase.auth.signOut();
     if (error) {
       toast({
         title: "Error",
@@ -55,7 +57,6 @@ export const ModernNavbar = memo(function ModernNavbar() {
       navigate('/');
     }
   };
-
   const handleDashboardClick = () => {
     if (userProfile?.role === 'admin') {
       navigate('/admin');
@@ -63,32 +64,19 @@ export const ModernNavbar = memo(function ModernNavbar() {
       navigate('/dashboard');
     }
   };
-
   const cartTotal = getTotalPrice();
-
-  return (
-    <>
+  return <>
       <div className="sticky top-0 z-50">
         <TopBar />
         
         {/* Main Navbar */}
-        <header 
-          className={cn(
-            "bg-background/95 backdrop-blur-md border-b transition-all duration-300",
-            isScrolled ? "shadow-lg border-border/50" : "border-border/30"
-          )}
-        >
+        <header className={cn("bg-background/95 backdrop-blur-md border-b transition-all duration-300", isScrolled ? "shadow-lg border-border/50" : "border-border/30")}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16 lg:h-18">
               
               {/* Logo */}
               <Link to="/" className="flex-shrink-0 group">
-                <img 
-                  alt="Mozamandu" 
-                  className="h-9 w-auto transition-transform duration-300 group-hover:scale-105" 
-                  src="/lovable-uploads/275eacee-9393-4919-a575-7341c6d73ab3.png"
-                  loading="eager"
-                />
+                <img alt="Mozamandu" loading="eager" src="/lovable-uploads/c5be09dc-3446-4e71-9d5a-482531992782.jpg" className="h-9 w-auto transition-transform duration-300 group-hover:scale-105 object-cover" />
               </Link>
 
               {/* Desktop Search Bar */}
@@ -99,58 +87,33 @@ export const ModernNavbar = memo(function ModernNavbar() {
               {/* Right Actions */}
               <div className="flex items-center gap-2">
                 {/* Mobile Search Button */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="lg:hidden"
-                  onClick={() => setIsMobileSearchOpen(true)}
-                >
+                <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMobileSearchOpen(true)}>
                   <Search className="w-5 h-5" />
                 </Button>
 
                 {/* Shop Button - visible on all screens */}
                 <Link to="/shop">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "flex flex-col items-center gap-0.5 h-auto py-1.5 px-2",
-                      location.pathname.startsWith('/shop') && "bg-primary text-primary-foreground"
-                    )}
-                  >
+                  <Button variant="ghost" size="sm" className={cn("flex flex-col items-center gap-0.5 h-auto py-1.5 px-2", location.pathname.startsWith('/shop') && "bg-primary text-primary-foreground")}>
                     <Store className="w-5 h-5" />
                     <span className="text-[10px] font-medium">Shop</span>
                   </Button>
                 </Link>
 
                 {/* Cart Button */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex flex-col items-center gap-0.5 h-auto py-1.5 px-2 relative"
-                  onClick={() => setIsCartOpen(true)}
-                >
+                <Button variant="ghost" size="sm" className="flex flex-col items-center gap-0.5 h-auto py-1.5 px-2 relative" onClick={() => setIsCartOpen(true)}>
                   <ShoppingBag className="w-5 h-5" />
                   <span className="text-[10px] font-medium">Cart</span>
-                  {cartTotal > 0 && (
-                    <Badge 
-                      className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-[9px] bg-primary text-primary-foreground flex items-center justify-center"
-                    >
+                  {cartTotal > 0 && <Badge className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-[9px] bg-primary text-primary-foreground flex items-center justify-center">
                       {cartTotal > 999 ? '999+' : Math.ceil(cartTotal / 100)}
-                    </Badge>
-                  )}
+                    </Badge>}
                 </Button>
 
                 {/* User Menu */}
-                {user ? (
-                  <DropdownMenu>
+                {user ? <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm" className="flex flex-col items-center gap-0.5 h-auto py-1.5 px-2">
                         <Avatar className="h-5 w-5">
-                          <AvatarImage 
-                            src={`https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.email}`} 
-                            alt={user.email || "Avatar"} 
-                          />
+                          <AvatarImage src={`https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.email}`} alt={user.email || "Avatar"} />
                           <AvatarFallback className="bg-primary/10 text-primary text-[8px]">
                             {user.email?.charAt(0).toUpperCase()}
                           </AvatarFallback>
@@ -174,15 +137,12 @@ export const ModernNavbar = memo(function ModernNavbar() {
                         Sign Out
                       </DropdownMenuItem>
                     </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : (
-                  <Link to="/auth">
+                  </DropdownMenu> : <Link to="/auth">
                     <Button variant="ghost" size="sm" className="flex flex-col items-center gap-0.5 h-auto py-1.5 px-2">
                       <User className="w-5 h-5" />
                       <span className="text-[10px] font-medium">Login</span>
                     </Button>
-                  </Link>
-                )}
+                  </Link>}
               </div>
             </div>
           </div>
@@ -190,17 +150,9 @@ export const ModernNavbar = memo(function ModernNavbar() {
       </div>
 
       {/* Mobile Search Overlay */}
-      <MobileSearch 
-        isOpen={isMobileSearchOpen} 
-        onClose={() => setIsMobileSearchOpen(false)} 
-      />
+      <MobileSearch isOpen={isMobileSearchOpen} onClose={() => setIsMobileSearchOpen(false)} />
 
       {/* Cart Drawer */}
-      <CartDrawer 
-        isOpen={isCartOpen} 
-        onClose={() => setIsCartOpen(false)}
-        disableModifications={location.pathname === '/checkout'}
-      />
-    </>
-  );
+      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} disableModifications={location.pathname === '/checkout'} />
+    </>;
 });
