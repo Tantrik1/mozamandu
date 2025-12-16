@@ -52,17 +52,15 @@ export const HeroSection = memo(function HeroSection() {
         }}>
             <div className="relative w-full max-w-lg">
               {/* Floating circles - CSS only */}
-              <div className="absolute -top-8 -left-8 w-24 h-24 bg-primary/20 rounded-full animate-bounce" style={{
-              animationDuration: '3s'
-            }} />
+              
               <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-accent/20 rounded-full animate-bounce" style={{
               animationDuration: '4s',
               animationDelay: '0.5s'
             }} />
               
               {/* Main image container */}
-              <div className="relative bg-gradient-to-br from-muted to-muted/50 rounded-3xl p-8 shadow-2xl">
-                <img src="/lovable-uploads/9e1dcca9-44bc-44a8-aa02-56cef600abbb.png" alt="Premium Mozamandu Socks Collection" className="w-full h-auto object-contain drop-shadow-xl" loading="eager" fetchPriority="high" width={400} height={400} />
+              <div className="relative bg-gradient-to-br from-muted to-muted/50 rounded-3xl p-8 shadow-2xl py-0 px-0">
+                <img src="/lovable-uploads/9e1dcca9-44bc-44a8-aa02-56cef600abbb.png" alt="Premium Mozamandu Socks Collection" loading="eager" fetchPriority="high" width={400} height={400} className="w-full h-auto object-contain" />
               </div>
             </div>
           </div>
