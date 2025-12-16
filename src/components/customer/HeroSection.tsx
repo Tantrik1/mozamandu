@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import heroBackground from "@/assets/hero-background.webp";
 export function HeroSection() {
-  return <section className="relative h-[50vh] min-h-[320px] max-h-[500px] md:h-[40vh] md:min-h-[300px] md:max-h-[400px] lg:h-[60vh] lg:min-h-[400px] lg:max-h-[650px] flex items-center justify-center overflow-hidden">
+  return <section className="relative h-[50vh] min-h-[320px] max-h-[500px] md:h-[40vh] md:min-h-[300px] md:max-h-[400px] lg:h-[70vh] lg:min-h-[600px] lg:max-h-[650px] flex items-center justify-center overflow-hidden">
       {/* Hero Background Image - Using img tag for better LCP optimization */}
       {/* eslint-disable-next-line react/no-unknown-property */}
       <img src={heroBackground} alt="Mozamandu Premium Socks Collection"
