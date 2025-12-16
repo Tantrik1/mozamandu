@@ -3,7 +3,6 @@ import { Footer } from '@/components/layout/Footer';
 import { NoticePopup } from '@/components/notices/NoticePopup';
 import { useHomepageData } from '@/hooks/useHomepageData';
 import { HeroSection, LatestProducts, ShopByCategory, MostSoldProducts, FAQSection, FeaturedDeals, MixedProducts } from '@/components/home';
-
 export default function Home() {
   const {
     latestProducts,
@@ -18,9 +17,7 @@ export default function Home() {
     isFAQsLoading,
     isFeaturedLoading
   } = useHomepageData();
-
-  return (
-    <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background">
       <ModernNavbar />
       <NoticePopup notice={notice} />
       
@@ -37,7 +34,7 @@ export default function Home() {
       <MostSoldProducts products={mostSoldProducts} isLoading={isMostSoldLoading} />
 
       {/* FAQ Section */}
-      <FAQSection faqs={faqs} isLoading={isFAQsLoading} />
+      <FAQSection faqs={faqs} isLoading={isFAQsLoading} className="py-0" />
 
       {/* Mixed Products - Explore Collection */}
       <MixedProducts />
@@ -47,6 +44,5 @@ export default function Home() {
 
       {/* Footer */}
       <Footer />
-    </div>
-  );
+    </div>;
 }
