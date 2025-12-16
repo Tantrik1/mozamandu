@@ -35,12 +35,12 @@ export const MixedProducts = memo(function MixedProducts() {
 
   if (isLoading) {
     return (
-      <section className="py-16 lg:py-24 bg-muted/30">
+      <section className="py-10 md:py-12 lg:py-16 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
             <div className="h-8 w-48 bg-muted rounded mx-auto animate-pulse" />
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
             {[...Array(8)].map((_, i) => (
               <div key={i} className="aspect-square bg-muted rounded-2xl animate-pulse" />
             ))}
@@ -53,15 +53,15 @@ export const MixedProducts = memo(function MixedProducts() {
   if (products.length === 0) return null;
 
   return (
-    <section className="py-16 lg:py-24 bg-muted/30">
+    <section className="py-10 md:py-12 lg:py-16 bg-muted/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center mb-12 animate-fade-in">
+        <div className="text-center mb-6 md:mb-8 animate-fade-in">
           <div className="inline-flex items-center gap-2 text-primary text-sm font-medium mb-3 bg-primary/10 px-4 py-1.5 rounded-full">
             <Sparkles className="w-4 h-4" />
             Discover More
           </div>
-          <h2 className="text-3xl lg:text-5xl font-bold text-foreground mb-3">
+          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2">
             Explore Our Collection
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
@@ -70,7 +70,7 @@ export const MixedProducts = memo(function MixedProducts() {
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-8">
           {products.map((product, index) => (
             <Link
               key={product.id}

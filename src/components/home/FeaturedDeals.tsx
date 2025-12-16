@@ -20,9 +20,9 @@ interface FeaturedDealsProps {
 export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }: FeaturedDealsProps) {
   if (isLoading) {
     return (
-      <section className="py-16 lg:py-24 bg-primary/5">
+      <section className="py-10 md:py-12 lg:py-16 bg-primary/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="bg-muted rounded-2xl aspect-square animate-pulse" />
             ))}
@@ -35,9 +35,9 @@ export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }
   if (products.length === 0) return null;
 
   return (
-    <section className="py-16 lg:py-24 bg-gradient-to-br from-primary/5 via-primary/10 to-accent/5">
+    <section className="py-10 md:py-12 lg:py-16 bg-gradient-to-br from-primary/5 via-primary/10 to-accent/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10 animate-fade-in">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6 md:mb-8 animate-fade-in">
           <div>
             <div className="inline-flex items-center gap-2 text-primary text-sm font-medium mb-2">
               <Tag className="w-4 h-4" />
@@ -58,7 +58,7 @@ export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
           {products.map((product, index) => {
             const discount = product.cost_price && product.selling_price 
               ? Math.round(((product.cost_price - product.selling_price) / product.cost_price) * 100)

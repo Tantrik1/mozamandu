@@ -19,7 +19,7 @@ export const FAQSection = memo(function FAQSection({ faqs, isLoading }: FAQSecti
 
   if (isLoading) {
     return (
-      <section className="py-16 lg:py-24 bg-muted/30">
+      <section className="py-10 md:py-12 lg:py-16 bg-muted/30">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="space-y-4">
             {[...Array(5)].map((_, i) => (
@@ -34,14 +34,14 @@ export const FAQSection = memo(function FAQSection({ faqs, isLoading }: FAQSecti
   if (faqs.length === 0) return null;
 
   return (
-    <section className="py-16 lg:py-24 bg-muted/30">
+    <section className="py-10 md:py-12 lg:py-16 bg-muted/30">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-10 animate-fade-in">
+        <div className="text-center mb-6 md:mb-8 animate-fade-in">
           <div className="inline-flex items-center gap-2 text-primary text-sm font-medium mb-2">
             <HelpCircle className="w-4 h-4" />
             Got Questions?
           </div>
-          <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
+          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-3">
             Frequently Asked Questions
           </h2>
           <p className="text-muted-foreground max-w-lg mx-auto">
@@ -81,7 +81,7 @@ export const FAQSection = memo(function FAQSection({ faqs, isLoading }: FAQSecti
           ))}
         </div>
 
-        <div className="text-center mt-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+        <div className="text-center mt-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
           <Button asChild variant="outline" className="rounded-full">
             <Link to="/faq">View All FAQs</Link>
           </Button>
