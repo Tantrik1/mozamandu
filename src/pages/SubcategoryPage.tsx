@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { ModernNavbar } from '@/components/navbar';
 import { ModernProductCard } from '@/components/customer/ModernProductCard';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

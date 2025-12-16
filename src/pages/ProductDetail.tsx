@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -338,7 +338,7 @@ export default function ProductDetail() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <CustomerHeader />
+        <ModernNavbar />
         <div className="max-w-7xl mx-auto px-4 py-8 lg:py-16">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
             <div className="space-y-4">
@@ -365,7 +365,7 @@ export default function ProductDetail() {
   if (!product) {
     return (
       <div className="min-h-screen bg-background">
-        <CustomerHeader />
+        <ModernNavbar />
         <div className="max-w-7xl mx-auto px-4 py-16 text-center">
           <div className="w-24 h-24 bg-muted rounded-full mx-auto flex items-center justify-center mb-6">
             <Package className="w-12 h-12 text-muted-foreground" />
@@ -384,7 +384,7 @@ export default function ProductDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      <CustomerHeader />
+      <ModernNavbar />
       
       {/* Breadcrumb */}
       <div className="border-b border-border/40 bg-muted/20">

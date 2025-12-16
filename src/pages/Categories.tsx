@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { ModernNavbar } from '@/components/navbar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';

@@ -20,6 +20,7 @@ const ShippingPolicy = lazy(() => import('@/pages/ShippingPolicy'));
 const TermsConditions = lazy(() => import('@/pages/TermsConditions'));
 const SubcategoryPage = lazy(() => import('@/pages/SubcategoryPage'));
 const Products = lazy(() => import('@/pages/Products'));
+const Shop = lazy(() => import('@/pages/Shop'));
 const FAQ = lazy(() => import('@/pages/FAQ'));
 const Categories = lazy(() => import('@/pages/Categories'));
 const CategoryPage = lazy(() => import('@/pages/CategoryPage'));
@@ -73,6 +74,7 @@ function App() {
                   </RouteGuard>
                 } />
                 <Route path="/products" element={<Products />} />
+                <Route path="/shop" element={<Shop />} />
                 <Route path="/product/:productId" element={<ProductDetail />} />
                 <Route path="/subcategory/:subcategoryId" element={<SubcategoryPage />} />
                 <Route path="/subcategories/:subcategoryId" element={<SubcategoryPage />} />
