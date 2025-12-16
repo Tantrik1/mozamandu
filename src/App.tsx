@@ -1,14 +1,13 @@
-
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { RobustCartProvider } from '@/hooks/useRobustCart';
 import { RouteGuard } from '@/components/RouteGuard';
 
-// Lazy load pages for better performance with more aggressive preloading
+// Lazy load pages with preloading support
 const Home = lazy(() => import('@/pages/Home'));
 const Auth = lazy(() => import('@/pages/Auth'));
 const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
@@ -30,12 +29,19 @@ const OrderSummary = lazy(() => import('@/pages/OrderSummary'));
 const CustomerOrderSummary = lazy(() => import('@/pages/CustomerOrderSummary'));
 const ProductDetail = lazy(() => import('@/pages/ProductDetail'));
 
+// Preload critical routes on app mount
+const preloadRoutes = () => {
+  import('@/pages/Shop');
+  import('@/pages/Auth');
+  import('@/pages/ProductDetail');
+};
+
 // Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 10 * 60 * 1000, // 10 minutes
-      gcTime: 15 * 60 * 1000, // 15 minutes
+      staleTime: 10 * 60 * 1000,
+      gcTime: 15 * 60 * 1000,
       retry: 1,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
@@ -43,17 +49,20 @@ const queryClient = new QueryClient({
   },
 });
 
-// Faster loading component
+// Minimal loading component
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
-    <div className="flex flex-col items-center gap-2">
-      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-      <div className="text-xs text-muted-foreground">Loading...</div>
-    </div>
+    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
   </div>
 );
 
 function App() {
+  // Preload critical routes after initial render
+  useEffect(() => {
+    const timer = setTimeout(preloadRoutes, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
