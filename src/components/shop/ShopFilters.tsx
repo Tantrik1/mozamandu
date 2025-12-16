@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, FolderOpen, Tag, X } from 'lucide-react';
+import { ChevronDown, FolderOpen, Tag, X, Palette, Ruler } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
 interface Category {
@@ -19,6 +19,18 @@ interface Subcategory {
   selling_price: number;
 }
 
+interface Color {
+  id: string;
+  name: string;
+  hex_code: string | null;
+}
+
+interface Size {
+  id: string;
+  name: string;
+  code: string | null;
+}
+
 interface ShopFiltersProps {
   categories: Category[];
   selectedCategoryId: string | null;
@@ -28,6 +40,10 @@ interface ShopFiltersProps {
   onClearFilters: () => void;
   priceRange: [number, number];
   onPriceRangeApply: (range: [number, number]) => void;
+  selectedColors?: string[];
+  onColorsChange?: (colors: string[]) => void;
+  selectedSizes?: string[];
+  onSizesChange?: (sizes: string[]) => void;
 }
 
 const MIN_PRICE = 50;
@@ -42,16 +58,33 @@ export function ShopFilters({
   onClearFilters,
   priceRange,
   onPriceRangeApply,
+  selectedColors = [],
+  onColorsChange,
+  selectedSizes = [],
+  onSizesChange,
 }: ShopFiltersProps) {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
-  const [localPriceRange, setLocalPriceRange] = useState<[number, number]>(priceRange);
   const [minInput, setMinInput] = useState(priceRange[0].toString());
   const [maxInput, setMaxInput] = useState(priceRange[1].toString());
+  const [colors, setColors] = useState<Color[]>([]);
+  const [sizes, setSizes] = useState<Size[]>([]);
+
+  // Fetch colors and sizes
+  useEffect(() => {
+    const fetchFilters = async () => {
+      const [colorsRes, sizesRes] = await Promise.all([
+        supabase.from('colors').select('id, name, hex_code').eq('is_active', true).order('name'),
+        supabase.from('sizes').select('id, name, code').eq('is_active', true).order('sort_order')
+      ]);
+      if (colorsRes.data) setColors(colorsRes.data);
+      if (sizesRes.data) setSizes(sizesRes.data);
+    };
+    fetchFilters();
+  }, []);
 
   // Sync local state when prop changes
   useEffect(() => {
-    setLocalPriceRange(priceRange);
     setMinInput(priceRange[0].toString());
     setMaxInput(priceRange[1].toString());
   }, [priceRange]);
@@ -89,70 +122,59 @@ export function ShopFilters({
     }
   };
 
-  const handleSliderChange = (value: number[]) => {
-    const newRange: [number, number] = [value[0], value[1]];
-    setLocalPriceRange(newRange);
-    setMinInput(newRange[0].toString());
-    setMaxInput(newRange[1].toString());
-  };
-
-  const handleMinChange = (value: string) => {
-    setMinInput(value);
-    const num = parseInt(value) || MIN_PRICE;
-    if (num >= MIN_PRICE && num <= localPriceRange[1]) {
-      setLocalPriceRange([num, localPriceRange[1]]);
-    }
-  };
-
-  const handleMaxChange = (value: string) => {
-    setMaxInput(value);
-    const num = parseInt(value) || MAX_PRICE;
-    if (num <= MAX_PRICE && num >= localPriceRange[0]) {
-      setLocalPriceRange([localPriceRange[0], num]);
-    }
-  };
-
   const handleApplyPrice = () => {
     let min = parseInt(minInput) || MIN_PRICE;
     let max = parseInt(maxInput) || MAX_PRICE;
     
-    // Clamp values
     min = Math.max(MIN_PRICE, Math.min(min, MAX_PRICE));
     max = Math.max(MIN_PRICE, Math.min(max, MAX_PRICE));
     
-    // Ensure min <= max
-    if (min > max) {
-      [min, max] = [max, min];
-    }
+    if (min > max) [min, max] = [max, min];
     
-    const newRange: [number, number] = [min, max];
-    setLocalPriceRange(newRange);
     setMinInput(min.toString());
     setMaxInput(max.toString());
-    onPriceRangeApply(newRange);
+    onPriceRangeApply([min, max]);
   };
 
   const handleClearPrice = () => {
-    const defaultRange: [number, number] = [MIN_PRICE, MAX_PRICE];
-    setLocalPriceRange(defaultRange);
     setMinInput(MIN_PRICE.toString());
     setMaxInput(MAX_PRICE.toString());
-    onPriceRangeApply(defaultRange);
+    onPriceRangeApply([MIN_PRICE, MAX_PRICE]);
+  };
+
+  const toggleColor = (colorName: string) => {
+    if (!onColorsChange) return;
+    const newColors = selectedColors.includes(colorName)
+      ? selectedColors.filter(c => c !== colorName)
+      : [...selectedColors, colorName];
+    onColorsChange(newColors);
+  };
+
+  const toggleSize = (sizeName: string) => {
+    if (!onSizesChange) return;
+    const newSizes = selectedSizes.includes(sizeName)
+      ? selectedSizes.filter(s => s !== sizeName)
+      : [...selectedSizes, sizeName];
+    onSizesChange(newSizes);
   };
 
   const hasActiveFilters = selectedCategoryId || selectedSubcategoryId;
   const hasPriceFilter = priceRange[0] !== MIN_PRICE || priceRange[1] !== MAX_PRICE;
+  const hasColorFilter = selectedColors.length > 0;
+  const hasSizeFilter = selectedSizes.length > 0;
 
   return (
     <div className="space-y-6">
       {/* Clear Filters */}
-      {(hasActiveFilters || hasPriceFilter) && (
+      {(hasActiveFilters || hasPriceFilter || hasColorFilter || hasSizeFilter) && (
         <Button
           variant="outline"
           size="sm"
           onClick={() => {
             onClearFilters();
             handleClearPrice();
+            onColorsChange?.([]);
+            onSizesChange?.([]);
           }}
           className="w-full justify-start text-destructive hover:text-destructive"
         >
@@ -167,7 +189,7 @@ export function ShopFilters({
           <FolderOpen className="w-4 h-4" />
           Categories
         </h3>
-        <div className="space-y-1">
+        <div className="space-y-1 max-h-48 overflow-y-auto">
           {categories.map((category) => {
             const isExpanded = expandedCategories.includes(category.id);
             const isSelected = selectedCategoryId === category.id;
@@ -187,18 +209,17 @@ export function ShopFilters({
                       : "hover:bg-accent"
                   )}
                 >
-                  <span className="font-medium">{category.name}</span>
+                  <span className="font-medium truncate">{category.name}</span>
                   {categorySubcategories.length > 0 && (
                     <ChevronDown 
                       className={cn(
-                        "w-4 h-4 transition-transform",
+                        "w-4 h-4 transition-transform shrink-0",
                         isExpanded && "rotate-180"
                       )} 
                     />
                   )}
                 </button>
 
-                {/* Subcategories */}
                 {isExpanded && categorySubcategories.length > 0 && (
                   <div className="ml-4 mt-1 space-y-1 border-l-2 border-border pl-3">
                     {categorySubcategories.map((subcategory) => (
@@ -212,7 +233,7 @@ export function ShopFilters({
                             : "text-muted-foreground hover:text-foreground hover:bg-accent"
                         )}
                       >
-                        <Tag className="w-3 h-3" />
+                        <Tag className="w-3 h-3 shrink-0" />
                         <span className="truncate">{subcategory.name}</span>
                       </button>
                     ))}
@@ -225,7 +246,7 @@ export function ShopFilters({
       </div>
 
       {/* Price Range */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Price Range</h3>
           {hasPriceFilter && (
@@ -238,60 +259,110 @@ export function ShopFilters({
           )}
         </div>
         
-        {/* Min/Max Inputs */}
         <div className="flex items-center gap-2">
           <div className="flex-1">
-            <label className="text-xs text-muted-foreground mb-1 block">Min</label>
             <Input
               type="number"
               value={minInput}
-              onChange={(e) => handleMinChange(e.target.value)}
+              onChange={(e) => setMinInput(e.target.value)}
               min={MIN_PRICE}
               max={MAX_PRICE}
               className="h-9 text-sm"
-              placeholder="50"
+              placeholder="Min"
             />
           </div>
-          <span className="text-muted-foreground mt-5">-</span>
+          <span className="text-muted-foreground">-</span>
           <div className="flex-1">
-            <label className="text-xs text-muted-foreground mb-1 block">Max</label>
             <Input
               type="number"
               value={maxInput}
-              onChange={(e) => handleMaxChange(e.target.value)}
+              onChange={(e) => setMaxInput(e.target.value)}
               min={MIN_PRICE}
               max={MAX_PRICE}
               className="h-9 text-sm"
-              placeholder="10000"
+              placeholder="Max"
             />
           </div>
         </div>
-
-        {/* Slider */}
-        <div className="px-1">
-          <Slider
-            value={localPriceRange}
-            onValueChange={handleSliderChange}
-            min={MIN_PRICE}
-            max={MAX_PRICE}
-            step={50}
-            className="my-4"
-          />
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Rs. {MIN_PRICE}</span>
-            <span>Rs. {MAX_PRICE.toLocaleString()}</span>
-          </div>
-        </div>
-
-        {/* Apply Button */}
-        <Button 
-          onClick={handleApplyPrice} 
-          size="sm" 
-          className="w-full"
-        >
-          Apply Price Filter
+        
+        <Button onClick={handleApplyPrice} size="sm" className="w-full">
+          Apply
         </Button>
       </div>
+
+      {/* Colors Filter */}
+      {colors.length > 0 && onColorsChange && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Palette className="w-4 h-4" />
+              Colors
+            </h3>
+            {hasColorFilter && (
+              <button 
+                onClick={() => onColorsChange([])}
+                className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+            {colors.map((color) => (
+              <label
+                key={color.id}
+                className="flex items-center gap-2 cursor-pointer text-sm hover:bg-accent px-2 py-1.5 rounded"
+              >
+                <Checkbox
+                  checked={selectedColors.includes(color.name)}
+                  onCheckedChange={() => toggleColor(color.name)}
+                />
+                <div
+                  className="w-4 h-4 rounded-full border border-border shrink-0"
+                  style={{ backgroundColor: color.hex_code || '#ccc' }}
+                />
+                <span className="truncate">{color.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sizes Filter */}
+      {sizes.length > 0 && onSizesChange && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Ruler className="w-4 h-4" />
+              Sizes
+            </h3>
+            {hasSizeFilter && (
+              <button 
+                onClick={() => onSizesChange([])}
+                className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {sizes.map((size) => (
+              <button
+                key={size.id}
+                onClick={() => toggleSize(size.name)}
+                className={cn(
+                  "px-3 py-1.5 text-sm rounded-md border transition-colors",
+                  selectedSizes.includes(size.name)
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border hover:bg-accent"
+                )}
+              >
+                {size.code || size.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
