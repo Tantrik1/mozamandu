@@ -35,33 +35,34 @@ export function CustomerTable({ customers, searchQuery, onViewCustomer, onRefres
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Registered Customers ({filteredCustomers.length})</CardTitle>
+      <CardHeader className="px-4 md:px-6">
+        <CardTitle className="text-lg md:text-xl">Registered Customers ({filteredCustomers.length})</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         {filteredCustomers.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Customer</TableHead>
-                <TableHead>Contact Info</TableHead>
-                <TableHead>Orders</TableHead>
-                <TableHead>Total Spent</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[180px]">Customer</TableHead>
+                  <TableHead className="min-w-[140px]">Contact Info</TableHead>
+                  <TableHead className="min-w-[80px]">Orders</TableHead>
+                  <TableHead className="min-w-[100px]">Total Spent</TableHead>
+                  <TableHead className="min-w-[100px]">Joined</TableHead>
+                  <TableHead className="min-w-[80px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
             <TableBody>
               {filteredCustomers.map((customer) => (
                 <TableRow key={customer.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-gray-400" />
+                      <User className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="font-medium">
+                        <p className="font-medium truncate max-w-[150px]">
                           {customer.full_name || 'Unnamed Customer'}
                         </p>
-                        <p className="text-sm text-gray-600">{customer.email}</p>
+                        <p className="text-sm text-muted-foreground truncate max-w-[150px]">{customer.email}</p>
                       </div>
                     </div>
                   </TableCell>
@@ -69,14 +70,14 @@ export function CustomerTable({ customers, searchQuery, onViewCustomer, onRefres
                     <div className="space-y-1">
                       {customer.contact_number && (
                         <div className="flex items-center gap-1 text-sm">
-                          <Phone className="h-3 w-3 text-gray-400" />
-                          {customer.contact_number}
+                          <Phone className="h-3 w-3 text-muted-foreground" />
+                          <span className="truncate">{customer.contact_number}</span>
                         </div>
                       )}
                       {customer.whatsapp_number && (
-                        <div className="flex items-center gap-1 text-sm text-green-600">
+                        <div className="flex items-center gap-1 text-sm text-emerald-600">
                           <Phone className="h-3 w-3" />
-                          WhatsApp: {customer.whatsapp_number}
+                          <span className="truncate">{customer.whatsapp_number}</span>
                         </div>
                       )}
                     </div>
@@ -104,19 +105,20 @@ export function CustomerTable({ customers, searchQuery, onViewCustomer, onRefres
               ))}
             </TableBody>
           </Table>
+          </div>
         ) : (
-          <div className="text-center py-8">
-            <p className="text-gray-500 mb-4">
+          <div className="text-center py-8 px-4">
+            <p className="text-muted-foreground mb-4">
               {searchQuery 
                 ? "No customers found matching your search criteria."
                 : "No customer profiles found in the database."
               }
             </p>
             {!searchQuery && (
-              <div className="text-sm text-gray-400 space-y-1">
+              <div className="text-sm text-muted-foreground space-y-1">
                 <p>• No customers have signed up yet, or</p>
                 <p>• There might be a database connectivity issue</p>
-                <Button onClick={onRefresh} variant="outline" className="mt-2">
+                <Button onClick={onRefresh} variant="outline" size="sm" className="mt-2">
                   Try Again
                 </Button>
               </div>

@@ -186,10 +186,13 @@ export function AdminOrdersPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Order Management</h1>
-        <Button onClick={fetchOrders} disabled={loading}>
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Order Management</h1>
+          <p className="text-muted-foreground mt-1">Track and manage customer orders</p>
+        </div>
+        <Button onClick={fetchOrders} disabled={loading} size="sm">
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
@@ -205,26 +208,28 @@ export function AdminOrdersPage() {
       />
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="all">
-            All Orders ({getOrdersByStatus('all').length})
-          </TabsTrigger>
-          <TabsTrigger value="pending_payment">
-            Pending ({getOrdersByStatus('pending_payment').length})
-          </TabsTrigger>
-          <TabsTrigger value="payment_confirmed">
-            Confirmed ({getOrdersByStatus('payment_confirmed').length})
-          </TabsTrigger>
-          <TabsTrigger value="on_delivery">
-            On Delivery ({getOrdersByStatus('on_delivery').length})
-          </TabsTrigger>
-          <TabsTrigger value="delivered">
-            Delivered ({getOrdersByStatus('delivered').length})
-          </TabsTrigger>
-          <TabsTrigger value="cancelled">
-            Cancelled ({getOrdersByStatus('cancelled').length})
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-2">
+          <TabsList className="inline-flex w-auto min-w-full md:grid md:grid-cols-6 md:w-full">
+            <TabsTrigger value="all" className="text-xs md:text-sm whitespace-nowrap">
+              All ({getOrdersByStatus('all').length})
+            </TabsTrigger>
+            <TabsTrigger value="pending_payment" className="text-xs md:text-sm whitespace-nowrap">
+              Pending ({getOrdersByStatus('pending_payment').length})
+            </TabsTrigger>
+            <TabsTrigger value="payment_confirmed" className="text-xs md:text-sm whitespace-nowrap">
+              Confirmed ({getOrdersByStatus('payment_confirmed').length})
+            </TabsTrigger>
+            <TabsTrigger value="on_delivery" className="text-xs md:text-sm whitespace-nowrap">
+              Delivery ({getOrdersByStatus('on_delivery').length})
+            </TabsTrigger>
+            <TabsTrigger value="delivered" className="text-xs md:text-sm whitespace-nowrap">
+              Delivered ({getOrdersByStatus('delivered').length})
+            </TabsTrigger>
+            <TabsTrigger value="cancelled" className="text-xs md:text-sm whitespace-nowrap">
+              Cancelled ({getOrdersByStatus('cancelled').length})
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="all" className="mt-6">
           <Card>
