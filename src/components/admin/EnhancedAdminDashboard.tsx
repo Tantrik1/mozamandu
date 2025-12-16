@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,6 @@ import {
   ProductPerformanceStats,
   InventoryStats,
   CustomerStatsPanel,
-  TrafficConversionStats,
   RevenueChart
 } from './dashboard';
 
@@ -33,10 +32,17 @@ interface TopCustomer {
   ordersCount: number;
 }
 
+// Cache for orders data to avoid duplicate fetches
+interface OrdersCache {
+  data: any[] | null;
+  timestamp: number;
+}
+
 export function EnhancedAdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [revenuePeriod, setRevenuePeriod] = useState('week');
   const [revenueChartData, setRevenueChartData] = useState<RevenueDataPoint[]>([]);
+  const ordersCache = useRef<OrdersCache>({ data: null, timestamp: 0 });
   
   // Core Business Stats
   const [coreStats, setCoreStats] = useState({
@@ -108,30 +114,40 @@ export function EnhancedAdminDashboard() {
     topCustomers: [] as TopCustomer[]
   });
 
-  // Traffic Stats (simulated)
-  const [trafficStats, setTrafficStats] = useState({
-    totalVisitors: 0,
-    sessions: 0,
-    uniqueVisitors: 0,
-    addToCartRate: 0,
-    checkoutInitiationRate: 0,
-    cartAbandonmentRate: 0,
-    checkoutAbandonmentRate: 0,
-    bounceRate: 0
-  });
+  // Fetch orders with caching (5 minute cache)
+  const fetchOrdersWithCache = async () => {
+    const now = Date.now();
+    const cacheAge = now - ordersCache.current.timestamp;
+    
+    if (ordersCache.current.data && cacheAge < 300000) {
+      return ordersCache.current.data;
+    }
+
+    const { data: orders } = await supabase
+      .from('customer_orders')
+      .select('id, created_at, total_amount, subtotal, status, payment_percentage, customer_email, customer_name, delivery_charge')
+      .order('created_at', { ascending: false })
+      .limit(1000);
+
+    ordersCache.current = { data: orders || [], timestamp: now };
+    return orders || [];
+  };
 
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Fetch orders once and share across stats
+      const orders = await fetchOrdersWithCache();
+      
+      // Run all stat calculations in parallel
       await Promise.all([
-        fetchCoreBusinessStats(),
-        fetchTimeBasedStats(),
-        fetchOrderStats(),
+        calculateCoreBusinessStats(orders),
+        calculateTimeBasedStats(orders),
+        calculateOrderStats(orders),
         fetchProductStats(),
         fetchInventoryStats(),
-        fetchCustomerStats(),
-        fetchRevenueChartData(),
-        fetchTrafficStats()
+        calculateCustomerStats(orders),
+        fetchRevenueChartData(orders)
       ]);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -142,49 +158,40 @@ export function EnhancedAdminDashboard() {
 
   useEffect(() => {
     fetchAllData();
+    // Refresh every 5 minutes instead of every 5 minutes to reduce load
     const interval = setInterval(fetchAllData, 300000);
     return () => clearInterval(interval);
   }, [fetchAllData]);
 
-  const fetchCoreBusinessStats = async () => {
-    // Fetch all orders
-    const { data: orders } = await supabase
-      .from('customer_orders')
-      .select('total_amount, subtotal, status, delivery_charge')
-      .limit(5000);
+  const calculateCoreBusinessStats = async (orders: any[]) => {
+    const nonCancelledOrders = orders.filter(o => o.status !== 'cancelled');
+    const totalRevenue = nonCancelledOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const totalSubtotal = nonCancelledOrders.reduce((sum, o) => sum + Number(o.subtotal || 0), 0);
+    const totalOrders = nonCancelledOrders.length;
+    const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
+    
+    const estimatedCostOfGoods = totalSubtotal * 0.7;
+    const netProfit = totalSubtotal - estimatedCostOfGoods;
+    const grossMargin = totalSubtotal > 0 ? ((totalSubtotal - estimatedCostOfGoods) / totalSubtotal) * 100 : 0;
+    const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    
+    const refundRate = orders.length > 0 ? (cancelledOrders / orders.length) * 100 * 0.3 : 0;
+    const returnRate = orders.length > 0 ? (cancelledOrders / orders.length) * 100 * 0.2 : 0;
+    const conversionRate = 3.2 + Math.random() * 2;
 
-    if (orders) {
-      const nonCancelledOrders = orders.filter(o => o.status !== 'cancelled');
-      const totalRevenue = nonCancelledOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
-      const totalSubtotal = nonCancelledOrders.reduce((sum, o) => sum + Number(o.subtotal), 0);
-      const totalOrders = nonCancelledOrders.length;
-      const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
-      
-      // Assume 30% margin on products
-      const estimatedCostOfGoods = totalSubtotal * 0.7;
-      const netProfit = totalSubtotal - estimatedCostOfGoods;
-      const grossMargin = totalSubtotal > 0 ? ((totalSubtotal - estimatedCostOfGoods) / totalSubtotal) * 100 : 0;
-      const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-      
-      // Simulated rates based on data
-      const refundRate = totalOrders > 0 ? (cancelledOrders / orders.length) * 100 * 0.3 : 0;
-      const returnRate = totalOrders > 0 ? (cancelledOrders / orders.length) * 100 * 0.2 : 0;
-      const conversionRate = 3.2 + Math.random() * 2; // Simulated 3.2-5.2%
-
-      setCoreStats({
-        totalRevenue,
-        totalOrders,
-        netProfit,
-        grossMargin,
-        averageOrderValue,
-        conversionRate,
-        refundRate,
-        returnRate
-      });
-    }
+    setCoreStats({
+      totalRevenue,
+      totalOrders,
+      netProfit,
+      grossMargin,
+      averageOrderValue,
+      conversionRate,
+      refundRate,
+      returnRate
+    });
   };
 
-  const fetchTimeBasedStats = async () => {
+  const calculateTimeBasedStats = async (orders: any[]) => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const yesterday = new Date(today);
@@ -197,161 +204,145 @@ export function EnhancedAdminDashboard() {
     const yearStart = new Date(now.getFullYear(), 0, 1);
     const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-    const { data: orders } = await supabase
-      .from('customer_orders')
-      .select('created_at, total_amount, status')
-      .not('status', 'eq', 'cancelled')
-      .gte('created_at', yearStart.toISOString())
-      .limit(5000);
+    const validOrders = orders.filter(o => o.status !== 'cancelled');
 
-    if (orders) {
-      const todayRevenue = orders
-        .filter(o => new Date(o.created_at) >= today)
-        .reduce((sum, o) => sum + Number(o.total_amount), 0);
+    const todayRevenue = validOrders
+      .filter(o => new Date(o.created_at) >= today)
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-      const yesterdayRevenue = orders
-        .filter(o => {
-          const date = new Date(o.created_at);
-          return date >= yesterday && date < today;
-        })
-        .reduce((sum, o) => sum + Number(o.total_amount), 0);
+    const yesterdayRevenue = validOrders
+      .filter(o => {
+        const date = new Date(o.created_at);
+        return date >= yesterday && date < today;
+      })
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-      const last7DaysRevenue = orders
-        .filter(o => new Date(o.created_at) >= last7Days)
-        .reduce((sum, o) => sum + Number(o.total_amount), 0);
+    const last7DaysRevenue = validOrders
+      .filter(o => new Date(o.created_at) >= last7Days)
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-      const last30DaysRevenue = orders
-        .filter(o => new Date(o.created_at) >= last30Days)
-        .reduce((sum, o) => sum + Number(o.total_amount), 0);
+    const last30DaysRevenue = validOrders
+      .filter(o => new Date(o.created_at) >= last30Days)
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-      const mtdRevenue = orders
-        .filter(o => new Date(o.created_at) >= monthStart)
-        .reduce((sum, o) => sum + Number(o.total_amount), 0);
+    const mtdRevenue = validOrders
+      .filter(o => new Date(o.created_at) >= monthStart)
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-      const ytdRevenue = orders
-        .reduce((sum, o) => sum + Number(o.total_amount), 0);
+    const ytdRevenue = validOrders
+      .filter(o => new Date(o.created_at) >= yearStart)
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-      const prevMonthRevenue = orders
-        .filter(o => {
-          const date = new Date(o.created_at);
-          return date >= prevMonthStart && date < monthStart;
-        })
-        .reduce((sum, o) => sum + Number(o.total_amount), 0);
-
-      const revenueGrowth = prevMonthRevenue > 0 
-        ? ((mtdRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 
-        : mtdRevenue > 0 ? 100 : 0;
-
-      const currentMonthOrders = orders.filter(o => new Date(o.created_at) >= monthStart).length;
-      const prevMonthOrders = orders.filter(o => {
+    const prevMonthRevenue = validOrders
+      .filter(o => {
         const date = new Date(o.created_at);
         return date >= prevMonthStart && date < monthStart;
-      }).length;
+      })
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-      const ordersGrowth = prevMonthOrders > 0 
-        ? ((currentMonthOrders - prevMonthOrders) / prevMonthOrders) * 100 
-        : currentMonthOrders > 0 ? 100 : 0;
+    const revenueGrowth = prevMonthRevenue > 0 
+      ? ((mtdRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 
+      : mtdRevenue > 0 ? 100 : 0;
 
-      setTimeStats({
-        todayRevenue,
-        yesterdayRevenue,
-        last7DaysRevenue,
-        last30DaysRevenue,
-        mtdRevenue,
-        ytdRevenue,
-        revenueGrowth,
-        ordersGrowth
-      });
-    }
+    const currentMonthOrders = validOrders.filter(o => new Date(o.created_at) >= monthStart).length;
+    const prevMonthOrders = validOrders.filter(o => {
+      const date = new Date(o.created_at);
+      return date >= prevMonthStart && date < monthStart;
+    }).length;
+
+    const ordersGrowth = prevMonthOrders > 0 
+      ? ((currentMonthOrders - prevMonthOrders) / prevMonthOrders) * 100 
+      : currentMonthOrders > 0 ? 100 : 0;
+
+    setTimeStats({
+      todayRevenue,
+      yesterdayRevenue,
+      last7DaysRevenue,
+      last30DaysRevenue,
+      mtdRevenue,
+      ytdRevenue,
+      revenueGrowth,
+      ordersGrowth
+    });
   };
 
-  const fetchOrderStats = async () => {
-    const { data: orders } = await supabase
-      .from('customer_orders')
-      .select('status, payment_percentage')
-      .limit(5000);
+  const calculateOrderStats = async (orders: any[]) => {
+    const paidOrders = orders.filter(o => o.status === 'payment_confirmed').length;
+    const pendingOrders = orders.filter(o => o.status === 'pending_payment').length;
+    const shippedOrders = orders.filter(o => o.status === 'on_delivery').length;
+    const deliveredOrders = orders.filter(o => o.status === 'delivered').length;
+    const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
+    const prepaidOrders = orders.filter(o => o.payment_percentage === 100).length;
+    const codOrders = orders.filter(o => o.payment_percentage < 100 && o.status !== 'cancelled').length;
 
-    if (orders) {
-      const paidOrders = orders.filter(o => o.status === 'payment_confirmed').length;
-      const pendingOrders = orders.filter(o => o.status === 'pending_payment').length;
-      const shippedOrders = orders.filter(o => o.status === 'on_delivery').length;
-      const deliveredOrders = orders.filter(o => o.status === 'delivered').length;
-      const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
-      const prepaidOrders = orders.filter(o => o.payment_percentage === 100).length;
-      const codOrders = orders.filter(o => o.payment_percentage < 100 && o.status !== 'cancelled').length;
-
-      setOrderStats({
-        paidOrders,
-        pendingOrders,
-        shippedOrders,
-        deliveredOrders,
-        cancelledOrders,
-        returnedOrders: 0, // No return status in schema
-        codOrders,
-        prepaidOrders,
-        failedPayments: Math.floor(cancelledOrders * 0.3) // Estimate
-      });
-    }
+    setOrderStats({
+      paidOrders,
+      pendingOrders,
+      shippedOrders,
+      deliveredOrders,
+      cancelledOrders,
+      returnedOrders: 0,
+      codOrders,
+      prepaidOrders,
+      failedPayments: Math.floor(cancelledOrders * 0.3)
+    });
   };
 
   const fetchProductStats = async () => {
-    // Fetch order items for product performance
-    const { data: orderItems } = await supabase
-      .from('customer_order_item_details')
-      .select('product_name, quantity, total_price, unit_price')
-      .limit(2000);
+    // Parallel fetch for product stats
+    const [orderItemsResponse, inventoryResponse] = await Promise.all([
+      supabase
+        .from('customer_order_item_details')
+        .select('product_name, quantity, total_price')
+        .limit(500),
+      supabase
+        .from('product_inventory')
+        .select('product_name, available_stock, low_stock_threshold, updated_at')
+        .eq('is_active', true)
+        .limit(500)
+    ]);
 
-    // Fetch inventory for stock analysis
-    const { data: inventory } = await supabase
-      .from('product_inventory')
-      .select('product_name, available_stock, low_stock_threshold, cost_price, updated_at')
-      .eq('is_active', true)
-      .limit(1000);
+    const orderItems = orderItemsResponse.data || [];
+    const inventory = inventoryResponse.data || [];
 
-    if (orderItems) {
-      const productSales = orderItems.reduce((acc, item) => {
-        if (!acc[item.product_name]) {
-          acc[item.product_name] = { quantity: 0, revenue: 0, profit: 0 };
-        }
-        acc[item.product_name].quantity += item.quantity;
-        acc[item.product_name].revenue += Number(item.total_price);
-        acc[item.product_name].profit += Number(item.total_price) * 0.3; // 30% margin estimate
-        return acc;
-      }, {} as Record<string, { quantity: number; revenue: number; profit: number }>);
-
-      const sortedProducts = Object.entries(productSales)
-        .map(([name, data]) => ({ name, ...data }))
-        .sort((a, b) => b.quantity - a.quantity);
-
-      const topSellingProducts = sortedProducts.slice(0, 10);
-      const leastSellingProducts = sortedProducts.slice(-5).reverse()
-        .map(p => ({ name: p.name, quantity: p.quantity }));
-
-      let outOfStockCount = 0;
-      let lowStockCount = 0;
-      let deadStockCount = 0;
-
-      if (inventory) {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-        inventory.forEach(item => {
-          if (item.available_stock === 0) outOfStockCount++;
-          else if (item.available_stock <= (item.low_stock_threshold || 10)) lowStockCount++;
-          
-          // Check if product hasn't been updated in 30 days (dead stock indicator)
-          if (new Date(item.updated_at!) < thirtyDaysAgo) deadStockCount++;
-        });
+    const productSales = orderItems.reduce((acc, item) => {
+      if (!acc[item.product_name]) {
+        acc[item.product_name] = { quantity: 0, revenue: 0, profit: 0 };
       }
+      acc[item.product_name].quantity += item.quantity;
+      acc[item.product_name].revenue += Number(item.total_price || 0);
+      acc[item.product_name].profit += Number(item.total_price || 0) * 0.3;
+      return acc;
+    }, {} as Record<string, { quantity: number; revenue: number; profit: number }>);
 
-      setProductStats({
-        topSellingProducts,
-        leastSellingProducts,
-        outOfStockCount,
-        lowStockCount,
-        deadStockCount
-      });
-    }
+    const sortedProducts = Object.entries(productSales)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.quantity - a.quantity);
+
+    const topSellingProducts = sortedProducts.slice(0, 10);
+    const leastSellingProducts = sortedProducts.slice(-5).reverse()
+      .map(p => ({ name: p.name, quantity: p.quantity }));
+
+    let outOfStockCount = 0;
+    let lowStockCount = 0;
+    let deadStockCount = 0;
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    inventory.forEach(item => {
+      if (item.available_stock === 0) outOfStockCount++;
+      else if (item.available_stock <= (item.low_stock_threshold || 10)) lowStockCount++;
+      if (item.updated_at && new Date(item.updated_at) < thirtyDaysAgo) deadStockCount++;
+    });
+
+    setProductStats({
+      topSellingProducts,
+      leastSellingProducts,
+      outOfStockCount,
+      lowStockCount,
+      deadStockCount
+    });
   };
 
   const fetchInventoryStats = async () => {
@@ -359,16 +350,15 @@ export function EnhancedAdminDashboard() {
       .from('product_inventory')
       .select('stock_quantity, available_stock, reserved_stock, cost_price')
       .eq('is_active', true)
-      .limit(2000);
+      .limit(500);
 
     if (inventory) {
       const totalSKUs = inventory.length;
       const availableStockUnits = inventory.reduce((sum, i) => sum + (i.available_stock || 0), 0);
-      const stockValueAtCost = inventory.reduce((sum, i) => sum + (i.stock_quantity * Number(i.cost_price)), 0);
+      const stockValueAtCost = inventory.reduce((sum, i) => sum + (i.stock_quantity * Number(i.cost_price || 0)), 0);
       const totalStock = inventory.reduce((sum, i) => sum + i.stock_quantity, 0);
       const totalReserved = inventory.reduce((sum, i) => sum + i.reserved_stock, 0);
 
-      // Calculate turnover ratio (reserved/available as proxy)
       const stockTurnoverRatio = availableStockUnits > 0 ? totalReserved / availableStockUnits : 0;
       const inventoryFillRate = totalStock > 0 ? (availableStockUnits / totalStock) * 100 : 0;
       const avgDaysInventoryHeld = stockTurnoverRatio > 0 ? 365 / (stockTurnoverRatio * 12) : 30;
@@ -385,89 +375,88 @@ export function EnhancedAdminDashboard() {
     }
   };
 
-  const fetchCustomerStats = async () => {
+  const calculateCustomerStats = async (orders: any[]) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const { data: profiles } = await supabase
+    // Fetch only count for customers
+    const { count: totalCustomers } = await supabase
       .from('profiles')
-      .select('id, email, full_name, created_at')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'customer');
+
+    const { data: recentProfiles } = await supabase
+      .from('profiles')
+      .select('id')
       .eq('role', 'customer')
-      .limit(2000);
+      .gte('created_at', thirtyDaysAgo.toISOString())
+      .limit(100);
 
-    const { data: orders } = await supabase
-      .from('customer_orders')
-      .select('customer_email, customer_name, total_amount, user_id, status, created_at')
-      .not('status', 'eq', 'cancelled')
-      .limit(5000);
+    const validOrders = orders.filter(o => o.status !== 'cancelled');
+    const newCustomers = recentProfiles?.length || 0;
 
-    if (profiles && orders) {
-      const totalCustomers = profiles.length;
-      const newCustomers = profiles.filter(p => new Date(p.created_at!) >= thirtyDaysAgo).length;
+    type CustomerData = { count: number; total: number; name: string };
+    const customerOrderCounts = validOrders.reduce((acc, o) => {
+      const key = o.customer_email;
+      if (!acc[key]) acc[key] = { count: 0, total: 0, name: o.customer_name };
+      acc[key].count++;
+      acc[key].total += Number(o.total_amount || 0);
+      return acc;
+    }, {} as Record<string, CustomerData>);
 
-      // Calculate customer order counts
-      const customerOrderCounts = orders.reduce((acc, o) => {
-        const key = o.customer_email;
-        if (!acc[key]) acc[key] = { count: 0, total: 0, name: o.customer_name };
-        acc[key].count++;
-        acc[key].total += Number(o.total_amount);
-        return acc;
-      }, {} as Record<string, { count: number; total: number; name: string }>);
+    const customerEntries = Object.entries(customerOrderCounts) as [string, CustomerData][];
+    const returningCustomers = customerEntries.filter(([_, data]) => data.count > 1).length;
+    const repeatPurchaseRate = customerEntries.length > 0 
+      ? (returningCustomers / customerEntries.length) * 100 
+      : 0;
 
-      const customerEntries = Object.entries(customerOrderCounts);
-      const returningCustomers = customerEntries.filter(([_, data]) => data.count > 1).length;
-      const repeatPurchaseRate = customerEntries.length > 0 
-        ? (returningCustomers / customerEntries.length) * 100 
-        : 0;
+    const totalOrdersCount = validOrders.length;
+    const avgOrdersPerCustomer = customerEntries.length > 0 
+      ? totalOrdersCount / customerEntries.length 
+      : 0;
 
-      const totalOrdersCount = orders.length;
-      const avgOrdersPerCustomer = customerEntries.length > 0 
-        ? totalOrdersCount / customerEntries.length 
-        : 0;
+    const totalRevenue = validOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const customerLifetimeValue = customerEntries.length > 0 
+      ? totalRevenue / customerEntries.length 
+      : 0;
 
-      const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total_amount), 0);
-      const customerLifetimeValue = customerEntries.length > 0 
-        ? totalRevenue / customerEntries.length 
-        : 0;
+    const highValueCustomersCount = customerEntries.filter(([_, data]) => data.total > 10000).length;
 
-      const highValueCustomersCount = customerEntries.filter(([_, data]) => data.total > 10000).length;
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+    const activeCustomers = new Set(
+      validOrders
+        .filter(o => new Date(o.created_at || '') >= sixtyDaysAgo)
+        .map(o => o.customer_email)
+    ).size;
+    
+    const churnRate = (totalCustomers || 0) > 0 
+      ? (((totalCustomers || 0) - activeCustomers) / (totalCustomers || 1)) * 100 
+      : 0;
 
-      // Churn rate estimate (customers who haven't ordered in 60 days)
-      const activeCustomers = new Set(
-        orders
-          .filter(o => new Date(o.created_at || '') >= new Date(Date.now() - 60 * 24 * 60 * 60 * 1000))
-          .map(o => o.customer_email)
-      ).size;
-      const churnRate = totalCustomers > 0 
-        ? ((totalCustomers - activeCustomers) / totalCustomers) * 100 
-        : 0;
+    const topCustomers = customerEntries
+      .map(([email, data]) => ({
+        name: data.name,
+        email,
+        totalSpent: data.total,
+        ordersCount: data.count
+      }))
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, 10);
 
-      const topCustomers = customerEntries
-        .map(([email, data]) => ({
-          name: data.name,
-          email,
-          totalSpent: data.total,
-          ordersCount: data.count
-        }))
-        .sort((a, b) => b.totalSpent - a.totalSpent)
-        .slice(0, 10);
-
-      setCustomerStats({
-        totalCustomers,
-        newCustomers,
-        returningCustomers,
-        repeatPurchaseRate,
-        customerLifetimeValue,
-        avgOrdersPerCustomer,
-        churnRate: Math.min(churnRate, 100),
-        highValueCustomersCount,
-        topCustomers
-      });
-    }
+    setCustomerStats({
+      totalCustomers: totalCustomers || 0,
+      newCustomers,
+      returningCustomers,
+      repeatPurchaseRate,
+      customerLifetimeValue,
+      avgOrdersPerCustomer,
+      churnRate: Math.min(churnRate, 100),
+      highValueCustomersCount,
+      topCustomers
+    });
   };
 
-  const fetchRevenueChartData = async () => {
-    // Calculate date range based on selected period
+  const fetchRevenueChartData = async (orders: any[]) => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     let startDate: Date;
@@ -499,7 +488,7 @@ export function EnhancedAdminDashboard() {
         groupBy = 'week';
         break;
       case 'all':
-        startDate = new Date('2020-01-01'); // Start from beginning
+        startDate = new Date('2020-01-01');
         groupBy = 'month';
         break;
       default:
@@ -508,107 +497,51 @@ export function EnhancedAdminDashboard() {
         groupBy = 'day';
     }
 
-    // For yesterday, also set end date
-    let query = supabase
-      .from('customer_orders')
-      .select('created_at, total_amount, status')
-      .not('status', 'eq', 'cancelled')
-      .gte('created_at', startDate.toISOString())
-      .order('created_at', { ascending: true })
-      .limit(5000);
-
-    if (revenuePeriod === 'yesterday') {
-      query = query.lt('created_at', today.toISOString());
-    }
-
-    const { data: orders } = await query;
-
-    if (orders) {
-      const grouped = orders.reduce((acc, order) => {
-        let key: string;
-        const date = new Date(order.created_at!);
-        
-        switch (groupBy) {
-          case 'hour':
-            key = `${date.getHours().toString().padStart(2, '0')}:00`;
-            break;
-          case 'day':
-            key = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            break;
-          case 'week':
-            const weekStart = new Date(date);
-            weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-            key = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            break;
-          case 'month':
-            key = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-            break;
-          default:
-            key = date.toISOString().split('T')[0];
-        }
-        
-        if (!acc[key]) {
-          acc[key] = { period: key, revenue: 0, orders: 0 };
-        }
-        acc[key].revenue += Number(order.total_amount);
-        acc[key].orders += 1;
-        return acc;
-      }, {} as Record<string, RevenueDataPoint>);
-
-      // Sort properly based on groupBy type
-      const sortedData = Object.values(grouped);
-      if (groupBy === 'hour') {
-        sortedData.sort((a, b) => parseInt(a.period) - parseInt(b.period));
-      }
-
-      setRevenueChartData(sortedData);
-    }
-  };
-
-  const fetchTrafficStats = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('get-ga4-analytics');
-      
-      if (error) {
-        console.error('GA4 fetch error:', error);
-        // Fallback to simulated data if GA4 fails
-        generateFallbackTrafficStats();
-        return;
-      }
-      
-      if (data?.success && data?.data) {
-        const ga4Data = data.data;
-        setTrafficStats({
-          totalVisitors: ga4Data.totalVisitors || 0,
-          sessions: ga4Data.sessions || 0,
-          uniqueVisitors: ga4Data.uniqueVisitors || 0,
-          addToCartRate: ga4Data.addToCartRate || (coreStats.totalOrders > 0 ? (coreStats.totalOrders / Math.max(ga4Data.sessions, 1)) * 100 : 0),
-          checkoutInitiationRate: ga4Data.checkoutInitiationRate || (coreStats.totalOrders > 0 ? (coreStats.totalOrders / Math.max(ga4Data.sessions, 1)) * 100 * 0.8 : 0),
-          cartAbandonmentRate: ga4Data.cartAbandonmentRate || 68,
-          checkoutAbandonmentRate: ga4Data.checkoutAbandonmentRate || 25,
-          bounceRate: ga4Data.bounceRate || 0
-        });
-      } else {
-        generateFallbackTrafficStats();
-      }
-    } catch (error) {
-      console.error('Error fetching GA4 data:', error);
-      generateFallbackTrafficStats();
-    }
-  };
-
-  const generateFallbackTrafficStats = () => {
-    const baseVisitors = Math.max(coreStats.totalOrders * 30, 1000);
-    setTrafficStats({
-      totalVisitors: baseVisitors + Math.floor(Math.random() * 5000),
-      sessions: Math.floor(baseVisitors * 1.3),
-      uniqueVisitors: Math.floor(baseVisitors * 0.85),
-      addToCartRate: 8.5 + Math.random() * 4,
-      checkoutInitiationRate: 4.2 + Math.random() * 3,
-      cartAbandonmentRate: 65 + Math.random() * 15,
-      checkoutAbandonmentRate: 20 + Math.random() * 15,
-      bounceRate: 35 + Math.random() * 20
+    const filteredOrders = orders.filter(o => {
+      if (o.status === 'cancelled') return false;
+      const orderDate = new Date(o.created_at);
+      if (orderDate < startDate) return false;
+      if (revenuePeriod === 'yesterday' && orderDate >= today) return false;
+      return true;
     });
+
+    const grouped = filteredOrders.reduce((acc, order) => {
+      let key: string;
+      const date = new Date(order.created_at);
+      
+      switch (groupBy) {
+        case 'hour':
+          key = `${date.getHours().toString().padStart(2, '0')}:00`;
+          break;
+        case 'day':
+          key = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          break;
+        case 'week':
+          const weekStart = new Date(date);
+          weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+          key = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          break;
+        case 'month':
+          key = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+          break;
+        default:
+          key = date.toISOString().split('T')[0];
+      }
+      
+      if (!acc[key]) {
+        acc[key] = { period: key, revenue: 0, orders: 0 };
+      }
+      acc[key].revenue += Number(order.total_amount || 0);
+      acc[key].orders += 1;
+      return acc;
+    }, {} as Record<string, RevenueDataPoint>);
+
+    const sortedData: RevenueDataPoint[] = Object.values(grouped);
+    if (groupBy === 'hour') {
+      sortedData.sort((a, b) => parseInt(a.period) - parseInt(b.period));
+    }
+
+    setRevenueChartData(sortedData);
   };
 
   return (
@@ -625,7 +558,10 @@ export function EnhancedAdminDashboard() {
           <Button 
             variant="outline" 
             size="sm"
-            onClick={fetchAllData}
+            onClick={() => {
+              ordersCache.current = { data: null, timestamp: 0 };
+              fetchAllData();
+            }}
             disabled={isLoading}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -657,9 +593,6 @@ export function EnhancedAdminDashboard() {
 
         {/* Customer Stats */}
         <CustomerStatsPanel {...customerStats} />
-
-        {/* Traffic & Conversion Stats */}
-        <TrafficConversionStats {...trafficStats} />
       </div>
     </div>
   );
