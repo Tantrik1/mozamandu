@@ -6,6 +6,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { RobustCartProvider } from '@/hooks/useRobustCart';
 import { RouteGuard } from '@/components/RouteGuard';
+import ScrollToTop from '@/components/ScrollToTop';
 
 // Lazy load pages with preloading support
 const Home = lazy(() => import('@/pages/Home'));
@@ -68,6 +69,7 @@ function App() {
       <AuthProvider>
         <RobustCartProvider>
           <BrowserRouter>
+            <ScrollToTop />
             <Toaster />
             <Suspense fallback={<PageLoader />}>
               <Routes>
