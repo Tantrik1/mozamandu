@@ -76,7 +76,7 @@ export const ModernNavbar = memo(function ModernNavbar() {
               
               {/* Logo */}
               <Link to="/" className="flex-shrink-0 group">
-                <img alt="Mozamandu" loading="eager" src="/lovable-uploads/c5be09dc-3446-4e71-9d5a-482531992782.jpg" className="h-9 w-auto transition-transform duration-300 group-hover:scale-105 object-cover" />
+                <img alt="Mozamandu" loading="eager" src="/lovable-uploads/c5be09dc-3446-4e71-9d5a-482531992782.jpg" className="h-9 w-auto transition-transform duration-300 group-hover:scale-105 object-cover" width={120} height={36} />
               </Link>
 
               {/* Desktop Search Bar */}
