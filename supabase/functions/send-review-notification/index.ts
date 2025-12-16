@@ -30,7 +30,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const emailResponse = await resend.emails.send({
       from: "Reviews <onboarding@resend.dev>",
-      to: ["admin@yourstore.com"], // Replace with actual admin email or fetch from DB
+      to: ["info@mozamandu.com"], // Replace with actual admin email or fetch from DB
       subject: `New Review Pending Approval - ${productName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
