@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import heroBackground from "@/assets/hero-background.webp";
 export function HeroSection() {
   return (
-    <section className="relative h-[60vh] min-h-[4000px] max-h-[500px] md:h-[60vh] md:min-h-[300px] md:max-h-[400px] lg:h-[70vh] lg:min-h-[600px] lg:max-h-[650px] flex items-center justify-center overflow-hidden">
+    <section className="relative h-[60vh] min-h-[320px] max-h-[500px] md:h-[60vh] md:min-h-[300px] md:max-h-[400px] lg:h-[70vh] lg:min-h-[600px] lg:max-h-[650px] flex items-center justify-center overflow-hidden">
       {/* Hero Background Image - Using img tag for better LCP optimization */}
       {/* eslint-disable-next-line react/no-unknown-property */}
       <img
