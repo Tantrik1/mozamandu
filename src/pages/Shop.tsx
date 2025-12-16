@@ -117,6 +117,16 @@ const fetchProductsBySearch = async (searchQuery: string) => {
   return data || [];
 };
 
+const fetchProductInventoryFilters = async (productIds: string[]) => {
+  if (productIds.length === 0) return [];
+  const { data } = await supabase
+    .from('product_inventory')
+    .select('product_id, color_name, size_name')
+    .in('product_id', productIds)
+    .eq('is_active', true);
+  return data || [];
+};
+
 const Shop = memo(function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
   
@@ -179,13 +189,41 @@ const Shop = memo(function Shop() {
     staleTime: 2 * 60 * 1000,
   });
 
-  // Filter products by price range
+  // Fetch inventory data for color/size filtering
+  const productIds = useMemo(() => products.map(p => p.id), [products]);
+  
+  const { data: inventoryData = [] } = useQuery({
+    queryKey: ['shop-inventory-filters', productIds],
+    queryFn: () => fetchProductInventoryFilters(productIds),
+    enabled: productIds.length > 0 && (selectedColors.length > 0 || selectedSizes.length > 0),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Filter products by price range, colors, and sizes
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const price = product.selling_price || product.cost_price;
-      return price >= priceRange[0] && price <= priceRange[1];
+      const priceMatch = price >= priceRange[0] && price <= priceRange[1];
+      
+      // If no color/size filters, just check price
+      if (selectedColors.length === 0 && selectedSizes.length === 0) {
+        return priceMatch;
+      }
+      
+      // Get inventory items for this product
+      const productInventory = inventoryData.filter(inv => inv.product_id === product.id);
+      
+      // Check color filter
+      const colorMatch = selectedColors.length === 0 || 
+        productInventory.some(inv => inv.color_name && selectedColors.includes(inv.color_name));
+      
+      // Check size filter
+      const sizeMatch = selectedSizes.length === 0 || 
+        productInventory.some(inv => inv.size_name && selectedSizes.includes(inv.size_name));
+      
+      return priceMatch && colorMatch && sizeMatch;
     });
-  }, [products, priceRange]);
+  }, [products, priceRange, selectedColors, selectedSizes, inventoryData]);
 
   const loading = useMemo(() => {
     if (viewMode === 'categories') return categoriesLoading;
