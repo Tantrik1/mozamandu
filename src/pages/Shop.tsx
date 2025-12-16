@@ -4,8 +4,6 @@ import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { ShopFilters } from '@/components/shop/ShopFilters';
 import { ShopProductCard } from '@/components/shop/ShopProductCard';
-import { AdvancedCategoryCard } from '@/components/shop/AdvancedCategoryCard';
-import { AdvancedSubcategoryCard } from '@/components/shop/AdvancedSubcategoryCard';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -16,6 +14,7 @@ import {
   Search, 
   SlidersHorizontal, 
   X, 
+  ChevronRight, 
   Grid3X3, 
   LayoutGrid,
   Package
@@ -439,35 +438,81 @@ const Shop = memo(function Shop() {
           {/* Content */}
           <main className="flex-1 min-w-0">
             {loading ? (
-              <div className="grid grid-cols-2 gap-4 lg:gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="space-y-3 animate-pulse">
-                    <Skeleton className="aspect-square rounded-3xl" />
+              <div className={cn(
+                "grid gap-4",
+                gridCols === 3 ? "grid-cols-2 lg:grid-cols-3" : "grid-cols-2 lg:grid-cols-4"
+              )}>
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="space-y-3">
+                    <Skeleton className="aspect-square rounded-xl" />
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-4 w-1/3" />
                   </div>
                 ))}
               </div>
             ) : viewMode === 'categories' ? (
-              /* Advanced Categories Grid - 2 cards per row */
-              <div className="grid grid-cols-2 gap-4 lg:gap-6">
-                {categories.map((category, index) => (
-                  <AdvancedCategoryCard
+              /* Categories Grid - 1:1 Image Cards */
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {categories.map((category) => (
+                  <button
                     key={category.id}
-                    category={category}
-                    index={index}
-                    onClick={handleCategorySelect}
-                  />
+                    onClick={() => handleCategorySelect(category.id)}
+                    className="group relative aspect-square rounded-2xl border overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/30 bg-card"
+                  >
+                    {category.image_url ? (
+                      <img
+                        src={category.image_url}
+                        alt={category.name}
+                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                        <Package className="w-12 h-12 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+                      <h3 className="font-semibold">{category.name}</h3>
+                      {category.description && (
+                        <p className="text-xs text-white/80 line-clamp-1 mt-0.5">
+                          {category.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ChevronRight className="w-5 h-5 text-white" />
+                    </div>
+                  </button>
                 ))}
               </div>
             ) : viewMode === 'subcategories' ? (
-              /* Advanced Subcategories Grid - 2 cards per row */
-              <div className="grid grid-cols-2 gap-4 lg:gap-6">
-                {subcategories.map((subcategory, index) => (
-                  <AdvancedSubcategoryCard
+              /* Subcategories Grid */
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {subcategories.map((subcategory) => (
+                  <button
                     key={subcategory.id}
-                    subcategory={subcategory}
-                    index={index}
-                    onClick={handleSubcategorySelect}
-                  />
+                    onClick={() => handleSubcategorySelect(subcategory.id)}
+                    className="group relative aspect-square rounded-2xl bg-card border overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/30"
+                  >
+                    {subcategory.image_url ? (
+                      <img
+                        src={subcategory.image_url}
+                        alt={subcategory.name}
+                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
+                        <Package className="w-12 h-12 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+                      <h3 className="font-semibold">{subcategory.name}</h3>
+                      <p className="text-sm text-white/80">From Rs.{subcategory.selling_price}</p>
+                    </div>
+                  </button>
                 ))}
                 
                 {subcategories.length === 0 && (
