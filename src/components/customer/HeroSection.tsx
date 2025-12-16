@@ -12,11 +12,8 @@ export function HeroSection() {
         backgroundPosition: "center",
       }}
     >
-      {/* Glass + gradient overlay for premium feel */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background/100 via-background/70 to-background/100" />
-
-      {/* Content with glassmorphism */}
-      <div className="relative z-10 text-center px-6 sm:px-10 max-w-[75%] sm:max-w-3xl mx-auto py-8 sm:py-14 bg-background/30 backdrop-blur-md rounded-2xl border border-white/20 shadow-xl shadow-black/5">
+      {/* Content */}
+      <div className="relative z-10 text-center px-6 sm:px-10 max-w-[75%] sm:max-w-3xl mx-auto py-8 sm:py-14 rounded-2xl border border-white/20 shadow-xl shadow-black/5">
         {/* H1 - CSS animated entrance */}
         <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-3 sm:mb-4 leading-tight tracking-tight animate-fade-in">
           Welcome To Mozamandu
