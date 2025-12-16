@@ -206,10 +206,12 @@ const Shop = memo(function Shop() {
 
   const handleCategorySelect = (catId: string) => {
     setSearchParams({ category: catId });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSubcategorySelect = (subId: string) => {
     setSearchParams({ subcategory: subId });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Build breadcrumb
