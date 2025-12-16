@@ -85,7 +85,7 @@ export function ImprovedMegaMenu() {
                   {category.subcategories?.map((subcategory) => (
                     <Link
                       key={subcategory.id}
-                      to={`/subcategory/${subcategory.id}`}
+                      to={`/shop?subcategory=${subcategory.id}`}
                       onClick={() => setIsOpen(false)}
                     >
                       <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-2 hover:border-red-200">
