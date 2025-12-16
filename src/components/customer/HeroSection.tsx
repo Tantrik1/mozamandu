@@ -8,11 +8,13 @@ export function HeroSection() {
   return (
     <section className="relative min-h-[75vh] flex items-center justify-center overflow-hidden">
       {/* Hero Background Image - Using img tag for better LCP optimization */}
+      {/* eslint-disable-next-line react/no-unknown-property */}
       <img
         src={heroBackground}
         alt="Mozamandu Premium Socks Collection"
         className="absolute inset-0 w-full h-full object-cover"
-        fetchPriority="high"
+        // @ts-ignore - fetchpriority is a valid HTML attribute
+        fetchpriority="high"
         decoding="sync"
         width={1920}
         height={1080}
