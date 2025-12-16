@@ -454,41 +454,6 @@ export default function ProductDetail() {
     <div className="min-h-screen bg-background">
       <ModernNavbar />
       
-      {/* Breadcrumb */}
-      <div className="border-b border-border/40 bg-muted/20">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <nav className="flex items-center gap-1.5 text-sm overflow-x-auto whitespace-nowrap scrollbar-hide">
-            <Link to="/" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 shrink-0">
-              <HomeIcon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Home</span>
-            </Link>
-            {subcategory?.category && (
-              <>
-                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
-                <Link 
-                  to={`/shop?category=${subcategory.category.id}`} 
-                  className="text-muted-foreground hover:text-primary transition-colors shrink-0"
-                >
-                  {subcategory.category.name}
-                </Link>
-              </>
-            )}
-            {subcategory && (
-              <>
-                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
-                <Link 
-                  to={`/shop?subcategory=${subcategory.id}`} 
-                  className="text-muted-foreground hover:text-primary transition-colors shrink-0"
-                >
-                  {subcategory.name}
-                </Link>
-              </>
-            )}
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
-            <span className="text-foreground font-medium truncate max-w-[150px] sm:max-w-[250px]">{product.name}</span>
-          </nav>
-        </div>
-      </div>
 
       <main className="max-w-7xl mx-auto px-4 py-6 lg:py-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
