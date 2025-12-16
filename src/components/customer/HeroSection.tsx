@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
-import heroBackground from "@/public/lovable-uploads/952f8e2c-0d46-4060-bc59-a447a84eb299.png";
+
+const heroBackground = "/lovable-uploads/952f8e2c-0d46-4060-bc59-a447a84eb299.png";
 export function HeroSection() {
   return (
     <section
