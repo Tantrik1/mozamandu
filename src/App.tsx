@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense, useEffect } from 'react';
-
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { RobustCartProvider } from '@/hooks/useRobustCart';
 import { RouteGuard } from '@/components/RouteGuard';
@@ -45,27 +44,22 @@ const queryClient = new QueryClient({
       gcTime: 15 * 60 * 1000,
       retry: 1,
       refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    },
-  },
+      refetchOnReconnect: false
+    }
+  }
 });
 
 // Minimal loading component
-const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-background">
+const PageLoader = () => <div className="min-h-screen flex items-center justify-center bg-background">
     <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-  </div>
-);
-
+  </div>;
 function App() {
   // Preload critical routes after initial render
   useEffect(() => {
     const timer = setTimeout(preloadRoutes, 100);
     return () => clearTimeout(timer);
   }, []);
-
-  return (
-    <QueryClientProvider client={queryClient}>
+  return <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <RobustCartProvider>
           <BrowserRouter>
@@ -73,14 +67,12 @@ function App() {
             <Toaster />
             <Suspense fallback={<PageLoader />}>
               <Routes>
-                <Route path="/" element={<Home />} />
+                <Route path="/" element={<Home />} className="py-0" />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/dashboard" element={
-                  <RouteGuard requireAuth={true}>
+                <Route path="/dashboard" element={<RouteGuard requireAuth={true}>
                     <CustomerDashboard />
-                  </RouteGuard>
-                } />
+                  </RouteGuard>} />
                 <Route path="/products" element={<Products />} />
                 <Route path="/shop" element={<Shop />} />
                 <Route path="/product/:productId" element={<ProductDetail />} />
@@ -92,21 +84,15 @@ function App() {
                 <Route path="/shipping" element={<ShippingPolicy />} />
                 <Route path="/thank-you/:orderId" element={<ThankYou />} />
                 <Route path="/order-summary/:orderId" element={<OrderSummary />} />
-                <Route path="/customer-order-summary/:orderId" element={
-                  <RouteGuard requireAuth={true}>
+                <Route path="/customer-order-summary/:orderId" element={<RouteGuard requireAuth={true}>
                     <CustomerOrderSummary />
-                  </RouteGuard>
-                } />
-                <Route path="/admin/*" element={
-                  <RouteGuard requireAuth={true} requireAdmin={true}>
+                  </RouteGuard>} />
+                <Route path="/admin/*" element={<RouteGuard requireAuth={true} requireAdmin={true}>
                     <AdminPage />
-                  </RouteGuard>
-                } />
-                <Route path="/inventory" element={
-                  <RouteGuard requireAuth={true} requireAdmin={true}>
+                  </RouteGuard>} />
+                <Route path="/inventory" element={<RouteGuard requireAuth={true} requireAdmin={true}>
                     <InventoryDashboard />
-                  </RouteGuard>
-                } />
+                  </RouteGuard>} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
@@ -114,8 +100,6 @@ function App() {
           </BrowserRouter>
         </RobustCartProvider>
       </AuthProvider>
-    </QueryClientProvider>
-  );
+    </QueryClientProvider>;
 }
-
 export default App;

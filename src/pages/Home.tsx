@@ -22,7 +22,7 @@ export default function Home() {
       <NoticePopup notice={notice} />
       
       {/* Hero Section */}
-      <HeroSection />
+      <HeroSection className="py-60 " />
 
       {/* Latest Products */}
       <LatestProducts products={latestProducts} isLoading={isLatestLoading} />
