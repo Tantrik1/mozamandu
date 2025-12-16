@@ -368,9 +368,12 @@ export function SubcategoryManagement() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Subcategory Management</h2>
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold">Subcategory Management</h2>
+          <p className="text-muted-foreground mt-1">Manage product subcategories</p>
+        </div>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
@@ -385,7 +388,7 @@ export function SubcategoryManagement() {
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">Subcategory Name</Label>
                   <Input
@@ -453,7 +456,7 @@ export function SubcategoryManagement() {
                 )}
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="selling_price">Selling Price ($)</Label>
                   <Input
@@ -476,7 +479,7 @@ export function SubcategoryManagement() {
                     placeholder="e.g., 3"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Minimum items from this subcategory required for checkout
                   </p>
                 </div>
@@ -512,9 +515,9 @@ export function SubcategoryManagement() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                          <Label>Quantity to reach to apply Discount</Label>
+                          <Label>Min Qty for Discount</Label>
                           <Input
                             type="number"
                             min="1"
@@ -530,11 +533,11 @@ export function SubcategoryManagement() {
                             min="1"
                             value={tier.max_quantity || ''}
                             onChange={(e) => updateDiscountTier(index, 'max_quantity', e.target.value ? parseInt(e.target.value) : null)}
-                            placeholder="Leave empty for no limit"
+                            placeholder="No limit"
                           />
                         </div>
                         <div>
-                          <Label>Discount Amount ($)</Label>
+                          <Label>Discount ($)</Label>
                           <Input
                             type="number"
                             step="0.01"
@@ -545,9 +548,9 @@ export function SubcategoryManagement() {
                           />
                         </div>
                       </div>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         Quantities {tier.min_quantity} {tier.max_quantity ? `to ${tier.max_quantity}` : 'and above'}: 
-                        ${tier.discount_amount} discount per item for ALL items in this quantity range
+                        ${tier.discount_amount} discount per item
                       </p>
                     </CardContent>
                   </Card>

@@ -235,15 +235,15 @@ export const CategoryManagement = memo(function CategoryManagement() {
   );
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold">Category Management</h2>
-          <p className="text-gray-600 mt-1">Organize your products into categories</p>
+          <h2 className="text-2xl md:text-3xl font-bold">Category Management</h2>
+          <p className="text-muted-foreground mt-1">Organize your products into categories</p>
         </div>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={resetForm}>
               <Plus className="h-4 w-4 mr-2" />
               Add Category
             </Button>
