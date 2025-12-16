@@ -67,7 +67,7 @@ function App() {
             <Toaster />
             <Suspense fallback={<PageLoader />}>
               <Routes>
-                <Route path="/" element={<Home />} className="py-0" />
+                <Route path="/" element={<Home />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/dashboard" element={<RouteGuard requireAuth={true}>
