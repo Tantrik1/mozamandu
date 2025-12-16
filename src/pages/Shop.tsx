@@ -40,6 +40,7 @@ interface Category {
   id: string;
   name: string;
   description?: string;
+  image_url?: string;
   subcategories?: Subcategory[];
 }
 
@@ -69,7 +70,7 @@ type ViewMode = 'categories' | 'subcategories' | 'products';
 const fetchCategories = async () => {
   const { data } = await supabase
     .from('categories')
-    .select('id, name, description')
+    .select('id, name, description, image_url')
     .eq('status', 'on')
     .order('name');
   return data || [];
@@ -450,27 +451,38 @@ const Shop = memo(function Shop() {
                 ))}
               </div>
             ) : viewMode === 'categories' ? (
-              /* Categories Grid */
+              /* Categories Grid - 1:1 Image Cards */
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {categories.map((category) => (
                   <button
                     key={category.id}
                     onClick={() => handleCategorySelect(category.id)}
-                    className="group relative aspect-square rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-border/50 hover:border-primary/30 overflow-hidden transition-all duration-300 hover:shadow-lg"
+                    className="group relative aspect-square rounded-2xl border overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/30 bg-card"
                   >
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-                      <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
-                        <Package className="w-8 h-8 text-primary" />
+                    {category.image_url ? (
+                      <img
+                        src={category.image_url}
+                        alt={category.name}
+                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                        <Package className="w-12 h-12 text-muted-foreground" />
                       </div>
-                      <h3 className="font-semibold text-center">{category.name}</h3>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+                      <h3 className="font-semibold">{category.name}</h3>
                       {category.description && (
-                        <p className="text-xs text-muted-foreground text-center mt-1 line-clamp-2">
+                        <p className="text-xs text-white/80 line-clamp-1 mt-0.5">
                           {category.description}
                         </p>
                       )}
                     </div>
-                    <div className="absolute bottom-3 right-3">
-                      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ChevronRight className="w-5 h-5 text-white" />
                     </div>
                   </button>
                 ))}

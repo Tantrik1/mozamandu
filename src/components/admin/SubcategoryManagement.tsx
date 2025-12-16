@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, X, Upload } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Upload, Package } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -442,11 +442,13 @@ export function SubcategoryManagement() {
                 </div>
                 {imagePreview && (
                   <div className="mt-2">
-                    <img 
-                      src={imagePreview} 
-                      alt="Preview" 
-                      className="w-32 h-32 object-cover rounded-lg border"
-                    />
+                    <div className="relative w-32 aspect-square rounded-lg border overflow-hidden bg-muted">
+                      <img 
+                        src={imagePreview} 
+                        alt="Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
@@ -575,7 +577,7 @@ export function SubcategoryManagement() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {subcategories.map((subcategory) => (
           <SubcategoryCard 
             key={subcategory.id} 
@@ -615,78 +617,70 @@ function SubcategoryCard({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            {subcategory.image_url && (
-              <img 
-                src={subcategory.image_url} 
-                alt={subcategory.name}
-                className="w-full h-32 object-cover rounded-lg mb-3"
-              />
-            )}
-            <CardTitle className="text-lg">{subcategory.name}</CardTitle>
-            <p className="text-sm text-gray-500">{subcategory.categories?.name}</p>
+    <Card className="group overflow-hidden hover:shadow-lg transition-shadow">
+      {/* 1:1 Image */}
+      <div className="relative aspect-square bg-muted overflow-hidden">
+        {subcategory.image_url ? (
+          <img 
+            src={subcategory.image_url} 
+            alt={subcategory.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            loading="lazy"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
+            <Package className="w-12 h-12 text-muted-foreground" />
           </div>
-          <div className="flex space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onEdit(subcategory)}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onDelete(subcategory.id)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+        )}
+        {/* Status Badge */}
+        <span className={`absolute top-2 left-2 px-2 py-1 rounded text-xs font-medium ${
+          subcategory.status === 'on' 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {subcategory.status === 'on' ? 'Active' : 'Inactive'}
+        </span>
+        {/* Action Buttons */}
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => onEdit(subcategory)}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-8 w-8 text-red-600 hover:text-red-700"
+            onClick={() => onDelete(subcategory.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      <CardContent className="p-3">
+        <h3 className="font-semibold truncate">{subcategory.name}</h3>
+        <p className="text-xs text-muted-foreground">{subcategory.categories?.name}</p>
+        <div className="mt-2 space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Price:</span>
+            <span className="font-medium">${subcategory.selling_price}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">MOQ:</span>
+            <span className="font-medium text-blue-600">{subcategory.minimum_quantity}</span>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-gray-600 mb-3">{subcategory.description}</p>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-sm">Selling Price:</span>
-            <span className="font-semibold">${subcategory.selling_price}</span>
-          </div>
-          
-          <div className="flex justify-between">
-            <span className="text-sm">Minimum Order Qty:</span>
-            <span className="font-semibold text-blue-600">{subcategory.minimum_quantity}</span>
-          </div>
-          
-          {discountTiers.length > 0 && (
-            <div className="space-y-1">
-              <span className="text-sm font-medium">Discount Tiers:</span>
-              {discountTiers.map((tier, index) => (
-                <div key={index} className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                  <span className="font-medium">
-                    {tier.min_quantity}{tier.max_quantity ? `-${tier.max_quantity}` : '+'} qty:
-                  </span>
-                  <span className="text-green-600 ml-2">${tier.discount_amount} off each</span>
-                </div>
-              ))}
+        {discountTiers.length > 0 && (
+          <div className="mt-2 pt-2 border-t">
+            <span className="text-xs font-medium">Discounts:</span>
+            <div className="text-xs text-green-600">
+              {discountTiers.length} tier{discountTiers.length > 1 ? 's' : ''}
             </div>
-          )}
-          
-          <div className="flex justify-between items-center">
-            <span className={`px-2 py-1 rounded text-sm ${
-              subcategory.status === 'on' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-red-100 text-red-800'
-            }`}>
-              {subcategory.status === 'on' ? 'Active' : 'Inactive'}
-            </span>
-            <span className="text-sm text-gray-500">
-              {new Date(subcategory.created_at).toLocaleDateString()}
-            </span>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
