@@ -56,7 +56,7 @@ export function CategoriesMegaMenu({ categories }: CategoriesMegaMenuProps) {
                         {category.subcategories?.map((subcategory) => (
                           <Link
                             key={subcategory.id}
-                            to={`/subcategories/${subcategory.id}`}
+                            to={`/shop?subcategory=${subcategory.id}`}
                             className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
                           >
                             {subcategory.image_url ? (

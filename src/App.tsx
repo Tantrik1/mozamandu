@@ -18,12 +18,9 @@ const InventoryDashboard = lazy(() => import('@/pages/InventoryDashboard'));
 const Checkout = lazy(() => import('@/pages/Checkout'));
 const ShippingPolicy = lazy(() => import('@/pages/ShippingPolicy'));
 const TermsConditions = lazy(() => import('@/pages/TermsConditions'));
-const SubcategoryPage = lazy(() => import('@/pages/SubcategoryPage'));
 const Products = lazy(() => import('@/pages/Products'));
 const Shop = lazy(() => import('@/pages/Shop'));
 const FAQ = lazy(() => import('@/pages/FAQ'));
-const Categories = lazy(() => import('@/pages/Categories'));
-const CategoryPage = lazy(() => import('@/pages/CategoryPage'));
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
 const About = lazy(() => import('@/pages/About'));
 const Contact = lazy(() => import('@/pages/Contact'));
@@ -76,10 +73,6 @@ function App() {
                 <Route path="/products" element={<Products />} />
                 <Route path="/shop" element={<Shop />} />
                 <Route path="/product/:productId" element={<ProductDetail />} />
-                <Route path="/subcategory/:subcategoryId" element={<SubcategoryPage />} />
-                <Route path="/subcategories/:subcategoryId" element={<SubcategoryPage />} />
-                <Route path="/categories" element={<Categories />} />
-                <Route path="/categories/:categoryId" element={<CategoryPage />} />
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/contact" element={<Contact />} />

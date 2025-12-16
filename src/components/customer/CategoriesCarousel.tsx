@@ -58,7 +58,7 @@ export function CategoriesCarousel() {
   };
 
   const handleCategoryClick = (categoryId: string) => {
-    navigate(`/categories/${categoryId}`);
+    navigate(`/shop?category=${categoryId}`);
   };
 
   if (loading) {

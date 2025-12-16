@@ -34,7 +34,7 @@ export function HeroSection() {
               size="lg" 
               className="bg-zinc-100 hover:bg-white text-zinc-900 rounded-full px-8 py-6 text-base font-semibold shadow-lg hover:shadow-xl transition-all group"
             >
-              <Link to="/categories">
+              <Link to="/shop">
                 BUY NOW
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>

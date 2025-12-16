@@ -470,7 +470,7 @@ export default function ProductDetail() {
               <>
                 <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
                 <Link 
-                  to={`/categories/${subcategory.category.id}`} 
+                  to={`/shop?category=${subcategory.category.id}`} 
                   className="text-muted-foreground hover:text-primary transition-colors shrink-0"
                 >
                   {subcategory.category.name}
@@ -481,7 +481,7 @@ export default function ProductDetail() {
               <>
                 <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
                 <Link 
-                  to={`/subcategories/${subcategory.id}`} 
+                  to={`/shop?subcategory=${subcategory.id}`} 
                   className="text-muted-foreground hover:text-primary transition-colors shrink-0"
                 >
                   {subcategory.name}
@@ -592,7 +592,7 @@ export default function ProductDetail() {
             <div>
               {subcategory && (
                 <Link 
-                  to={`/subcategories/${subcategory.id}`}
+                  to={`/shop?subcategory=${subcategory.id}`}
                   className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium mb-2"
                 >
                   {subcategory.name}
