@@ -3,16 +3,21 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
 const heroBackground = "/lovable-uploads/952f8e2c-0d46-4060-bc59-a447a84eb299.png";
+
 export function HeroSection() {
   return (
-    <section
-      className="relative min-h-[75vh] flex items-center justify-center overflow-hidden"
-      style={{
-        backgroundImage: `url(${heroBackground})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }}
-    >
+    <section className="relative min-h-[75vh] flex items-center justify-center overflow-hidden">
+      {/* Hero Background Image - Using img tag for better LCP optimization */}
+      <img
+        src={heroBackground}
+        alt="Mozamandu Premium Socks Collection"
+        className="absolute inset-0 w-full h-full object-cover"
+        fetchPriority="high"
+        decoding="sync"
+        width={1920}
+        height={1080}
+      />
+      
       {/* Content */}
       <div className="relative z-10 text-center px-6 sm:px-10 max-w-[75%] sm:max-w-3xl mx-auto py-8 sm:py-14 bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 shadow-xl shadow-black/10">
         {/* H1 - CSS animated entrance */}
