@@ -2,15 +2,7 @@ import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { NoticePopup } from '@/components/notices/NoticePopup';
 import { useHomepageData } from '@/hooks/useHomepageData';
-import {
-  HeroSection,
-  LatestProducts,
-  ShopByCategory,
-  MostSoldProducts,
-  FAQSection,
-  FeaturedDeals,
-} from '@/components/home';
-
+import { HeroSection, LatestProducts, ShopByCategory, MostSoldProducts, FAQSection, FeaturedDeals } from '@/components/home';
 export default function Home() {
   const {
     latestProducts,
@@ -23,16 +15,14 @@ export default function Home() {
     isMostSoldLoading,
     isCategoriesLoading,
     isFAQsLoading,
-    isFeaturedLoading,
+    isFeaturedLoading
   } = useHomepageData();
-
-  return (
-    <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background">
       <ModernNavbar />
       <NoticePopup notice={notice} />
       
       {/* Hero Section */}
-      <HeroSection />
+      <HeroSection className="py-0" />
 
       {/* Latest Products */}
       <LatestProducts products={latestProducts} isLoading={isLatestLoading} />
@@ -51,6 +41,5 @@ export default function Home() {
 
       {/* Footer */}
       <Footer />
-    </div>
-  );
+    </div>;
 }
