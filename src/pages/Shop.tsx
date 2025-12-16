@@ -375,45 +375,54 @@ const Shop = memo(function Shop() {
           <div className="flex flex-wrap items-center gap-2 mb-6">
             <span className="text-sm text-muted-foreground">Active filters:</span>
             {searchQuery && (
-              <Badge variant="secondary" className="gap-1">
-                Search: {searchQuery}
-                <button onClick={() => {
-                  setLocalSearch('');
-                  const newParams = new URLSearchParams(searchParams);
-                  newParams.delete('search');
-                  setSearchParams(newParams);
-                }}>
-                  <X className="w-3 h-3" />
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-medium">
+                <span>"{searchQuery}"</span>
+                <button 
+                  onClick={() => {
+                    setLocalSearch('');
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.delete('search');
+                    setSearchParams(newParams);
+                  }}
+                  className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
                 </button>
-              </Badge>
+              </div>
             )}
             {selectedCategory && (
-              <Badge variant="secondary" className="gap-1">
-                {selectedCategory.name}
-                <button onClick={() => {
-                  const newParams = new URLSearchParams(searchParams);
-                  newParams.delete('category');
-                  newParams.delete('subcategory');
-                  setSearchParams(newParams);
-                }}>
-                  <X className="w-3 h-3" />
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-medium">
+                <span>{selectedCategory.name}</span>
+                <button 
+                  onClick={() => {
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.delete('category');
+                    newParams.delete('subcategory');
+                    setSearchParams(newParams);
+                  }}
+                  className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
                 </button>
-              </Badge>
+              </div>
             )}
             {selectedSubcategory && (
-              <Badge variant="secondary" className="gap-1">
-                {selectedSubcategory.name}
-                <button onClick={() => {
-                  const newParams = new URLSearchParams(searchParams);
-                  newParams.delete('subcategory');
-                  if (categoryId) newParams.set('category', categoryId);
-                  setSearchParams(newParams);
-                }}>
-                  <X className="w-3 h-3" />
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-medium">
+                <span>{selectedSubcategory.name}</span>
+                <button 
+                  onClick={() => {
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.delete('subcategory');
+                    if (categoryId) newParams.set('category', categoryId);
+                    setSearchParams(newParams);
+                  }}
+                  className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
                 </button>
-              </Badge>
+              </div>
             )}
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-destructive">
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-destructive hover:text-destructive">
               Clear all
             </Button>
           </div>
