@@ -297,16 +297,16 @@ export function PaymentMethodManagement() {
   );
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">Payment Methods</h2>
-          <p className="text-gray-600 mt-1">Manage payment methods and QR codes</p>
+          <h2 className="text-2xl md:text-3xl font-bold">Payment Methods</h2>
+          <p className="text-muted-foreground mt-1">Manage payment methods and QR codes</p>
         </div>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm} className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg">
+            <Button onClick={resetForm}>
               <Plus className="h-4 w-4 mr-2" />
               Add Payment Method
             </Button>
@@ -389,8 +389,8 @@ export function PaymentMethodManagement() {
                 <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={uploading} className="bg-green-600 hover:bg-green-700">
-                  {uploading ? 'Uploading...' : editingPaymentMethod ? 'Update' : 'Create'} Payment Method
+                <Button type="submit" disabled={uploading}>
+                  {uploading ? 'Uploading...' : editingPaymentMethod ? 'Update' : 'Create'}
                 </Button>
               </div>
             </form>
@@ -399,44 +399,44 @@ export function PaymentMethodManagement() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 gap-4">
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Methods</p>
-                <p className="text-2xl font-bold text-gray-900">{totalPaymentMethods}</p>
+                <p className="text-sm font-medium text-muted-foreground">Total</p>
+                <p className="text-2xl font-bold">{totalPaymentMethods}</p>
               </div>
-              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <CreditCard className="h-6 w-6 text-blue-600" />
+              <div className="h-10 w-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <CreditCard className="h-5 w-5 text-primary" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active Methods</p>
-                <p className="text-2xl font-bold text-green-600">{activePaymentMethods}</p>
+                <p className="text-sm font-medium text-muted-foreground">Active</p>
+                <p className="text-2xl font-bold text-emerald-600">{activePaymentMethods}</p>
               </div>
-              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <QrCode className="h-6 w-6 text-green-600" />
+              <div className="h-10 w-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
+                <QrCode className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Inactive Methods</p>
+                <p className="text-sm font-medium text-muted-foreground">Inactive</p>
                 <p className="text-2xl font-bold text-red-600">{totalPaymentMethods - activePaymentMethods}</p>
               </div>
-              <div className="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <X className="h-6 w-6 text-red-600" />
+              <div className="h-10 w-10 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+                <X className="h-5 w-5 text-red-600" />
               </div>
             </div>
           </CardContent>
@@ -445,8 +445,8 @@ export function PaymentMethodManagement() {
 
       {/* Search */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <div className="relative flex-1 max-w-md w-full">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="Search payment methods..."
             value={searchTerm}
@@ -454,7 +454,7 @@ export function PaymentMethodManagement() {
             className="pl-10"
           />
         </div>
-        <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-lg">
+        <div className="text-sm text-muted-foreground bg-muted px-3 py-2 rounded-lg">
           {filteredPaymentMethods.length} of {paymentMethods.length} methods
         </div>
       </div>

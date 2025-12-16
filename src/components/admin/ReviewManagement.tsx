@@ -195,16 +195,16 @@ export const ReviewManagement = memo(function ReviewManagement() {
   const pendingCount = reviews.filter(r => r.status === 'pending').length;
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
             <MessageSquare className="w-6 h-6 text-primary" />
             Review Management
           </h2>
           <p className="text-muted-foreground mt-1">
-            Manage and approve customer product reviews
+            Manage and approve customer reviews
           </p>
         </div>
         {pendingCount > 0 && (

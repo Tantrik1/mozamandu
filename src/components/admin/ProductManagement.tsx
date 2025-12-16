@@ -234,18 +234,21 @@ export function ProductManagement() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Product Management</h2>
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold">Product Management</h2>
+          <p className="text-muted-foreground mt-1">Manage your product catalog</p>
+        </div>
         <Button onClick={() => setIsCreateFormOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Product
         </Button>
       </div>
 
-      <div className="flex items-center space-x-4 flex-wrap gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+      <div className="flex flex-col lg:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="Search products..."
             value={searchTerm}
@@ -254,10 +257,10 @@ export function ProductManagement() {
           />
         </div>
         
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-gray-500" />
+        <div className="flex flex-wrap items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-40">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
@@ -275,7 +278,7 @@ export function ProductManagement() {
             onValueChange={setSubcategoryFilter}
             disabled={!categoryFilter}
           >
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-44">
               <SelectValue placeholder="All Subcategories" />
             </SelectTrigger>
             <SelectContent>
@@ -290,7 +293,7 @@ export function ProductManagement() {
             </SelectContent>
           </Select>
           
-          {(categoryFilter && categoryFilter !== 'all') || (subcategoryFilter && subcategoryFilter !== 'all') && (
+          {((categoryFilter && categoryFilter !== 'all') || (subcategoryFilter && subcategoryFilter !== 'all')) && (
             <Button 
               variant="outline" 
               size="sm" 
@@ -299,7 +302,7 @@ export function ProductManagement() {
                 setSubcategoryFilter('all');
               }}
             >
-              Clear Filters
+              Clear
             </Button>
           )}
         </div>
