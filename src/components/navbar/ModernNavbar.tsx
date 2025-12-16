@@ -112,28 +112,31 @@ export const ModernNavbar = memo(function ModernNavbar() {
                 <Link to="/shop">
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="sm"
                     className={cn(
+                      "flex flex-col items-center gap-0.5 h-auto py-1.5 px-2",
                       location.pathname.startsWith('/shop') && "bg-primary text-primary-foreground"
                     )}
                   >
                     <Store className="w-5 h-5" />
+                    <span className="text-[10px] font-medium">Shop</span>
                   </Button>
                 </Link>
 
                 {/* Cart Button */}
                 <Button
                   variant="ghost"
-                  size="default"
-                  className="relative gap-2"
+                  size="sm"
+                  className="flex flex-col items-center gap-0.5 h-auto py-1.5 px-2 relative"
                   onClick={() => setIsCartOpen(true)}
                 >
                   <ShoppingBag className="w-5 h-5" />
+                  <span className="text-[10px] font-medium">Cart</span>
                   {cartTotal > 0 && (
                     <Badge 
-                      className="h-6 px-2 text-[11px] bg-primary text-primary-foreground hidden sm:flex"
+                      className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-[9px] bg-primary text-primary-foreground flex items-center justify-center"
                     >
-                      Nrs. {cartTotal.toLocaleString()}
+                      {cartTotal > 999 ? '999+' : Math.ceil(cartTotal / 100)}
                     </Badge>
                   )}
                 </Button>
@@ -142,16 +145,17 @@ export const ModernNavbar = memo(function ModernNavbar() {
                 {user ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="rounded-full">
-                        <Avatar className="h-8 w-8">
+                      <Button variant="ghost" size="sm" className="flex flex-col items-center gap-0.5 h-auto py-1.5 px-2">
+                        <Avatar className="h-5 w-5">
                           <AvatarImage 
                             src={`https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.email}`} 
                             alt={user.email || "Avatar"} 
                           />
-                          <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                          <AvatarFallback className="bg-primary/10 text-primary text-[8px]">
                             {user.email?.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
+                        <span className="text-[10px] font-medium">Profile</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
@@ -173,8 +177,9 @@ export const ModernNavbar = memo(function ModernNavbar() {
                   </DropdownMenu>
                 ) : (
                   <Link to="/auth">
-                    <Button variant="ghost" size="icon" className="rounded-full">
+                    <Button variant="ghost" size="sm" className="flex flex-col items-center gap-0.5 h-auto py-1.5 px-2">
                       <User className="w-5 h-5" />
+                      <span className="text-[10px] font-medium">Login</span>
                     </Button>
                   </Link>
                 )}
