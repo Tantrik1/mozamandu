@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useCallback, memo, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
@@ -65,6 +65,65 @@ interface Product {
 
 type ViewMode = 'categories' | 'subcategories' | 'products';
 
+// Cached fetch functions
+const fetchCategories = async () => {
+  const { data } = await supabase
+    .from('categories')
+    .select('id, name, description')
+    .eq('status', 'on')
+    .order('name');
+  return data || [];
+};
+
+const fetchSubcategories = async (categoryId: string) => {
+  const { data } = await supabase
+    .from('subcategories')
+    .select('*')
+    .eq('status', 'on')
+    .eq('category_id', categoryId)
+    .order('name');
+  return data || [];
+};
+
+const fetchCategoryById = async (categoryId: string) => {
+  const { data } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('id', categoryId)
+    .single();
+  return data;
+};
+
+const fetchSubcategoryById = async (subcategoryId: string) => {
+  const { data } = await supabase
+    .from('subcategories')
+    .select('*, category:categories(id, name)')
+    .eq('id', subcategoryId)
+    .single();
+  return data;
+};
+
+const fetchProductsBySubcategory = async (subcategoryId: string) => {
+  const { data } = await supabase
+    .from('products')
+    .select('id, name, image_url, selling_price, cost_price, subcategory_id, category_id, is_featured, subcategory:subcategories(name)')
+    .eq('status', 'active')
+    .eq('subcategory_id', subcategoryId)
+    .order('name');
+  return data || [];
+};
+
+const fetchProductsBySearch = async (searchQuery: string) => {
+  const searchTerm = `%${searchQuery.toLowerCase()}%`;
+  const { data } = await supabase
+    .from('products')
+    .select('id, name, image_url, selling_price, cost_price, subcategory_id, category_id, is_featured, subcategory:subcategories(name)')
+    .eq('status', 'active')
+    .ilike('name', searchTerm)
+    .order('name');
+  return data || [];
+};
+
 const Shop = memo(function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
   
@@ -74,17 +133,9 @@ const Shop = memo(function Shop() {
   const searchQuery = searchParams.get('search') || '';
   
   // State
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const [gridCols, setGridCols] = useState<2 | 3 | 4>(4);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  
-  // Selected category/subcategory info
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<Subcategory | null>(null);
 
   // Determine view mode
   const viewMode: ViewMode = searchQuery 
@@ -95,93 +146,48 @@ const Shop = memo(function Shop() {
         ? 'subcategories' 
         : 'categories';
 
-  // Fetch data based on view mode
-  useEffect(() => {
-    fetchData();
-  }, [categoryId, subcategoryId, searchQuery]);
+  // React Query with caching
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery({
+    queryKey: ['shop-categories'],
+    queryFn: fetchCategories,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const fetchData = async () => {
-    setLoading(true);
-    
-    try {
-      // Always fetch categories for filters
-      const { data: cats } = await supabase
-        .from('categories')
-        .select('id, name, description')
-        .eq('status', 'on')
-        .order('name');
-      
-      setCategories(cats || []);
+  const { data: selectedCategory } = useQuery({
+    queryKey: ['category', categoryId],
+    queryFn: () => fetchCategoryById(categoryId!),
+    enabled: !!categoryId,
+    staleTime: 5 * 60 * 1000,
+  });
 
-      if (searchQuery) {
-        // Search mode - fetch matching products
-        const searchTerm = `%${searchQuery.toLowerCase()}%`;
-        const { data: prods } = await supabase
-          .from('products')
-          .select('id, name, image_url, selling_price, cost_price, subcategory_id, category_id, is_featured, subcategory:subcategories(name)')
-          .eq('status', 'active')
-          .ilike('name', searchTerm)
-          .order('name');
-        
-        setProducts(prods || []);
-        setSubcategories([]);
-        setSelectedCategory(null);
-        setSelectedSubcategory(null);
-      } else if (subcategoryId) {
-        // Subcategory selected - fetch products
-        const { data: sub } = await supabase
-          .from('subcategories')
-          .select('*, category:categories(id, name)')
-          .eq('id', subcategoryId)
-          .single();
-        
-        if (sub) {
-          setSelectedSubcategory(sub);
-          setSelectedCategory(sub.category as any);
-          
-          const { data: prods } = await supabase
-            .from('products')
-            .select('id, name, image_url, selling_price, cost_price, subcategory_id, category_id, is_featured, subcategory:subcategories(name)')
-            .eq('status', 'active')
-            .eq('subcategory_id', subcategoryId)
-            .order('name');
-          
-          setProducts(prods || []);
-        }
-        setSubcategories([]);
-      } else if (categoryId) {
-        // Category selected - fetch subcategories
-        const { data: cat } = await supabase
-          .from('categories')
-          .select('*')
-          .eq('id', categoryId)
-          .single();
-        
-        setSelectedCategory(cat);
-        setSelectedSubcategory(null);
-        
-        const { data: subs } = await supabase
-          .from('subcategories')
-          .select('*')
-          .eq('status', 'on')
-          .eq('category_id', categoryId)
-          .order('name');
-        
-        setSubcategories(subs || []);
-        setProducts([]);
-      } else {
-        // No selection - show categories
-        setSelectedCategory(null);
-        setSelectedSubcategory(null);
-        setSubcategories([]);
-        setProducts([]);
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: selectedSubcategory } = useQuery({
+    queryKey: ['subcategory', subcategoryId],
+    queryFn: () => fetchSubcategoryById(subcategoryId!),
+    enabled: !!subcategoryId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: subcategories = [], isLoading: subcategoriesLoading } = useQuery({
+    queryKey: ['shop-subcategories', categoryId],
+    queryFn: () => fetchSubcategories(categoryId!),
+    enabled: !!categoryId && !subcategoryId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: products = [], isLoading: productsLoading } = useQuery({
+    queryKey: ['shop-products', subcategoryId, searchQuery],
+    queryFn: () => searchQuery 
+      ? fetchProductsBySearch(searchQuery) 
+      : fetchProductsBySubcategory(subcategoryId!),
+    enabled: !!subcategoryId || !!searchQuery,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const loading = useMemo(() => {
+    if (viewMode === 'categories') return categoriesLoading;
+    if (viewMode === 'subcategories') return subcategoriesLoading;
+    return productsLoading;
+  }, [viewMode, categoriesLoading, subcategoriesLoading, productsLoading]);
 
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
@@ -10,6 +10,7 @@ import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing
 import { getProductStockSummary } from '@/utils/stockCalculation';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
 import { 
   ShoppingCart, 
   Plus, 
@@ -78,41 +79,176 @@ interface Subcategory {
   } | null;
 }
 
+// Cached fetch functions
+const fetchProduct = async (productId: string) => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', productId)
+    .single();
+  if (error) throw error;
+  return data;
+};
+
+const fetchSubcategory = async (subcategoryId: string) => {
+  const { data } = await supabase
+    .from('subcategories')
+    .select('*, category:categories(id, name)')
+    .eq('id', subcategoryId)
+    .single();
+  return data;
+};
+
+const fetchDiscountTiers = async (subcategoryId: string) => {
+  const { data } = await supabase
+    .from('discount_tiers')
+    .select('*')
+    .eq('subcategory_id', subcategoryId)
+    .order('min_quantity');
+  return data || [];
+};
+
+const fetchColorVariants = async (productId: string) => {
+  const { data } = await supabase
+    .from('color_variants')
+    .select('id, color_name, has_sizes, image_url')
+    .eq('product_id', productId);
+  return data || [];
+};
+
+const fetchAdditionalImages = async (productId: string) => {
+  const { data } = await supabase
+    .from('product_images')
+    .select('image_url')
+    .eq('product_id', productId)
+    .eq('is_primary', false)
+    .order('created_at');
+  return data?.map(img => img.image_url) || [];
+};
+
 export default function ProductDetail() {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
   
-  const [product, setProduct] = useState<Product | null>(null);
-  const [subcategory, setSubcategory] = useState<Subcategory | null>(null);
-  const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
-  const [sizeVariants, setSizeVariants] = useState<SizeVariant[]>([]);
-  const [discountTiers, setDiscountTiers] = useState<{ [key: string]: DiscountTier[] }>({});
-  const [additionalImages, setAdditionalImages] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [selectedSize, setSelectedSize] = useState<string>('');
-  const [productStock, setProductStock] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomPosition, setZoomPosition] = useState({ x: 0, y: 0 });
+  const [sizeVariants, setSizeVariants] = useState<SizeVariant[]>([]);
   const imageRef = useRef<HTMLDivElement>(null);
 
   const { addToCart, cartItems } = useRobustCart();
 
+  // React Query with caching
+  const { data: product, isLoading: productLoading, error: productError } = useQuery({
+    queryKey: ['product', productId],
+    queryFn: () => fetchProduct(productId!),
+    enabled: !!productId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: subcategory } = useQuery({
+    queryKey: ['product-subcategory', product?.subcategory_id],
+    queryFn: () => fetchSubcategory(product!.subcategory_id),
+    enabled: !!product?.subcategory_id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: discountTiersData = [] } = useQuery({
+    queryKey: ['discount-tiers', product?.subcategory_id],
+    queryFn: () => fetchDiscountTiers(product!.subcategory_id),
+    enabled: !!product?.subcategory_id,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const { data: colorVariants = [] } = useQuery({
+    queryKey: ['color-variants', productId],
+    queryFn: () => fetchColorVariants(productId!),
+    enabled: !!productId && product?.has_color_variants,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: additionalImages = [] } = useQuery({
+    queryKey: ['product-images', productId],
+    queryFn: () => fetchAdditionalImages(productId!),
+    enabled: !!productId,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const { data: productStock = 0 } = useQuery({
+    queryKey: ['product-stock', productId],
+    queryFn: () => getProductStockSummary(productId!),
+    enabled: !!productId,
+    staleTime: 1 * 60 * 1000,
+  });
+
+  const discountTiers = useMemo(() => 
+    product?.subcategory_id ? { [product.subcategory_id]: discountTiersData } : {},
+    [product?.subcategory_id, discountTiersData]
+  );
+
+  const loading = productLoading;
+
   // Build image gallery
-  const images: string[] = [];
-  if (product?.image_url) images.push(product.image_url);
-  additionalImages.forEach(img => {
-    if (!images.includes(img)) images.push(img);
-  });
-  colorVariants.forEach(cv => {
-    if (cv.image_url && !images.includes(cv.image_url)) {
-      images.push(cv.image_url);
+  const images: string[] = useMemo(() => {
+    const imgs: string[] = [];
+    if (product?.image_url) imgs.push(product.image_url);
+    additionalImages.forEach(img => {
+      if (!imgs.includes(img)) imgs.push(img);
+    });
+    colorVariants.forEach(cv => {
+      if (cv.image_url && !imgs.includes(cv.image_url)) {
+        imgs.push(cv.image_url);
+      }
+    });
+    return imgs;
+  }, [product?.image_url, additionalImages, colorVariants]);
+
+  // Set initial color selection
+  useEffect(() => {
+    if (colorVariants.length > 0 && !selectedColor) {
+      setSelectedColor(colorVariants[0].id);
     }
-  });
+  }, [colorVariants, selectedColor]);
+
+  useEffect(() => {
+    if (selectedColor && product?.color_has_size_variants) {
+      fetchSizeVariants(selectedColor);
+    }
+  }, [selectedColor, product?.color_has_size_variants]);
+
+  useEffect(() => {
+    if (selectedColor) {
+      const colorVariant = colorVariants.find(cv => cv.id === selectedColor);
+      if (colorVariant?.image_url) {
+        const imageIndex = images.indexOf(colorVariant.image_url);
+        if (imageIndex !== -1) {
+          setCurrentImageIndex(imageIndex);
+        }
+      }
+    }
+  }, [selectedColor, colorVariants, images]);
+
+  const fetchSizeVariants = async (colorVariantId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('size_variants')
+        .select('id, size_name')
+        .eq('color_variant_id', colorVariantId);
+
+      if (error) throw error;
+      setSizeVariants(data || []);
+      if (data && data.length > 0) {
+        setSelectedSize(data[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching size variants:', error);
+    }
+  };
 
   const getCartQuantity = () => {
     const cartItem = cartItems.find(item => {
@@ -153,117 +289,6 @@ export default function ProductDetail() {
     discountTiers
   });
 
-  useEffect(() => {
-    if (productId) {
-      fetchProductData();
-    }
-  }, [productId]);
-
-  useEffect(() => {
-    if (selectedColor && product?.color_has_size_variants) {
-      fetchSizeVariants(selectedColor);
-    }
-  }, [selectedColor, product?.color_has_size_variants]);
-
-  useEffect(() => {
-    if (selectedColor) {
-      const colorVariant = colorVariants.find(cv => cv.id === selectedColor);
-      if (colorVariant?.image_url) {
-        const imageIndex = images.indexOf(colorVariant.image_url);
-        if (imageIndex !== -1) {
-          setCurrentImageIndex(imageIndex);
-        }
-      }
-    }
-  }, [selectedColor, colorVariants, images]);
-
-  const fetchProductData = async () => {
-    setLoading(true);
-    try {
-      const { data: productData, error: productError } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', productId)
-        .single();
-
-      if (productError) throw productError;
-      setProduct(productData);
-
-      const { data: subcategoryData, error: subcategoryError } = await supabase
-        .from('subcategories')
-        .select('*, category:categories(id, name)')
-        .eq('id', productData.subcategory_id)
-        .single();
-
-      if (!subcategoryError && subcategoryData) {
-        setSubcategory(subcategoryData);
-      }
-
-      const { data: tiersData } = await supabase
-        .from('discount_tiers')
-        .select('*')
-        .eq('subcategory_id', productData.subcategory_id)
-        .order('min_quantity');
-
-      if (tiersData) {
-        setDiscountTiers({ [productData.subcategory_id]: tiersData });
-      }
-
-      if (productData.has_color_variants) {
-        const { data: colorsData } = await supabase
-          .from('color_variants')
-          .select('id, color_name, has_sizes, image_url')
-          .eq('product_id', productId);
-
-        if (colorsData && colorsData.length > 0) {
-          setColorVariants(colorsData);
-          setSelectedColor(colorsData[0].id);
-        }
-      }
-
-      const { data: additionalImagesData } = await supabase
-        .from('product_images')
-        .select('image_url')
-        .eq('product_id', productId)
-        .eq('is_primary', false)
-        .order('created_at');
-
-      if (additionalImagesData) {
-        setAdditionalImages(additionalImagesData.map(img => img.image_url));
-      }
-
-      const stock = await getProductStockSummary(productId!);
-      setProductStock(stock);
-
-    } catch (error) {
-      console.error('Error fetching product:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load product details',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSizeVariants = async (colorVariantId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('size_variants')
-        .select('id, size_name')
-        .eq('color_variant_id', colorVariantId);
-
-      if (error) throw error;
-      setSizeVariants(data || []);
-      if (data && data.length > 0) {
-        setSelectedSize(data[0].id);
-      }
-    } catch (error) {
-      console.error('Error fetching size variants:', error);
-    }
-  };
-
   const basePrice = product?.selling_price || subcategory?.selling_price || 0;
   
   const getMarginalPrice = () => {
@@ -292,6 +317,7 @@ export default function ProductDetail() {
   const totalPrice = marginalPrice * quantity;
   const savings = basePrice > marginalPrice ? (basePrice - marginalPrice) * quantity : 0;
   const discountPercent = basePrice > marginalPrice ? Math.round((1 - marginalPrice / basePrice) * 100) : 0;
+
 
   const handleAddToCart = async () => {
     if (!product) return;
