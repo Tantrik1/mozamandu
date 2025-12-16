@@ -1,15 +1,15 @@
-
-import { useState, useEffect, memo } from 'react';
+import { memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
 import { Eye } from 'lucide-react';
-import { getProductStockSummary } from '@/utils/stockCalculation';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 import { StarRating } from '@/components/product/StarRating';
 import { useProductRating } from '@/hooks/useProductRating';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { getProductStockSummary } from '@/utils/stockCalculation';
 
 interface Product {
   id: string;
@@ -25,13 +25,6 @@ interface Product {
   subcategory_id: string;
 }
 
-interface DiscountTier {
-  id: string;
-  min_quantity: number;
-  max_quantity: number | null;
-  discount_amount: number;
-}
-
 interface ModernProductCardProps {
   product: Product;
   subcategorySellingPrice: number;
@@ -39,60 +32,46 @@ interface ModernProductCardProps {
 
 export const ModernProductCard = memo(function ModernProductCard({ product, subcategorySellingPrice }: ModernProductCardProps) {
   const navigate = useNavigate();
-  const [productStock, setProductStock] = useState<number>(0);
-  const [discountTiers, setDiscountTiers] = useState<DiscountTier[]>([]);
-  const [realtimeSubcategoryPrice, setRealtimeSubcategoryPrice] = useState<number>(subcategorySellingPrice);
   const { averageRating, reviewCount } = useProductRating(product.id);
 
-  useEffect(() => {
-    fetchProductStock();
-    fetchDiscountTiers();
-    fetchRealtimeSubcategoryPrice();
-  }, [product.id, product.subcategory_id]);
+  // Use React Query for stock with long cache
+  const { data: productStock = 0 } = useQuery({
+    queryKey: ['product-stock', product.id],
+    queryFn: () => getProductStockSummary(product.id),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 10 * 60 * 1000,
+  });
 
-  const fetchRealtimeSubcategoryPrice = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('subcategories')
-        .select('selling_price')
-        .eq('id', product.subcategory_id)
-        .single();
-
-      if (error) throw error;
-      if (data) {
-        setRealtimeSubcategoryPrice(data.selling_price);
-      }
-    } catch (error) {
-      console.error('Error fetching realtime subcategory price:', error);
-      setRealtimeSubcategoryPrice(subcategorySellingPrice);
-    }
-  };
-
-  const fetchDiscountTiers = async () => {
-    try {
-      const { data, error } = await supabase
+  // Use React Query for discount tiers with long cache (shared across products in same subcategory)
+  const { data: discountTiers = [] } = useQuery({
+    queryKey: ['discount-tiers', product.subcategory_id],
+    queryFn: async () => {
+      const { data } = await supabase
         .from('discount_tiers')
         .select('*')
         .eq('subcategory_id', product.subcategory_id)
         .order('min_quantity');
+      return data || [];
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes - rarely changes
+    gcTime: 30 * 60 * 1000,
+  });
 
-      if (error) throw error;
-      setDiscountTiers(data || []);
-    } catch (error) {
-      console.error('Error fetching discount tiers:', error);
-      setDiscountTiers([]);
-    }
-  };
-
-  const fetchProductStock = async () => {
-    try {
-      const stock = await getProductStockSummary(product.id);
-      setProductStock(stock);
-    } catch (error) {
-      console.error('Error fetching product stock:', error);
-      setProductStock(0);
-    }
-  };
+  // Use React Query for subcategory price with long cache (shared across products in same subcategory)
+  const { data: realtimeSubcategoryPrice } = useQuery({
+    queryKey: ['subcategory-price', product.subcategory_id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('subcategories')
+        .select('selling_price')
+        .eq('id', product.subcategory_id)
+        .single();
+      return data?.selling_price || subcategorySellingPrice;
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes - rarely changes
+    gcTime: 30 * 60 * 1000,
+    initialData: subcategorySellingPrice,
+  });
 
   const basePrice = product.selling_price || realtimeSubcategoryPrice;
   const hasVolumeDiscount = discountTiers.length > 0;
