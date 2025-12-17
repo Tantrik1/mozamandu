@@ -63,9 +63,9 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Order fetched successfully:', order.order_number);
 
     // Determine the order summary URL - use production domain
+    // Always use 'order-summary' path as it's public and accessible without auth
     const baseUrl = 'https://mozamandu.com';
-    const summaryPath = isCustomerOrder ? 'customer-order-summary' : 'order-summary';
-    const orderSummaryUrl = `${baseUrl}/${summaryPath}/${orderId}`;
+    const orderSummaryUrl = `${baseUrl}/order-summary/${orderId}`;
 
     let emailHtml = '';
     let subject = '';
