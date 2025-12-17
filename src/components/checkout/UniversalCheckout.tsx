@@ -92,10 +92,36 @@ export function UniversalCheckout() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [promoDiscount, setPromoDiscount] = useState(0);
 
+  // Batch fetch all initial data in parallel for faster loading
   useEffect(() => {
-    fetchDeliveryLocations();
-    fetchPaymentMethods();
-    fetchDiscountTiers();
+    const fetchInitialData = async () => {
+      const [deliveryData, paymentData, tiersData] = await Promise.all([
+        supabase.from('delivery_charges').select('*').eq('is_active', true).order('place_name'),
+        supabase.from('payment_methods').select('*').eq('is_active', true).order('name'),
+        supabase.from('discount_tiers').select('*').order('subcategory_id, min_quantity')
+      ]);
+
+      if (deliveryData.data) setDeliveryLocations(deliveryData.data);
+      if (paymentData.data) {
+        setPaymentMethods(paymentData.data);
+        // Auto-select first payment method
+        if (paymentData.data.length > 0 && !paymentMethod) {
+          setPaymentMethod(paymentData.data[0]);
+        }
+      }
+      if (tiersData.data) {
+        const tiersBySubcategory: { [key: string]: any[] } = {};
+        tiersData.data.forEach(tier => {
+          if (!tiersBySubcategory[tier.subcategory_id]) {
+            tiersBySubcategory[tier.subcategory_id] = [];
+          }
+          tiersBySubcategory[tier.subcategory_id].push(tier);
+        });
+        setDiscountTiers(tiersBySubcategory);
+      }
+    };
+
+    fetchInitialData();
   }, []);
 
   useEffect(() => {
@@ -121,72 +147,8 @@ export function UniversalCheckout() {
   }, [user, userProfile]);
 
 
-  const fetchDeliveryLocations = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('delivery_charges')
-        .select('*')
-        .order('place_name');
+  // Individual fetch functions removed - now using batched fetch above
 
-      if (error) {
-        throw error;
-      }
-
-      setDeliveryLocations(data || []);
-    } catch (error) {
-      console.error('Error fetching delivery locations:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load delivery options.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const fetchPaymentMethods = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('payment_methods')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) {
-        throw error;
-      }
-
-      setPaymentMethods(data || []);
-    } catch (error) {
-      console.error('Error fetching payment methods:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load payment methods.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const fetchDiscountTiers = async () => {
-    try {
-      const { data } = await supabase
-        .from('discount_tiers')
-        .select('*')
-        .order('subcategory_id, min_quantity');
-      
-      if (data) {
-        const tiersBySubcategory: { [key: string]: any[] } = {};
-        data.forEach(tier => {
-          if (!tiersBySubcategory[tier.subcategory_id]) {
-            tiersBySubcategory[tier.subcategory_id] = [];
-          }
-          tiersBySubcategory[tier.subcategory_id].push(tier);
-        });
-        setDiscountTiers(tiersBySubcategory);
-      }
-    } catch (error) {
-      console.error('Error fetching discount tiers:', error);
-    }
-  };
 
   const calculatePromoDiscount = () => {
     if (appliedPromo) {
@@ -625,25 +587,18 @@ export function UniversalCheckout() {
   const totalBeforeDelivery = subtotal - promoDiscount;
   const finalTotal = totalBeforeDelivery + (deliveryLocation ? deliveryLocation.delivery_price : 0);
 
-  console.log('🎯 Final checkout calculations:', {
-    subtotal,
-    totalSavings: getTotalSavings(),
-    promoDiscount,
-    finalTotal
-  });
-
   // Remove the showSuccess condition since we're redirecting to thank you page
   
   return (
     <div className="container mx-auto py-8 pb-32">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
-        <p className="text-gray-600 mt-1">Complete your order below</p>
+        <h1 className="text-3xl font-bold text-foreground">Checkout</h1>
+        <p className="text-muted-foreground mt-1">Complete your order below</p>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
         <div className="space-y-6">
-          <Card className="shadow-sm border-gray-200">
+          <Card className="shadow-sm border-border">
             <CardContent className="p-6">
               <CustomerInfoForm
                 customerInfo={customerInfo}
@@ -667,7 +622,7 @@ export function UniversalCheckout() {
             onRemovePromo={handlePromoCodeRemoved}
           />
 
-          <Card className="shadow-sm border-gray-200">
+          <Card className="shadow-sm border-border">
             <CardContent className="p-6">
               <PaymentMethodSection
                 paymentMethods={paymentMethods}
@@ -701,7 +656,7 @@ export function UniversalCheckout() {
           </Card>
 
           {/* Payment Screenshot Upload */}
-          <Card className="shadow-sm border-gray-200">
+          <Card className="shadow-sm border-border">
             <CardContent className="p-6">
               <PaymentScreenshotUpload
                 onUploadComplete={handlePaymentScreenshotUpload}
@@ -728,11 +683,11 @@ export function UniversalCheckout() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 lg:hidden z-50 shadow-2xl">
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-4 lg:hidden z-50 shadow-2xl">
         <div className="container mx-auto">
           {(getTotalSavings() + promoDiscount) > 0 && (
             <div className="text-center mb-3">
-              <div className="text-green-600 font-semibold text-sm">
+              <div className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm">
                 🎉 You're saving Rs. {(getTotalSavings() + promoDiscount).toFixed(2)}!
               </div>
             </div>
@@ -741,7 +696,7 @@ export function UniversalCheckout() {
           <Button
             onClick={handleSubmitOrder}
             disabled={isSubmitting || cartItems.length === 0 || !paymentScreenshotUrl}
-            className="w-full h-14 text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
+            className="w-full h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
             size="lg"
           >
             {isSubmitting ? (
