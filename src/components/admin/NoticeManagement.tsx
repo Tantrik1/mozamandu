@@ -93,14 +93,10 @@ export function NoticeManagement() {
   };
 
   const uploadImage = async (file: File): Promise<string> => {
-    const { prepareImageForUpload } = await import('@/utils/imageOptimizer');
+    const { prepareImageForUpload, HIGH_COMPRESSION } = await import('@/utils/imageOptimizer');
     
-    // Optimize image (converts to WebP and compresses)
-    const { file: optimizedFile } = await prepareImageForUpload(file, {
-      maxSizeMB: 1,
-      maxWidthOrHeight: 1200,
-      quality: 0.85,
-    });
+    // Optimize image with aggressive compression for notices (target ~200KB)
+    const { file: optimizedFile } = await prepareImageForUpload(file, HIGH_COMPRESSION);
 
     const fileName = `${Date.now()}-notice.webp`;
     const filePath = `notices/${fileName}`;

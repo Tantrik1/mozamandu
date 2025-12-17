@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, X, Eye, ImagePlus, Loader2 } from 'lucide-react';
-import { prepareImageForUpload } from '@/utils/imageOptimizer';
+import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
 
 interface AdditionalImage {
   id?: string;
@@ -165,12 +165,8 @@ export function ProductAdditionalImages({
         ));
 
         try {
-          // Optimize image
-          const { file: optimizedFile } = await prepareImageForUpload(img.file, {
-            maxSizeMB: 1,
-            maxWidthOrHeight: 1200,
-            quality: 0.85,
-          });
+          // Optimize image with aggressive compression
+          const { file: optimizedFile } = await prepareImageForUpload(img.file, PRODUCT_COMPRESSION);
 
           const fileName = `product-additional-${targetProductId}-${Date.now()}-${i}.webp`;
 

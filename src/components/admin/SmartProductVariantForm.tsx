@@ -153,14 +153,10 @@ export function SmartProductVariantForm({
     setUploadingImages(prev => ({ ...prev, [colorIndex]: true }));
 
     try {
-      const { prepareImageForUpload } = await import('@/utils/imageOptimizer');
+      const { prepareImageForUpload, PRODUCT_COMPRESSION } = await import('@/utils/imageOptimizer');
       
-      // Optimize image (converts to WebP and compresses)
-      const { file: optimizedFile } = await prepareImageForUpload(file, {
-        maxSizeMB: 1,
-        maxWidthOrHeight: 1200,
-        quality: 0.85,
-      });
+      // Optimize image with aggressive compression (~250KB)
+      const { file: optimizedFile } = await prepareImageForUpload(file, PRODUCT_COMPRESSION);
 
       const fileName = `product-${productId}-${colorIndex}-${Date.now()}.webp`;
 

@@ -15,7 +15,7 @@ import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { EnhancedProductVariantForm } from './EnhancedProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 import { ProductAdditionalImages, type AdditionalImage } from './ProductAdditionalImages';
-import { prepareImageForUpload } from '@/utils/imageOptimizer';
+import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -259,14 +259,10 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     if (!imageFile) return null;
 
     try {
-      const { prepareImageForUpload } = await import('@/utils/imageOptimizer');
+      const { prepareImageForUpload, PRODUCT_COMPRESSION } = await import('@/utils/imageOptimizer');
       
-      // Optimize image (converts to WebP and compresses)
-      const { file: optimizedFile } = await prepareImageForUpload(imageFile, {
-        maxSizeMB: 1,
-        maxWidthOrHeight: 1200,
-        quality: 0.85,
-      });
+      // Optimize image with aggressive compression (~250KB)
+      const { file: optimizedFile } = await prepareImageForUpload(imageFile, PRODUCT_COMPRESSION);
 
       const fileName = `product-${Date.now()}.webp`;
 
@@ -302,11 +298,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       if (!img.file) continue;
 
       try {
-        const { file: optimizedFile } = await prepareImageForUpload(img.file, {
-          maxSizeMB: 1,
-          maxWidthOrHeight: 1200,
-          quality: 0.85,
-        });
+        const { file: optimizedFile } = await prepareImageForUpload(img.file, PRODUCT_COMPRESSION);
 
         const fileName = `product-additional-${productId}-${Date.now()}-${i}.webp`;
 

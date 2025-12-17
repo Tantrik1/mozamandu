@@ -95,14 +95,10 @@ export function PaymentMethodManagement() {
     setUploading(true);
 
     try {
-      const { prepareImageForUpload } = await import('@/utils/imageOptimizer');
+      const { prepareImageForUpload, THUMBNAIL_COMPRESSION } = await import('@/utils/imageOptimizer');
       
-      // Optimize image (converts to WebP and compresses)
-      const { file: optimizedFile } = await prepareImageForUpload(qrCodeFile, {
-        maxSizeMB: 0.5,
-        maxWidthOrHeight: 600,
-        quality: 0.9,
-      });
+      // Optimize QR code image with thumbnail compression (~150KB)
+      const { file: optimizedFile } = await prepareImageForUpload(qrCodeFile, THUMBNAIL_COMPRESSION);
 
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.webp`;
       const filePath = `payment-qr-codes/${fileName}`;
