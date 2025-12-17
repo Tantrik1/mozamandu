@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,8 +8,8 @@ import { CheckCircle, Package, Phone, Mail, Download, ArrowLeft, Printer, Tag } 
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
-import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
 
 interface OrderDetails {
   id: string;
@@ -52,145 +51,69 @@ interface OrderItem {
   pricing_details: any;
 }
 
+// Optimized fetch function - tries both tables in parallel
+const fetchOrderData = async (orderId: string) => {
+  // Fetch from both tables in parallel
+  const [customerOrderResult, guestOrderResult] = await Promise.all([
+    supabase
+      .from('customer_orders')
+      .select(`
+        id, order_number, customer_name, customer_email, contact_number,
+        whatsapp_number, delivery_address, total_amount, paid_amount,
+        remaining_amount, subtotal, delivery_charge, status, created_at,
+        updated_at, promocode_used, promocode_discount, payment_screenshot_url,
+        pricing_breakdown, payment_method:payment_methods(name),
+        delivery_location:delivery_charges(place_name)
+      `)
+      .eq('id', orderId)
+      .maybeSingle(),
+    supabase
+      .from('orders')
+      .select(`
+        id, order_number, customer_name, customer_email, contact_number,
+        whatsapp_number, delivery_address, total_amount, paid_amount,
+        remaining_amount, subtotal, delivery_charge, status, created_at,
+        updated_at, promocode_used, promocode_discount, payment_screenshot_url,
+        pricing_breakdown, payment_method:payment_methods(name),
+        delivery_location:delivery_charges(place_name)
+      `)
+      .eq('id', orderId)
+      .maybeSingle()
+  ]);
+
+  const order = customerOrderResult.data || guestOrderResult.data;
+  const isCustomerOrder = !!customerOrderResult.data;
+
+  if (!order) throw new Error('Order not found');
+
+  // Fetch items from appropriate table
+  const itemsTable = isCustomerOrder ? 'customer_order_item_details' : 'order_item_details';
+  const { data: items } = await supabase
+    .from(itemsTable)
+    .select('*')
+    .eq('order_id', orderId);
+
+  return { order, items: items || [] };
+};
+
 export default function OrderSummary() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const { userProfile } = useAuth();
-  const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Check if user came from admin panel
   const isAdminView = userProfile?.role === 'admin';
 
-  useEffect(() => {
-    if (!orderId) {
-      navigate('/');
-      return;
-    }
-    fetchOrderDetails();
-  }, [orderId, navigate]);
+  // Use React Query for fast cached fetching
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['order-summary', orderId],
+    queryFn: () => fetchOrderData(orderId!),
+    enabled: !!orderId,
+    staleTime: 2 * 60 * 1000,
+    retry: 1,
+  });
 
-  const fetchOrderDetails = async () => {
-    if (!orderId) return;
-
-    try {
-      console.log('Fetching order details for:', orderId);
-
-      // First try customer_orders table (authenticated users)
-      let order = null;
-      let isCustomerOrder = true;
-      
-      const { data: customerOrder, error: customerOrderError } = await supabase
-        .from('customer_orders')
-        .select(`
-          id,
-          order_number,
-          customer_name,
-          customer_email,
-          contact_number,
-          whatsapp_number,
-          delivery_address,
-          total_amount,
-          paid_amount,
-          remaining_amount,
-          subtotal,
-          delivery_charge,
-          status,
-          created_at,
-          updated_at,
-          promocode_used,
-          promocode_discount,
-          payment_screenshot_url,
-          pricing_breakdown,
-          payment_method:payment_methods(name),
-          delivery_location:delivery_charges(place_name)
-        `)
-        .eq('id', orderId)
-        .maybeSingle();
-
-      if (customerOrder) {
-        order = customerOrder;
-        isCustomerOrder = true;
-        console.log('Found order in customer_orders table');
-      } else {
-        // Try orders table (guest users)
-        const { data: guestOrder, error: guestOrderError } = await supabase
-          .from('orders')
-          .select(`
-            id,
-            order_number,
-            customer_name,
-            customer_email,
-            contact_number,
-            whatsapp_number,
-            delivery_address,
-            total_amount,
-            paid_amount,
-            remaining_amount,
-            subtotal,
-            delivery_charge,
-            status,
-            created_at,
-            updated_at,
-            promocode_used,
-            promocode_discount,
-            payment_screenshot_url,
-            pricing_breakdown,
-            payment_method:payment_methods(name),
-            delivery_location:delivery_charges(place_name)
-          `)
-          .eq('id', orderId)
-          .maybeSingle();
-
-        if (guestOrder) {
-          order = guestOrder;
-          isCustomerOrder = false;
-          console.log('Found order in orders table (guest)');
-        }
-      }
-
-      if (!order) {
-        console.error('Order not found in any table');
-        toast({
-          title: "Error",
-          description: "Order not found",
-          variant: "destructive",
-        });
-        navigate('/');
-        return;
-      }
-
-      // Fetch order items from appropriate table
-      const itemsTable = isCustomerOrder ? 'customer_order_item_details' : 'order_item_details';
-      const { data: items, error: itemsError } = await supabase
-        .from(itemsTable)
-        .select('*')
-        .eq('order_id', orderId);
-
-      if (itemsError) {
-        console.error('Error fetching order items:', itemsError);
-        toast({
-          title: "Error",
-          description: "Failed to load order items",
-          variant: "destructive",
-        });
-      }
-
-      setOrderDetails(order);
-      setOrderItems(items || []);
-    } catch (error) {
-      console.error('Unexpected error fetching order:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load order details",
-        variant: "destructive",
-      });
-      navigate('/');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const orderDetails = data?.order || null;
+  const orderItems = data?.items || [];
 
   const handlePrintPDF = () => {
     window.print();
@@ -301,21 +224,27 @@ export default function OrderSummary() {
     }
   };
 
+  // Redirect if no orderId
+  if (!orderId) {
+    navigate('/');
+    return null;
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <ModernNavbar />
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading order details...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading order...</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!orderDetails) {
+  if (error || !orderDetails) {
     return (
       <div className="min-h-screen bg-gray-50">
         <ModernNavbar />

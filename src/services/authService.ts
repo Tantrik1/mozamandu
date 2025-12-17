@@ -147,6 +147,34 @@ export const authService = {
     }
   },
 
+  async signInWithGoogle() {
+    try {
+      console.log('🔄 AuthService: Starting Google sign in');
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth?confirmed=true`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+      
+      if (error) {
+        console.error('❌ AuthService: Google sign in error:', error);
+        return { error: { message: error.message } };
+      }
+      
+      console.log('✅ AuthService: Google sign in initiated');
+      return { error: null };
+    } catch (error) {
+      console.error('❌ AuthService: Google sign in exception:', error);
+      return { error: { message: 'Failed to sign in with Google. Please try again.' } };
+    }
+  },
+
   async fetchUserProfile(userId: string) {
     try {
       console.log('🔄 AuthService: Fetching user profile for:', userId);

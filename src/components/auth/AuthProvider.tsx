@@ -77,6 +77,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return authService.signUp(email, password, fullName);
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    return authService.signInWithGoogle();
+  }, []);
+
   const signOut = useCallback(async () => {
     setUser(null);
     setSession(null);
@@ -92,6 +96,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       isLoading,
       signIn,
       signUp,
+      signInWithGoogle,
       signOut,
     }}>
       {children}

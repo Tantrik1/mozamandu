@@ -1,5 +1,3 @@
-
-import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +8,17 @@ import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
 import { useAuth } from '@/hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
+
+interface PricingBreakdown {
+  pricingMode?: string;
+  tieredSubtotal?: number;
+  tieredSavings?: number;
+  comboInfo?: {
+    combo: { name: string; description: string };
+    totalComboSavings: number;
+  };
+}
 
 interface CustomerOrderDetails {
   id: string;
@@ -30,7 +39,7 @@ interface CustomerOrderDetails {
   promocode_used?: string;
   combo_applied?: boolean;
   created_at: string;
-  pricing_breakdown?: any;
+  pricing_breakdown?: PricingBreakdown;
   payment_method?: {
     name: string;
   };
@@ -56,71 +65,56 @@ interface OrderItem {
   };
 }
 
+// Optimized fetch function - parallel queries
+const fetchCustomerOrderData = async (orderId: string) => {
+  // Fetch order and items in parallel
+  const [orderResult, itemsResult] = await Promise.all([
+    supabase
+      .from('customer_orders')
+      .select(`
+        *, payment_method:payment_methods(name),
+        delivery_location:delivery_charges(place_name)
+      `)
+      .eq('id', orderId)
+      .single(),
+    supabase
+      .from('customer_order_item_details')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('created_at')
+  ]);
+
+  if (orderResult.error) throw new Error('Order not found');
+
+  const items = (itemsResult.data || []).map(item => ({
+    ...item,
+    pricing_details: item.pricing_details as any || { savings: 0 }
+  }));
+
+  return { order: orderResult.data, items };
+};
+
 export default function CustomerOrderSummary() {
   const { orderId } = useParams();
   const { userProfile } = useAuth();
-  const [orderDetails, setOrderDetails] = useState<CustomerOrderDetails | null>(null);
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Check if user is admin
   const isAdminView = userProfile?.role === 'admin';
 
-  useEffect(() => {
-    if (orderId) {
-      fetchOrderDetails();
-    }
-  }, [orderId]);
+  // Use React Query for fast cached fetching
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['customer-order-summary', orderId],
+    queryFn: () => fetchCustomerOrderData(orderId!),
+    enabled: !!orderId,
+    staleTime: 2 * 60 * 1000,
+    retry: 1,
+  });
 
-  const fetchOrderDetails = async () => {
-    try {
-      console.log('🔍 Fetching customer order details for:', orderId);
-
-      // Fetch order details with related data
-      const { data: orderData, error: orderError } = await supabase
-        .from('customer_orders')
-        .select(`
-          *,
-          payment_method:payment_methods(name),
-          delivery_location:delivery_charges(place_name)
-        `)
-        .eq('id', orderId)
-        .single();
-
-      if (orderError) {
-        console.error('❌ Error fetching customer order:', orderError);
-        setError('Order not found');
-        setIsLoading(false);
-        return;
-      }
-
-      // Fetch order items
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('customer_order_item_details')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('created_at');
-
-      if (itemsError) {
-        console.error('❌ Error fetching order items:', itemsError);
-      }
-
-      console.log('✅ Customer order data fetched:', orderData);
-      console.log('✅ Order items fetched:', itemsData);
-
-      setOrderDetails(orderData);
-      setOrderItems((itemsData || []).map(item => ({
-        ...item,
-        pricing_details: item.pricing_details as any || { savings: 0 }
-      })));
-    } catch (error) {
-      console.error('💥 Error fetching customer order details:', error);
-      setError('Failed to load order details');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const orderDetails: CustomerOrderDetails | null = data?.order ? {
+    ...data.order,
+    pricing_breakdown: data.order.pricing_breakdown as PricingBreakdown | undefined,
+    combo_applied: (data.order as any).combo_applied
+  } : null;
+  const orderItems = data?.items || [];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -152,8 +146,8 @@ export default function CustomerOrderSummary() {
         <ModernNavbar />
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading order details...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading order...</p>
           </div>
         </div>
         <Footer />
@@ -168,7 +162,7 @@ export default function CustomerOrderSummary() {
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Order Not Found</h1>
-            <p className="text-gray-600 mb-6">{error || 'The requested order could not be found.'}</p>
+            <p className="text-gray-600 mb-6">{error instanceof Error ? error.message : 'The requested order could not be found.'}</p>
             <Button asChild>
               <Link to={isAdminView ? "/admin" : "/dashboard"}>
                 <ArrowLeft className="h-4 w-4 mr-2" />

@@ -84,12 +84,6 @@ export const ProductReviews = memo(function ProductReviews({ productId }: Produc
           </div>
         </div>
 
-        {/* Review Form */}
-        <div className="bg-card border border-border rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Write a Review</h3>
-          <ReviewForm productId={productId} onReviewSubmitted={handleReviewSubmitted} />
-        </div>
-
         {/* Reviews List */}
         {reviews.length > 0 ? (
           <div className="space-y-4">
@@ -126,6 +120,12 @@ export const ProductReviews = memo(function ProductReviews({ productId }: Produc
             <p className="text-muted-foreground">No reviews yet. Be the first to review this product!</p>
           </div>
         )}
+
+        {/* Review Form */}
+        <div className="bg-card border border-border rounded-2xl p-6">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Write a Review</h3>
+          <ReviewForm productId={productId} onReviewSubmitted={handleReviewSubmitted} />
+        </div>
       </div>
     </section>
   );
