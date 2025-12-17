@@ -77,7 +77,11 @@ export default function OrderSummary() {
     try {
       console.log('Fetching order details for:', orderId);
 
-      const { data: order, error: orderError } = await supabase
+      // First try customer_orders table (authenticated users)
+      let order = null;
+      let isCustomerOrder = true;
+      
+      const { data: customerOrder, error: customerOrderError } = await supabase
         .from('customer_orders')
         .select(`
           id,
@@ -103,10 +107,51 @@ export default function OrderSummary() {
           delivery_location:delivery_charges(place_name)
         `)
         .eq('id', orderId)
-        .single();
+        .maybeSingle();
 
-      if (orderError) {
-        console.error('Error fetching order:', orderError);
+      if (customerOrder) {
+        order = customerOrder;
+        isCustomerOrder = true;
+        console.log('Found order in customer_orders table');
+      } else {
+        // Try orders table (guest users)
+        const { data: guestOrder, error: guestOrderError } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            customer_name,
+            customer_email,
+            contact_number,
+            whatsapp_number,
+            delivery_address,
+            total_amount,
+            paid_amount,
+            remaining_amount,
+            subtotal,
+            delivery_charge,
+            status,
+            created_at,
+            updated_at,
+            promocode_used,
+            promocode_discount,
+            payment_screenshot_url,
+            pricing_breakdown,
+            payment_method:payment_methods(name),
+            delivery_location:delivery_charges(place_name)
+          `)
+          .eq('id', orderId)
+          .maybeSingle();
+
+        if (guestOrder) {
+          order = guestOrder;
+          isCustomerOrder = false;
+          console.log('Found order in orders table (guest)');
+        }
+      }
+
+      if (!order) {
+        console.error('Order not found in any table');
         toast({
           title: "Error",
           description: "Order not found",
@@ -116,8 +161,10 @@ export default function OrderSummary() {
         return;
       }
 
+      // Fetch order items from appropriate table
+      const itemsTable = isCustomerOrder ? 'customer_order_item_details' : 'order_item_details';
       const { data: items, error: itemsError } = await supabase
-        .from('customer_order_item_details')
+        .from(itemsTable)
         .select('*')
         .eq('order_id', orderId);
 
