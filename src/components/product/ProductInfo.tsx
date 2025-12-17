@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, useEffect, memo, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,10 +11,12 @@ import {
   Truck,
   RotateCcw,
   Shield,
-  ChevronRight
+  ChevronRight,
+  AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StarRating } from './StarRating';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ColorVariant {
   id: string;
@@ -35,14 +37,19 @@ interface DiscountTier {
   discount_amount: number;
 }
 
+interface CartItem {
+  productId: string;
+  quantity: number;
+  subcategoryId: string;
+  basePrice: number;
+  totalPrice: number;
+}
+
 interface ProductInfoProps {
   productName: string;
   subcategoryName?: string;
   subcategoryId?: string;
   basePrice: number;
-  discountedPrice: number;
-  discountPercent: number;
-  savings: number;
   stock: number;
   quantity: number;
   cartQuantity: number;
@@ -55,6 +62,7 @@ interface ProductInfoProps {
   hasSizeVariants: boolean;
   averageRating?: number;
   reviewCount?: number;
+  cartItems: CartItem[];
   onQuantityChange: (qty: number) => void;
   onColorChange: (colorId: string) => void;
   onSizeChange: (sizeId: string) => void;
@@ -68,9 +76,6 @@ export const ProductInfo = memo(function ProductInfo({
   subcategoryName,
   subcategoryId,
   basePrice,
-  discountedPrice,
-  discountPercent,
-  savings,
   stock,
   quantity,
   cartQuantity,
@@ -83,6 +88,7 @@ export const ProductInfo = memo(function ProductInfo({
   hasSizeVariants,
   averageRating = 0,
   reviewCount = 0,
+  cartItems,
   onQuantityChange,
   onColorChange,
   onSizeChange,
@@ -90,9 +96,119 @@ export const ProductInfo = memo(function ProductInfo({
   onBuyNow,
   isLoading
 }: ProductInfoProps) {
-  const totalPrice = discountedPrice * quantity;
+  const [subcategoryRequirements, setSubcategoryRequirements] = useState<{
+    minimumQuantity: number;
+    currentQuantity: number;
+    fulfilled: boolean;
+  } | null>(null);
+
   const selectedColorName = colorVariants.find(c => c.id === selectedColor)?.color_name;
   const selectedSizeName = sizeVariants.find(s => s.id === selectedSize)?.size_name;
+
+  // Calculate pricing exactly like cart - FIFO based on subcategory quantity
+  const pricingCalculation = useMemo(() => {
+    // Get total quantity in cart for this subcategory
+    const cartSubcategoryQuantity = cartItems
+      .filter(item => item.subcategoryId === subcategoryId)
+      .reduce((sum, item) => sum + item.quantity, 0);
+    
+    // Total quantity including current selection
+    const totalSubcategoryQuantity = cartSubcategoryQuantity + quantity;
+    
+    // Find applicable tier
+    const sortedTiers = [...discountTiers].sort((a, b) => b.min_quantity - a.min_quantity);
+    const moqTier = sortedTiers.find(tier => tier.min_quantity > 1) || sortedTiers[0];
+    
+    if (!moqTier) {
+      return {
+        unitPrice: basePrice,
+        totalPrice: basePrice * quantity,
+        savings: 0,
+        discountPercent: 0,
+        moqReached: false,
+        moqRequired: 0,
+        itemsUntilDiscount: 0
+      };
+    }
+    
+    const moqReached = totalSubcategoryQuantity >= moqTier.min_quantity;
+    const discountedPrice = basePrice - moqTier.discount_amount;
+    
+    // Calculate FIFO pricing for current items
+    let totalCost = 0;
+    let normalPriceQty = 0;
+    let discountPriceQty = 0;
+    
+    if (moqReached) {
+      // Items before MOQ threshold at normal price
+      normalPriceQty = Math.max(0, Math.min(quantity, moqTier.min_quantity - cartSubcategoryQuantity));
+      // Items after MOQ threshold at discounted price
+      discountPriceQty = quantity - normalPriceQty;
+      
+      totalCost = (normalPriceQty * basePrice) + (discountPriceQty * discountedPrice);
+    } else {
+      // MOQ not reached, all at normal price
+      normalPriceQty = quantity;
+      totalCost = quantity * basePrice;
+    }
+    
+    const avgUnitPrice = totalCost / quantity;
+    const savings = discountPriceQty * moqTier.discount_amount;
+    const discountPercent = moqTier.discount_amount > 0 
+      ? Math.round((moqTier.discount_amount / basePrice) * 100) 
+      : 0;
+    
+    return {
+      unitPrice: avgUnitPrice,
+      totalPrice: totalCost,
+      savings,
+      discountPercent,
+      moqReached,
+      moqRequired: moqTier.min_quantity,
+      itemsUntilDiscount: moqReached ? 0 : moqTier.min_quantity - totalSubcategoryQuantity,
+      discountAmount: moqTier.discount_amount,
+      discountedPrice
+    };
+  }, [cartItems, subcategoryId, quantity, discountTiers, basePrice]);
+
+  // Calculate cart total including current selection for MOQ bypass check
+  const cartTotalWithSelection = useMemo(() => {
+    const cartTotal = cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
+    return cartTotal + pricingCalculation.totalPrice;
+  }, [cartItems, pricingCalculation.totalPrice]);
+
+  // Check MOQ requirements
+  useEffect(() => {
+    const checkRequirements = async () => {
+      if (!subcategoryId) return;
+      
+      const { data } = await supabase
+        .from('subcategories')
+        .select('minimum_quantity')
+        .eq('id', subcategoryId)
+        .single();
+      
+      if (data) {
+        const cartQuantityForSubcategory = cartItems
+          .filter(item => item.subcategoryId === subcategoryId)
+          .reduce((sum, item) => sum + item.quantity, 0);
+        
+        const totalQuantity = cartQuantityForSubcategory + quantity;
+        
+        setSubcategoryRequirements({
+          minimumQuantity: data.minimum_quantity,
+          currentQuantity: totalQuantity,
+          fulfilled: totalQuantity >= data.minimum_quantity
+        });
+      }
+    };
+    
+    checkRequirements();
+  }, [subcategoryId, cartItems, quantity]);
+
+  // MOQ bypass if total >= 1000
+  const moqBypass = cartTotalWithSelection >= 1000;
+  const canCheckout = moqBypass || (subcategoryRequirements?.fulfilled ?? false);
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -128,15 +244,15 @@ export const ProductInfo = memo(function ProductInfo({
       <div className="space-y-2">
         <div className="flex items-baseline gap-3 flex-wrap">
           <span className="text-3xl lg:text-4xl font-bold text-foreground">
-            Rs. {discountedPrice.toLocaleString()}
+            Rs. {pricingCalculation.unitPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </span>
-          {discountPercent > 0 && (
+          {pricingCalculation.savings > 0 && (
             <>
               <span className="text-lg text-muted-foreground line-through">
                 Rs. {basePrice.toLocaleString()}
               </span>
               <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0">
-                Save Rs. {savings.toLocaleString()}
+                Save Rs. {pricingCalculation.savings.toLocaleString()}
               </Badge>
             </>
           )}
@@ -169,20 +285,43 @@ export const ProductInfo = memo(function ProductInfo({
             Buy More, Save More
           </p>
           <div className="grid gap-2">
-            {discountTiers.slice(0, 3).map((tier) => (
-              <div 
-                key={tier.id}
-                className="flex items-center justify-between text-sm"
-              >
-                <span className="text-muted-foreground">
-                  {tier.min_quantity}+ items
-                </span>
-                <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                  Rs. {tier.discount_amount} off/item
-                </span>
-              </div>
-            ))}
+            {discountTiers.slice(0, 3).map((tier) => {
+              const cartSubcategoryQty = cartItems
+                .filter(item => item.subcategoryId === subcategoryId)
+                .reduce((sum, item) => sum + item.quantity, 0);
+              const totalQty = cartSubcategoryQty + quantity;
+              const isActive = totalQty >= tier.min_quantity;
+              
+              return (
+                <div 
+                  key={tier.id}
+                  className={cn(
+                    "flex items-center justify-between text-sm px-3 py-2 rounded-lg transition-colors",
+                    isActive ? "bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800" : "bg-background/50"
+                  )}
+                >
+                  <span className={cn(
+                    "text-muted-foreground",
+                    isActive && "text-emerald-700 dark:text-emerald-400"
+                  )}>
+                    {tier.min_quantity}+ items
+                  </span>
+                  <span className={cn(
+                    "font-medium",
+                    isActive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                  )}>
+                    Rs. {tier.discount_amount} off/item
+                    {isActive && <Check className="w-3.5 h-3.5 inline ml-1" />}
+                  </span>
+                </div>
+              );
+            })}
           </div>
+          {pricingCalculation.itemsUntilDiscount > 0 && (
+            <p className="text-xs text-muted-foreground mt-3">
+              Add {pricingCalculation.itemsUntilDiscount} more to unlock volume discount
+            </p>
+          )}
         </div>
       )}
 
@@ -282,7 +421,19 @@ export const ProductInfo = memo(function ProductInfo({
         {quantity > 1 && (
           <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
             <span className="text-sm text-muted-foreground">Total for {quantity} items</span>
-            <span className="text-xl font-bold text-foreground">Rs. {totalPrice.toLocaleString()}</span>
+            <span className="text-xl font-bold text-foreground">Rs. {pricingCalculation.totalPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+          </div>
+        )}
+
+        {/* MOQ Warning */}
+        {!canCheckout && subcategoryRequirements && (
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="w-4 h-4" />
+              <span className="text-sm font-medium">
+                Need {subcategoryRequirements.minimumQuantity - subcategoryRequirements.currentQuantity} more items or Rs. {(1000 - cartTotalWithSelection).toLocaleString()} more to checkout
+              </span>
+            </div>
           </div>
         )}
 
@@ -301,8 +452,11 @@ export const ProductInfo = memo(function ProductInfo({
           <Button 
             size="lg"
             onClick={onBuyNow}
-            disabled={isLoading || stock === 0}
-            className="h-12 lg:h-14 text-sm lg:text-base font-semibold rounded-xl"
+            disabled={isLoading || stock === 0 || !canCheckout}
+            className={cn(
+              "h-12 lg:h-14 text-sm lg:text-base font-semibold rounded-xl",
+              !canCheckout && "opacity-50 cursor-not-allowed"
+            )}
           >
             <Zap className="w-4 h-4 lg:w-5 lg:h-5 mr-2" />
             Buy Now

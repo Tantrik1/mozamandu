@@ -9,13 +9,27 @@ import { FileText, Sparkles, Leaf, Info } from 'lucide-react';
 
 interface ProductDetailsAccordionProps {
   description?: string | null;
-  subcategoryDescription?: string | null;
+  materialComposition?: string | null;
+  careInstructions?: string[] | null;
 }
 
 export const ProductDetailsAccordion = memo(function ProductDetailsAccordion({
   description,
-  subcategoryDescription
+  materialComposition,
+  careInstructions
 }: ProductDetailsAccordionProps) {
+  // Default values if not provided
+  const defaultMaterial = 'Premium quality fabric blend designed for comfort and durability.';
+  const defaultCare = [
+    'Machine wash cold with similar colors',
+    'Do not bleach',
+    'Tumble dry low',
+    'Iron on low heat if needed'
+  ];
+
+  const material = materialComposition || defaultMaterial;
+  const care = careInstructions && careInstructions.length > 0 ? careInstructions : defaultCare;
+
   return (
     <div className="border-t border-border pt-6">
       <Accordion type="single" collapsible defaultValue="description" className="w-full">
@@ -48,15 +62,14 @@ export const ProductDetailsAccordion = memo(function ProductDetailsAccordion({
             <div className="space-y-4 text-sm text-muted-foreground">
               <div>
                 <h4 className="font-medium text-foreground mb-2">Material Composition</h4>
-                <p>Premium quality fabric blend designed for comfort and durability.</p>
+                <p>{material}</p>
               </div>
               <div>
                 <h4 className="font-medium text-foreground mb-2">Care Instructions</h4>
                 <ul className="list-disc list-inside space-y-1">
-                  <li>Machine wash cold with similar colors</li>
-                  <li>Do not bleach</li>
-                  <li>Tumble dry low</li>
-                  <li>Iron on low heat if needed</li>
+                  {care.map((instruction, index) => (
+                    <li key={index}>{instruction}</li>
+                  ))}
                 </ul>
               </div>
             </div>

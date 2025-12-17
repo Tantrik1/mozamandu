@@ -1047,6 +1047,7 @@ export type Database = {
       }
       products: {
         Row: {
+          care_instructions: string[] | null
           category_id: string
           color_has_size_variants: boolean | null
           cost_price: number
@@ -1056,6 +1057,7 @@ export type Database = {
           id: string
           image_url: string | null
           is_featured: boolean | null
+          material_composition: string | null
           name: string
           selling_price: number | null
           status: Database["public"]["Enums"]["product_status"] | null
@@ -1063,6 +1065,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          care_instructions?: string[] | null
           category_id: string
           color_has_size_variants?: boolean | null
           cost_price: number
@@ -1072,6 +1075,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_featured?: boolean | null
+          material_composition?: string | null
           name: string
           selling_price?: number | null
           status?: Database["public"]["Enums"]["product_status"] | null
@@ -1079,6 +1083,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          care_instructions?: string[] | null
           category_id?: string
           color_has_size_variants?: boolean | null
           cost_price?: number
@@ -1088,6 +1093,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_featured?: boolean | null
+          material_composition?: string | null
           name?: string
           selling_price?: number | null
           status?: Database["public"]["Enums"]["product_status"] | null

@@ -28,6 +28,8 @@ const productSchema = z.object({
   has_color_variants: z.boolean().default(false),
   has_size_variants: z.boolean().default(false),
   status: z.enum(['active', 'inactive']).default('active'),
+  material_composition: z.string().optional(),
+  care_instructions: z.string().optional(),
 });
 
 interface Category {
@@ -88,6 +90,8 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       has_color_variants: false,
       has_size_variants: false,
       status: 'active',
+      material_composition: 'Premium quality fabric blend designed for comfort and durability.',
+      care_instructions: 'Machine wash cold with similar colors\nDo not bleach\nTumble dry low\nIron on low heat if needed',
     },
   });
 
@@ -298,6 +302,8 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
         color_has_size_variants: data.has_size_variants,
         status: data.status,
         image_url: imageUrl,
+        material_composition: data.material_composition || 'Premium quality fabric blend designed for comfort and durability.',
+        care_instructions: data.care_instructions ? data.care_instructions.split('\n').filter(line => line.trim()) : ['Machine wash cold with similar colors', 'Do not bleach', 'Tumble dry low', 'Iron on low heat if needed'],
       };
 
       console.log('Product data to insert:', productData);
@@ -442,6 +448,27 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                     placeholder="Enter product description"
                     rows={3}
                   />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="material_composition">Material Composition</Label>
+                    <Textarea
+                      id="material_composition"
+                      {...form.register('material_composition')}
+                      placeholder="e.g., Premium quality fabric blend designed for comfort and durability."
+                      rows={2}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="care_instructions">Care Instructions (one per line)</Label>
+                    <Textarea
+                      id="care_instructions"
+                      {...form.register('care_instructions')}
+                      placeholder="Machine wash cold with similar colors&#10;Do not bleach&#10;Tumble dry low&#10;Iron on low heat if needed"
+                      rows={4}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
