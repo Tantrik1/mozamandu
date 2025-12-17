@@ -117,15 +117,6 @@ const fetchProductsBySearch = async (searchQuery: string) => {
   return data || [];
 };
 
-const fetchProductInventoryFilters = async (productIds: string[]) => {
-  if (productIds.length === 0) return [];
-  const { data } = await supabase
-    .from('product_inventory')
-    .select('product_id, color_name, size_name')
-    .in('product_id', productIds)
-    .eq('is_active', true);
-  return data || [];
-};
 
 const Shop = memo(function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -140,8 +131,6 @@ const Shop = memo(function Shop() {
   const [gridCols, setGridCols] = useState<2 | 3 | 4>(4);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [priceRange, setPriceRange] = useState<[number, number]>([50, 10000]);
-  const [selectedColors, setSelectedColors] = useState<string[]>([]);
-  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
 
   // Determine view mode
   const viewMode: ViewMode = searchQuery 
@@ -189,41 +178,13 @@ const Shop = memo(function Shop() {
     staleTime: 2 * 60 * 1000,
   });
 
-  // Fetch inventory data for color/size filtering
-  const productIds = useMemo(() => products.map(p => p.id), [products]);
-  
-  const { data: inventoryData = [] } = useQuery({
-    queryKey: ['shop-inventory-filters', productIds],
-    queryFn: () => fetchProductInventoryFilters(productIds),
-    enabled: productIds.length > 0 && (selectedColors.length > 0 || selectedSizes.length > 0),
-    staleTime: 2 * 60 * 1000,
-  });
-
-  // Filter products by price range, colors, and sizes
+  // Filter products by price range only
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const price = product.selling_price || product.cost_price;
-      const priceMatch = price >= priceRange[0] && price <= priceRange[1];
-      
-      // If no color/size filters, just check price
-      if (selectedColors.length === 0 && selectedSizes.length === 0) {
-        return priceMatch;
-      }
-      
-      // Get inventory items for this product
-      const productInventory = inventoryData.filter(inv => inv.product_id === product.id);
-      
-      // Check color filter
-      const colorMatch = selectedColors.length === 0 || 
-        productInventory.some(inv => inv.color_name && selectedColors.includes(inv.color_name));
-      
-      // Check size filter
-      const sizeMatch = selectedSizes.length === 0 || 
-        productInventory.some(inv => inv.size_name && selectedSizes.includes(inv.size_name));
-      
-      return priceMatch && colorMatch && sizeMatch;
+      return price >= priceRange[0] && price <= priceRange[1];
     });
-  }, [products, priceRange, selectedColors, selectedSizes, inventoryData]);
+  }, [products, priceRange]);
 
   const loading = useMemo(() => {
     if (viewMode === 'categories') return categoriesLoading;
@@ -344,16 +305,10 @@ const Shop = memo(function Shop() {
                     onClearFilters={() => {
                       clearFilters();
                       setPriceRange([50, 10000]);
-                      setSelectedColors([]);
-                      setSelectedSizes([]);
                       setMobileFiltersOpen(false);
                     }}
                     priceRange={priceRange}
                     onPriceRangeApply={setPriceRange}
-                    selectedColors={selectedColors}
-                    onColorsChange={setSelectedColors}
-                    selectedSizes={selectedSizes}
-                    onSizesChange={setSelectedSizes}
                   />
                 </div>
               </SheetContent>
@@ -362,7 +317,7 @@ const Shop = memo(function Shop() {
         </div>
 
         {/* Active Filters */}
-        {(categoryId || subcategoryId || searchQuery || priceRange[0] !== 50 || priceRange[1] !== 10000 || selectedColors.length > 0 || selectedSizes.length > 0) && (
+        {(categoryId || subcategoryId || searchQuery || priceRange[0] !== 50 || priceRange[1] !== 10000) && (
           <div className="flex flex-wrap items-center gap-2 mb-6">
             <span className="text-sm text-muted-foreground">Active filters:</span>
             {searchQuery && (
@@ -424,36 +379,12 @@ const Shop = memo(function Shop() {
                 </button>
               </div>
             )}
-            {selectedColors.length > 0 && (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-medium">
-                <span>Colors: {selectedColors.join(', ')}</span>
-                <button 
-                  onClick={() => setSelectedColors([])}
-                  className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-            {selectedSizes.length > 0 && (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-medium">
-                <span>Sizes: {selectedSizes.join(', ')}</span>
-                <button 
-                  onClick={() => setSelectedSizes([])}
-                  className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
             <Button 
               variant="ghost" 
               size="sm" 
               onClick={() => {
                 clearFilters();
                 setPriceRange([50, 10000]);
-                setSelectedColors([]);
-                setSelectedSizes([]);
               }} 
               className="text-destructive hover:text-destructive"
             >
@@ -476,15 +407,9 @@ const Shop = memo(function Shop() {
                 onClearFilters={() => {
                   clearFilters();
                   setPriceRange([50, 10000]);
-                  setSelectedColors([]);
-                  setSelectedSizes([]);
                 }}
                 priceRange={priceRange}
                 onPriceRangeApply={setPriceRange}
-                selectedColors={selectedColors}
-                onColorsChange={setSelectedColors}
-                selectedSizes={selectedSizes}
-                onSizesChange={setSelectedSizes}
               />
             </div>
           </aside>
@@ -564,7 +489,7 @@ const Shop = memo(function Shop() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                     <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
                       <h3 className="font-semibold">{subcategory.name}</h3>
-                      <p className="text-sm text-white/80">From Rs.{subcategory.selling_price}</p>
+                      <p className="text-sm text-white/80">From Rs.{subcategory.min_selling_price}</p>
                     </div>
                   </button>
                 ))}

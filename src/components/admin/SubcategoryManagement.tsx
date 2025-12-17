@@ -28,7 +28,8 @@ interface Subcategory {
   id: string;
   name: string;
   description: string;
-  selling_price: number;
+  min_selling_price: number;
+  max_selling_price: number;
   minimum_quantity: number;
   status: 'on' | 'off';
   category_id: string;
@@ -49,7 +50,8 @@ export function SubcategoryManagement() {
     name: '',
     description: '',
     category_id: '',
-    selling_price: '',
+    min_selling_price: '',
+    max_selling_price: '',
     minimum_quantity: '',
     status: true,
   });
@@ -231,7 +233,8 @@ export function SubcategoryManagement() {
       name: formData.name,
       description: formData.description,
       category_id: formData.category_id,
-      selling_price: parseFloat(formData.selling_price),
+      min_selling_price: parseFloat(formData.min_selling_price),
+      max_selling_price: parseFloat(formData.max_selling_price) || parseFloat(formData.min_selling_price),
       minimum_quantity: parseInt(formData.minimum_quantity),
       status: formData.status ? 'on' : 'off' as 'on' | 'off',
       image_url: imageUrl,
@@ -312,7 +315,8 @@ export function SubcategoryManagement() {
       name: subcategory.name,
       description: subcategory.description,
       category_id: subcategory.category_id,
-      selling_price: subcategory.selling_price.toString(),
+      min_selling_price: subcategory.min_selling_price.toString(),
+      max_selling_price: subcategory.max_selling_price?.toString() || subcategory.min_selling_price.toString(),
       minimum_quantity: subcategory.minimum_quantity.toString(),
       status: subcategory.status === 'on',
     });
@@ -357,7 +361,8 @@ export function SubcategoryManagement() {
       name: '',
       description: '',
       category_id: '',
-      selling_price: '',
+      min_selling_price: '',
+      max_selling_price: '',
       minimum_quantity: '',
       status: true,
     });
@@ -456,17 +461,35 @@ export function SubcategoryManagement() {
                 )}
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="selling_price">Selling Price ($)</Label>
+                  <Label htmlFor="min_selling_price">Min Selling Price (Rs.)</Label>
                   <Input
-                    id="selling_price"
+                    id="min_selling_price"
                     type="number"
                     step="0.01"
-                    value={formData.selling_price}
-                    onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                    value={formData.min_selling_price}
+                    onChange={(e) => setFormData({ ...formData, min_selling_price: e.target.value })}
+                    placeholder="e.g., 100"
                     required
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Default price for products without selling price
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="max_selling_price">Max Selling Price (Rs.)</Label>
+                  <Input
+                    id="max_selling_price"
+                    type="number"
+                    step="0.01"
+                    value={formData.max_selling_price}
+                    onChange={(e) => setFormData({ ...formData, max_selling_price: e.target.value })}
+                    placeholder="e.g., 500"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Maximum price in this subcategory (optional)
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="minimum_quantity">Minimum Order Quantity (MOQ)</Label>
@@ -480,7 +503,7 @@ export function SubcategoryManagement() {
                     required
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Minimum items from this subcategory required for checkout
+                    Minimum items required for checkout
                   </p>
                 </div>
               </div>
@@ -668,8 +691,13 @@ function SubcategoryCard({
         <p className="text-xs text-muted-foreground">{subcategory.categories?.name}</p>
         <div className="mt-2 space-y-1 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Price:</span>
-            <span className="font-medium">${subcategory.selling_price}</span>
+            <span className="text-muted-foreground">Price Range:</span>
+            <span className="font-medium">
+              Rs.{subcategory.min_selling_price}
+              {subcategory.max_selling_price && subcategory.max_selling_price !== subcategory.min_selling_price 
+                ? ` - Rs.${subcategory.max_selling_price}` 
+                : ''}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">MOQ:</span>

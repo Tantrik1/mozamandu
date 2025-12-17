@@ -1286,9 +1286,10 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          max_selling_price: number | null
+          min_selling_price: number
           minimum_quantity: number
           name: string
-          selling_price: number
           status: Database["public"]["Enums"]["category_status"]
           updated_at: string | null
         }
@@ -1298,9 +1299,10 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          max_selling_price?: number | null
+          min_selling_price: number
           minimum_quantity?: number
           name: string
-          selling_price: number
           status?: Database["public"]["Enums"]["category_status"]
           updated_at?: string | null
         }
@@ -1310,9 +1312,10 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          max_selling_price?: number | null
+          min_selling_price?: number
           minimum_quantity?: number
           name?: string
-          selling_price?: number
           status?: Database["public"]["Enums"]["category_status"]
           updated_at?: string | null
         }

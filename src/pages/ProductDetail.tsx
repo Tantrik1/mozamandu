@@ -275,7 +275,7 @@ export default function ProductDetail() {
   const currentCartQuantity = getCartQuantity();
 
   // Base price from product or subcategory
-  const basePrice = product?.selling_price || subcategory?.selling_price || 0;
+  const basePrice = product?.selling_price || subcategory?.min_selling_price || 0;
 
   // Calculate total quantity in cart for this subcategory (including current selection)
   const getTotalSubcategoryQuantityWithCurrent = () => {
@@ -326,7 +326,7 @@ export default function ProductDetail() {
         quantity,
         colorVariantId: selectedColor || undefined,
         sizeVariantId: selectedSize || undefined,
-        unitPrice: product.selling_price || subcategory?.selling_price || 0,
+        unitPrice: product.selling_price || subcategory?.min_selling_price || 0,
       });
       
       toast({
@@ -354,14 +354,14 @@ export default function ProductDetail() {
       quantity,
       colorVariantId: selectedColor || undefined,
       sizeVariantId: selectedSize || undefined,
-      unitPrice: product.selling_price || subcategory?.selling_price || 0,
+      unitPrice: product.selling_price || subcategory?.min_selling_price || 0,
     });
     
     if (!added) return;
     
     // Calculate the new cart total after adding
     const currentCartTotal = cartItems.reduce((total, item) => total + item.totalPrice, 0);
-    const itemPrice = product.selling_price || subcategory?.selling_price || 0;
+    const itemPrice = product.selling_price || subcategory?.min_selling_price || 0;
     const newTotal = currentCartTotal + (itemPrice * quantity);
     
     // Check if MOQ is bypassed (total >= 1000)

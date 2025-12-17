@@ -20,7 +20,7 @@ interface Product {
   stock_quantity: number;
   subcategories: {
     name: string;
-    selling_price: number;
+    min_selling_price: number;
   } | null;
 }
 
@@ -35,7 +35,7 @@ const LatestProducts = memo(() => {
         .from('products')
         .select(`
           *,
-          subcategories(name, selling_price)
+          subcategories(name, min_selling_price)
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
@@ -118,7 +118,7 @@ const LatestProducts = memo(() => {
               >
                 <ModernProductCard
                   product={product}
-                  subcategorySellingPrice={product.subcategories?.selling_price || 0}
+                  subcategorySellingPrice={product.subcategories?.min_selling_price || 0}
                 />
               </CarouselItem>
             ))}
