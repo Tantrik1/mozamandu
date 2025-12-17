@@ -6,6 +6,7 @@ import { AuthProvider } from '@/components/auth/AuthProvider';
 import { RobustCartProvider } from '@/hooks/useRobustCart';
 import { RouteGuard } from '@/components/RouteGuard';
 import ScrollToTop from '@/components/ScrollToTop';
+import { ProductChatbot } from '@/components/chatbot';
 
 // Lazy load pages with preloading support
 const Home = lazy(() => import('@/pages/Home'));
@@ -67,6 +68,7 @@ function App() {
             <ScrollToTop />
             <Toaster />
             <Suspense fallback={<PageLoader />}>
+              <ProductChatbot />
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/auth" element={<Auth />} />
