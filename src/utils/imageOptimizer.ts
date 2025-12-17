@@ -11,13 +11,35 @@ export interface ImageOptimizationOptions {
   quality?: number;
 }
 
+// Aggressive compression defaults for fast page loads
 const DEFAULT_OPTIONS: ImageOptimizationOptions = {
-  maxSizeMB: 1, // Target 1MB to stay well under 2MB limit
-  maxWidthOrHeight: 1920,
-  quality: 0.85,
+  maxSizeMB: 0.3, // Target 300KB for most images
+  maxWidthOrHeight: 1200,
+  quality: 0.75,
 };
 
-const MAX_FILE_SIZE_MB = 2;
+// Preset for high compression (notices, banners)
+export const HIGH_COMPRESSION: ImageOptimizationOptions = {
+  maxSizeMB: 0.2, // Target 200KB for notices/banners
+  maxWidthOrHeight: 1200,
+  quality: 0.7,
+};
+
+// Preset for product images (balance quality and size)
+export const PRODUCT_COMPRESSION: ImageOptimizationOptions = {
+  maxSizeMB: 0.25, // Target 250KB
+  maxWidthOrHeight: 800,
+  quality: 0.75,
+};
+
+// Preset for thumbnails/category images
+export const THUMBNAIL_COMPRESSION: ImageOptimizationOptions = {
+  maxSizeMB: 0.15, // Target 150KB
+  maxWidthOrHeight: 600,
+  quality: 0.7,
+};
+
+const MAX_FILE_SIZE_MB = 5; // Allow larger uploads, we'll compress them
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 /**
@@ -34,7 +56,7 @@ export function validateFileSize(file: File): { valid: boolean; message?: string
 }
 
 /**
- * Converts an image file to WebP format and compresses it
+ * Converts an image file to WebP format and compresses it aggressively
  */
 export async function optimizeImage(
   file: File,
@@ -42,20 +64,21 @@ export async function optimizeImage(
 ): Promise<OptimizedImageResult> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   
-  // First validate the original file size
+  // Validate the original file size
   const validation = validateFileSize(file);
   if (!validation.valid) {
     throw new Error(validation.message);
   }
 
   try {
-    // Compress and resize the image
+    // Compress and resize the image with aggressive settings
     const compressedFile = await imageCompression(file, {
       maxSizeMB: opts.maxSizeMB!,
       maxWidthOrHeight: opts.maxWidthOrHeight!,
       useWebWorker: true,
       fileType: 'image/webp',
       initialQuality: opts.quality!,
+      alwaysKeepResolution: false,
     });
 
     // Create a new file with .webp extension
@@ -67,8 +90,12 @@ export async function optimizeImage(
     // Generate preview URL
     const preview = await generatePreview(webpFile);
 
+    const originalSizeKB = (file.size / 1024).toFixed(1);
+    const newSizeKB = (webpFile.size / 1024).toFixed(1);
+    const savings = ((1 - webpFile.size / file.size) * 100).toFixed(0);
+    
     console.log(
-      `Image optimized: ${file.name} (${(file.size / 1024).toFixed(1)}KB) → ${webpFile.name} (${(webpFile.size / 1024).toFixed(1)}KB)`
+      `Image optimized: ${file.name} (${originalSizeKB}KB) → ${webpFile.name} (${newSizeKB}KB) - ${savings}% smaller`
     );
 
     return {

@@ -88,13 +88,10 @@ export const CategoryManagement = memo(function CategoryManagement() {
 
   const uploadImage = async (file: File): Promise<string | null> => {
     try {
-      const { prepareImageForUpload } = await import('@/utils/imageOptimizer');
+      const { prepareImageForUpload, THUMBNAIL_COMPRESSION } = await import('@/utils/imageOptimizer');
       
-      const { file: optimizedFile } = await prepareImageForUpload(file, {
-        maxSizeMB: 1,
-        maxWidthOrHeight: 800,
-        quality: 0.85,
-      });
+      // Use aggressive thumbnail compression for category images (~150KB)
+      const { file: optimizedFile } = await prepareImageForUpload(file, THUMBNAIL_COMPRESSION);
 
       const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.webp`;
 
