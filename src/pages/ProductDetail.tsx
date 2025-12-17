@@ -189,12 +189,20 @@ export default function ProductDetail() {
     return imgs;
   }, [product?.image_url, additionalImages, colorVariants]);
 
-  // Set initial color selection
+  // Reset selections when product changes
+  useEffect(() => {
+    setSelectedColor('');
+    setSelectedSize('');
+    setSizeVariants([]);
+    setQuantity(1);
+  }, [productId]);
+
+  // Set initial color selection when colorVariants load
   useEffect(() => {
     if (colorVariants.length > 0 && !selectedColor) {
       setSelectedColor(colorVariants[0].id);
     }
-  }, [colorVariants, selectedColor]);
+  }, [colorVariants]);
 
   // Fetch size variants when color changes
   useEffect(() => {
