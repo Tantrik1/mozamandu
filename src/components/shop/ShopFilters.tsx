@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, FolderOpen, Tag, X, Palette, Ruler } from 'lucide-react';
+import { ChevronDown, FolderOpen, Tag, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
 interface Category {
@@ -16,19 +15,7 @@ interface Subcategory {
   id: string;
   name: string;
   category_id: string;
-  selling_price: number;
-}
-
-interface Color {
-  id: string;
-  name: string;
-  hex_code: string | null;
-}
-
-interface Size {
-  id: string;
-  name: string;
-  code: string | null;
+  min_selling_price: number;
 }
 
 interface ShopFiltersProps {
@@ -40,10 +27,6 @@ interface ShopFiltersProps {
   onClearFilters: () => void;
   priceRange: [number, number];
   onPriceRangeApply: (range: [number, number]) => void;
-  selectedColors?: string[];
-  onColorsChange?: (colors: string[]) => void;
-  selectedSizes?: string[];
-  onSizesChange?: (sizes: string[]) => void;
 }
 
 const MIN_PRICE = 50;
@@ -58,30 +41,11 @@ export function ShopFilters({
   onClearFilters,
   priceRange,
   onPriceRangeApply,
-  selectedColors = [],
-  onColorsChange,
-  selectedSizes = [],
-  onSizesChange,
 }: ShopFiltersProps) {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [minInput, setMinInput] = useState(priceRange[0].toString());
   const [maxInput, setMaxInput] = useState(priceRange[1].toString());
-  const [colors, setColors] = useState<Color[]>([]);
-  const [sizes, setSizes] = useState<Size[]>([]);
-
-  // Fetch colors and sizes
-  useEffect(() => {
-    const fetchFilters = async () => {
-      const [colorsRes, sizesRes] = await Promise.all([
-        supabase.from('colors').select('id, name, hex_code').eq('is_active', true).order('name'),
-        supabase.from('sizes').select('id, name, code').eq('is_active', true).order('sort_order')
-      ]);
-      if (colorsRes.data) setColors(colorsRes.data);
-      if (sizesRes.data) setSizes(sizesRes.data);
-    };
-    fetchFilters();
-  }, []);
 
   // Sync local state when prop changes
   useEffect(() => {
@@ -100,7 +64,7 @@ export function ShopFilters({
   const fetchSubcategories = async (categoryId: string) => {
     const { data } = await supabase
       .from('subcategories')
-      .select('id, name, category_id, selling_price')
+      .select('id, name, category_id, min_selling_price')
       .eq('status', 'on')
       .eq('category_id', categoryId)
       .order('name');
@@ -142,39 +106,19 @@ export function ShopFilters({
     onPriceRangeApply([MIN_PRICE, MAX_PRICE]);
   };
 
-  const toggleColor = (colorName: string) => {
-    if (!onColorsChange) return;
-    const newColors = selectedColors.includes(colorName)
-      ? selectedColors.filter(c => c !== colorName)
-      : [...selectedColors, colorName];
-    onColorsChange(newColors);
-  };
-
-  const toggleSize = (sizeName: string) => {
-    if (!onSizesChange) return;
-    const newSizes = selectedSizes.includes(sizeName)
-      ? selectedSizes.filter(s => s !== sizeName)
-      : [...selectedSizes, sizeName];
-    onSizesChange(newSizes);
-  };
-
   const hasActiveFilters = selectedCategoryId || selectedSubcategoryId;
   const hasPriceFilter = priceRange[0] !== MIN_PRICE || priceRange[1] !== MAX_PRICE;
-  const hasColorFilter = selectedColors.length > 0;
-  const hasSizeFilter = selectedSizes.length > 0;
 
   return (
     <div className="space-y-6">
       {/* Clear Filters */}
-      {(hasActiveFilters || hasPriceFilter || hasColorFilter || hasSizeFilter) && (
+      {(hasActiveFilters || hasPriceFilter) && (
         <Button
           variant="outline"
           size="sm"
           onClick={() => {
             onClearFilters();
             handleClearPrice();
-            onColorsChange?.([]);
-            onSizesChange?.([]);
           }}
           className="w-full justify-start text-destructive hover:text-destructive"
         >
@@ -289,80 +233,6 @@ export function ShopFilters({
           Apply
         </Button>
       </div>
-
-      {/* Colors Filter */}
-      {colors.length > 0 && onColorsChange && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Palette className="w-4 h-4" />
-              Colors
-            </h3>
-            {hasColorFilter && (
-              <button 
-                onClick={() => onColorsChange([])}
-                className="text-xs text-muted-foreground hover:text-destructive transition-colors"
-              >
-                Reset
-              </button>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-            {colors.map((color) => (
-              <label
-                key={color.id}
-                className="flex items-center gap-2 cursor-pointer text-sm hover:bg-accent px-2 py-1.5 rounded"
-              >
-                <Checkbox
-                  checked={selectedColors.includes(color.name)}
-                  onCheckedChange={() => toggleColor(color.name)}
-                />
-                <div
-                  className="w-4 h-4 rounded-full border border-border shrink-0"
-                  style={{ backgroundColor: color.hex_code || '#ccc' }}
-                />
-                <span className="truncate">{color.name}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Sizes Filter */}
-      {sizes.length > 0 && onSizesChange && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Ruler className="w-4 h-4" />
-              Sizes
-            </h3>
-            {hasSizeFilter && (
-              <button 
-                onClick={() => onSizesChange([])}
-                className="text-xs text-muted-foreground hover:text-destructive transition-colors"
-              >
-                Reset
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {sizes.map((size) => (
-              <button
-                key={size.id}
-                onClick={() => toggleSize(size.name)}
-                className={cn(
-                  "px-3 py-1.5 text-sm rounded-md border transition-colors",
-                  selectedSizes.includes(size.name)
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "border-border hover:bg-accent"
-                )}
-              >
-                {size.code || size.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

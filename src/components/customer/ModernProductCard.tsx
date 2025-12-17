@@ -63,10 +63,10 @@ export const ModernProductCard = memo(function ModernProductCard({ product, subc
     queryFn: async () => {
       const { data } = await supabase
         .from('subcategories')
-        .select('selling_price')
+        .select('min_selling_price')
         .eq('id', product.subcategory_id)
         .single();
-      return data?.selling_price || subcategorySellingPrice;
+      return data?.min_selling_price || subcategorySellingPrice;
     },
     staleTime: 10 * 60 * 1000, // 10 minutes - rarely changes
     gcTime: 30 * 60 * 1000,

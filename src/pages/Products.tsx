@@ -23,7 +23,7 @@ interface Product {
   } | null;
   subcategories: {
     name: string;
-    selling_price: number;
+    min_selling_price: number;
   } | null;
 }
 
@@ -45,7 +45,7 @@ export default function Products() {
           *,
            subcategory_id,
           categories(name),
-          subcategories(name, selling_price)
+          subcategories(name, min_selling_price)
         `)
         .eq('status', 'active');
 
@@ -120,7 +120,7 @@ export default function Products() {
             <ModernProductCard
               key={product.id}
               product={product}
-              subcategorySellingPrice={product.subcategories?.selling_price || 0}
+              subcategorySellingPrice={product.subcategories?.min_selling_price || 0}
             />
           ))}
         </div>

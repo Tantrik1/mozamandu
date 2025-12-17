@@ -13,7 +13,7 @@ interface MoreSubcategoriesProps {
 const fetchMoreSubcategories = async (categoryId: string, currentSubcategoryId: string) => {
   const { data } = await supabase
     .from('subcategories')
-    .select('id, name, image_url, selling_price')
+    .select('id, name, image_url, min_selling_price')
     .eq('category_id', categoryId)
     .eq('status', 'on')
     .neq('id', currentSubcategoryId)
@@ -98,7 +98,7 @@ export const MoreSubcategories = memo(function MoreSubcategories({ categoryId, c
                     {subcategory.name}
                   </h3>
                   <p className="text-white/70 text-xs mt-0.5">
-                    From Rs. {subcategory.selling_price}
+                    From Rs. {subcategory.min_selling_price}
                   </p>
                 </div>
               </div>
