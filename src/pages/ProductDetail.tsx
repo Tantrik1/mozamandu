@@ -28,6 +28,8 @@ interface Product {
   category_id: string;
   subcategory_id: string;
   status: string;
+  material_composition: string | null;
+  care_instructions: string[] | null;
 }
 
 interface ColorVariant {
@@ -410,9 +412,6 @@ export default function ProductDetail() {
               subcategoryName={subcategory?.name}
               subcategoryId={subcategory?.id}
               basePrice={basePrice}
-              discountedPrice={discountedPrice}
-              discountPercent={discountPercent}
-              savings={savings}
               stock={productStock}
               quantity={quantity}
               cartQuantity={currentCartQuantity}
@@ -425,6 +424,13 @@ export default function ProductDetail() {
               hasSizeVariants={product.color_has_size_variants || false}
               averageRating={Number(ratingData?.average_rating) || 0}
               reviewCount={ratingData?.review_count || 0}
+              cartItems={cartItems.map(item => ({
+                productId: item.productId,
+                quantity: item.quantity,
+                subcategoryId: item.subcategoryId,
+                basePrice: item.basePrice,
+                totalPrice: item.totalPrice
+              }))}
               onQuantityChange={setQuantity}
               onColorChange={setSelectedColor}
               onSizeChange={setSelectedSize}
@@ -436,7 +442,8 @@ export default function ProductDetail() {
             {/* Product Details Accordion */}
             <ProductDetailsAccordion
               description={product.description}
-              subcategoryDescription={subcategory?.description}
+              materialComposition={product.material_composition}
+              careInstructions={product.care_instructions}
             />
           </div>
         </div>
