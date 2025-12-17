@@ -23,6 +23,7 @@ interface Order {
   created_at: string;
   user_id: string | null;
   user_role?: string;
+  isGuestOrder?: boolean; // Track if order is from guest (orders table) vs customer (customer_orders table)
 }
 
 export function AdminOrdersPage() {
@@ -39,31 +40,39 @@ export function AdminOrdersPage() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      console.log('Fetching all customer orders...');
+      console.log('Fetching all orders from both tables...');
       
-      // Fetch all customer orders from the unified table
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('customer_orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Fetch from both customer_orders and orders tables in parallel
+      const [customerOrdersResult, guestOrdersResult] = await Promise.all([
+        supabase
+          .from('customer_orders')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('orders')
+          .select('*')
+          .order('created_at', { ascending: false })
+      ]);
 
-      if (ordersError) {
-        console.error('Error fetching customer orders:', ordersError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch orders: " + ordersError.message,
-          variant: "destructive",
-        });
-        return;
+      if (customerOrdersResult.error) {
+        console.error('Error fetching customer orders:', customerOrdersResult.error);
+      }
+      
+      if (guestOrdersResult.error) {
+        console.error('Error fetching guest orders:', guestOrdersResult.error);
       }
 
-      console.log('Fetched customer orders count:', ordersData?.length || 0);
+      const customerOrders = customerOrdersResult.data || [];
+      const guestOrders = guestOrdersResult.data || [];
 
-      // Get unique user IDs that are not null
-      const userIds = ordersData
-        ?.filter(order => order.user_id)
+      console.log('Fetched customer orders count:', customerOrders.length);
+      console.log('Fetched guest orders count:', guestOrders.length);
+
+      // Get unique user IDs that are not null from customer orders
+      const userIds = customerOrders
+        .filter(order => order.user_id)
         .map(order => order.user_id)
-        .filter((id, index, array) => array.indexOf(id) === index) || [];
+        .filter((id, index, array) => array.indexOf(id) === index);
       
       let profilesMap: { [key: string]: { role: string } } = {};
       
@@ -78,7 +87,6 @@ export function AdminOrdersPage() {
           if (profilesError) {
             console.error('Error fetching profiles:', profilesError);
           } else {
-            // Create a map for quick lookup
             profilesMap = (profiles || []).reduce((acc, profile) => {
               acc[profile.id] = { role: profile.role };
               return acc;
@@ -89,14 +97,26 @@ export function AdminOrdersPage() {
         }
       }
 
-      // Transform orders with profile data
-      const transformedOrders = ordersData?.map(order => ({
+      // Transform customer orders with profile data
+      const transformedCustomerOrders = customerOrders.map(order => ({
         ...order,
-        user_role: order.user_id ? profilesMap[order.user_id]?.role || 'customer' : null
-      })) || [];
+        user_role: order.user_id ? profilesMap[order.user_id]?.role || 'customer' : null,
+        isGuestOrder: false
+      }));
 
-      console.log('Final transformed orders:', transformedOrders.length);
-      setOrders(transformedOrders);
+      // Transform guest orders
+      const transformedGuestOrders = guestOrders.map(order => ({
+        ...order,
+        user_role: 'guest',
+        isGuestOrder: true
+      }));
+
+      // Combine and sort by created_at descending
+      const allOrders = [...transformedCustomerOrders, ...transformedGuestOrders]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      console.log('Final combined orders:', allOrders.length);
+      setOrders(allOrders);
     } catch (error) {
       console.error('Unexpected error fetching orders:', error);
       toast({
@@ -114,8 +134,14 @@ export function AdminOrdersPage() {
     try {
       console.log('Updating order status:', orderId, 'to', newStatus);
       
+      // Find the order to determine which table to update
+      const order = orders.find(o => o.id === orderId);
+      const tableName = order?.isGuestOrder ? 'orders' : 'customer_orders';
+      
+      console.log('Updating in table:', tableName);
+      
       const { error } = await supabase
-        .from('customer_orders')
+        .from(tableName)
         .update({ 
           status: newStatus as 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled', 
           updated_at: new Date().toISOString() 
