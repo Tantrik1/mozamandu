@@ -103,13 +103,17 @@ export function useInventoryManager() {
     }
   };
 
-  const reserveStock = async (orderId: string) => {
+  const reserveStock = async (orderId: string, isCustomerOrder: boolean = true) => {
     try {
-      console.log('🔒 Starting robust stock reservation for order:', orderId);
+      console.log('🔒 Starting robust stock reservation for order:', orderId, 'isCustomerOrder:', isCustomerOrder);
+      
+      // Determine which tables to query based on order type
+      const ordersTable = isCustomerOrder ? 'customer_orders' : 'orders';
+      const orderItemDetailsTable = isCustomerOrder ? 'customer_order_item_details' : 'order_item_details';
       
       // Get order details for logging
       const { data: orderData, error: orderError } = await supabase
-        .from('customer_orders')
+        .from(ordersTable)
         .select('order_number')
         .eq('id', orderId)
         .single();
@@ -118,7 +122,7 @@ export function useInventoryManager() {
       
       // Get all order items for this order
       const { data: orderItems, error: itemsError } = await supabase
-        .from('customer_order_item_details')
+        .from(orderItemDetailsTable)
         .select('product_inventory_id, sku, quantity, product_name')
         .eq('order_id', orderId);
       
@@ -274,13 +278,16 @@ export function useInventoryManager() {
     }
   };
 
-  const releaseStock = async (orderId: string) => {
+  const releaseStock = async (orderId: string, isCustomerOrder: boolean = true) => {
     try {
-      console.log('🔓 Starting robust stock release for order:', orderId);
+      console.log('🔓 Starting robust stock release for order:', orderId, 'isCustomerOrder:', isCustomerOrder);
+      
+      // Determine which table to query based on order type
+      const orderItemDetailsTable = isCustomerOrder ? 'customer_order_item_details' : 'order_item_details';
       
       // Get all order items for this order
       const { data: orderItems, error: itemsError } = await supabase
-        .from('customer_order_item_details')
+        .from(orderItemDetailsTable)
         .select('product_inventory_id, sku, quantity, product_name')
         .eq('order_id', orderId);
       
@@ -377,13 +384,16 @@ export function useInventoryManager() {
     }
   };
 
-  const fulfillStock = async (orderId: string) => {
+  const fulfillStock = async (orderId: string, isCustomerOrder: boolean = true) => {
     try {
-      console.log('📦 Starting robust stock fulfillment for order:', orderId);
+      console.log('📦 Starting robust stock fulfillment for order:', orderId, 'isCustomerOrder:', isCustomerOrder);
+      
+      // Determine which table to query based on order type
+      const orderItemDetailsTable = isCustomerOrder ? 'customer_order_item_details' : 'order_item_details';
       
       // Get all order items for this order
       const { data: orderItems, error: itemsError } = await supabase
-        .from('customer_order_item_details')
+        .from(orderItemDetailsTable)
         .select('product_inventory_id, sku, quantity, product_name')
         .eq('order_id', orderId);
       

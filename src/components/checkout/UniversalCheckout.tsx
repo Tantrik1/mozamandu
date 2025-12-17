@@ -418,6 +418,14 @@ export function UniversalCheckout() {
 
       console.log('📝 Creating order with validated inventory data...');
       
+      // Determine which tables to use based on authentication status
+      const isCustomerOrder = !!user;
+      const ordersTable = isCustomerOrder ? 'customer_orders' : 'orders';
+      const orderItemsTable = isCustomerOrder ? 'customer_order_items' : 'order_items';
+      const orderItemDetailsTable = isCustomerOrder ? 'customer_order_item_details' : 'order_item_details';
+      
+      console.log(`📋 Using tables: ${ordersTable}, ${orderItemsTable}, ${orderItemDetailsTable} (isCustomerOrder: ${isCustomerOrder})`);
+      
       const orderData = {
         user_id: user?.id || null,
         customer_name: customerInfo.name,
@@ -443,7 +451,7 @@ export function UniversalCheckout() {
       console.log('📋 Order data being sent:', orderData);
       
       const { data: createdOrder, error: orderError } = await supabase
-        .from('customer_orders')
+        .from(ordersTable)
         .insert(orderData)
         .select()
         .single();
@@ -462,7 +470,7 @@ export function UniversalCheckout() {
       }));
 
       const { error: orderItemsError } = await supabase
-        .from('customer_order_items')
+        .from(orderItemsTable)
         .insert(orderItemsToInsert);
 
       if (orderItemsError) {
@@ -512,7 +520,7 @@ export function UniversalCheckout() {
       console.log('📝 Enhanced order item details with validated inventory IDs:', orderItemDetailsToInsert.length);
 
       const { error: orderItemDetailsError } = await supabase
-        .from('customer_order_item_details')
+        .from(orderItemDetailsTable)
         .insert(orderItemDetailsToInsert);
 
       if (orderItemDetailsError) {
@@ -522,7 +530,7 @@ export function UniversalCheckout() {
 
       console.log('🔒 Reserving stock immediately for order:', createdOrder.id);
       try {
-        await reserveStock(createdOrder.id);
+        await reserveStock(createdOrder.id, isCustomerOrder);
         console.log('✅ Stock reserved successfully for order:', createdOrder.id);
         toast({
           title: 'Order Placed Successfully!',
@@ -546,7 +554,7 @@ export function UniversalCheckout() {
           body: {
             type: 'order_created',
             orderId: createdOrder.id,
-            isCustomerOrder: true
+            isCustomerOrder: isCustomerOrder
           }
         });
 
