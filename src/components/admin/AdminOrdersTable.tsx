@@ -21,6 +21,7 @@ interface Order {
   created_at: string;
   user_id: string | null;
   user_role?: string;
+  isGuestOrder?: boolean;
 }
 
 interface AdminOrdersTableProps {
@@ -50,7 +51,7 @@ export function AdminOrdersTable({
   };
 
   const getOrderType = (order: Order) => {
-    if (!order.user_id) return 'Guest';
+    if (order.isGuestOrder || !order.user_id) return 'Guest';
     if (order.user_role === 'admin') return 'Admin';
     return 'Customer';
   };
@@ -66,19 +67,24 @@ export function AdminOrdersTable({
 
   const { reserveStock, releaseStock, fulfillStock } = useInventoryManager();
 
-  const handleInventoryUpdate = async (orderId: string, newStatus: string, oldStatus: string) => {
+  const handleInventoryUpdate = async (
+    orderId: string,
+    newStatus: string,
+    oldStatus: string,
+    isCustomerOrder: boolean
+  ) => {
     try {
       console.log('🔄 Checking inventory update for order:', orderId, 'from', oldStatus, 'to', newStatus);
-      
+
       // Only handle inventory for specific status changes
       if (newStatus === 'delivered' && oldStatus !== 'delivered') {
         // Fulfill stock: reduce both reserved and total stock
         console.log('📦 Fulfilling stock for delivery...');
-        await fulfillStock(orderId);
+        await fulfillStock(orderId, isCustomerOrder);
       } else if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
         // Release stock: only reduce reserved stock, keep total stock
         console.log('🔓 Releasing reserved stock for cancellation...');
-        await releaseStock(orderId);
+        await releaseStock(orderId, isCustomerOrder);
       } else {
         // No inventory changes needed for other status transitions
         console.log('ℹ️ No inventory changes required for this status transition');
@@ -97,21 +103,22 @@ export function AdminOrdersTable({
     if (!order) return;
 
     const oldStatus = order.status;
-    
+    const isCustomerOrder = !order.isGuestOrder;
+
     try {
       // Handle inventory changes first
-      await handleInventoryUpdate(orderId, newStatus, oldStatus);
-      
+      await handleInventoryUpdate(orderId, newStatus, oldStatus, isCustomerOrder);
+
       // Update order status in database
       await onUpdateStatus(orderId, newStatus);
-      
+
       // Send status update email
       console.log('Sending status update email...');
       const { error: emailError } = await supabase.functions.invoke('send-order-email', {
         body: {
           type: 'status_updated',
           orderId: orderId,
-          isCustomerOrder: true,
+          isCustomerOrder,
           oldStatus: oldStatus,
           newStatus: newStatus
         }
@@ -190,7 +197,7 @@ export function AdminOrdersTable({
   };
 
   const handleViewOrder = (orderId: string) => {
-    navigate(`/customer-order-summary/${orderId}`);
+    navigate(`/order-summary/${orderId}`);
   };
 
   return (
