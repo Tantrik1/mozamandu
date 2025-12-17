@@ -40,7 +40,7 @@ const fetchMostSoldProducts = async () => {
 const fetchCategories = async () => {
   const { data } = await supabase
     .from('categories')
-    .select(`id, name, description, subcategories(image_url)`)
+    .select(`id, name, description, image_url, subcategories(image_url, min_selling_price)`)
     .eq('status', 'on')
     .limit(6);
   return data || [];
