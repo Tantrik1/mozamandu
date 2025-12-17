@@ -19,11 +19,10 @@ const fetchMixedProducts = async () => {
     .from('products')
     .select('id, name, image_url, selling_price, cost_price, subcategory:subcategories(name)')
     .eq('status', 'active')
-    .limit(12);
+    .limit(8); // Reduced limit
   
   // Shuffle the products for random order
-  const shuffled = (data || []).sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, 8);
+  return (data || []).sort(() => Math.random() - 0.5).slice(0, 4); // Show only 4
 };
 
 export const MixedProducts = memo(function MixedProducts() {
@@ -37,11 +36,8 @@ export const MixedProducts = memo(function MixedProducts() {
     return (
       <section className="py-10 md:py-12 lg:py-16 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10">
-            <div className="h-8 w-48 bg-muted rounded mx-auto animate-pulse" />
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
-            {[...Array(8)].map((_, i) => (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
+            {[...Array(4)].map((_, i) => (
               <div key={i} className="aspect-square bg-muted rounded-2xl animate-pulse" />
             ))}
           </div>
@@ -56,7 +52,7 @@ export const MixedProducts = memo(function MixedProducts() {
     <section className="py-10 md:py-12 lg:py-16 bg-muted/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center mb-6 md:mb-8 animate-fade-in">
+        <div className="text-center mb-6 md:mb-8">
           <div className="inline-flex items-center gap-2 text-primary text-sm font-medium mb-3 bg-primary/10 px-4 py-1.5 rounded-full">
             <Sparkles className="w-4 h-4" />
             Discover More
@@ -70,13 +66,12 @@ export const MixedProducts = memo(function MixedProducts() {
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-8">
-          {products.map((product, index) => (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-8">
+          {products.map((product) => (
             <Link
               key={product.id}
               to={`/product/${product.id}`}
-              className="group animate-fade-in"
-              style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'backwards' }}
+              className="group"
             >
               <div className="relative aspect-square rounded-2xl overflow-hidden bg-card border border-border/50 shadow-sm hover:shadow-xl transition-all duration-500">
                 {product.image_url ? (
@@ -85,6 +80,9 @@ export const MixedProducts = memo(function MixedProducts() {
                     alt={product.name}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     loading="lazy"
+                    decoding="async"
+                    width={300}
+                    height={300}
                   />
                 ) : (
                   <div className="w-full h-full bg-muted flex items-center justify-center">
@@ -127,7 +125,7 @@ export const MixedProducts = memo(function MixedProducts() {
         </div>
 
         {/* Shop More CTA */}
-        <div className="text-center animate-fade-in" style={{ animationDelay: '0.4s', animationFillMode: 'backwards' }}>
+        <div className="text-center">
           <Button asChild size="lg" className="rounded-full gap-2 px-10 shadow-lg hover:shadow-xl transition-all">
             <Link to="/shop">
               Shop More
