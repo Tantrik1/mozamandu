@@ -215,21 +215,25 @@ export default function ProductDetail() {
     }
   };
 
-  // Cart quantity calculation
+  // Cart quantity calculation - handle undefined/null/empty string consistently
   const getCartQuantity = () => {
     const cartItem = cartItems.find(item => {
       const productMatch = item.productId === product?.id;
-      const colorMatch = item.colorVariantId === (selectedColor || null);
-      const sizeMatch = item.sizeVariantId === (selectedSize || null);
+      
+      // Normalize values - treat undefined, null, and empty string as equivalent
+      const itemColorId = item.colorVariantId || null;
+      const itemSizeId = item.sizeVariantId || null;
+      const currentColorId = selectedColor || null;
+      const currentSizeId = selectedSize || null;
       
       if (!product?.has_color_variants) {
-        return productMatch && !item.colorVariantId && !item.sizeVariantId;
+        return productMatch && !itemColorId && !itemSizeId;
       }
       if (product?.has_color_variants && !product?.color_has_size_variants) {
-        return productMatch && colorMatch && !item.sizeVariantId;
+        return productMatch && itemColorId === currentColorId && !itemSizeId;
       }
       if (product?.has_color_variants && product?.color_has_size_variants) {
-        return productMatch && colorMatch && sizeMatch;
+        return productMatch && itemColorId === currentColorId && itemSizeId === currentSizeId;
       }
       return productMatch;
     });
@@ -276,6 +280,7 @@ export default function ProductDetail() {
     
     setActionLoading(true);
     try {
+      // useRobustCart already shows toast on success/failure
       await addToCart({
         productId: product.id,
         productName: product.name,
@@ -284,17 +289,10 @@ export default function ProductDetail() {
         sizeVariantId: selectedSize || undefined,
         unitPrice: product.selling_price || subcategory?.min_selling_price || 0,
       });
-      
-      toast({
-        title: 'Added to Cart',
-        description: `${quantity} ${product.name} added to your cart`,
-      });
+      // Reset quantity after adding
+      setQuantity(1);
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to add to cart',
-        variant: 'destructive'
-      });
+      // Error toast already handled by useRobustCart
     } finally {
       setActionLoading(false);
     }
