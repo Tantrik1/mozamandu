@@ -7,6 +7,214 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 
+const INTERNAL_ROUTES = new Set([
+  '/shop',
+  '/products',
+  '/contact',
+  '/about',
+  '/faq',
+  '/privacy',
+  '/terms',
+  '/shipping',
+  '/auth',
+  '/dashboard',
+  '/admin',
+  '/admin/chatbot-knowledge',
+  '/admin/settings',
+  '/admin/analytics',
+  '/admin/analytics-settings',
+]);
+
+const ROUTE_LABELS: Record<string, string> = {
+  '/contact': 'Contact',
+};
+
+function renderInlineMarkdown(text: string) {
+  const parts: Array<{ type: 'text' | 'bold'; value: string }> = [];
+  const boldRegex = /\*\*([^*]+)\*\*/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = boldRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', value: text.slice(lastIndex, match.index) });
+    }
+    parts.push({ type: 'bold', value: match[1] });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({ type: 'text', value: text.slice(lastIndex) });
+  }
+
+  return parts.map((p, idx) =>
+    p.type === 'bold' ? (
+      <strong key={idx} className="font-semibold">
+        {p.value}
+      </strong>
+    ) : (
+      <span key={idx}>{p.value}</span>
+    )
+  );
+}
+
+function renderInlineMarkdownWithLinks(text: string, onInternalNavigate?: () => void) {
+  const parts: Array<{ type: 'text' | 'bold'; value: string }> = [];
+  const boldRegex = /\*\*([^*]+)\*\*/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = boldRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', value: text.slice(lastIndex, match.index) });
+    }
+    parts.push({ type: 'bold', value: match[1] });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({ type: 'text', value: text.slice(lastIndex) });
+  }
+
+  return parts.map((p, idx) =>
+    p.type === 'bold' ? (
+      <strong key={idx} className="font-semibold">
+        {renderLinkifiedText(p.value, onInternalNavigate)}
+      </strong>
+    ) : (
+      <span key={idx}>{renderLinkifiedText(p.value, onInternalNavigate)}</span>
+    )
+  );
+}
+
+function renderLinkifiedText(text: string, onInternalNavigate?: () => void) {
+  const parts: React.ReactNode[] = [];
+  const tokenRegex = /(https?:\/\/[^\s)]+)|(\/[a-zA-Z0-9][a-zA-Z0-9\/-]*)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = tokenRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+
+    const token = match[0];
+
+    // External URL
+    if (token.startsWith('http://') || token.startsWith('https://')) {
+      parts.push(
+        <a
+          key={`${match.index}-${token}`}
+          href={token}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 text-primary hover:text-primary/80"
+        >
+          {token}
+        </a>
+      );
+      lastIndex = match.index + token.length;
+      continue;
+    }
+
+    // Internal route
+    if (token.startsWith('/') && (INTERNAL_ROUTES.has(token) || token.startsWith('/admin'))) {
+      const label = ROUTE_LABELS[token] ?? token;
+      parts.push(
+        <Link
+          key={`${match.index}-${token}`}
+          to={token}
+          onClick={onInternalNavigate}
+          className="underline underline-offset-2 text-primary hover:text-primary/80"
+        >
+          {label}
+        </Link>
+      );
+      lastIndex = match.index + token.length;
+      continue;
+    }
+
+    // Fallback: leave as plain text (e.g. unknown /path)
+    parts.push(token);
+    lastIndex = match.index + token.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.map((p, idx) => (typeof p === 'string' ? <span key={idx}>{p}</span> : p));
+}
+
+function renderMarkdownLite(content: string, onInternalNavigate?: () => void) {
+  const lines = content.split(/\r?\n/);
+  const blocks: Array<{ type: 'p' | 'ul'; lines: string[] }> = [];
+
+  let currentPara: string[] = [];
+  let currentList: string[] = [];
+
+  const flushPara = () => {
+    if (currentPara.length) {
+      blocks.push({ type: 'p', lines: [...currentPara] });
+      currentPara = [];
+    }
+  };
+
+  const flushList = () => {
+    if (currentList.length) {
+      blocks.push({ type: 'ul', lines: [...currentList] });
+      currentList = [];
+    }
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    const isBullet = /^\s*[-*]\s+/.test(line);
+
+    if (line.trim() === '') {
+      flushList();
+      flushPara();
+      continue;
+    }
+
+    if (isBullet) {
+      flushPara();
+      currentList.push(line.replace(/^\s*[-*]\s+/, ''));
+      continue;
+    }
+
+    flushList();
+    currentPara.push(line);
+  }
+
+  flushList();
+  flushPara();
+
+  return (
+    <div className="space-y-2">
+      {blocks.map((b, idx) => {
+        if (b.type === 'ul') {
+          return (
+            <ul key={idx} className="list-disc pl-5 space-y-1">
+              {b.lines.map((li, liIdx) => (
+                <li key={liIdx} className="leading-relaxed">
+                  {renderInlineMarkdownWithLinks(li, onInternalNavigate)}
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
+        return (
+          <p key={idx} className="leading-relaxed whitespace-pre-wrap">
+            {renderInlineMarkdownWithLinks(b.lines.join('\n'), onInternalNavigate)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -43,6 +251,16 @@ export function ProductChatbot() {
   const [isLoading, setIsLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Prevent background scroll on mobile when chat is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -148,7 +366,7 @@ export function ProductChatbot() {
       {/* Chat Window */}
       <div
         className={cn(
-          "fixed z-50 flex flex-col bg-background border shadow-2xl transition-all duration-300",
+          "fixed z-[1000] flex flex-col bg-background border shadow-2xl transition-all duration-300",
           // Mobile: Full screen
           "inset-0 rounded-none",
           // Tablet and up: Floating window
@@ -161,7 +379,7 @@ export function ProductChatbot() {
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-primary text-primary-foreground sm:rounded-t-2xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-primary text-primary-foreground sm:rounded-t-2xl pt-[env(safe-area-inset-top)]">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary-foreground/20">
               <Bot className="h-5 w-5" />
@@ -227,9 +445,11 @@ export function ProductChatbot() {
                       : "bg-muted rounded-tl-sm"
                   )}
                 >
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                    {message.content}
-                  </p>
+                  <div className="text-sm leading-relaxed">
+                    {message.role === 'assistant' ? renderMarkdownLite(message.content, () => setIsOpen(false)) : (
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                    )}
+                  </div>
                   
                   {/* Mentioned Products */}
                   {message.mentionedProducts && message.mentionedProducts.length > 0 && (
@@ -287,7 +507,7 @@ export function ProductChatbot() {
         </ScrollArea>
 
         {/* Input Area */}
-        <div className="p-4 border-t bg-background">
+        <div className="p-4 border-t bg-background pb-[env(safe-area-inset-bottom)]">
           <div className="flex gap-2">
             <Input
               ref={inputRef}
@@ -320,7 +540,7 @@ export function ProductChatbot() {
       {/* Backdrop for mobile */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/20 z-40 sm:hidden"
+          className="fixed inset-0 bg-black/20 z-[900] sm:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
