@@ -34,6 +34,7 @@ const preloadRoutes = () => {
   import('@/pages/Shop');
   import('@/pages/Auth');
   import('@/pages/ProductDetail');
+  import('@/pages/Checkout');
 };
 
 // Optimized QueryClient with aggressive caching
