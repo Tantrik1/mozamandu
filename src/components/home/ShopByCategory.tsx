@@ -7,7 +7,7 @@ interface Category {
   name: string;
   description: string | null;
   image_url?: string | null;
-  subcategories: { image_url: string | null }[];
+  subcategories: { image_url: string | null; min_selling_price: number }[];
 }
 
 interface ShopByCategoryProps {
@@ -48,6 +48,9 @@ export const ShopByCategory = memo(function ShopByCategory({ categories, isLoadi
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 lg:gap-6">
           {categories.map((category, index) => {
             const categoryImage = category.image_url || category.subcategories?.[0]?.image_url;
+            const lowestPrice = category.subcategories?.length > 0
+              ? Math.min(...category.subcategories.map(s => s.min_selling_price || 0).filter(p => p > 0))
+              : null;
             
             return (
               <div
@@ -88,6 +91,11 @@ export const ShopByCategory = memo(function ShopByCategory({ categories, isLoadi
                     {category.description && (
                       <p className="text-sm text-white/70 line-clamp-2 mb-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         {category.description}
+                      </p>
+                    )}
+                    {lowestPrice && lowestPrice !== Infinity && (
+                      <p className="text-sm text-white/90 mb-2">
+                        Starting from Rs. {lowestPrice.toLocaleString()}
                       </p>
                     )}
                     <div className="flex items-center gap-2 text-sm font-semibold text-white">

@@ -33,14 +33,15 @@ interface Category {
   name: string;
   description?: string;
   image_url?: string;
-  subcategories?: Subcategory[];
+  subcategories?: { min_selling_price: number }[];
 }
 
 interface Subcategory {
   id: string;
   name: string;
   image_url?: string;
-  selling_price: number;
+  min_selling_price: number;
+  max_selling_price?: number;
   category_id: string;
 }
 
@@ -62,7 +63,7 @@ type ViewMode = 'categories' | 'subcategories' | 'products';
 const fetchCategories = async () => {
   const { data } = await supabase
     .from('categories')
-    .select('id, name, description, image_url')
+    .select('id, name, description, image_url, subcategories(min_selling_price)')
     .eq('status', 'on')
     .order('name');
   return data || [];
@@ -432,39 +433,45 @@ const Shop = memo(function Shop() {
             ) : viewMode === 'categories' ? (
               /* Categories Grid - 1:1 Image Cards */
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {categories.map((category) => (
-                  <button
-                    key={category.id}
-                    onClick={() => handleCategorySelect(category.id)}
-                    className="group relative aspect-square rounded-2xl border overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/30 bg-card"
-                  >
-                    {category.image_url ? (
-                      <img
-                        src={category.image_url}
-                        alt={category.name}
-                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                        <Package className="w-12 h-12 text-muted-foreground" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                    <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                      <h3 className="font-semibold">{category.name}</h3>
-                      {category.description && (
-                        <p className="text-xs text-white/80 line-clamp-1 mt-0.5">
-                          {category.description}
-                        </p>
+                {categories.map((category) => {
+                  const lowestPrice = category.subcategories?.length 
+                    ? Math.min(...category.subcategories.map(s => s.min_selling_price || 0).filter(p => p > 0))
+                    : null;
+                  
+                  return (
+                    <button
+                      key={category.id}
+                      onClick={() => handleCategorySelect(category.id)}
+                      className="group relative aspect-square rounded-2xl border overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/30 bg-card"
+                    >
+                      {category.image_url ? (
+                        <img
+                          src={category.image_url}
+                          alt={category.name}
+                          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                          <Package className="w-12 h-12 text-muted-foreground" />
+                        </div>
                       )}
-                    </div>
-                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ChevronRight className="w-5 h-5 text-white" />
-                    </div>
-                  </button>
-                ))}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+                        <h3 className="font-semibold">{category.name}</h3>
+                        {lowestPrice && lowestPrice !== Infinity && (
+                          <p className="text-xs text-white/90 mt-0.5">
+                            Starting from Rs. {lowestPrice.toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ChevronRight className="w-5 h-5 text-white" />
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             ) : viewMode === 'subcategories' ? (
               /* Subcategories Grid */
@@ -489,7 +496,12 @@ const Shop = memo(function Shop() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                     <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
                       <h3 className="font-semibold">{subcategory.name}</h3>
-                      <p className="text-sm text-white/80">From Rs.{subcategory.min_selling_price}</p>
+                      <p className="text-xs text-white/90 mt-0.5">
+                        Rs. {subcategory.min_selling_price?.toLocaleString()}
+                        {subcategory.max_selling_price && subcategory.max_selling_price > subcategory.min_selling_price && (
+                          <> - Rs. {subcategory.max_selling_price.toLocaleString()}</>
+                        )}
+                      </p>
                     </div>
                   </button>
                 ))}
