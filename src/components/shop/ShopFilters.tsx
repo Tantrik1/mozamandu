@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, FolderOpen, Tag, X } from 'lucide-react';
+import { ChevronDown, FolderOpen, Tag, X, Palette } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+
+interface Color {
+  id: string;
+  name: string;
+  hex_code: string | null;
+}
 
 interface Category {
   id: string;
@@ -27,6 +34,12 @@ interface ShopFiltersProps {
   onClearFilters: () => void;
   priceRange: [number, number];
   onPriceRangeApply: (range: [number, number]) => void;
+  selectedColorIds?: string[];
+  onColorToggle?: (colorId: string) => void;
+  onClearColors?: () => void;
+  // Context for dynamic color filtering
+  productIds?: string[];
+  showColorFilter?: boolean;
 }
 
 const MIN_PRICE = 50;
@@ -41,11 +54,48 @@ export function ShopFilters({
   onClearFilters,
   priceRange,
   onPriceRangeApply,
+  selectedColorIds = [],
+  onColorToggle,
+  onClearColors,
+  productIds = [],
+  showColorFilter = false,
 }: ShopFiltersProps) {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [minInput, setMinInput] = useState(priceRange[0].toString());
   const [maxInput, setMaxInput] = useState(priceRange[1].toString());
+
+  // Fetch colors dynamically based on current product context (fast: uses productIds)
+  const { data: availableColors = [] } = useQuery({
+    queryKey: ['shop-colors-context', productIds],
+    queryFn: async (): Promise<Color[]> => {
+      if (productIds.length === 0) return [];
+      
+      // Get color_ids for the current products in view
+      const { data: colorVariants } = await supabase
+        .from('color_variants')
+        .select('color_id')
+        .in('product_id', productIds)
+        .not('color_id', 'is', null);
+      
+      if (!colorVariants || colorVariants.length === 0) return [];
+      
+      // Get unique color IDs
+      const uniqueColorIds = [...new Set(colorVariants.map(cv => cv.color_id))];
+      
+      // Fetch only those colors
+      const { data } = await supabase
+        .from('colors')
+        .select('id, name, hex_code')
+        .in('id', uniqueColorIds)
+        .eq('is_active', true)
+        .order('name');
+      
+      return data || [];
+    },
+    enabled: showColorFilter && productIds.length > 0,
+    staleTime: 2 * 60 * 1000,
+  });
 
   // Sync local state when prop changes
   useEffect(() => {
@@ -108,17 +158,19 @@ export function ShopFilters({
 
   const hasActiveFilters = selectedCategoryId || selectedSubcategoryId;
   const hasPriceFilter = priceRange[0] !== MIN_PRICE || priceRange[1] !== MAX_PRICE;
+  const hasColorFilter = selectedColorIds.length > 0;
 
   return (
     <div className="space-y-6">
       {/* Clear Filters */}
-      {(hasActiveFilters || hasPriceFilter) && (
+      {(hasActiveFilters || hasPriceFilter || hasColorFilter) && (
         <Button
           variant="outline"
           size="sm"
           onClick={() => {
             onClearFilters();
             handleClearPrice();
+            onClearColors?.();
           }}
           className="w-full justify-start text-destructive hover:text-destructive"
         >
@@ -188,6 +240,51 @@ export function ShopFilters({
           })}
         </div>
       </div>
+
+      {/* Color Filter - Only show when products are visible */}
+      {showColorFilter && availableColors.length > 0 && onColorToggle && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Palette className="w-4 h-4" />
+              Colors
+            </h3>
+            {hasColorFilter && onClearColors && (
+              <button
+                onClick={onClearColors}
+                className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {availableColors.map((color) => {
+              const isSelected = selectedColorIds.includes(color.id);
+              return (
+                <button
+                  key={color.id}
+                  onClick={() => onColorToggle(color.id)}
+                  className={cn(
+                    "w-7 h-7 rounded-full border-2 transition-all hover:scale-110",
+                    isSelected
+                      ? "border-primary ring-2 ring-primary/30 scale-110"
+                      : "border-border hover:border-primary/50"
+                  )}
+                  style={{ backgroundColor: color.hex_code || '#ccc' }}
+                  title={color.name}
+                  aria-label={`Filter by ${color.name}`}
+                />
+              );
+            })}
+          </div>
+          {selectedColorIds.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-2">
+              {selectedColorIds.length} color{selectedColorIds.length !== 1 ? 's' : ''} selected
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Price Range */}
       <div className="space-y-3">

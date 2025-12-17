@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface ColorVariant {
   id?: string;
   color_name: string;
+  color_hex?: string;
   image_url?: string;
   has_sizes: boolean;
   size_variants: SizeVariant[];
@@ -47,6 +48,7 @@ export function SmartProductVariantForm({
       // Initialize with one empty color variant
       setColorVariants([{
         color_name: '',
+        color_hex: '#000000',
         image_url: '',
         has_sizes: hasSizeVariants,
         size_variants: hasSizeVariants ? [{ size_name: '', size_code: '' }] : [],
@@ -77,6 +79,7 @@ export function SmartProductVariantForm({
       ...colorVariants,
       {
         color_name: '',
+        color_hex: '#000000',
         image_url: '',
         has_sizes: hasSizeVariants,
         size_variants: hasSizeVariants ? [{ size_name: '', size_code: '' }] : [],
@@ -237,6 +240,24 @@ export function SmartProductVariantForm({
                     onChange={(e) => updateColorVariant(colorIndex, 'color_name', e.target.value)}
                     placeholder="Enter color name"
                   />
+
+                  <div className="mt-3">
+                    <Label>Color *</Label>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        type="color"
+                        value={colorVariant.color_hex || '#000000'}
+                        onChange={(e) => updateColorVariant(colorIndex, 'color_hex', e.target.value)}
+                        className="w-16 h-10"
+                      />
+                      <Input
+                        value={colorVariant.color_hex || ''}
+                        onChange={(e) => updateColorVariant(colorIndex, 'color_hex', e.target.value)}
+                        placeholder="#000000"
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div>

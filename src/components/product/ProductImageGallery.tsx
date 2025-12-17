@@ -1,4 +1,4 @@
-import { useState, useRef, memo, useCallback } from 'react';
+import { useState, useRef, memo, useCallback, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ZoomIn, Heart, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,11 @@ export const ProductImageGallery = memo(function ProductImageGallery({
   const imageContainerRef = useRef<HTMLDivElement>(null);
 
   const displayImages = images.length > 0 ? images : ['/placeholder.svg'];
+
+  useEffect(() => {
+    setCurrentIndex(0);
+    onImageChange?.(0);
+  }, [images, onImageChange]);
 
   const goToImage = useCallback((index: number) => {
     const newIndex = Math.max(0, Math.min(index, displayImages.length - 1));

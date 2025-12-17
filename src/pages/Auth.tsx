@@ -8,9 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SignUpForm } from '@/components/auth/SignUpForm';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Eye, EyeOff, CheckCircle, Mail, ArrowLeft, Lock } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle, Mail, ArrowLeft, Lock, ShoppingBag } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { ModernNavbar } from '@/components/navbar';
+import { Footer } from '@/components/layout/Footer';
 
 // Memoized loading spinner
 const LoadingSpinner = memo(() => (
@@ -149,7 +151,9 @@ function Auth() {
 
   if (showForgotPassword) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-red-50/30 p-4">
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-red-50/20">
+        <ModernNavbar />
+        <main className="flex-1 flex items-center justify-center p-4 py-8">
         <div className="w-full max-w-md">
           <Card className="shadow-xl border-0 bg-white">
             <CardHeader className="text-center pb-6 relative">
@@ -204,19 +208,34 @@ function Auth() {
             </CardContent>
           </Card>
         </div>
+        </main>
+        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-red-50/30 p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-red-50/20">
+      <ModernNavbar />
+      <main className="flex-1 flex items-center justify-center p-4 py-8">
+      <div className="w-full max-w-md animate-fade-in">
+        {/* Back to Shopping */}
+        <div className="mb-6">
+          <Link 
+            to="/shop" 
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors group"
+          >
+            <ShoppingBag className="w-4 h-4 group-hover:scale-110 transition-transform" />
+            <span>Back to Shopping</span>
+          </Link>
+        </div>
+
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-red-600 mb-2">
-            Mozamandu
+        <div className="text-center mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent mb-2">
+            Welcome to Mozamandu
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm sm:text-base">
             Your premium gear destination
           </p>
         </div>
@@ -247,7 +266,7 @@ function Auth() {
         )}
 
         {/* Main Auth Card */}
-        <Card className="shadow-xl border-0 bg-white">
+        <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="px-6 pt-6">
               <TabsList className="grid w-full grid-cols-2 bg-muted/30 p-1 rounded-lg h-12">
@@ -397,6 +416,8 @@ function Auth() {
           </div>
         </div>
       </div>
+      </main>
+      <Footer />
     </div>
   );
 }

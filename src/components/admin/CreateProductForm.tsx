@@ -46,6 +46,7 @@ interface Subcategory {
 interface ColorVariant {
   id?: string;
   color_name: string;
+  color_hex?: string;
   image_url?: string;
   has_sizes: boolean;
   size_variants: SizeVariant[];
@@ -356,12 +357,42 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       const validVariants = colorVariants.filter(cv => cv.color_name.trim());
       if (validVariants.length === 0) return;
 
+      const normalized = validVariants.map(cv => ({
+        ...cv,
+        color_name: cv.color_name.trim(),
+        color_hex: cv.color_hex?.trim() || null,
+      }));
+
+      const uniqueColorNames = Array.from(new Set(normalized.map(v => v.color_name)));
+      const colorIdByName = new Map<string, string>();
+
+      for (const name of uniqueColorNames) {
+        const hex = normalized.find(v => v.color_name === name)?.color_hex || null;
+        const { data: upsertedColor, error: upsertColorError } = await supabase
+          .from('colors')
+          .upsert(
+            {
+              name,
+              hex_code: hex,
+            },
+            { onConflict: 'name' }
+          )
+          .select('id, name')
+          .single();
+
+        if (upsertColorError) throw upsertColorError;
+        if (upsertedColor?.id) {
+          colorIdByName.set(name, upsertedColor.id);
+        }
+      }
+
       const { data: insertedColors, error: colorError } = await supabase
         .from('color_variants')
         .insert(
-          validVariants.map(cv => ({
+          normalized.map(cv => ({
             product_id: productId,
             color_name: cv.color_name,
+            color_id: colorIdByName.get(cv.color_name) || null,
             image_url: cv.image_url || null,
             has_sizes: hasSizeVariants,
           }))

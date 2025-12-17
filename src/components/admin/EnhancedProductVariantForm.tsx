@@ -20,6 +20,7 @@ interface SizeVariant {
 interface ColorVariant {
   id?: string;
   color_name: string;
+  color_hex?: string;
   image_url?: string;
   has_sizes: boolean;
   size_variants: SizeVariant[];
@@ -120,7 +121,7 @@ export function EnhancedProductVariantForm({
     try {
       const { data: colorData, error: colorError } = await supabase
         .from('color_variants')
-        .select('*')
+        .select('*, colors(hex_code)')
         .eq('product_id', productId);
 
       if (colorError) throw colorError;
@@ -136,6 +137,7 @@ export function EnhancedProductVariantForm({
 
           return {
             ...colorVariant,
+            color_hex: (colorVariant as any).colors?.hex_code || undefined,
             size_variants: (sizeData || []).map(sv => ({
               id: sv.id,
               size_name: sv.size_name,
@@ -187,6 +189,7 @@ export function EnhancedProductVariantForm({
   const addColorVariant = () => {
     const newVariant: ColorVariant = {
       color_name: '',
+      color_hex: '#000000',
       has_sizes: hasSizeVariants,
       size_variants: hasSizeVariants ? [{ size_name: '', size_code: '', isNew: true }] : [],
       isNew: true,
@@ -440,10 +443,44 @@ export function EnhancedProductVariantForm({
   };
 
   const handleUpserts = async () => {
+    const activeColorVariants = colorVariants
+      .filter(v => !v.toDelete)
+      .map(v => ({
+        ...v,
+        color_name: v.color_name.trim(),
+        color_hex: v.color_hex?.trim() || null,
+      }))
+      .filter(v => v.color_name);
+
+    const uniqueColorNames = Array.from(new Set(activeColorVariants.map(v => v.color_name)));
+    const colorIdByName = new Map<string, string>();
+
+    for (const name of uniqueColorNames) {
+      const hex = activeColorVariants.find(v => v.color_name === name)?.color_hex || null;
+      const { data: upsertedColor, error: upsertColorError } = await supabase
+        .from('colors')
+        .upsert(
+          {
+            name,
+            hex_code: hex,
+          },
+          { onConflict: 'name' }
+        )
+        .select('id')
+        .single();
+
+      if (upsertColorError) throw upsertColorError;
+      if (upsertedColor?.id) {
+        colorIdByName.set(name, upsertedColor.id);
+      }
+    }
+
     for (const colorVariant of colorVariants) {
       if (colorVariant.toDelete) continue;
 
       let colorVariantId = colorVariant.id;
+      const normalizedColorName = colorVariant.color_name.trim();
+      const colorId = normalizedColorName ? (colorIdByName.get(normalizedColorName) || null) : null;
 
       if (colorVariant.isNew || !colorVariantId) {
         // Create new color variant
@@ -451,7 +488,8 @@ export function EnhancedProductVariantForm({
           .from('color_variants')
           .insert({
             product_id: productId,
-            color_name: colorVariant.color_name,
+            color_name: normalizedColorName,
+            color_id: colorId,
             image_url: colorVariant.image_url || null,
             has_sizes: hasSizeVariants,
           })
@@ -465,7 +503,8 @@ export function EnhancedProductVariantForm({
         const { error } = await supabase
           .from('color_variants')
           .update({
-            color_name: colorVariant.color_name,
+            color_name: normalizedColorName,
+            color_id: colorId,
             image_url: colorVariant.image_url || null,
             has_sizes: hasSizeVariants,
           })
@@ -564,6 +603,24 @@ export function EnhancedProductVariantForm({
                       onChange={(e) => updateColorVariant(colorIndex, 'color_name', e.target.value)}
                       placeholder="Enter color name"
                     />
+
+                    <div className="mt-3">
+                      <Label>Color *</Label>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          type="color"
+                          value={colorVariant.color_hex || '#000000'}
+                          onChange={(e) => updateColorVariant(colorIndex, 'color_hex', e.target.value)}
+                          className="w-16 h-10"
+                        />
+                        <Input
+                          value={colorVariant.color_hex || ''}
+                          onChange={(e) => updateColorVariant(colorIndex, 'color_hex', e.target.value)}
+                          placeholder="#000000"
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div>

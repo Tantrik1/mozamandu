@@ -46,7 +46,7 @@ export function TopBar() {
   if (!topBarText || !isVisible) return null;
 
   return (
-    <div className="bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white py-2.5 relative z-50 sticky top-0 overflow-hidden">
+    <div className="bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white py-2.5 relative z-50 overflow-hidden">
       {/* Subtle shimmer overlay - using transform for composited animation */}
       <div 
         className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"

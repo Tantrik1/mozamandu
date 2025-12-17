@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Percent, Tag } from 'lucide-react';
+import { HomeProductCard } from './HomeProductCard';
 
 interface Product {
   id: string;
@@ -10,6 +11,7 @@ interface Product {
   cost_price: number;
   image_url: string | null;
   subcategory: { name: string } | null;
+  has_color_variants?: boolean;
 }
 
 interface FeaturedDealsProps {
@@ -70,36 +72,20 @@ export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }
                 className="animate-fade-in"
                 style={{ animationDelay: `${index * 50}ms` }}
               >
-                <Link 
-                  to={`/product/${product.id}`}
-                  className="group block bg-card rounded-2xl overflow-hidden border-2 border-primary/20 hover:border-primary/50 hover:shadow-xl transition-all duration-300"
-                >
-                  <div className="aspect-square bg-muted relative overflow-hidden">
-                    <img
-                      src={product.image_url || '/placeholder.svg'}
-                      alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      loading="lazy"
-                      decoding="async"
-                      width={512}
-                      height={512}
-                    />
-                    {discount > 0 && (
+                <HomeProductCard
+                  product={product}
+                  className="border-2 border-primary/20 hover:border-primary/50 hover:shadow-xl"
+                  badge={
+                    discount > 0 ? (
                       <div className="absolute top-3 left-3">
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-destructive text-destructive-foreground text-xs font-bold rounded-full">
                           <Percent className="w-3 h-3" />
                           {discount}% OFF
                         </span>
                       </div>
-                    )}
-                  </div>
-                  <div className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">
-                      {product.subcategory?.name || 'Uncategorized'}
-                    </p>
-                    <h3 className="font-semibold text-foreground line-clamp-1 mb-2 group-hover:text-primary transition-colors">
-                      {product.name}
-                    </h3>
+                    ) : null
+                  }
+                  priceSlot={
                     <div className="flex items-center gap-2">
                       <p className="text-lg font-bold text-primary">
                         Rs. {product.selling_price?.toLocaleString() || '0'}
@@ -110,8 +96,8 @@ export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }
                         </p>
                       )}
                     </div>
-                  </div>
-                </Link>
+                  }
+                />
               </div>
             );
           })}

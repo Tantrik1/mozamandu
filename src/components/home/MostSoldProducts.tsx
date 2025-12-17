@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, TrendingUp, Flame } from 'lucide-react';
+import { HomeProductCard } from './HomeProductCard';
 
 interface Product {
   id: string;
@@ -10,6 +11,7 @@ interface Product {
   image_url: string | null;
   subcategory: { name: string } | null;
   order_count: number;
+  has_color_variants?: boolean;
 }
 
 interface MostSoldProductsProps {
@@ -62,39 +64,17 @@ export const MostSoldProducts = memo(function MostSoldProducts({ products, isLoa
               className="animate-fade-in"
               style={{ animationDelay: `${index * 50}ms` }}
             >
-              <Link 
-                to={`/product/${product.id}`}
-                className="group block bg-card rounded-2xl overflow-hidden border border-border/50 hover:border-primary/30 hover:shadow-lg transition-all duration-300"
-              >
-                <div className="aspect-square bg-muted relative overflow-hidden">
-                  <img
-                    src={product.image_url || '/placeholder.svg'}
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    loading="lazy"
-                    decoding="async"
-                    width={512}
-                    height={512}
-                  />
+              <HomeProductCard
+                product={product}
+                badge={
                   <div className="absolute top-3 left-3">
                     <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-500 text-white text-xs font-medium rounded-full">
                       <Flame className="w-3 h-3" />
                       Popular
                     </span>
                   </div>
-                </div>
-                <div className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    {product.subcategory?.name || 'Uncategorized'}
-                  </p>
-                  <h3 className="font-semibold text-foreground line-clamp-1 mb-2 group-hover:text-primary transition-colors">
-                    {product.name}
-                  </h3>
-                  <p className="text-lg font-bold text-foreground">
-                    Rs. {product.selling_price?.toLocaleString() || '0'}
-                  </p>
-                </div>
-              </Link>
+                }
+              />
             </div>
           ))}
         </div>

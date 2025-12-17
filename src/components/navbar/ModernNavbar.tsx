@@ -66,7 +66,7 @@ export const ModernNavbar = memo(function ModernNavbar() {
   };
   const cartTotal = getTotalPrice();
   return <>
-      <div className="sticky top-0 z-50">
+      <div id="site-header" className="sticky top-0 z-50">
         <TopBar />
         
         {/* Main Navbar */}
@@ -104,7 +104,7 @@ export const ModernNavbar = memo(function ModernNavbar() {
                   <ShoppingBag className="w-5 h-5" />
                   <span className="text-[10px] font-medium">Cart</span>
                   {cartTotal > 0 && <Badge className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-[9px] bg-primary text-primary-foreground flex items-center justify-center">
-                      {cartTotal > 999 ? '999+' : Math.ceil(cartTotal / 100)}
+                      {`Rs.${Math.round(cartTotal).toLocaleString()}`}
                     </Badge>}
                 </Button>
 

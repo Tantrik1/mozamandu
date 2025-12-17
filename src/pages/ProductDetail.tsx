@@ -37,6 +37,7 @@ interface ColorVariant {
   color_name: string;
   has_sizes: boolean;
   image_url: string | null;
+  hex_code: string | null;
 }
 
 interface SizeVariant {
@@ -92,9 +93,15 @@ const fetchDiscountTiers = async (subcategoryId: string): Promise<DiscountTier[]
 const fetchColorVariants = async (productId: string): Promise<ColorVariant[]> => {
   const { data } = await supabase
     .from('color_variants')
-    .select('id, color_name, has_sizes, image_url')
+    .select('id, color_name, has_sizes, image_url, colors(hex_code)')
     .eq('product_id', productId);
-  return data || [];
+  return (data || []).map((cv: any) => ({
+    id: cv.id,
+    color_name: cv.color_name,
+    has_sizes: cv.has_sizes,
+    image_url: cv.image_url,
+    hex_code: cv.colors?.hex_code || null,
+  }));
 };
 
 const fetchAdditionalImages = async (productId: string): Promise<string[]> => {
@@ -177,17 +184,22 @@ export default function ProductDetail() {
   // Build image gallery
   const images = useMemo(() => {
     const imgs: string[] = [];
+
+    const selectedCv = colorVariants.find(cv => cv.id === selectedColor);
+    if (selectedCv?.image_url) imgs.push(selectedCv.image_url);
+
     if (product?.image_url) imgs.push(product.image_url);
     additionalImages.forEach(img => {
       if (!imgs.includes(img)) imgs.push(img);
     });
     colorVariants.forEach(cv => {
+      if (cv.id === selectedColor) return;
       if (cv.image_url && !imgs.includes(cv.image_url)) {
         imgs.push(cv.image_url);
       }
     });
     return imgs;
-  }, [product?.image_url, additionalImages, colorVariants]);
+  }, [product?.image_url, additionalImages, colorVariants, selectedColor]);
 
   // Reset selections when product changes
   useEffect(() => {

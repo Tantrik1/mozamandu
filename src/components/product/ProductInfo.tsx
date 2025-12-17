@@ -23,6 +23,7 @@ interface ColorVariant {
   color_name: string;
   has_sizes: boolean;
   image_url: string | null;
+  hex_code?: string | null;
 }
 
 interface SizeVariant {
@@ -339,23 +340,18 @@ export const ProductInfo = memo(function ProductInfo({
                 key={color.id}
                 onClick={() => onColorChange(color.id)}
                 className={cn(
-                  "relative w-12 h-12 lg:w-14 lg:h-14 rounded-lg overflow-hidden border-2 transition-all",
-                  selectedColor === color.id 
-                    ? "border-primary ring-2 ring-primary/20" 
+                  "relative w-9 h-9 lg:w-10 lg:h-10 rounded-full border-2 transition-all",
+                  selectedColor === color.id
+                    ? "border-primary ring-2 ring-primary/30 ring-offset-2"
                     : "border-border hover:border-primary/50"
                 )}
+                style={{ backgroundColor: color.hex_code || '#ccc' }}
                 aria-label={`Select ${color.color_name}`}
+                title={color.color_name}
               >
-                {color.image_url ? (
-                  <img src={color.image_url} alt={color.color_name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
-                    {color.color_name.slice(0, 2).toUpperCase()}
-                  </div>
-                )}
                 {selectedColor === color.id && (
-                  <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                    <Check className="w-4 h-4 text-primary" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Check className="w-4 h-4 text-white drop-shadow" />
                   </div>
                 )}
               </button>
