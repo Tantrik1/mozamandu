@@ -1,22 +1,22 @@
-import { useQuery, useQueries } from '@tanstack/react-query';
+import { useQueries } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-// Fetch functions
+// Fetch functions - optimized with minimal data
 const fetchLatestProducts = async () => {
   const { data } = await supabase
     .from('products')
     .select(`id, name, selling_price, image_url, subcategory:subcategories(name)`)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
-    .limit(8);
+    .limit(4); // Reduced from 8 for faster initial load
   return data || [];
 };
 
 const fetchMostSoldProducts = async () => {
-  // Use aggregation to count orders per product - much more efficient
   const { data: orderData } = await supabase
     .from('customer_order_item_details')
-    .select('product_name, quantity');
+    .select('product_name, quantity')
+    .limit(100); // Limit order data for faster query
 
   const productCounts: Record<string, number> = {};
   orderData?.forEach(item => {
@@ -27,14 +27,14 @@ const fetchMostSoldProducts = async () => {
     .from('products')
     .select(`id, name, selling_price, image_url, subcategory:subcategories(name)`)
     .eq('status', 'active')
-    .limit(20); // Get more to ensure we have enough after sorting
+    .limit(12);
 
   if (!products) return [];
 
   return products
     .map(p => ({ ...p, order_count: productCounts[p.name] || 0 }))
     .sort((a, b) => b.order_count - a.order_count)
-    .slice(0, 8);
+    .slice(0, 4); // Reduced from 8
 };
 
 const fetchCategories = async () => {
@@ -77,32 +77,35 @@ const fetchNotice = async () => {
   return data;
 };
 
-// Main hook - fetches all homepage data in parallel with caching
+// Main hook - prioritized data fetching
 export function useHomepageData() {
   const results = useQueries({
     queries: [
+      // Priority 1: Above-the-fold content
       {
         queryKey: ['homepage', 'latestProducts'],
         queryFn: fetchLatestProducts,
-        staleTime: 2 * 60 * 1000, // 2 minutes
-        gcTime: 10 * 60 * 1000, // 10 minutes
+        staleTime: 2 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
       },
-      {
-        queryKey: ['homepage', 'mostSold'],
-        queryFn: fetchMostSoldProducts,
-        staleTime: 5 * 60 * 1000, // 5 minutes
-        gcTime: 15 * 60 * 1000,
-      },
+      // Priority 2: Second section
       {
         queryKey: ['homepage', 'categories'],
         queryFn: fetchCategories,
         staleTime: 5 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
       },
+      // Priority 3: Below-the-fold content
+      {
+        queryKey: ['homepage', 'mostSold'],
+        queryFn: fetchMostSoldProducts,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+      },
       {
         queryKey: ['homepage', 'faqs'],
         queryFn: fetchFAQs,
-        staleTime: 30 * 60 * 1000, // 30 minutes - FAQs rarely change
+        staleTime: 30 * 60 * 1000,
         gcTime: 60 * 60 * 1000,
       },
       {
@@ -111,6 +114,7 @@ export function useHomepageData() {
         staleTime: 5 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
       },
+      // Priority 4: Deferred content
       {
         queryKey: ['homepage', 'notice'],
         queryFn: fetchNotice,
@@ -120,19 +124,16 @@ export function useHomepageData() {
     ],
   });
 
-  const isLoading = results.some(r => r.isLoading);
-
   return {
     latestProducts: results[0].data || [],
-    mostSoldProducts: results[1].data || [],
-    categories: results[2].data || [],
+    categories: results[1].data || [],
+    mostSoldProducts: results[2].data || [],
     faqs: results[3].data || [],
     featuredProducts: results[4].data || [],
     notice: results[5].data,
-    isLoading,
     isLatestLoading: results[0].isLoading,
-    isMostSoldLoading: results[1].isLoading,
-    isCategoriesLoading: results[2].isLoading,
+    isCategoriesLoading: results[1].isLoading,
+    isMostSoldLoading: results[2].isLoading,
     isFAQsLoading: results[3].isLoading,
     isFeaturedLoading: results[4].isLoading,
     isNoticeLoading: results[5].isLoading,

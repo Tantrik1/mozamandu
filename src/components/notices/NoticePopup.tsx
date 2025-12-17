@@ -16,10 +16,16 @@ interface NoticePopupProps {
 
 export const NoticePopup = memo(function NoticePopup({ notice }: NoticePopupProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [shouldRender, setShouldRender] = useState(false);
 
   useEffect(() => {
     if (notice) {
-      setIsOpen(true);
+      // Defer notice popup to not block initial render - show after 3 seconds
+      const timer = setTimeout(() => {
+        setShouldRender(true);
+        setIsOpen(true);
+      }, 3000);
+      return () => clearTimeout(timer);
     }
   }, [notice]);
 
@@ -27,7 +33,8 @@ export const NoticePopup = memo(function NoticePopup({ notice }: NoticePopupProp
     setIsOpen(false);
   };
 
-  if (!notice) return null;
+  // Don't render anything until deferred
+  if (!notice || !shouldRender) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -51,10 +58,11 @@ export const NoticePopup = memo(function NoticePopup({ notice }: NoticePopupProp
               src={notice.image_url}
               alt={notice.title}
               className="w-full h-full object-cover"
-              loading="eager"
+              loading="lazy"
+              decoding="async"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center">
+            <div className="w-full h-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
               <div className="text-center text-white p-6">
                 <h2 className="text-2xl md:text-4xl font-bold mb-4">{notice.title}</h2>
                 {notice.description && (

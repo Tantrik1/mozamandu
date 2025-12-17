@@ -70,6 +70,8 @@ export const ShopByCategory = memo(function ShopByCategory({ categories, isLoadi
                       className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                       loading="lazy"
                       decoding="async"
+                      width={400}
+                      height={400}
                     />
                   ) : (
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20" />

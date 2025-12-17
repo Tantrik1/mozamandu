@@ -21,8 +21,8 @@ export const LatestProducts = memo(function LatestProducts({ products, isLoading
     return (
       <section className="py-10 md:py-12 lg:py-16 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
-            {[...Array(8)].map((_, i) => (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
+            {[...Array(4)].map((_, i) => (
               <div key={i} className="bg-muted rounded-2xl aspect-square animate-pulse" />
             ))}
           </div>
@@ -54,7 +54,7 @@ export const LatestProducts = memo(function LatestProducts({ products, isLoading
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
           {products.map((product, index) => (
             <div
               key={product.id}
