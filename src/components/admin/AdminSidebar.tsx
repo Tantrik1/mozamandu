@@ -1,5 +1,5 @@
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { Home, Package, Users, Tag, CreditCard, Truck, Bell, Type, Settings, ShoppingCart, UserCheck, LogOut, HelpCircle, Warehouse, MessageSquare } from "lucide-react";
+import { Home, Package, Users, Tag, CreditCard, Truck, Bell, Type, Settings, ShoppingCart, UserCheck, LogOut, HelpCircle, Warehouse, MessageSquare, BarChart3, Key } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -59,6 +59,14 @@ const menuItems = [{
   title: "Reviews",
   url: "/admin/reviews",
   icon: MessageSquare
+}, {
+  title: "Analytics",
+  url: "/admin/analytics",
+  icon: BarChart3
+}, {
+  title: "Analytics Settings",
+  url: "/admin/analytics-settings",
+  icon: Key
 }, {
   title: "Settings",
   url: "/admin/settings",

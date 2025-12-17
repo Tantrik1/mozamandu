@@ -22,6 +22,8 @@ import { ReviewManagement } from '@/components/admin/ReviewManagement';
 import { PromocodeManagement } from '@/components/admin/PromocodeManagement';
 import { AdminSettings } from '@/components/admin/AdminSettings';
 import { ModernInventoryManagement } from '@/components/inventory/ModernInventoryManagement';
+import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
+import { AnalyticsSettings } from '@/components/admin/AnalyticsSettings';
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -109,6 +111,8 @@ export default function AdminPage() {
               <Route path="notices" element={<NoticeManagement />} />
               <Route path="top-bar-text" element={<TopBarTextManagement />} />
               <Route path="reviews" element={<ReviewManagement />} />
+              <Route path="analytics" element={<AnalyticsDashboard />} />
+              <Route path="analytics-settings" element={<AnalyticsSettings />} />
               <Route path="settings" element={<AdminSettings />} />
               <Route path="*" element={<Navigate to="/admin" replace />} />
             </Routes>
