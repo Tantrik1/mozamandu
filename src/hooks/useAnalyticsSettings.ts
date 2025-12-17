@@ -7,6 +7,7 @@ export interface AnalyticsSettings {
   google_private_key?: string;
   google_search_console_site_url?: string;
   is_configured: boolean;
+  has_private_key?: boolean;
 }
 
 export function useAnalyticsSettings() {
@@ -37,9 +38,10 @@ export function useAnalyticsSettings() {
 
       setSettings({
         google_service_account_email: settingsMap.google_service_account_email,
-        google_private_key: settingsMap.google_private_key,
+        google_private_key: undefined, // Never expose the private key
         google_search_console_site_url: settingsMap.google_search_console_site_url,
         is_configured: isConfigured,
+        has_private_key: !!settingsMap.google_private_key,
       });
     } catch (error) {
       console.error('Error fetching analytics settings:', error);
@@ -48,15 +50,23 @@ export function useAnalyticsSettings() {
     }
   };
 
-  const saveSettings = async (newSettings: Omit<AnalyticsSettings, 'is_configured'>) => {
+  const saveSettings = async (newSettings: Omit<AnalyticsSettings, 'is_configured' | 'has_private_key'>) => {
     try {
       setSaving(true);
 
-      const settingsToSave = [
+      const settingsToSave: { setting_key: string; setting_value: string; is_encrypted?: boolean }[] = [
         { setting_key: 'google_service_account_email', setting_value: newSettings.google_service_account_email || '' },
-        { setting_key: 'google_private_key', setting_value: newSettings.google_private_key || '', is_encrypted: true },
         { setting_key: 'google_search_console_site_url', setting_value: newSettings.google_search_console_site_url || '' },
       ];
+
+      // Only update private key if provided
+      if (newSettings.google_private_key) {
+        settingsToSave.push({ 
+          setting_key: 'google_private_key', 
+          setting_value: newSettings.google_private_key, 
+          is_encrypted: true 
+        });
+      }
 
       for (const setting of settingsToSave) {
         const { error } = await supabase

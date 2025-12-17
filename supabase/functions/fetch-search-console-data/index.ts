@@ -40,11 +40,13 @@ async function createJWT(email: string, privateKey: string): Promise<string> {
   const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   const unsignedToken = `${headerB64}.${payloadB64}`;
 
-  // Parse the private key
-  const pemContents = privateKey
+  // Parse the private key - handle escaped newlines from JSON
+  const normalizedKey = privateKey.replace(/\\n/g, '\n');
+  const pemContents = normalizedKey
     .replace(/-----BEGIN PRIVATE KEY-----/, '')
     .replace(/-----END PRIVATE KEY-----/, '')
-    .replace(/\n/g, '');
+    .replace(/\n/g, '')
+    .replace(/\s/g, '');
   
   const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
   

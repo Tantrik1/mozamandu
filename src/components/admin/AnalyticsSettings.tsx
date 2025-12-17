@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,20 +15,31 @@ export function AnalyticsSettings() {
     google_private_key: '',
     google_search_console_site_url: '',
   });
+  const [privateKeyTouched, setPrivateKeyTouched] = useState(false);
+  const initialLoadDone = useRef(false);
 
   useEffect(() => {
-    if (settings) {
+    if (settings && !initialLoadDone.current) {
       setFormData({
         google_service_account_email: settings.google_service_account_email || '',
-        google_private_key: settings.google_private_key || '',
+        google_private_key: '', // Never show the actual key
         google_search_console_site_url: settings.google_search_console_site_url || '',
       });
+      initialLoadDone.current = true;
     }
   }, [settings]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await saveSettings(formData);
+    
+    // If private key wasn't touched and we already have one, don't update it
+    if (!privateKeyTouched && settings.has_private_key) {
+      const { google_private_key, ...rest } = formData;
+      await saveSettings(rest as any);
+    } else {
+      await saveSettings(formData);
+    }
+    setPrivateKeyTouched(false);
   };
 
   const handleDelete = async () => {
@@ -39,6 +50,8 @@ export function AnalyticsSettings() {
         google_private_key: '',
         google_search_console_site_url: '',
       });
+      setPrivateKeyTouched(false);
+      initialLoadDone.current = false;
     }
   };
 
@@ -111,17 +124,29 @@ export function AnalyticsSettings() {
               <Label htmlFor="private_key" className="flex items-center gap-2">
                 <Key className="h-4 w-4" />
                 Private Key
+                {settings.has_private_key && !privateKeyTouched && (
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full ml-2">
+                    Configured (hidden for security)
+                  </span>
+                )}
               </Label>
               <Textarea
                 id="private_key"
-                placeholder="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+                placeholder={settings.has_private_key && !privateKeyTouched 
+                  ? "Private key is saved. Enter a new key to replace it." 
+                  : "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"}
                 value={formData.google_private_key}
-                onChange={(e) => setFormData({ ...formData, google_private_key: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, google_private_key: e.target.value });
+                  setPrivateKeyTouched(true);
+                }}
                 rows={6}
                 className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
-                The private key from your service account JSON file (including BEGIN and END markers)
+                {settings.has_private_key && !privateKeyTouched
+                  ? "Your private key is securely stored. Leave empty to keep the existing key, or enter a new one to replace it."
+                  : "The private key from your service account JSON file (including BEGIN and END markers)"}
               </p>
             </div>
 
