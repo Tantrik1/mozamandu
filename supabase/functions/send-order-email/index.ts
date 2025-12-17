@@ -48,19 +48,42 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Function environment check - RESEND_API_KEY exists:', !!Deno.env.get("RESEND_API_KEY"));
 
     // Fetch order details from appropriate table
-    const tableName = isCustomerOrder ? 'customer_orders' : 'orders';
-    const { data: order, error: orderError } = await supabase
-      .from(tableName)
+    // Note: we accept isCustomerOrder hint, but also fall back to the other table
+    const requestedTable = isCustomerOrder ? 'customer_orders' : 'orders';
+    const fallbackTable = isCustomerOrder ? 'orders' : 'customer_orders';
+
+    let actualIsCustomerOrder = isCustomerOrder;
+
+    let { data: order, error: orderError } = await supabase
+      .from(requestedTable)
       .select('*')
       .eq('id', orderId)
-      .single();
+      .maybeSingle();
+
+    if (!order) {
+      console.warn('Order not found in requested table, trying fallback:', {
+        requestedTable,
+        fallbackTable,
+        orderError,
+      });
+
+      const fallback = await supabase
+        .from(fallbackTable)
+        .select('*')
+        .eq('id', orderId)
+        .maybeSingle();
+
+      order = fallback.data;
+      orderError = fallback.error;
+      if (order) actualIsCustomerOrder = !isCustomerOrder;
+    }
 
     if (orderError || !order) {
       console.error('Error fetching order:', orderError);
       throw new Error('Order not found');
     }
 
-    console.log('Order fetched successfully:', order.order_number);
+    console.log('Order fetched successfully:', order.order_number, 'actualIsCustomerOrder:', actualIsCustomerOrder);
 
     // Determine the order summary URL - use production domain
     // Always use 'order-summary' path as it's public and accessible without auth
@@ -80,7 +103,7 @@ const handler = async (req: Request): Promise<Response> => {
           paidAmount: parseFloat(order.paid_amount),
           remainingAmount: parseFloat(order.remaining_amount),
           orderSummaryUrl,
-          isCustomerOrder,
+          isCustomerOrder: actualIsCustomerOrder,
         })
       );
     } else if (type === 'status_updated' && oldStatus && newStatus) {
@@ -102,7 +125,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Send email
     console.log('Attempting to send email to:', order.customer_email);
     console.log('Email subject:', subject);
-    
+
     const emailResponse = await resend.emails.send({
       from: "Mozamandu <orders@mozamandu.com>",
       to: [order.customer_email],
