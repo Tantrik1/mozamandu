@@ -8,21 +8,12 @@ import { SortBottomSheet, SortOption } from '@/components/shop/SortBottomSheet';
 import { CategorySubcategoryBar } from '@/components/shop/CategorySubcategoryBar';
 import { FilterSummaryStrip } from '@/components/shop/FilterSummaryStrip';
 import { EmptyState } from '@/components/shop/EmptyState';
-import { ShopFilters } from '@/components/shop/ShopFilters';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const DESKTOP_SORT_OPTIONS: { value: SortOption; label: string }[] = [
-  { value: 'bestseller', label: 'Best Sellers' },
-  { value: 'newest', label: 'Newest First' },
-  { value: 'price_low', label: 'Price: Low to High' },
-  { value: 'price_high', label: 'Price: High to Low' },
-  { value: 'name', label: 'Name: A to Z' },
-];
 
 interface Category {
   id: string;
@@ -358,29 +349,27 @@ const Shop = memo(function Shop() {
       <ModernNavbar />
       
       {/* Category/Subcategory Bar - Visual boxes with images */}
-      <div className="lg:hidden">
-        <CategorySubcategoryBar
-          categories={categories}
-          selectedCategoryId={selectedCategoryId}
-          onCategorySelect={(id) => {
-            setSelectedCategoryId(id);
-            setSelectedSubcategoryId(null);
-            updateUrlParams({ category: id, subcategory: null });
-            setIsFiltering(true);
-            setTimeout(() => setIsFiltering(false), 300);
-          }}
-          selectedSubcategoryId={selectedSubcategoryId}
-          onSubcategorySelect={(id) => {
-            setSelectedSubcategoryId(id);
-            updateUrlParams({ subcategory: id });
-            setIsFiltering(true);
-            setTimeout(() => setIsFiltering(false), 300);
-          }}
-          onMoreFilters={() => setFilterSheetOpen(true)}
-          activeFilterCount={filterCount}
-          topOffset={headerHeight}
-        />
-      </div>
+      <CategorySubcategoryBar
+        categories={categories}
+        selectedCategoryId={selectedCategoryId}
+        onCategorySelect={(id) => {
+          setSelectedCategoryId(id);
+          setSelectedSubcategoryId(null);
+          updateUrlParams({ category: id, subcategory: null });
+          setIsFiltering(true);
+          setTimeout(() => setIsFiltering(false), 300);
+        }}
+        selectedSubcategoryId={selectedSubcategoryId}
+        onSubcategorySelect={(id) => {
+          setSelectedSubcategoryId(id);
+          updateUrlParams({ subcategory: id });
+          setIsFiltering(true);
+          setTimeout(() => setIsFiltering(false), 300);
+        }}
+        onMoreFilters={() => setFilterSheetOpen(true)}
+        activeFilterCount={filterCount}
+        topOffset={headerHeight}
+      />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         {/* Header with Search */}
@@ -404,124 +393,44 @@ const Shop = memo(function Shop() {
           </form>
         </div>
 
-        <div className="lg:flex lg:gap-8">
-          {/* Desktop Sidebar Filters */}
-          <aside className="hidden lg:block w-80 shrink-0">
-            <div className="sticky" style={{ top: `${headerHeight + 16}px` }}>
-              <div
-                className="rounded-2xl border bg-background p-4"
-                style={{ maxHeight: `calc(100vh - ${headerHeight + 32}px)`, overflowY: 'auto' }}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-semibold">Filters</h2>
-                  {(filterCount > 0 || searchQuery.length > 0) && (
-                    <button
-                      onClick={handleClearAllFilters}
-                      className="text-sm text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
+        {/* Filter Summary Strip */}
+        <FilterSummaryStrip
+          filters={appliedFilters}
+          onRemove={handleRemoveFilter}
+          onClearAll={handleClearAllFilters}
+          productCount={filteredProducts.length}
+          className="mb-4"
+        />
 
-                <ShopFilters
-                  categories={categories}
-                  selectedCategoryId={selectedCategoryId}
-                  selectedSubcategoryId={selectedSubcategoryId}
-                  onCategorySelect={(id) => {
-                    setSelectedCategoryId(id);
-                    setSelectedSubcategoryId(null);
-                    updateUrlParams({ category: id, subcategory: null });
-                    setIsFiltering(true);
-                    setTimeout(() => setIsFiltering(false), 300);
-                  }}
-                  onSubcategorySelect={(id) => {
-                    setSelectedSubcategoryId(id);
-                    updateUrlParams({ subcategory: id });
-                    setIsFiltering(true);
-                    setTimeout(() => setIsFiltering(false), 300);
-                  }}
-                  onClearFilters={handleClearAllFilters}
-                  priceRange={priceRange}
-                  onPriceRangeApply={(range) => {
-                    setPriceRange(range);
-                    setIsFiltering(true);
-                    setTimeout(() => setIsFiltering(false), 300);
-                  }}
-                  selectedColorIds={selectedColorIds}
-                  onColorToggle={handleColorToggle}
-                  onClearColors={() => setSelectedColorIds([])}
-                  productIds={productIds}
-                  showColorFilter
-                />
-
-                <div className="mt-6 pt-5 border-t">
-                  <h3 className="font-semibold mb-3">Sort</h3>
-                  <div className="space-y-1">
-                    {DESKTOP_SORT_OPTIONS.map((opt) => {
-                      const isActive = sortBy === opt.value;
-                      return (
-                        <button
-                          key={opt.value}
-                          onClick={() => setSortBy(opt.value)}
-                          className={cn(
-                            'w-full text-left px-3 py-2 rounded-lg text-sm transition-colors',
-                            isActive ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
-                          )}
-                        >
-                          {opt.label}
-                        </button>
-                      );
-                    })}
+        {/* Product Grid */}
+        <main className="flex-1 min-w-0">
+            {productsLoading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 transition-opacity duration-300">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="space-y-3">
+                    <Skeleton className="aspect-square rounded-xl" />
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-4 w-1/3" />
                   </div>
-                </div>
+                ))}
               </div>
-            </div>
-          </aside>
-
-          <div className="min-w-0 flex-1">
-            {/* Filter Summary Strip */}
-            <FilterSummaryStrip
-              filters={appliedFilters}
-              onRemove={handleRemoveFilter}
-              onClearAll={handleClearAllFilters}
-              productCount={filteredProducts.length}
-              className="mb-4"
-            />
-
-            {/* Product Grid */}
-            <main className="flex-1 min-w-0">
-              {productsLoading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 transition-opacity duration-300">
-                  {[...Array(8)].map((_, i) => (
-                    <div key={i} className="space-y-3">
-                      <Skeleton className="aspect-square rounded-xl" />
-                      <Skeleton className="h-4 w-2/3" />
-                      <Skeleton className="h-4 w-1/3" />
-                    </div>
-                  ))}
-                </div>
-              ) : filteredProducts.length > 0 ? (
-                <div
-                  className={cn(
-                    'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 transition-opacity duration-300',
-                    isFiltering && 'opacity-50'
-                  )}
-                >
-                  {filteredProducts.map((product) => (
-                    <ShopProductCard key={product.id} product={product} />
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  hasFilters={filterCount > 0 || searchQuery.length > 0}
-                  onClearFilters={handleClearAllFilters}
-                  suggestions={emptySuggestions}
-                />
-              )}
-            </main>
-          </div>
-        </div>
+            ) : filteredProducts.length > 0 ? (
+              <div className={cn(
+                "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 transition-opacity duration-300",
+                isFiltering && "opacity-50"
+              )}>
+                {filteredProducts.map((product) => (
+                  <ShopProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                hasFilters={filterCount > 0 || searchQuery.length > 0}
+                onClearFilters={handleClearAllFilters}
+                suggestions={emptySuggestions}
+              />
+            )}
+        </main>
       </div>
 
       {/* Filter Bottom Sheet */}

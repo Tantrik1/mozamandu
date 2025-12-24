@@ -24,7 +24,6 @@ import { AdminSettings } from '@/components/admin/AdminSettings';
 import { ModernInventoryManagement } from '@/components/inventory/ModernInventoryManagement';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
 import { AnalyticsSettings } from '@/components/admin/AnalyticsSettings';
-import { ChatbotKnowledgeManagement } from '@/components/admin/ChatbotKnowledgeManagement';
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -114,7 +113,6 @@ export default function AdminPage() {
               <Route path="reviews" element={<ReviewManagement />} />
               <Route path="analytics" element={<AnalyticsDashboard />} />
               <Route path="analytics-settings" element={<AnalyticsSettings />} />
-              <Route path="chatbot-knowledge" element={<ChatbotKnowledgeManagement />} />
               <Route path="settings" element={<AdminSettings />} />
               <Route path="*" element={<Navigate to="/admin" replace />} />
             </Routes>
