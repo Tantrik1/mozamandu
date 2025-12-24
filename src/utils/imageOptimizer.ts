@@ -9,37 +9,43 @@ export interface ImageOptimizationOptions {
   maxSizeMB?: number;
   maxWidthOrHeight?: number;
   quality?: number;
+  forceCompress?: boolean; // Force compression regardless of size
 }
 
-// Aggressive compression defaults for fast page loads
+// Threshold for compression - only compress if larger than 1.5MB
+const COMPRESSION_THRESHOLD_MB = 1.5;
+const COMPRESSION_THRESHOLD_BYTES = COMPRESSION_THRESHOLD_MB * 1024 * 1024;
+
+// Default options for images that need compression (>1.5MB)
 const DEFAULT_OPTIONS: ImageOptimizationOptions = {
-  maxSizeMB: 0.3, // Target 300KB for most images
-  maxWidthOrHeight: 1200,
-  quality: 0.75,
+  maxSizeMB: 1.5, // Target 1.5MB for large images
+  maxWidthOrHeight: 1920,
+  quality: 0.9,
 };
 
-// Preset for high compression (notices, banners)
+// Preset for high compression (notices, banners) - only used if forceCompress is true
 export const HIGH_COMPRESSION: ImageOptimizationOptions = {
-  maxSizeMB: 0.2, // Target 200KB for notices/banners
-  maxWidthOrHeight: 1200,
-  quality: 0.7,
+  maxSizeMB: 1.5,
+  maxWidthOrHeight: 1920,
+  quality: 0.85,
+  forceCompress: true,
 };
 
-// Preset for product images (balance quality and size)
+// Preset for product images - light touch, mainly format conversion
 export const PRODUCT_COMPRESSION: ImageOptimizationOptions = {
-  maxSizeMB: 0.25, // Target 250KB
-  maxWidthOrHeight: 800,
-  quality: 0.75,
+  maxSizeMB: 1.5,
+  maxWidthOrHeight: 1920,
+  quality: 0.92,
 };
 
 // Preset for thumbnails/category images
 export const THUMBNAIL_COMPRESSION: ImageOptimizationOptions = {
-  maxSizeMB: 0.15, // Target 150KB
-  maxWidthOrHeight: 600,
-  quality: 0.7,
+  maxSizeMB: 1.5,
+  maxWidthOrHeight: 1200,
+  quality: 0.9,
 };
 
-const MAX_FILE_SIZE_MB = 5; // Allow larger uploads, we'll compress them
+const MAX_FILE_SIZE_MB = 10; // Allow uploads up to 10MB
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 /**
@@ -56,7 +62,8 @@ export function validateFileSize(file: File): { valid: boolean; message?: string
 }
 
 /**
- * Converts an image file to WebP format and compresses it aggressively
+ * Converts an image file to WebP format
+ * Only compresses if file is larger than 1.5MB, otherwise just converts format
  */
 export async function optimizeImage(
   file: File,
@@ -71,35 +78,59 @@ export async function optimizeImage(
   }
 
   try {
-    // Compress and resize the image with aggressive settings
-    const compressedFile = await imageCompression(file, {
-      maxSizeMB: opts.maxSizeMB!,
-      maxWidthOrHeight: opts.maxWidthOrHeight!,
-      useWebWorker: true,
-      fileType: 'image/webp',
-      initialQuality: opts.quality!,
-      alwaysKeepResolution: false,
-    });
+    const needsCompression = file.size > COMPRESSION_THRESHOLD_BYTES || opts.forceCompress;
+    
+    let resultFile: File;
+    
+    if (needsCompression) {
+      // Compress the image if it's larger than threshold
+      console.log(`Image ${file.name} is ${(file.size / 1024 / 1024).toFixed(2)}MB - compressing...`);
+      
+      const compressedFile = await imageCompression(file, {
+        maxSizeMB: opts.maxSizeMB!,
+        maxWidthOrHeight: opts.maxWidthOrHeight!,
+        useWebWorker: true,
+        fileType: 'image/webp',
+        initialQuality: opts.quality!,
+        alwaysKeepResolution: false,
+      });
 
-    // Create a new file with .webp extension
-    const originalName = file.name.replace(/\.[^/.]+$/, '');
-    const webpFile = new File([compressedFile], `${originalName}.webp`, {
-      type: 'image/webp',
-    });
+      const originalName = file.name.replace(/\.[^/.]+$/, '');
+      resultFile = new File([compressedFile], `${originalName}.webp`, {
+        type: 'image/webp',
+      });
+    } else {
+      // Just convert to WebP without heavy compression
+      console.log(`Image ${file.name} is ${(file.size / 1024 / 1024).toFixed(2)}MB - converting to WebP only...`);
+      
+      const convertedFile = await imageCompression(file, {
+        maxSizeMB: 10, // No real size limit for small images
+        maxWidthOrHeight: 4096, // Keep original dimensions up to 4K
+        useWebWorker: true,
+        fileType: 'image/webp',
+        initialQuality: 0.95, // High quality for format conversion
+        alwaysKeepResolution: true,
+      });
+
+      const originalName = file.name.replace(/\.[^/.]+$/, '');
+      resultFile = new File([convertedFile], `${originalName}.webp`, {
+        type: 'image/webp',
+      });
+    }
 
     // Generate preview URL
-    const preview = await generatePreview(webpFile);
+    const preview = await generatePreview(resultFile);
 
-    const originalSizeKB = (file.size / 1024).toFixed(1);
-    const newSizeKB = (webpFile.size / 1024).toFixed(1);
-    const savings = ((1 - webpFile.size / file.size) * 100).toFixed(0);
+    const originalSizeMB = (file.size / 1024 / 1024).toFixed(2);
+    const newSizeMB = (resultFile.size / 1024 / 1024).toFixed(2);
+    const savings = ((1 - resultFile.size / file.size) * 100).toFixed(0);
     
     console.log(
-      `Image optimized: ${file.name} (${originalSizeKB}KB) → ${webpFile.name} (${newSizeKB}KB) - ${savings}% smaller`
+      `Image processed: ${file.name} (${originalSizeMB}MB) → ${resultFile.name} (${newSizeMB}MB) - ${savings}% ${Number(savings) > 0 ? 'smaller' : 'change'}`
     );
 
     return {
-      file: webpFile,
+      file: resultFile,
       preview,
     };
   } catch (error) {
