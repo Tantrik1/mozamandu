@@ -15,7 +15,7 @@ interface Category {
   id: string;
   name: string;
   description: string;
-  status: 'on' | 'off';
+  status: string;
   image_url?: string;
   created_at: string;
 }

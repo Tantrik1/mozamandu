@@ -19,11 +19,11 @@ interface Order {
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;
-  status: 'pending_payment' | 'payment_confirmed' | 'on_delivery' | 'delivered' | 'cancelled';
+  status: string;
   created_at: string;
-  user_id: string | null;
+  user_id?: string | null;
   user_role?: string;
-  isGuestOrder?: boolean; // Track if order is from guest (orders table) vs customer (customer_orders table)
+  isGuestOrder?: boolean;
 }
 
 export function AdminOrdersPage() {
