@@ -1,15 +1,15 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { MessageCircle, X, Send, Loader2, Bot, User, ExternalLink, Sparkles, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { supabase } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
-import { Link } from 'react-router-dom';
+import { useState, useRef, useEffect, useCallback } from "react";
+import { MessageCircle, X, Send, Loader2, Bot, User, ExternalLink, Sparkles, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
 
 interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   timestamp: Date;
   mentionedProducts?: MentionedProduct[];
@@ -30,24 +30,20 @@ interface ChatResponse {
   error?: string;
 }
 
-const QUICK_PROMPTS = [
-  "What's popular?",
-  "Show me new arrivals",
-  "Help me find a gift",
-  "Any discounts?",
-];
+const QUICK_PROMPTS = ["What's popular?", "Show me new arrivals", "Help me find a gift", "Any discounts?"];
 
 const INITIAL_MESSAGE: Message = {
-  id: 'welcome',
-  role: 'assistant',
-  content: "Hi! 👋 I'm your Mozamandu AI assistant. I can help you find the perfect products, answer questions about our store, and recommend items based on your needs. What can I help you with today?",
+  id: "welcome",
+  role: "assistant",
+  content:
+    "Hi! 👋 I'm your Mozamandu AI assistant. I can help you find the perfect products, answer questions about our store, and recommend items based on your needs. What can I help you with today?",
   timestamp: new Date(),
 };
 
 export function ProductChatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -56,7 +52,7 @@ export function ProductChatbot() {
   // Scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      const scrollContainer = scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]");
       if (scrollContainer) {
         setTimeout(() => {
           scrollContainer.scrollTop = scrollContainer.scrollHeight;
@@ -72,71 +68,74 @@ export function ProductChatbot() {
     }
   }, [isOpen]);
 
-  const sendMessage = useCallback(async (messageText?: string) => {
-    const message = (messageText || inputValue).trim();
-    if (!message || isLoading) return;
+  const sendMessage = useCallback(
+    async (messageText?: string) => {
+      const message = (messageText || inputValue).trim();
+      if (!message || isLoading) return;
 
-    setHasInteracted(true);
+      setHasInteracted(true);
 
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: message,
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
-    setIsLoading(true);
-
-    try {
-      // Build conversation history (exclude welcome message and limit to last 10)
-      const conversationHistory = messages
-        .filter(m => m.id !== 'welcome' && !m.isError)
-        .slice(-10)
-        .map(m => ({
-          role: m.role,
-          content: m.content,
-        }));
-
-      const { data, error } = await supabase.functions.invoke<ChatResponse>('product-chatbot', {
-        body: {
-          message,
-          conversationHistory,
-        },
-      });
-
-      if (error) throw error;
-
-      const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: data?.response || "I'm sorry, I couldn't process that. Please try again.",
+      const userMessage: Message = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: message,
         timestamp: new Date(),
-        mentionedProducts: data?.mentionedProducts,
-        isError: !data?.success,
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (error: any) {
-      console.error('Chat error:', error);
-      const errorMessage: Message = {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: error?.message?.includes('429') 
-          ? "I'm a bit busy right now. Please try again in a moment! 🙏"
-          : "I'm having trouble connecting right now. Please try again in a moment.",
-        timestamp: new Date(),
-        isError: true,
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [inputValue, isLoading, messages]);
+      setMessages((prev) => [...prev, userMessage]);
+      setInputValue("");
+      setIsLoading(true);
+
+      try {
+        // Build conversation history (exclude welcome message and limit to last 10)
+        const conversationHistory = messages
+          .filter((m) => m.id !== "welcome" && !m.isError)
+          .slice(-10)
+          .map((m) => ({
+            role: m.role,
+            content: m.content,
+          }));
+
+        const { data, error } = await supabase.functions.invoke<ChatResponse>("product-chatbot", {
+          body: {
+            message,
+            conversationHistory,
+          },
+        });
+
+        if (error) throw error;
+
+        const assistantMessage: Message = {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: data?.response || "I'm sorry, I couldn't process that. Please try again.",
+          timestamp: new Date(),
+          mentionedProducts: data?.mentionedProducts,
+          isError: !data?.success,
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+      } catch (error: any) {
+        console.error("Chat error:", error);
+        const errorMessage: Message = {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          content: error?.message?.includes("429")
+            ? "I'm a bit busy right now. Please try again in a moment! 🙏"
+            : "I'm having trouble connecting right now. Please try again in a moment.",
+          timestamp: new Date(),
+          isError: true,
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [inputValue, isLoading, messages],
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
@@ -161,7 +160,7 @@ export function ProductChatbot() {
           "bg-primary text-primary-foreground hover:bg-primary/90",
           "bottom-4 right-4 h-14 w-14",
           "sm:bottom-6 sm:right-6 sm:h-16 sm:w-16",
-          isOpen && "scale-0 opacity-0"
+          isOpen && "scale-0 opacity-0",
         )}
         aria-label="Open chat"
       >
@@ -182,7 +181,7 @@ export function ProductChatbot() {
           // Large screens
           "lg:w-[420px] lg:h-[650px]",
           // Animation
-          isOpen ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none sm:translate-y-8"
+          isOpen ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none sm:translate-y-8",
         )}
       >
         {/* Header */}
@@ -193,8 +192,7 @@ export function ProductChatbot() {
               <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-400 border-2 border-primary" />
             </div>
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">AI Shopping Assistant</h3>
-              <p className="text-xs opacity-80">Powered by Lovable AI</p>
+              <h3 className="font-semibold text-sm sm:text-base">Mozamandu AI</h3>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -224,44 +222,35 @@ export function ProductChatbot() {
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={cn(
-                  "flex gap-3",
-                  message.role === 'user' ? "flex-row-reverse" : "flex-row"
-                )}
+                className={cn("flex gap-3", message.role === "user" ? "flex-row-reverse" : "flex-row")}
               >
                 {/* Avatar */}
                 <div
                   className={cn(
                     "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
-                    message.role === 'user'
+                    message.role === "user"
                       ? "bg-primary text-primary-foreground"
                       : message.isError
                         ? "bg-destructive/20 text-destructive"
-                        : "bg-muted"
+                        : "bg-muted",
                   )}
                 >
-                  {message.role === 'user' ? (
-                    <User className="h-4 w-4" />
-                  ) : (
-                    <Bot className="h-4 w-4" />
-                  )}
+                  {message.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
                 </div>
 
                 {/* Message Content */}
                 <div
                   className={cn(
                     "max-w-[80%] rounded-2xl px-4 py-2.5",
-                    message.role === 'user'
+                    message.role === "user"
                       ? "bg-primary text-primary-foreground rounded-tr-sm"
                       : message.isError
                         ? "bg-destructive/10 border border-destructive/20 rounded-tl-sm"
-                        : "bg-muted rounded-tl-sm"
+                        : "bg-muted rounded-tl-sm",
                   )}
                 >
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                    {message.content}
-                  </p>
-                  
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+
                   {/* Mentioned Products */}
                   {message.mentionedProducts && message.mentionedProducts.length > 0 && (
                     <div className="mt-3 space-y-2">
@@ -287,9 +276,7 @@ export function ProductChatbot() {
                             <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">
                               {product.name}
                             </p>
-                            <p className="text-xs font-semibold text-primary">
-                              Rs {product.price.toLocaleString()}
-                            </p>
+                            <p className="text-xs font-semibold text-primary">Rs {product.price.toLocaleString()}</p>
                           </div>
                           <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
                         </Link>
@@ -309,9 +296,18 @@ export function ProductChatbot() {
                 <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <span
+                        className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
+                        style={{ animationDelay: "0ms" }}
+                      />
+                      <span
+                        className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
+                        style={{ animationDelay: "150ms" }}
+                      />
+                      <span
+                        className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
+                        style={{ animationDelay: "300ms" }}
+                      />
                     </div>
                     <span className="text-sm text-muted-foreground ml-1">Thinking...</span>
                   </div>
@@ -357,11 +353,7 @@ export function ProductChatbot() {
               size="icon"
               className="rounded-full h-10 w-10 flex-shrink-0"
             >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
           <p className="text-[10px] text-muted-foreground text-center mt-2">
@@ -371,12 +363,7 @@ export function ProductChatbot() {
       </div>
 
       {/* Backdrop for mobile */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/20 z-40 sm:hidden"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
+      {isOpen && <div className="fixed inset-0 bg-black/20 z-40 sm:hidden" onClick={() => setIsOpen(false)} />}
     </>
   );
 }
