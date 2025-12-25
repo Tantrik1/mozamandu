@@ -10,7 +10,7 @@ import { FileText, Sparkles, Leaf, Info } from 'lucide-react';
 interface ProductDetailsAccordionProps {
   description?: string | null;
   materialComposition?: string | null;
-  careInstructions?: string[] | null;
+  careInstructions?: string | null;
 }
 
 export const ProductDetailsAccordion = memo(function ProductDetailsAccordion({
@@ -28,7 +28,21 @@ export const ProductDetailsAccordion = memo(function ProductDetailsAccordion({
   ];
 
   const material = materialComposition || defaultMaterial;
-  const care = careInstructions && careInstructions.length > 0 ? careInstructions : defaultCare;
+  // Parse care instructions - handle both string and array formats
+  const parseCareInstructions = (instructions: string | null | undefined): string[] => {
+    if (!instructions) return defaultCare;
+    // If it's a comma-separated string, split it
+    if (instructions.includes(',')) {
+      return instructions.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    // If it has newlines, split by newlines
+    if (instructions.includes('\n')) {
+      return instructions.split('\n').map(s => s.trim()).filter(Boolean);
+    }
+    // Otherwise return as single item array
+    return [instructions];
+  };
+  const care = parseCareInstructions(careInstructions);
 
   return (
     <div className="border-t border-border pt-6">

@@ -420,14 +420,16 @@ export function UniversalCheckout() {
       
       // Determine which tables to use based on authentication status
       const isCustomerOrder = !!user;
-      const ordersTable = isCustomerOrder ? 'customer_orders' : 'orders';
-      const orderItemsTable = isCustomerOrder ? 'customer_order_items' : 'order_items';
-      const orderItemDetailsTable = isCustomerOrder ? 'customer_order_item_details' : 'order_item_details';
       
-      console.log(`📋 Using tables: ${ordersTable}, ${orderItemsTable}, ${orderItemDetailsTable} (isCustomerOrder: ${isCustomerOrder})`);
+      console.log(`📋 Using ${isCustomerOrder ? 'customer_orders' : 'orders'} table (isCustomerOrder: ${isCustomerOrder})`);
       
-      const orderData = {
-        user_id: user?.id || null,
+      // Generate order number
+      const { data: orderNumberData } = await supabase.rpc('generate_order_number');
+      const orderNumber = orderNumberData || `ORD-${Date.now()}`;
+      
+      
+      const baseOrderData = {
+        order_number: orderNumber,
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
         contact_number: customerInfo.phone,
@@ -441,27 +443,51 @@ export function UniversalCheckout() {
         total_amount: orderFinalTotal,
         paid_amount: paidAmount,
         remaining_amount: remainingAmount,
-        payment_percentage: paymentPercentageValue,
         payment_method_id: paymentMethod.id,
         payment_screenshot_url: paymentScreenshotUrl,
         pricing_breakdown: pricingBreakdown,
         status: 'pending_payment' as const
       };
 
-      console.log('📋 Order data being sent:', orderData);
+      console.log('📋 Order data being sent:', baseOrderData);
       
-      const { data: createdOrder, error: orderError } = await supabase
-        .from(ordersTable)
-        .insert(orderData)
-        .select()
-        .single();
+      let createdOrderId: string;
+      let createdOrderNumber: string;
 
-      if (orderError) {
-        console.error('❌ Order creation error:', orderError);
-        throw new Error(`Failed to create order: ${orderError.message}`);
+      if (isCustomerOrder && user) {
+        // Insert into customer_orders table
+        const { data: createdOrder, error: orderError } = await supabase
+          .from('customer_orders')
+          .insert({
+            ...baseOrderData,
+            user_id: user.id,
+          })
+          .select()
+          .single();
+
+        if (orderError) {
+          console.error('❌ Order creation error:', orderError);
+          throw new Error(`Failed to create order: ${orderError.message}`);
+        }
+        createdOrderId = createdOrder.id;
+        createdOrderNumber = createdOrder.order_number;
+      } else {
+        // Insert into orders table (guest orders)
+        const { data: createdOrder, error: orderError } = await supabase
+          .from('orders')
+          .insert(baseOrderData)
+          .select()
+          .single();
+
+        if (orderError) {
+          console.error('❌ Order creation error:', orderError);
+          throw new Error(`Failed to create order: ${orderError.message}`);
+        }
+        createdOrderId = createdOrder.id;
+        createdOrderNumber = createdOrder.order_number;
       }
 
-      console.log('✅ Order created successfully:', createdOrder.id);
+      console.log('✅ Order created successfully:', createdOrderId);
 
       const orderItemsToInsert = cartItemsWithInventory.map(item => {
         const pricingResult = getTieredItemPricing(item.id);
@@ -469,7 +495,7 @@ export function UniversalCheckout() {
         const totalPrice = unitPrice * item.quantity;
         
         return {
-          order_id: createdOrder.id,
+          order_id: createdOrderId,
           product_id: item.productId,
           quantity: item.quantity,
           unit_price: unitPrice,
@@ -477,13 +503,22 @@ export function UniversalCheckout() {
         };
       });
 
-      const { error: orderItemsError } = await supabase
-        .from(orderItemsTable)
-        .insert(orderItemsToInsert);
-
-      if (orderItemsError) {
-        console.error('❌ Order items error:', orderItemsError);
-        throw new Error(`Failed to create order items: ${orderItemsError.message}`);
+      if (isCustomerOrder) {
+        const { error: orderItemsError } = await supabase
+          .from('customer_order_items')
+          .insert(orderItemsToInsert);
+        if (orderItemsError) {
+          console.error('❌ Order items error:', orderItemsError);
+          throw new Error(`Failed to create order items: ${orderItemsError.message}`);
+        }
+      } else {
+        const { error: orderItemsError } = await supabase
+          .from('order_items')
+          .insert(orderItemsToInsert);
+        if (orderItemsError) {
+          console.error('❌ Order items error:', orderItemsError);
+          throw new Error(`Failed to create order items: ${orderItemsError.message}`);
+        }
       }
 
       const orderItemDetailsToInsert = cartItemsWithInventory.map(item => {
@@ -498,7 +533,7 @@ export function UniversalCheckout() {
         };
 
         return {
-          order_id: createdOrder.id,
+          order_id: createdOrderId,
           product_inventory_id: item.inventoryId,
           product_name: item.productName,
           color_name: item.colorName || null,
@@ -514,7 +549,6 @@ export function UniversalCheckout() {
             savings: pricingInfo.savings || 0,
             basePrice: item.basePrice,
             subcategoryId: item.subcategoryId,
-            
             discountApplied: (pricingInfo.savings || 0) > 0,
             inventoryId: item.inventoryId,
             moqPricingApplied: pricingInfo.appliedTier === 'discount',
@@ -527,19 +561,28 @@ export function UniversalCheckout() {
 
       console.log('📝 Enhanced order item details with validated inventory IDs:', orderItemDetailsToInsert.length);
 
-      const { error: orderItemDetailsError } = await supabase
-        .from(orderItemDetailsTable)
-        .insert(orderItemDetailsToInsert);
-
-      if (orderItemDetailsError) {
-        console.error('❌ Order item details error:', orderItemDetailsError);
-        throw new Error(`Failed to create order item details: ${orderItemDetailsError.message}`);
+      if (isCustomerOrder) {
+        const { error: orderItemDetailsError } = await supabase
+          .from('customer_order_item_details')
+          .insert(orderItemDetailsToInsert);
+        if (orderItemDetailsError) {
+          console.error('❌ Order item details error:', orderItemDetailsError);
+          throw new Error(`Failed to create order item details: ${orderItemDetailsError.message}`);
+        }
+      } else {
+        const { error: orderItemDetailsError } = await supabase
+          .from('order_item_details')
+          .insert(orderItemDetailsToInsert);
+        if (orderItemDetailsError) {
+          console.error('❌ Order item details error:', orderItemDetailsError);
+          throw new Error(`Failed to create order item details: ${orderItemDetailsError.message}`);
+        }
       }
 
-      console.log('🔒 Reserving stock immediately for order:', createdOrder.id);
+      console.log('🔒 Reserving stock immediately for order:', createdOrderId);
       try {
-        await reserveStock(createdOrder.id, isCustomerOrder);
-        console.log('✅ Stock reserved successfully for order:', createdOrder.id);
+        await reserveStock(createdOrderId, isCustomerOrder);
+        console.log('✅ Stock reserved successfully for order:', createdOrderId);
         toast({
           title: 'Order Placed Successfully!',
           description: 'Stock has been reserved for your order!',
@@ -561,7 +604,7 @@ export function UniversalCheckout() {
         const { error: emailError } = await supabase.functions.invoke('send-order-email', {
           body: {
             type: 'order_created',
-            orderId: createdOrder.id,
+            orderId: createdOrderId,
             isCustomerOrder: isCustomerOrder
           }
         });
@@ -584,7 +627,7 @@ export function UniversalCheckout() {
       clearCart();
       
       // Redirect to thank you page instead of showing inline success
-      window.location.href = `/thank-you/${createdOrder.id}`;
+      window.location.href = `/thank-you/${createdOrderId}`;
 
     } catch (error) {
       console.error('💥 Enhanced order submission failed:', error);
