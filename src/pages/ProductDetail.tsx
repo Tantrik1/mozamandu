@@ -29,7 +29,7 @@ interface Product {
   subcategory_id: string;
   status: string;
   material_composition: string | null;
-  care_instructions: string[] | null;
+  care_instructions: string | null;
 }
 
 interface ColorVariant {
@@ -87,7 +87,10 @@ const fetchDiscountTiers = async (subcategoryId: string): Promise<DiscountTier[]
     .select('*')
     .eq('subcategory_id', subcategoryId)
     .order('min_quantity');
-  return data || [];
+  return (data || []).map(tier => ({
+    ...tier,
+    discount_amount: tier.discount_percentage,
+  })) as DiscountTier[];
 };
 
 const fetchColorVariants = async (productId: string): Promise<ColorVariant[]> => {
@@ -109,14 +112,23 @@ const fetchAdditionalImages = async (productId: string): Promise<string[]> => {
     .from('product_images')
     .select('image_url')
     .eq('product_id', productId)
-    .eq('is_primary', false)
-    .order('created_at');
+    .order('display_order');
   return data?.map(img => img.image_url) || [];
 };
 
 const fetchProductRating = async (productId: string) => {
-  const { data } = await supabase.rpc('get_product_rating', { p_product_id: productId });
-  return data?.[0] || { average_rating: 0, review_count: 0 };
+  const { data } = await supabase
+    .from('product_reviews')
+    .select('rating')
+    .eq('product_id', productId)
+    .eq('status', 'approved');
+  
+  if (!data || data.length === 0) {
+    return { average_rating: 0, review_count: 0 };
+  }
+  
+  const totalRating = data.reduce((sum, review) => sum + review.rating, 0);
+  return { average_rating: totalRating / data.length, review_count: data.length };
 };
 
 export default function ProductDetail() {

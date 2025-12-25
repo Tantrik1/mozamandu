@@ -7,25 +7,13 @@ import { CustomerTable } from './CustomerTable';
 import { CustomerDialog } from './CustomerDialog';
 import { useCustomerManagement } from '@/hooks/useCustomerManagement';
 
-interface Customer {
-  id: string;
-  email: string;
-  full_name: string | null;
-  contact_number: string | null;
-  whatsapp_number: string | null;
-  role: string;
-  created_at: string;
-  total_orders: number;
-  total_spent: number;
-}
-
 export function CustomerManagement() {
   const { customers, customerOrders, loading, fetchCustomers, fetchCustomerOrders } = useCustomerManagement();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<typeof customers[0] | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const handleViewCustomer = async (customer: Customer) => {
+  const handleViewCustomer = async (customer: typeof customers[0]) => {
     setSelectedCustomer(customer);
     setIsDialogOpen(true);
     await fetchCustomerOrders(customer.id);
@@ -46,6 +34,13 @@ export function CustomerManagement() {
       </div>
     );
   }
+
+  // Transform customers to match expected interface with contact_number and whatsapp_number
+  const transformedCustomers = customers.map(c => ({
+    ...c,
+    contact_number: c.phone,
+    whatsapp_number: c.whatsapp,
+  }));
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -69,19 +64,23 @@ export function CustomerManagement() {
 
       <CustomerSearch searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
-      <CustomerStats customers={customers} />
+      <CustomerStats customers={transformedCustomers} />
 
       <CustomerTable 
-        customers={customers}
+        customers={transformedCustomers}
         searchQuery={searchQuery}
-        onViewCustomer={handleViewCustomer}
+        onViewCustomer={(c) => handleViewCustomer(customers.find(cust => cust.id === c.id)!)}
         onRefresh={fetchCustomers}
       />
 
       <CustomerDialog
         isOpen={isDialogOpen}
         onClose={handleCloseDialog}
-        customer={selectedCustomer}
+        customer={selectedCustomer ? {
+          ...selectedCustomer,
+          contact_number: selectedCustomer.phone,
+          whatsapp_number: selectedCustomer.whatsapp,
+        } : null}
         customerOrders={customerOrders}
       />
     </div>

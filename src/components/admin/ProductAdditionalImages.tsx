@@ -47,8 +47,7 @@ export function ProductAdditionalImages({
         .from('product_images')
         .select('id, image_url')
         .eq('product_id', productId)
-        .eq('is_primary', false)
-        .order('created_at');
+        .order('display_order');
 
       if (error) throw error;
 
@@ -81,12 +80,12 @@ export function ProductAdditionalImages({
     const filesToProcess = files.slice(0, remainingSlots);
 
     for (const file of filesToProcess) {
-      // Validate file size (max 2MB)
-      const maxSize = 2 * 1024 * 1024;
+      // Validate file size (max 10MB - will be compressed if needed)
+      const maxSize = 10 * 1024 * 1024;
       if (file.size > maxSize) {
         toast({
           title: 'Error',
-          description: `${file.name} exceeds 2MB limit`,
+          description: `${file.name} exceeds 10MB limit`,
           variant: 'destructive',
         });
         continue;
@@ -160,12 +159,12 @@ export function ProductAdditionalImages({
         if (!img.file) continue;
 
         // Update uploading state
-        setImages(prev => prev.map((p, idx) => 
+        setImages(prev => prev.map((p) => 
           p === img ? { ...p, uploading: true } : p
         ));
 
         try {
-          // Optimize image with aggressive compression
+          // Optimize image with compression
           const { file: optimizedFile } = await prepareImageForUpload(img.file, PRODUCT_COMPRESSION);
 
           const fileName = `product-additional-${targetProductId}-${Date.now()}-${i}.webp`;
@@ -188,20 +187,18 @@ export function ProductAdditionalImages({
             .insert({
               product_id: targetProductId,
               image_url: urlData.publicUrl,
-              storage_path: fileName,
-              is_primary: false,
-              image_type: 'additional',
+              display_order: i,
             });
 
           if (dbError) throw dbError;
 
           // Update image state to mark as uploaded
-          setImages(prev => prev.map((p, idx) => 
+          setImages(prev => prev.map((p) => 
             p === img ? { ...p, isNew: false, uploading: false, id: crypto.randomUUID() } : p
           ));
         } catch (error) {
           console.error('Error uploading additional image:', error);
-          setImages(prev => prev.map((p, idx) => 
+          setImages(prev => prev.map((p) => 
             p === img ? { ...p, uploading: false } : p
           ));
           throw error;
@@ -260,7 +257,7 @@ export function ProductAdditionalImages({
             Upload up to {maxImages} additional product images
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Images will be automatically optimized (WebP, max 2MB)
+            Images will be automatically optimized (WebP format)
           </p>
         </div>
       ) : (

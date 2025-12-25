@@ -45,12 +45,27 @@ export function useProductVariants(productId?: string) {
     setError(null);
     
     try {
-      const { data, error } = await supabase.rpc('get_product_variants', {
-        p_product_id: productId
-      });
+      // Fetch variants from product_inventory table directly
+      const { data, error } = await supabase
+        .from('product_inventory')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('is_active', true);
 
       if (error) throw error;
-      setVariants(data || []);
+      
+      const transformedVariants: ProductVariant[] = (data || []).map(inv => ({
+        variant_id: inv.id,
+        sku: inv.sku,
+        product_name: inv.product_name,
+        color_name: inv.color_name || undefined,
+        size_name: inv.size_name || undefined,
+        stock_quantity: inv.stock_quantity || 0,
+        available_stock: (inv.stock_quantity || 0) - (inv.reserved_stock || 0),
+        price: inv.selling_price || inv.cost_price,
+      }));
+      
+      setVariants(transformedVariants);
     } catch (err) {
       console.error('Error fetching product variants:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch variants');
@@ -78,12 +93,29 @@ export function useProductColors(productId?: string) {
     setError(null);
     
     try {
-      const { data, error } = await supabase.rpc('get_product_colors', {
-        p_product_id: productId
-      });
+      // Fetch color variants from color_variants table
+      const { data, error } = await supabase
+        .from('color_variants')
+        .select('*, product_inventory!inner(stock_quantity, reserved_stock)')
+        .eq('product_id', productId)
+        .eq('is_active', true);
 
       if (error) throw error;
-      setColors(data || []);
+      
+      const transformedColors: ProductColor[] = (data || []).map(cv => {
+        const inventory = cv.product_inventory as any[];
+        const totalStock = inventory?.reduce((sum: number, inv: any) => sum + ((inv.stock_quantity || 0) - (inv.reserved_stock || 0)), 0) || 0;
+        
+        return {
+          color_id: cv.id,
+          color_name: cv.color_name,
+          hex_code: cv.color_code || undefined,
+          image_url: cv.image_url || undefined,
+          total_stock: totalStock,
+        };
+      });
+      
+      setColors(transformedColors);
     } catch (err) {
       console.error('Error fetching product colors:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch colors');
@@ -111,13 +143,28 @@ export function useProductSizes(productId?: string, colorName?: string) {
     setError(null);
     
     try {
-      const { data, error } = await supabase.rpc('get_product_sizes', {
-        p_product_id: productId,
-        p_color_name: colorName
-      });
+      // Fetch sizes from product_inventory filtered by color
+      const { data, error } = await supabase
+        .from('product_inventory')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('color_name', colorName)
+        .eq('is_active', true)
+        .not('size_name', 'is', null);
 
       if (error) throw error;
-      setSizes(data || []);
+      
+      const transformedSizes: ProductSize[] = (data || []).map(inv => ({
+        size_id: inv.size_variant_id || inv.id,
+        size_name: inv.size_name || '',
+        size_code: inv.size_name?.substring(0, 2).toUpperCase(),
+        stock_quantity: inv.stock_quantity || 0,
+        available_stock: (inv.stock_quantity || 0) - (inv.reserved_stock || 0),
+        variant_id: inv.id,
+        sku: inv.sku,
+      }));
+      
+      setSizes(transformedSizes);
     } catch (err) {
       console.error('Error fetching product sizes:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch sizes');

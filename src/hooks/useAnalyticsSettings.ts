@@ -3,15 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export interface AnalyticsSettings {
-  google_service_account_email?: string;
-  google_private_key?: string;
-  google_search_console_site_url?: string;
-  is_configured: boolean;
-  has_private_key?: boolean;
+  google_analytics_id?: string;
+  facebook_pixel_id?: string;
+  is_active: boolean;
 }
 
 export function useAnalyticsSettings() {
-  const [settings, setSettings] = useState<AnalyticsSettings>({ is_configured: false });
+  const [settings, setSettings] = useState<AnalyticsSettings>({ is_active: false });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -21,28 +19,18 @@ export function useAnalyticsSettings() {
       setLoading(true);
       const { data, error } = await supabase
         .from('analytics_settings')
-        .select('setting_key, setting_value');
+        .select('google_analytics_id, facebook_pixel_id, is_active')
+        .maybeSingle();
 
       if (error) throw error;
 
-      const settingsMap: Record<string, string> = {};
-      data?.forEach((item: { setting_key: string; setting_value: string }) => {
-        settingsMap[item.setting_key] = item.setting_value;
-      });
-
-      const isConfigured = !!(
-        settingsMap.google_service_account_email &&
-        settingsMap.google_private_key &&
-        settingsMap.google_search_console_site_url
-      );
-
-      setSettings({
-        google_service_account_email: settingsMap.google_service_account_email,
-        google_private_key: undefined, // Never expose the private key
-        google_search_console_site_url: settingsMap.google_search_console_site_url,
-        is_configured: isConfigured,
-        has_private_key: !!settingsMap.google_private_key,
-      });
+      if (data) {
+        setSettings({
+          google_analytics_id: data.google_analytics_id || undefined,
+          facebook_pixel_id: data.facebook_pixel_id || undefined,
+          is_active: data.is_active ?? false,
+        });
+      }
     } catch (error) {
       console.error('Error fetching analytics settings:', error);
     } finally {
@@ -50,28 +38,38 @@ export function useAnalyticsSettings() {
     }
   };
 
-  const saveSettings = async (newSettings: Omit<AnalyticsSettings, 'is_configured' | 'has_private_key'>) => {
+  const saveSettings = async (newSettings: Partial<AnalyticsSettings>) => {
     try {
       setSaving(true);
 
-      const settingsToSave: { setting_key: string; setting_value: string; is_encrypted?: boolean }[] = [
-        { setting_key: 'google_service_account_email', setting_value: newSettings.google_service_account_email || '' },
-        { setting_key: 'google_search_console_site_url', setting_value: newSettings.google_search_console_site_url || '' },
-      ];
+      // Check if a record exists
+      const { data: existing } = await supabase
+        .from('analytics_settings')
+        .select('id')
+        .maybeSingle();
 
-      // Only update private key if provided
-      if (newSettings.google_private_key) {
-        settingsToSave.push({ 
-          setting_key: 'google_private_key', 
-          setting_value: newSettings.google_private_key, 
-          is_encrypted: true 
-        });
-      }
-
-      for (const setting of settingsToSave) {
+      if (existing) {
+        // Update existing record
         const { error } = await supabase
           .from('analytics_settings')
-          .upsert(setting, { onConflict: 'setting_key' });
+          .update({
+            google_analytics_id: newSettings.google_analytics_id || null,
+            facebook_pixel_id: newSettings.facebook_pixel_id || null,
+            is_active: newSettings.is_active ?? true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id);
+
+        if (error) throw error;
+      } else {
+        // Insert new record
+        const { error } = await supabase
+          .from('analytics_settings')
+          .insert({
+            google_analytics_id: newSettings.google_analytics_id || null,
+            facebook_pixel_id: newSettings.facebook_pixel_id || null,
+            is_active: newSettings.is_active ?? true,
+          });
 
         if (error) throw error;
       }
@@ -100,11 +98,7 @@ export function useAnalyticsSettings() {
       const { error } = await supabase
         .from('analytics_settings')
         .delete()
-        .in('setting_key', [
-          'google_service_account_email',
-          'google_private_key',
-          'google_search_console_site_url',
-        ]);
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
 
       if (error) throw error;
 
@@ -113,7 +107,7 @@ export function useAnalyticsSettings() {
         description: 'Analytics settings have been removed.',
       });
 
-      setSettings({ is_configured: false });
+      setSettings({ is_active: false });
     } catch (error) {
       console.error('Error deleting analytics settings:', error);
       toast({

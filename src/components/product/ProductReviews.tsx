@@ -32,11 +32,24 @@ const fetchApprovedReviews = async (productId: string): Promise<Review[]> => {
 };
 
 const fetchProductRating = async (productId: string) => {
+  // Calculate rating from approved reviews directly
   const { data, error } = await supabase
-    .rpc('get_product_rating', { p_product_id: productId });
+    .from('product_reviews')
+    .select('rating')
+    .eq('product_id', productId)
+    .eq('status', 'approved');
   
   if (error) throw error;
-  return data?.[0] || { average_rating: 0, review_count: 0 };
+  
+  if (!data || data.length === 0) {
+    return { average_rating: 0, review_count: 0 };
+  }
+  
+  const totalRating = data.reduce((sum, review) => sum + review.rating, 0);
+  return { 
+    average_rating: totalRating / data.length, 
+    review_count: data.length 
+  };
 };
 
 export const ProductReviews = memo(function ProductReviews({ productId }: ProductReviewsProps) {

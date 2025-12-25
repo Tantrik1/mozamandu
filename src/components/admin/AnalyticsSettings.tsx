@@ -3,27 +3,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { useAnalyticsSettings } from '@/hooks/useAnalyticsSettings';
-import { Loader2, Save, Trash2, Key, Globe, Mail, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Save, Trash2, Settings, CheckCircle, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export function AnalyticsSettings() {
   const { settings, loading, saving, saveSettings, deleteSettings } = useAnalyticsSettings();
   const [formData, setFormData] = useState({
-    google_service_account_email: '',
-    google_private_key: '',
-    google_search_console_site_url: '',
+    google_analytics_id: '',
+    facebook_pixel_id: '',
   });
-  const [privateKeyTouched, setPrivateKeyTouched] = useState(false);
   const initialLoadDone = useRef(false);
 
   useEffect(() => {
     if (settings && !initialLoadDone.current) {
       setFormData({
-        google_service_account_email: settings.google_service_account_email || '',
-        google_private_key: '', // Never show the actual key
-        google_search_console_site_url: settings.google_search_console_site_url || '',
+        google_analytics_id: settings.google_analytics_id || '',
+        facebook_pixel_id: settings.facebook_pixel_id || '',
       });
       initialLoadDone.current = true;
     }
@@ -31,26 +27,20 @@ export function AnalyticsSettings() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // If private key wasn't touched and we already have one, don't update it
-    if (!privateKeyTouched && settings.has_private_key) {
-      const { google_private_key, ...rest } = formData;
-      await saveSettings(rest as any);
-    } else {
-      await saveSettings(formData);
-    }
-    setPrivateKeyTouched(false);
+    await saveSettings({
+      google_analytics_id: formData.google_analytics_id,
+      facebook_pixel_id: formData.facebook_pixel_id,
+      is_active: true,
+    });
   };
 
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete all analytics settings?')) {
       await deleteSettings();
       setFormData({
-        google_service_account_email: '',
-        google_private_key: '',
-        google_search_console_site_url: '',
+        google_analytics_id: '',
+        facebook_pixel_id: '',
       });
-      setPrivateKeyTouched(false);
       initialLoadDone.current = false;
     }
   };
@@ -63,21 +53,23 @@ export function AnalyticsSettings() {
     );
   }
 
+  const isConfigured = !!(settings.google_analytics_id || settings.facebook_pixel_id);
+
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Analytics Settings</h1>
         <p className="text-muted-foreground">
-          Configure Google Search Console API credentials to enable analytics
+          Configure Google Analytics and Facebook Pixel tracking
         </p>
       </div>
 
-      {settings.is_configured ? (
+      {isConfigured ? (
         <Alert className="border-green-200 bg-green-50">
           <CheckCircle className="h-4 w-4 text-green-600" />
           <AlertTitle className="text-green-800">Analytics Configured</AlertTitle>
           <AlertDescription className="text-green-700">
-            Your Google Search Console credentials are configured. You can view analytics data in the Analytics page.
+            Your analytics tracking is configured and active.
           </AlertDescription>
         </Alert>
       ) : (
@@ -85,7 +77,7 @@ export function AnalyticsSettings() {
           <AlertCircle className="h-4 w-4 text-yellow-600" />
           <AlertTitle className="text-yellow-800">Analytics Not Configured</AlertTitle>
           <AlertDescription className="text-yellow-700">
-            Please configure your Google Search Console credentials below to enable analytics.
+            Please configure your analytics IDs below to enable tracking.
           </AlertDescription>
         </Alert>
       )}
@@ -93,77 +85,42 @@ export function AnalyticsSettings() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Key className="h-5 w-5" />
-            Google Search Console Credentials
+            <Settings className="h-5 w-5" />
+            Tracking Configuration
           </CardTitle>
           <CardDescription>
-            Enter your Google Cloud service account credentials to fetch Search Console data.
-            You need to create a service account in Google Cloud Console and grant it access to your Search Console property.
+            Enter your tracking IDs to enable analytics on your site.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="service_account_email" className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                Service Account Email
+              <Label htmlFor="google_analytics_id">
+                Google Analytics ID
               </Label>
               <Input
-                id="service_account_email"
-                type="email"
-                placeholder="your-service-account@project-id.iam.gserviceaccount.com"
-                value={formData.google_service_account_email}
-                onChange={(e) => setFormData({ ...formData, google_service_account_email: e.target.value })}
+                id="google_analytics_id"
+                placeholder="G-XXXXXXXXXX or UA-XXXXXXXX-X"
+                value={formData.google_analytics_id}
+                onChange={(e) => setFormData({ ...formData, google_analytics_id: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
-                The email address of your Google Cloud service account
+                Your Google Analytics 4 measurement ID (starts with G-) or Universal Analytics ID (starts with UA-)
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="private_key" className="flex items-center gap-2">
-                <Key className="h-4 w-4" />
-                Private Key
-                {settings.has_private_key && !privateKeyTouched && (
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full ml-2">
-                    Configured (hidden for security)
-                  </span>
-                )}
-              </Label>
-              <Textarea
-                id="private_key"
-                placeholder={settings.has_private_key && !privateKeyTouched 
-                  ? "Private key is saved. Enter a new key to replace it." 
-                  : "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"}
-                value={formData.google_private_key}
-                onChange={(e) => {
-                  setFormData({ ...formData, google_private_key: e.target.value });
-                  setPrivateKeyTouched(true);
-                }}
-                rows={6}
-                className="font-mono text-xs"
-              />
-              <p className="text-xs text-muted-foreground">
-                {settings.has_private_key && !privateKeyTouched
-                  ? "Your private key is securely stored. Leave empty to keep the existing key, or enter a new one to replace it."
-                  : "The private key from your service account JSON file (including BEGIN and END markers)"}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="site_url" className="flex items-center gap-2">
-                <Globe className="h-4 w-4" />
-                Search Console Site URL
+              <Label htmlFor="facebook_pixel_id">
+                Facebook Pixel ID
               </Label>
               <Input
-                id="site_url"
-                type="url"
-                placeholder="https://mozamandu.com or sc-domain:mozamandu.com"
-                value={formData.google_search_console_site_url}
-                onChange={(e) => setFormData({ ...formData, google_search_console_site_url: e.target.value })}
+                id="facebook_pixel_id"
+                placeholder="XXXXXXXXXXXXXXXX"
+                value={formData.facebook_pixel_id}
+                onChange={(e) => setFormData({ ...formData, facebook_pixel_id: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
-                Your verified property URL in Google Search Console (URL prefix or domain property)
+                Your Facebook Pixel ID for tracking conversions and events
               </p>
             </div>
 
@@ -182,7 +139,7 @@ export function AnalyticsSettings() {
                 )}
               </Button>
 
-              {settings.is_configured && (
+              {isConfigured && (
                 <Button type="button" variant="destructive" onClick={handleDelete} disabled={saving}>
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete Settings
@@ -190,40 +147,6 @@ export function AnalyticsSettings() {
               )}
             </div>
           </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Setup Instructions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <h4 className="font-semibold">1. Create a Google Cloud Project</h4>
-            <p className="text-sm text-muted-foreground">
-              Go to the Google Cloud Console and create a new project or select an existing one.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <h4 className="font-semibold">2. Enable the Search Console API</h4>
-            <p className="text-sm text-muted-foreground">
-              In your project, go to APIs & Services → Library and enable the "Google Search Console API".
-            </p>
-          </div>
-          <div className="space-y-2">
-            <h4 className="font-semibold">3. Create a Service Account</h4>
-            <p className="text-sm text-muted-foreground">
-              Go to APIs & Services → Credentials → Create Credentials → Service Account. 
-              Download the JSON key file.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <h4 className="font-semibold">4. Grant Access in Search Console</h4>
-            <p className="text-sm text-muted-foreground">
-              In Google Search Console, go to Settings → Users and permissions → Add user. 
-              Add the service account email with "Full" permission.
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>
