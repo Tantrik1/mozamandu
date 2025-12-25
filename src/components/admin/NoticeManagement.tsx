@@ -150,7 +150,7 @@ export function NoticeManagement() {
       } else {
         const { error } = await supabase
           .from('notices')
-          .insert([noticeData]);
+          .insert([{ ...noticeData, content: formData.description || formData.title }]);
 
         if (error) throw error;
 

@@ -188,9 +188,9 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         is_featured: product.is_featured,
         has_color_variants: product.has_color_variants,
         has_size_variants: product.color_has_size_variants || false,
-        status: product.status,
+        status: (product.status === 'active' || product.status === 'inactive') ? product.status : 'active',
         material_composition: product.material_composition || '',
-        care_instructions: product.care_instructions ? product.care_instructions.join('\n') : '',
+        care_instructions: product.care_instructions || '',
       });
 
       setImagePreview(product.image_url);
@@ -360,7 +360,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         image_url: imageUrl,
         updated_at: new Date().toISOString(),
         material_composition: data.material_composition || null,
-        care_instructions: data.care_instructions ? data.care_instructions.split('\n').filter(line => line.trim()) : null,
+        care_instructions: data.care_instructions || null,
       };
 
       const { error } = await supabase

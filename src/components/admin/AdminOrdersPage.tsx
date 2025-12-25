@@ -104,15 +104,16 @@ export function AdminOrdersPage() {
         isGuestOrder: false
       }));
 
-      // Transform guest orders
+      // Transform guest orders (add user_id: null for compatibility)
       const transformedGuestOrders = guestOrders.map(order => ({
         ...order,
+        user_id: null as string | null,
         user_role: 'guest',
         isGuestOrder: true
       }));
 
       // Combine and sort by created_at descending
-      const allOrders = [...transformedCustomerOrders, ...transformedGuestOrders]
+      const allOrders = ([...transformedCustomerOrders, ...transformedGuestOrders] as Order[])
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       console.log('Final combined orders:', allOrders.length);

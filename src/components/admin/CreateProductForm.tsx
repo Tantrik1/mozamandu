@@ -304,7 +304,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
         status: data.status,
         image_url: imageUrl,
         material_composition: data.material_composition || 'Premium quality fabric blend designed for comfort and durability.',
-        care_instructions: data.care_instructions ? data.care_instructions.split('\n').filter(line => line.trim()) : ['Machine wash cold with similar colors', 'Do not bleach', 'Tumble dry low', 'Iron on low heat if needed'],
+        care_instructions: data.care_instructions || 'Machine wash cold with similar colors\nDo not bleach\nTumble dry low\nIron on low heat if needed',
       };
 
       console.log('Product data to insert:', productData);

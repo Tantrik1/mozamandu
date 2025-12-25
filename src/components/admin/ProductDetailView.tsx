@@ -62,8 +62,9 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
       if (productError) throw productError;
       
       // Add missing properties with defaults
-      const productWithDefaults = {
+      const productWithDefaults: Product = {
         ...productData,
+        status: (productData.status === 'active' || productData.status === 'inactive') ? productData.status : 'active',
         has_size_variants: productData.color_has_size_variants || false,
         stock_quantity: null
       };

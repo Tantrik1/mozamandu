@@ -51,7 +51,7 @@ export const CategoryManagement = memo(function CategoryManagement() {
         variant: "destructive",
       });
     } else {
-      setCategories(data || []);
+      setCategories((data || []) as Category[]);
     }
   };
 

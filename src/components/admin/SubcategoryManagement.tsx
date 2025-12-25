@@ -21,7 +21,8 @@ interface DiscountTier {
   id?: string;
   min_quantity: number;
   max_quantity: number | null;
-  discount_amount: number;
+  discount_percentage?: number;
+  discount_amount?: number;
 }
 
 interface Subcategory {
@@ -77,7 +78,7 @@ export function SubcategoryManagement() {
         variant: "destructive",
       });
     } else {
-      setSubcategories(data || []);
+      setSubcategories((data || []) as Subcategory[]);
     }
   };
 
@@ -98,7 +99,7 @@ export function SubcategoryManagement() {
     }
   };
 
-  const fetchDiscountTiers = async (subcategoryId: string) => {
+  const fetchDiscountTiers = async (subcategoryId: string): Promise<DiscountTier[]> => {
     const { data, error } = await supabase
       .from('discount_tiers')
       .select('*')
@@ -113,7 +114,13 @@ export function SubcategoryManagement() {
       });
       return [];
     }
-    return data || [];
+    return (data || []).map(tier => ({
+      id: tier.id,
+      min_quantity: tier.min_quantity,
+      max_quantity: tier.max_quantity,
+      discount_percentage: tier.discount_percentage,
+      discount_amount: tier.discount_percentage // Use discount_percentage as discount_amount for compatibility
+    }));
   };
 
   const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
