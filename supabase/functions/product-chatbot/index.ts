@@ -21,6 +21,7 @@ interface Product {
   category_name: string | null;
   subcategory_name: string | null;
   min_selling_price: number | null;
+  available_stock: number | null;
 }
 
 const supabase = createClient(
@@ -49,6 +50,18 @@ async function fetchAllProducts(): Promise<Product[]> {
     return [];
   }
 
+  // Also fetch inventory for stock info
+  const { data: inventory } = await supabase
+    .from('product_inventory')
+    .select('product_id, available_stock')
+    .eq('is_active', true);
+
+  const stockMap = new Map<string, number>();
+  (inventory || []).forEach((inv: any) => {
+    const current = stockMap.get(inv.product_id) || 0;
+    stockMap.set(inv.product_id, current + (inv.available_stock || 0));
+  });
+
   return (data || []).map((p: any) => ({
     id: p.id,
     name: p.name,
@@ -59,6 +72,7 @@ async function fetchAllProducts(): Promise<Product[]> {
     category_name: p.categories?.name || null,
     subcategory_name: p.subcategories?.name || null,
     min_selling_price: p.subcategories?.min_selling_price || null,
+    available_stock: stockMap.get(p.id) || 0,
   }));
 }
 
@@ -77,125 +91,124 @@ async function fetchCategories(): Promise<string[]> {
   return (data || []).map((c: any) => c.name);
 }
 
-function buildProductContext(products: Product[], categories: string[]): string {
-  const categoryList = categories.join(', ');
-  
-  const productSummaries = products.map(p => {
-    const price = p.min_selling_price || p.selling_price || p.cost_price;
-    return `- ${p.name} (ID: ${p.id}): ${p.description || 'No description'} | Category: ${p.category_name || 'Uncategorized'} | Subcategory: ${p.subcategory_name || 'None'} | Price: Rs ${price}`;
-  }).join('\n');
+async function fetchFAQs(): Promise<Array<{question: string, answer: string}>> {
+  const { data, error } = await supabase
+    .from('faqs')
+    .select('question, answer')
+    .eq('is_active', true)
+    .order('display_order');
 
-  return `
-You are a helpful shopping assistant for Mozamandu, a gear and apparel shop. Your role is to help customers find the perfect products based on their needs.
+  if (error) {
+    console.error('Error fetching FAQs:', error);
+    return [];
+  }
 
-AVAILABLE CATEGORIES: ${categoryList}
-
-AVAILABLE PRODUCTS:
-${productSummaries}
-
-INSTRUCTIONS:
-1. Be friendly, helpful, and conversational
-2. When recommending products, always include the product name and price
-3. If a customer asks about a specific category, filter your recommendations accordingly
-4. If you recommend a product, format it as: **[Product Name]** - Rs [Price] - [Brief description]
-5. You can recommend up to 3-5 products at a time
-6. If the customer's request is unclear, ask clarifying questions
-7. Always be honest - if a product doesn't exist or you're unsure, say so
-8. Include product IDs in your response using this format: [PRODUCT_ID:uuid] so the frontend can create links
-9. Keep responses concise but helpful
-10. If asked about stock, sizes, or colors, mention that customers can check the product page for current availability
-11. For pricing, use the min_selling_price if available, otherwise selling_price, otherwise cost_price
-
-Remember: You are representing Mozamandu. Be professional yet friendly!
-`;
+  return data || [];
 }
 
-async function callGeminiAPI(
+function buildProductContext(products: Product[], categories: string[], faqs: Array<{question: string, answer: string}>): string {
+  const categoryList = categories.join(', ');
+  
+  const productSummaries = products.slice(0, 50).map(p => {
+    const price = p.min_selling_price || p.selling_price || p.cost_price;
+    const stock = p.available_stock && p.available_stock > 0 ? 'In Stock' : 'Low Stock';
+    return `- ${p.name} (ID: ${p.id}): ${p.description?.substring(0, 100) || 'Premium quality product'} | Category: ${p.category_name || 'General'} | Price: Rs ${price} | ${stock}`;
+  }).join('\n');
+
+  const faqSummaries = faqs.slice(0, 10).map(f => 
+    `Q: ${f.question}\nA: ${f.answer}`
+  ).join('\n\n');
+
+  return `You are the AI shopping assistant for Mozamandu, a premium gear and apparel shop in Nepal. You are helpful, friendly, and knowledgeable about our products.
+
+STORE INFO:
+- Name: Mozamandu
+- Speciality: Quality gear and apparel
+- Currency: Nepali Rupees (Rs)
+
+AVAILABLE CATEGORIES: ${categoryList || 'Various categories'}
+
+TOP PRODUCTS (${products.length} total):
+${productSummaries || 'Various products available'}
+
+FREQUENTLY ASKED QUESTIONS:
+${faqSummaries || 'Ask me anything about our products!'}
+
+RESPONSE GUIDELINES:
+1. Be conversational, helpful, and enthusiastic about our products
+2. When recommending products, format as: **Product Name** - Rs Price
+3. Always include the product ID in this exact format for linking: [PRODUCT_ID:uuid-here]
+4. Recommend 1-3 relevant products at a time, not more
+5. If asked about stock/availability, sizes, or colors, suggest checking the product page
+6. For pricing, show the best available price (min_selling_price or selling_price)
+7. If you don't know something, be honest and suggest contacting customer support
+8. Keep responses concise but helpful (2-4 sentences max for general queries)
+9. Use emojis sparingly to add personality ✨
+10. For order status or account questions, direct them to login to their account
+
+EXAMPLE PRODUCT RECOMMENDATION:
+"I'd recommend checking out **Premium Cotton T-Shirt** - Rs 1,200 [PRODUCT_ID:abc-123] - it's one of our bestsellers! 🌟"
+
+Remember: You represent Mozamandu. Be professional, helpful, and enthusiastic!`;
+}
+
+async function callLovableAI(
   systemPrompt: string,
   userMessage: string,
   conversationHistory: Array<{ role: string; content: string }>
 ): Promise<string> {
-  const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   
-  if (!geminiApiKey) {
-    throw new Error('GEMINI_API_KEY is not configured');
+  if (!LOVABLE_API_KEY) {
+    throw new Error('LOVABLE_API_KEY is not configured');
   }
 
-  // Build conversation for Gemini
-  const contents = [];
-  
-  // Add conversation history
-  for (const msg of conversationHistory) {
-    contents.push({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    });
-  }
-  
-  // Add current user message
-  contents.push({
-    role: 'user',
-    parts: [{ text: userMessage }]
+  // Build messages array
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...conversationHistory.map(msg => ({
+      role: msg.role as 'user' | 'assistant',
+      content: msg.content
+    })),
+    { role: 'user', content: userMessage }
+  ];
+
+  console.log('Calling Lovable AI with', messages.length, 'messages');
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages,
+      max_tokens: 500,
+      temperature: 0.7,
+    }),
   });
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents,
-        systemInstruction: {
-          parts: [{ text: systemPrompt }]
-        },
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
-        },
-        safetySettings: [
-          {
-            category: "HARM_CATEGORY_HARASSMENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_HATE_SPEECH",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          }
-        ]
-      }),
-    }
-  );
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('Gemini API error:', errorText);
-    throw new Error(`Gemini API error: ${response.status}`);
+    console.error('Lovable AI error:', response.status, errorText);
+    
+    if (response.status === 429) {
+      throw new Error('AI is busy right now. Please try again in a moment.');
+    }
+    if (response.status === 402) {
+      throw new Error('AI service temporarily unavailable.');
+    }
+    throw new Error(`AI service error: ${response.status}`);
   }
 
   const data = await response.json();
   
-  if (!data.candidates || data.candidates.length === 0) {
-    throw new Error('No response from Gemini');
+  if (!data.choices || data.choices.length === 0) {
+    throw new Error('No response from AI');
   }
 
-  const candidate = data.candidates[0];
-  if (candidate.finishReason === 'SAFETY') {
-    return "I apologize, but I can't respond to that. How can I help you find products today?";
-  }
-
-  return candidate.content?.parts?.[0]?.text || "I'm sorry, I couldn't generate a response. Please try again.";
+  return data.choices[0].message?.content || "I'm sorry, I couldn't generate a response. Please try again.";
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -213,19 +226,20 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Chat request received:', { message: message.substring(0, 100) });
 
-    // Fetch products and categories
-    const [products, categories] = await Promise.all([
+    // Fetch products, categories, and FAQs in parallel
+    const [products, categories, faqs] = await Promise.all([
       fetchAllProducts(),
-      fetchCategories()
+      fetchCategories(),
+      fetchFAQs()
     ]);
 
-    console.log(`Loaded ${products.length} products and ${categories.length} categories`);
+    console.log(`Loaded ${products.length} products, ${categories.length} categories, ${faqs.length} FAQs`);
 
     // Build context with product data
-    const systemPrompt = buildProductContext(products, categories);
+    const systemPrompt = buildProductContext(products, categories, faqs);
 
-    // Call Gemini API
-    const response = await callGeminiAPI(systemPrompt, message, conversationHistory);
+    // Call Lovable AI
+    const response = await callLovableAI(systemPrompt, message, conversationHistory);
 
     // Extract product IDs from response for frontend linking
     const productIdRegex = /\[PRODUCT_ID:([a-f0-9-]+)\]/gi;
@@ -266,10 +280,12 @@ const handler = async (req: Request): Promise<Response> => {
       JSON.stringify({
         success: false,
         error: error.message,
-        response: "I'm sorry, I'm having trouble right now. Please try again in a moment.",
+        response: error.message.includes('busy') || error.message.includes('unavailable')
+          ? error.message
+          : "I'm sorry, I'm having trouble right now. Please try again in a moment.",
       }),
       {
-        status: 500,
+        status: error.message.includes('busy') ? 429 : 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       }
     );
