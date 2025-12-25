@@ -15,6 +15,9 @@ interface OTPVerificationFormProps {
   setIsLoading: (loading: boolean) => void;
 }
 
+// Store OTP codes in memory for verification (since we don't have an email_verification_codes table)
+const otpStore: Record<string, { code: string; expires: number }> = {};
+
 export function OTPVerificationForm({ 
   email, 
   signUpData, 
@@ -25,6 +28,7 @@ export function OTPVerificationForm({
 }: OTPVerificationFormProps) {
   const [otpCode, setOtpCode] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [expectedCode, setExpectedCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (resendCooldown > 0) {
@@ -56,6 +60,13 @@ export function OTPVerificationForm({
       }
 
       if (data?.success) {
+        // Store the code in memory for verification
+        otpStore[email] = { 
+          code, 
+          expires: Date.now() + 10 * 60 * 1000 // 10 minutes
+        };
+        setExpectedCode(code);
+        
         toast({
           title: isResend ? "New Code Sent" : "Code Sent",
           description: "Please check your email for the verification code.",
@@ -90,17 +101,10 @@ export function OTPVerificationForm({
     setIsLoading(true);
 
     try {
-      // Verify OTP code
-      const { data: verification, error: verifyError } = await supabase
-        .from('email_verification_codes')
-        .select('*')
-        .eq('email', email)
-        .eq('code', otpCode)
-        .gt('expires_at', new Date().toISOString())
-        .eq('verified', false)
-        .single();
-
-      if (verifyError || !verification) {
+      // Verify OTP code from memory store
+      const storedOTP = otpStore[email];
+      
+      if (!storedOTP || storedOTP.code !== otpCode || Date.now() > storedOTP.expires) {
         toast({
           title: "Invalid Code",
           description: "The verification code is invalid or expired. Please try again.",
@@ -110,11 +114,8 @@ export function OTPVerificationForm({
         return;
       }
 
-      // Mark code as verified
-      await supabase
-        .from('email_verification_codes')
-        .update({ verified: true })
-        .eq('id', verification.id);
+      // Clear the used code
+      delete otpStore[email];
 
       // Create the user account
       const { error: signUpError } = await supabase.auth.signUp({

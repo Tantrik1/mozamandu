@@ -119,8 +119,7 @@ export function useEnhancedInventoryManager() {
         p_color_variant_id: inventory.color_variant_id,
         p_size_variant_id: inventory.size_variant_id,
         p_reservation_change: quantity, // Reserve this quantity
-        p_reason: reason,
-        p_order_id: orderId,
+        p_reason: `${reason} - Order: ${orderId}`,
         p_transaction_type: 'reserve'
       });
 
@@ -172,8 +171,7 @@ export function useEnhancedInventoryManager() {
         p_color_variant_id: inventory.color_variant_id,
         p_size_variant_id: inventory.size_variant_id,
         p_reservation_change: -quantity, // Release this quantity
-        p_reason: reason,
-        p_order_id: orderId,
+        p_reason: `${reason} - Order: ${orderId}`,
         p_transaction_type: 'release'
       });
 
@@ -225,8 +223,7 @@ export function useEnhancedInventoryManager() {
         p_color_variant_id: inventory.color_variant_id,
         p_size_variant_id: inventory.size_variant_id,
         p_reservation_change: -quantity, // Also release reservation
-        p_reason: reason,
-        p_order_id: orderId,
+        p_reason: `${reason} - Order: ${orderId}`,
         p_transaction_type: 'fulfill'
       });
 

@@ -7,8 +7,8 @@ interface Customer {
   id: string;
   email: string;
   full_name: string | null;
-  contact_number: string | null;
-  whatsapp_number: string | null;
+  phone: string | null;
+  whatsapp: string | null;
   role: string;
   created_at: string;
   total_orders: number;
@@ -73,7 +73,7 @@ export function useCustomerManagement() {
           .order('created_at', { ascending: false }),
         supabase
           .from('orders')
-          .select('user_id, customer_email, contact_number, total_amount, promocode_used')
+          .select('customer_email, contact_number, total_amount, promocode_used')
           .order('created_at', { ascending: false })
       ]);
 
@@ -84,7 +84,7 @@ export function useCustomerManagement() {
       }
       
       if (!allOrders.error && allOrders.data) {
-        allOrdersData = [...allOrdersData, ...allOrders.data.map(order => ({ ...order, source: 'orders' }))];
+        allOrdersData = [...allOrdersData, ...allOrders.data.map(order => ({ ...order, user_id: null, source: 'orders' }))];
       }
 
       console.log(`📈 Total orders found: ${allOrdersData.length}`);
@@ -111,10 +111,10 @@ export function useCustomerManagement() {
               }
               
               // Phone number match for guest orders
-              if (order.user_id === null && order.contact_number && profile.contact_number) {
+              if (order.user_id === null && order.contact_number && profile.phone) {
                 // Clean phone numbers for comparison
                 const orderPhone = order.contact_number.replace(/\D/g, '');
-                const profilePhone = profile.contact_number.replace(/\D/g, '');
+                const profilePhone = profile.phone.replace(/\D/g, '');
                 return orderPhone === profilePhone;
               }
               
@@ -122,21 +122,21 @@ export function useCustomerManagement() {
             });
 
             const totalOrders = customerOrders.length;
-            const totalSpent = customerOrders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
+            const totalSpent = customerOrders.reduce((sum: number, order: any) => sum + Number(order.total_amount || 0), 0);
 
             console.log(`✅ Customer ${profile.email}: ${totalOrders} orders, Rs. ${totalSpent.toFixed(2)} spent`);
-            console.log(`   - Direct user_id matches: ${customerOrders.filter(o => o.user_id === profile.id).length}`);
-            console.log(`   - Email matches: ${customerOrders.filter(o => o.user_id === null && o.customer_email?.toLowerCase() === profile.email?.toLowerCase()).length}`);
-            console.log(`   - Phone matches: ${customerOrders.filter(o => o.user_id === null && o.contact_number && profile.contact_number && o.contact_number.replace(/\D/g, '') === profile.contact_number.replace(/\D/g, '')).length}`);
+            console.log(`   - Direct user_id matches: ${customerOrders.filter((o: any) => o.user_id === profile.id).length}`);
+            console.log(`   - Email matches: ${customerOrders.filter((o: any) => o.user_id === null && o.customer_email?.toLowerCase() === profile.email?.toLowerCase()).length}`);
+            console.log(`   - Phone matches: ${customerOrders.filter((o: any) => o.user_id === null && o.contact_number && profile.phone && o.contact_number.replace(/\D/g, '') === profile.phone.replace(/\D/g, '')).length}`);
 
             return {
               id: profile.id,
-              email: profile.email,
+              email: profile.email || '',
               full_name: profile.full_name,
-              contact_number: profile.contact_number,
-              whatsapp_number: profile.whatsapp_number,
+              phone: profile.phone,
+              whatsapp: profile.whatsapp,
               role: profile.role || 'customer',
-              created_at: profile.created_at,
+              created_at: profile.created_at || '',
               total_orders: totalOrders,
               total_spent: totalSpent,
             };
@@ -144,12 +144,12 @@ export function useCustomerManagement() {
             console.error('❌ Error processing customer profile', profile.id, ':', error);
             return {
               id: profile.id,
-              email: profile.email,
+              email: profile.email || '',
               full_name: profile.full_name,
-              contact_number: profile.contact_number,
-              whatsapp_number: profile.whatsapp_number,
+              phone: profile.phone,
+              whatsapp: profile.whatsapp,
               role: profile.role || 'customer',
-              created_at: profile.created_at,
+              created_at: profile.created_at || '',
               total_orders: 0,
               total_spent: 0,
             };
@@ -181,7 +181,7 @@ export function useCustomerManagement() {
     // Get customer profile for email/phone matching
     const { data: customerProfile } = await supabase
       .from('profiles')
-      .select('email, contact_number')
+      .select('email, phone')
       .eq('id', customerId)
       .single();
 
@@ -199,7 +199,7 @@ export function useCustomerManagement() {
         .order('created_at', { ascending: false }),
       supabase
         .from('orders')
-        .select('id, order_number, total_amount, status, created_at, user_id, customer_email, contact_number, promocode_used')
+        .select('id, order_number, total_amount, status, created_at, customer_email, contact_number, promocode_used')
         .order('created_at', { ascending: false })
     ]);
 
@@ -217,9 +217,9 @@ export function useCustomerManagement() {
         }
         
         // Phone number match for guest orders
-        if (order.user_id === null && order.contact_number && customerProfile.contact_number) {
+        if (order.user_id === null && order.contact_number && customerProfile.phone) {
           const orderPhone = order.contact_number.replace(/\D/g, '');
-          const profilePhone = customerProfile.contact_number.replace(/\D/g, '');
+          const profilePhone = customerProfile.phone.replace(/\D/g, '');
           return orderPhone === profilePhone;
         }
         
@@ -229,21 +229,18 @@ export function useCustomerManagement() {
       allOrders = [...allOrders, ...matchingOrders.map(order => ({ ...order, source: 'customer_orders' }))];
     }
     
-    // Process orders
+    // Process orders (guest orders table - no user_id column)
     if (!ordersResult.error && ordersResult.data) {
       const matchingOrders = ordersResult.data.filter(order => {
-        // Direct user_id match
-        if (order.user_id === customerId) return true;
-        
         // Email match for guest orders
-        if (order.user_id === null && order.customer_email && customerProfile.email) {
+        if (order.customer_email && customerProfile.email) {
           return order.customer_email.toLowerCase() === customerProfile.email.toLowerCase();
         }
         
         // Phone number match for guest orders
-        if (order.user_id === null && order.contact_number && customerProfile.contact_number) {
+        if (order.contact_number && customerProfile.phone) {
           const orderPhone = order.contact_number.replace(/\D/g, '');
-          const profilePhone = customerProfile.contact_number.replace(/\D/g, '');
+          const profilePhone = customerProfile.phone.replace(/\D/g, '');
           return orderPhone === profilePhone;
         }
         

@@ -463,11 +463,19 @@ export function UniversalCheckout() {
 
       console.log('✅ Order created successfully:', createdOrder.id);
 
-      const orderItemsToInsert = cartItemsWithInventory.map(item => ({
-        order_id: createdOrder.id,
-        product_id: item.productId,
-        quantity: item.quantity
-      }));
+      const orderItemsToInsert = cartItemsWithInventory.map(item => {
+        const pricingResult = getTieredItemPricing(item.id);
+        const unitPrice = pricingResult?.unitPrice || item.basePrice;
+        const totalPrice = unitPrice * item.quantity;
+        
+        return {
+          order_id: createdOrder.id,
+          product_id: item.productId,
+          quantity: item.quantity,
+          unit_price: unitPrice,
+          total_price: totalPrice,
+        };
+      });
 
       const { error: orderItemsError } = await supabase
         .from(orderItemsTable)

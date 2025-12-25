@@ -23,7 +23,7 @@ export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (userProfile?.contact_number) {
+    if (userProfile?.phone) {
       navigate('/dashboard');
     }
   }, [userProfile, navigate]);
@@ -54,8 +54,8 @@ export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
       const { error } = await supabase
         .from('profiles')
         .update({
-          contact_number: contactNumber.trim(),
-          whatsapp_number: finalWhatsappNumber.trim(),
+          phone: contactNumber.trim(),
+          whatsapp: finalWhatsappNumber.trim(),
         })
         .eq('id', user?.id);
 
