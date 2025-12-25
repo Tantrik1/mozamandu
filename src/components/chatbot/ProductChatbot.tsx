@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   id: string;
@@ -249,7 +250,23 @@ export function ProductChatbot() {
                         : "bg-muted rounded-tl-sm",
                   )}
                 >
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                  <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-inherit">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="list-none pl-0 space-y-1">{children}</ul>,
+                        li: ({ children }) => <li className="flex gap-2"><span>•</span><span>{children}</span></li>,
+                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                        a: ({ href, children }) => (
+                          <a href={href} className="text-primary underline hover:no-underline" target="_blank" rel="noopener noreferrer">
+                            {children}
+                          </a>
+                        ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
 
                   {/* Mentioned Products */}
                   {message.mentionedProducts && message.mentionedProducts.length > 0 && (
