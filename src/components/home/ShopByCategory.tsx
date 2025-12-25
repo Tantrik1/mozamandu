@@ -22,7 +22,7 @@ export const ShopByCategory = memo(function ShopByCategory({ categories, isLoadi
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 lg:gap-6">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-muted rounded-2xl md:rounded-3xl h-40 md:h-52 lg:h-64 animate-pulse" />
+              <div key={i} className="bg-muted rounded-2xl md:rounded-3xl aspect-square animate-pulse" />
             ))}
           </div>
         </div>
@@ -60,7 +60,7 @@ export const ShopByCategory = memo(function ShopByCategory({ categories, isLoadi
               >
                 <Link 
                   to={`/shop?category=${category.id}`}
-                  className="group relative block rounded-2xl md:rounded-3xl overflow-hidden h-40 md:h-52 lg:h-64 shadow-md hover:shadow-xl transition-all duration-500"
+                  className="group relative block rounded-2xl md:rounded-3xl overflow-hidden aspect-square shadow-md hover:shadow-xl transition-all duration-500"
                 >
                   {/* Background Image */}
                   {categoryImage ? (
