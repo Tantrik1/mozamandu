@@ -45,11 +45,10 @@ interface Review {
   id: string;
   product_id: string;
   reviewer_name: string;
-  reviewer_email: string;
+  reviewer_email: string | null;
   rating: number;
   review_text: string | null;
   status: string;
-  admin_notes: string | null;
   created_at: string;
   product?: {
     name: string;
@@ -67,7 +66,6 @@ const fetchAllReviews = async (): Promise<Review[]> => {
       rating,
       review_text,
       status,
-      admin_notes,
       created_at
     `)
     .order('created_at', { ascending: false });
@@ -75,7 +73,7 @@ const fetchAllReviews = async (): Promise<Review[]> => {
   if (error) throw error;
 
   // Fetch product names separately
-  const productIds = [...new Set(data?.map(r => r.product_id) || [])];
+  const productIds = [...new Set((data || []).map(r => r.product_id))];
   const { data: products } = await supabase
     .from('products')
     .select('id, name')
@@ -94,7 +92,6 @@ export const ReviewManagement = memo(function ReviewManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedReview, setSelectedReview] = useState<Review | null>(null);
-  const [adminNotes, setAdminNotes] = useState('');
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
   const { data: reviews = [], isLoading } = useQuery({
@@ -104,9 +101,8 @@ export const ReviewManagement = memo(function ReviewManagement() {
   });
 
   const updateReviewMutation = useMutation({
-    mutationFn: async ({ id, status, notes }: { id: string; status: string; notes?: string }) => {
-      const updateData: any = { status, updated_at: new Date().toISOString() };
-      if (notes !== undefined) updateData.admin_notes = notes;
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const updateData = { status, updated_at: new Date().toISOString(), is_approved: status === 'approved' };
       
       const { error } = await supabase
         .from('product_reviews')
@@ -159,7 +155,6 @@ export const ReviewManagement = memo(function ReviewManagement() {
 
   const handleViewReview = (review: Review) => {
     setSelectedReview(review);
-    setAdminNotes(review.admin_notes || '');
     setIsViewDialogOpen(true);
   };
 
@@ -171,12 +166,11 @@ export const ReviewManagement = memo(function ReviewManagement() {
     updateReviewMutation.mutate({ id: review.id, status: 'rejected' });
   };
 
-  const handleSaveNotes = () => {
+  const handleUpdateStatus = (status: string) => {
     if (selectedReview) {
       updateReviewMutation.mutate({
         id: selectedReview.id,
-        status: selectedReview.status,
-        notes: adminNotes
+        status
       });
     }
   };
@@ -382,15 +376,6 @@ export const ReviewManagement = memo(function ReviewManagement() {
                 </div>
               )}
 
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Admin Notes</p>
-                <Textarea
-                  value={adminNotes}
-                  onChange={(e) => setAdminNotes(e.target.value)}
-                  placeholder="Add private notes about this review..."
-                  rows={3}
-                />
-              </div>
             </div>
           )}
           <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -398,26 +383,14 @@ export const ReviewManagement = memo(function ReviewManagement() {
               <>
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    updateReviewMutation.mutate({
-                      id: selectedReview.id,
-                      status: 'rejected',
-                      notes: adminNotes
-                    });
-                  }}
+                  onClick={() => handleUpdateStatus('rejected')}
                   className="text-red-500 border-red-500/30 hover:bg-red-500/10"
                 >
                   <X className="w-4 h-4 mr-2" />
                   Reject
                 </Button>
                 <Button
-                  onClick={() => {
-                    updateReviewMutation.mutate({
-                      id: selectedReview.id,
-                      status: 'approved',
-                      notes: adminNotes
-                    });
-                  }}
+                  onClick={() => handleUpdateStatus('approved')}
                   className="bg-emerald-500 hover:bg-emerald-600"
                 >
                   <Check className="w-4 h-4 mr-2" />
@@ -426,8 +399,8 @@ export const ReviewManagement = memo(function ReviewManagement() {
               </>
             )}
             {selectedReview?.status !== 'pending' && (
-              <Button onClick={handleSaveNotes}>
-                Save Notes
+              <Button onClick={() => setIsViewDialogOpen(false)}>
+                Close
               </Button>
             )}
           </DialogFooter>

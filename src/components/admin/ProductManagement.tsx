@@ -99,7 +99,7 @@ export function ProductManagement() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setProducts(data || []);
+      setProducts((data || []) as Product[]);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast({

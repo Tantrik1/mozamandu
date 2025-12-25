@@ -155,7 +155,7 @@ export function PromocodeManagement() {
     } else {
       ({ error } = await supabase
         .from('promocodes')
-        .insert([promocodeData]));
+        .insert([{ ...promocodeData, discount_type: 'percentage' }]));
     }
 
     if (error) {
