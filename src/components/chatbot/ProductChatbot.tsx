@@ -173,11 +173,11 @@ export function ProductChatbot() {
       {/* Chat Window */}
       <div
         className={cn(
-          "fixed z-50 flex flex-col bg-background border shadow-2xl transition-all duration-300",
-          // Mobile: Full screen
-          "inset-0 rounded-none",
+          "fixed flex flex-col bg-background border shadow-2xl transition-all duration-300",
+          // Mobile: Full screen with higher z-index
+          "inset-0 rounded-none z-[100]",
           // Tablet and up: Floating window
-          "sm:inset-auto sm:bottom-6 sm:right-6 sm:rounded-2xl",
+          "sm:inset-auto sm:bottom-6 sm:right-6 sm:rounded-2xl sm:z-50",
           "sm:w-[400px] sm:h-[600px] sm:max-h-[80vh]",
           // Large screens
           "lg:w-[420px] lg:h-[650px]",
