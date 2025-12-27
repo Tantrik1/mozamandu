@@ -471,7 +471,7 @@ export const ProductInfo = memo(function ProductInfo({
       {/* Trust Badges */}
       <div className="grid grid-cols-3 gap-2 pt-4 border-t border-border">
         {[
-          { icon: Truck, label: "Free Delivery" },
+          { icon: Truck, label: "Delivery All Over Nepal" },
           { icon: RotateCcw, label: "Easy Returns" },
           { icon: Shield, label: "Quality Assured" },
         ].map(({ icon: Icon, label }, idx) => (
