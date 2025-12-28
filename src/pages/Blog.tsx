@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
@@ -6,9 +7,17 @@ import { Footer } from '@/components/layout/Footer';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calendar, Clock, User, ArrowRight } from 'lucide-react';
+import { Calendar, Clock, User, ArrowRight, FolderOpen } from 'lucide-react';
 import { format } from 'date-fns';
 import { Helmet } from 'react-helmet-async';
+
+interface BlogCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  image_url: string | null;
+}
 
 interface Blog {
   id: string;
@@ -24,9 +33,25 @@ interface Blog {
   is_featured: boolean;
   published_at: string | null;
   created_at: string;
+  category_id: string | null;
 }
 
 export default function Blog() {
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['public-blog-categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('blog_categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      if (error) throw error;
+      return data as BlogCategory[];
+    },
+  });
+
   const { data: blogs = [], isLoading } = useQuery({
     queryKey: ['public-blogs'],
     queryFn: async () => {
@@ -40,8 +65,17 @@ export default function Blog() {
     },
   });
 
-  const featuredBlogs = blogs.filter(b => b.is_featured);
-  const regularBlogs = blogs.filter(b => !b.is_featured);
+  const filteredBlogs = selectedCategory 
+    ? blogs.filter(b => b.category_id === selectedCategory)
+    : blogs;
+
+  const featuredBlogs = filteredBlogs.filter(b => b.is_featured);
+  const regularBlogs = filteredBlogs.filter(b => !b.is_featured);
+
+  const getCategoryName = (categoryId: string | null) => {
+    if (!categoryId) return null;
+    return categories.find(c => c.id === categoryId)?.name;
+  };
 
   return (
     <>
@@ -68,6 +102,40 @@ export default function Blog() {
           </div>
         </section>
 
+        {/* Category Filter */}
+        {categories.length > 0 && (
+          <section className="border-b">
+            <div className="container mx-auto px-4 py-4">
+              <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                    !selectedCategory 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted hover:bg-muted/80'
+                  }`}
+                >
+                  All Posts
+                </button>
+                {categories.map(category => (
+                  <button
+                    key={category.id}
+                    onClick={() => setSelectedCategory(category.id)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-2 ${
+                      selectedCategory === category.id 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-muted hover:bg-muted/80'
+                    }`}
+                  >
+                    <FolderOpen className="h-3 w-3" />
+                    {category.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         <div className="container mx-auto px-4 py-12">
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -82,9 +150,9 @@ export default function Blog() {
                 </Card>
               ))}
             </div>
-          ) : blogs.length === 0 ? (
+          ) : filteredBlogs.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-muted-foreground text-lg">No blog posts yet. Check back soon!</p>
+              <p className="text-muted-foreground text-lg">No blog posts found. Check back soon!</p>
             </div>
           ) : (
             <>
@@ -107,6 +175,9 @@ export default function Blog() {
                             </div>
                           )}
                           <CardContent className="p-6">
+                            {getCategoryName(blog.category_id) && (
+                              <Badge variant="outline" className="mb-2">{getCategoryName(blog.category_id)}</Badge>
+                            )}
                             <h3 className="text-xl font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-2">
                               {blog.title}
                             </h3>
@@ -152,6 +223,9 @@ export default function Blog() {
                           </div>
                         )}
                         <CardContent className="p-5">
+                          {getCategoryName(blog.category_id) && (
+                            <Badge variant="outline" className="mb-2 text-xs">{getCategoryName(blog.category_id)}</Badge>
+                          )}
                           <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-2">
                             {blog.title}
                           </h3>

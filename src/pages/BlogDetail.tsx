@@ -13,6 +13,12 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import { useToast } from '@/hooks/use-toast';
 
+interface BlogCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface Blog {
   id: string;
   title: string;
@@ -31,6 +37,7 @@ interface Blog {
   view_count: number;
   published_at: string | null;
   created_at: string;
+  category_id: string | null;
 }
 
 export default function BlogDetail() {
@@ -69,15 +76,38 @@ export default function BlogDetail() {
     }
   }, [blog?.id]);
 
-  const { data: relatedBlogs = [] } = useQuery({
-    queryKey: ['related-blogs', blog?.id],
+  // Fetch category info
+  const { data: category } = useQuery({
+    queryKey: ['blog-category', blog?.category_id],
     queryFn: async () => {
+      if (!blog?.category_id) return null;
       const { data, error } = await supabase
+        .from('blog_categories')
+        .select('id, name, slug')
+        .eq('id', blog.category_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data as BlogCategory | null;
+    },
+    enabled: !!blog?.category_id,
+  });
+
+  const { data: relatedBlogs = [] } = useQuery({
+    queryKey: ['related-blogs', blog?.id, blog?.category_id],
+    queryFn: async () => {
+      let query = supabase
         .from('blogs')
         .select('id, title, slug, featured_image_url, reading_time_minutes, published_at')
         .eq('status', 'published')
         .neq('id', blog?.id)
         .limit(3);
+      
+      // Prioritize same category
+      if (blog?.category_id) {
+        query = query.eq('category_id', blog.category_id);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -190,6 +220,12 @@ export default function BlogDetail() {
               <Link to="/" className="hover:text-foreground">Home</Link>
               <span>/</span>
               <Link to="/blog" className="hover:text-foreground">Blog</Link>
+              {category && (
+                <>
+                  <span>/</span>
+                  <Link to={`/blog?category=${category.id}`} className="hover:text-foreground">{category.name}</Link>
+                </>
+              )}
               <span>/</span>
               <span className="text-foreground line-clamp-1">{blog.title}</span>
             </nav>
