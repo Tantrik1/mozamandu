@@ -46,7 +46,8 @@ export function ProductAdditionalImages({
       const { data, error } = await supabase
         .from('product_images')
         .select('id, image_url')
-        .eq('product_id', productId);
+        .eq('product_id', productId)
+        .order('display_order');
 
       if (error) throw error;
 
@@ -186,6 +187,7 @@ export function ProductAdditionalImages({
             .insert({
               product_id: targetProductId,
               image_url: urlData.publicUrl,
+              display_order: i,
             });
 
           if (dbError) throw dbError;
@@ -226,7 +228,7 @@ export function ProductAdditionalImages({
         <Label className="text-sm font-medium">
           Additional Images ({images.length}/{maxImages})
         </Label>
-        {canAddMore && images.length > 0 && (
+        {canAddMore && (
           <div>
             <input
               id="additional-images-upload"
@@ -242,81 +244,60 @@ export function ProductAdditionalImages({
               className={`cursor-pointer inline-flex items-center justify-center px-3 py-1.5 border border-dashed border-border rounded-md text-sm text-muted-foreground hover:bg-muted/50 transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <ImagePlus className="h-4 w-4 mr-1.5" />
-              Add More
+              Add Images
             </label>
           </div>
         )}
       </div>
 
       {images.length === 0 ? (
-        <label
-          htmlFor="additional-images-upload"
-          className="block cursor-pointer"
-        >
-          <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:bg-muted/30 transition-colors">
-            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-              <ImagePlus className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <p className="text-sm font-medium text-foreground">
-              Add Additional Images
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Upload up to {maxImages} images (1:1 ratio)
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Auto-optimized to WebP format
-            </p>
-          </div>
-          <input
-            id="additional-images-upload"
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleImageUpload}
-            className="hidden"
-            disabled={loading}
-          />
-        </label>
+        <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+          <ImagePlus className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground">
+            Upload up to {maxImages} additional product images
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Images will be automatically optimized (WebP format)
+          </p>
+        </div>
       ) : (
         <div className="grid grid-cols-3 gap-3">
           {images.map((image, index) => (
-            <div key={index} className="relative group">
-              <div className="aspect-square w-full overflow-hidden rounded-xl border-2 border-border bg-muted/30">
-                <img
-                  src={image.preview}
-                  alt={`Additional ${index + 1}`}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+            <div key={index} className="relative group aspect-square">
+              <img
+                src={image.preview}
+                alt={`Additional ${index + 1}`}
+                className="w-full h-full object-cover rounded-lg border border-border"
+              />
               {image.uploading && (
-                <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded-xl">
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded-lg">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
               )}
-              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+              <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                 <Button
                   type="button"
                   size="icon"
                   variant="secondary"
-                  className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm"
+                  className="h-6 w-6"
                   onClick={() => window.open(image.preview, '_blank')}
                 >
-                  <Eye className="h-3.5 w-3.5" />
+                  <Eye className="h-3 w-3" />
                 </Button>
                 <Button
                   type="button"
                   size="icon"
                   variant="destructive"
-                  className="h-7 w-7 shadow-sm"
+                  className="h-6 w-6"
                   onClick={() => removeImage(index)}
                   disabled={image.uploading}
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-3 w-3" />
                 </Button>
               </div>
               {image.isNew && !image.uploading && (
-                <div className="absolute bottom-2 left-2">
-                  <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-md font-medium">
+                <div className="absolute bottom-1 left-1">
+                  <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">
                     New
                   </span>
                 </div>
@@ -324,26 +305,22 @@ export function ProductAdditionalImages({
             </div>
           ))}
           
-          {/* Add more placeholder - 1:1 aspect ratio */}
+          {/* Add more placeholder */}
           {canAddMore && (
             <label
               htmlFor="additional-images-upload"
-              className="cursor-pointer block"
+              className="aspect-square border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
             >
-              <div className="aspect-square w-full border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center bg-muted/20 hover:bg-muted/40 transition-colors">
-                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center mb-2">
-                  <Upload className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <span className="text-xs font-medium text-muted-foreground">Add</span>
-              </div>
+              <Upload className="h-6 w-6 text-muted-foreground mb-1" />
+              <span className="text-xs text-muted-foreground">Add</span>
             </label>
           )}
         </div>
       )}
 
       {hasNewImages && (
-        <p className="text-xs text-muted-foreground italic">
-          ✓ New images will be uploaded when you save the product
+        <p className="text-xs text-muted-foreground">
+          New images will be uploaded when you save the product
         </p>
       )}
     </div>
