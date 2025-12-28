@@ -9,14 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
+import { ArrowLeft, Upload, Eye, X, Check, Package, ImageIcon, DollarSign, FolderOpen, Sparkles, Star, Palette, Ruler, Shirt, FileText } from 'lucide-react';
 import { EnhancedProductVariantForm } from './EnhancedProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 import { ProductAdditionalImages, type AdditionalImage } from './ProductAdditionalImages';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
 import { CareInstructionsInput } from './CareInstructionsInput';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -108,7 +108,6 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     if (watchedCategoryId && subcategories.length > 0) {
       const filtered = subcategories.filter(sub => sub.category_id === watchedCategoryId);
       setFilteredSubcategories(filtered);
-      console.log('Filtered subcategories for category', watchedCategoryId, ':', filtered);
     } else {
       setFilteredSubcategories([]);
     }
@@ -129,41 +128,24 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         .order('name');
 
       if (error) throw error;
-      console.log('Fetched categories:', data);
       setCategories(data || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch categories',
-        variant: 'destructive',
-      });
     }
   };
 
   const fetchSubcategories = async () => {
     try {
-      // Enhanced query with better error handling
       const { data, error } = await supabase
         .from('subcategories')
         .select('id, name, category_id')
         .eq('status', 'on')
         .order('name');
 
-      if (error) {
-        console.error('Supabase error fetching subcategories:', error);
-        throw error;
-      }
-      
-      console.log('Raw subcategories data:', data);
+      if (error) throw error;
       setSubcategories(data || []);
     } catch (error) {
       console.error('Error fetching subcategories:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch subcategories',
-        variant: 'destructive',
-      });
     }
   };
 
@@ -176,8 +158,6 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         .single();
 
       if (error) throw error;
-
-      console.log('Fetched product:', product);
 
       form.reset({
         name: product.name,
@@ -209,18 +189,16 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file size (max 2MB)
     const maxSize = 2 * 1024 * 1024;
     if (file.size > maxSize) {
       toast({
         title: 'Error',
-        description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`,
+        description: `File size exceeds 2MB limit`,
         variant: 'destructive',
       });
       return;
     }
 
-    // Validate it's an image
     if (!file.type.startsWith('image/')) {
       toast({
         title: 'Error',
@@ -238,20 +216,14 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         setImagePreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
-
       setImageFile(file);
       
       toast({
-        title: 'Success',
-        description: 'Image ready for upload (will be optimized to WebP)',
+        title: 'Image ready!',
+        description: 'Will be optimized on save',
       });
     } catch (error) {
       console.error('Error preparing image:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to prepare image',
-        variant: 'destructive',
-      });
     } finally {
       setUploadingImage(false);
     }
@@ -266,18 +238,12 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     if (!imageFile) return null;
 
     try {
-      const { prepareImageForUpload, PRODUCT_COMPRESSION } = await import('@/utils/imageOptimizer');
-      
-      // Optimize image with aggressive compression (~250KB)
       const { file: optimizedFile } = await prepareImageForUpload(imageFile, PRODUCT_COMPRESSION);
-
       const fileName = `product-${Date.now()}.webp`;
 
-      const { data, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(fileName, optimizedFile, {
-          contentType: 'image/webp',
-        });
+        .upload(fileName, optimizedFile, { contentType: 'image/webp' });
 
       if (uploadError) throw uploadError;
 
@@ -288,11 +254,6 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       return urlData.publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to upload image',
-        variant: 'destructive',
-      });
       return null;
     }
   };
@@ -306,14 +267,11 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
       try {
         const { file: optimizedFile } = await prepareImageForUpload(img.file, PRODUCT_COMPRESSION);
-
         const fileName = `product-additional-${productId}-${Date.now()}-${i}.webp`;
 
         const { error: uploadError } = await supabase.storage
           .from('product-images')
-          .upload(fileName, optimizedFile, {
-            contentType: 'image/webp',
-          });
+          .upload(fileName, optimizedFile, { contentType: 'image/webp' });
 
         if (uploadError) throw uploadError;
 
@@ -371,7 +329,6 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
       if (error) throw error;
 
-      // Upload additional images
       if (additionalImages.some(img => img.isNew)) {
         await uploadAdditionalImages();
       }
@@ -381,11 +338,9 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         description: 'Product updated successfully',
       });
 
-      // Only show inventory popup if product doesn't have variants
       if (!data.has_color_variants && !data.has_size_variants) {
         setShowInventoryPopup(true);
       } else {
-        // If it has variants, user will manage inventory through variant form
         onSave();
       }
     } catch (error) {
@@ -402,303 +357,433 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   const handleInventoryClose = () => {
     setShowInventoryPopup(false);
-    onSave(); // Close the edit form after inventory management is done
+    onSave();
   };
+
+  // Section Card Component
+  const SectionCard = ({ 
+    icon: Icon, 
+    title, 
+    description, 
+    children 
+  }: { 
+    icon: React.ElementType; 
+    title: string; 
+    description?: string; 
+    children: React.ReactNode;
+  }) => (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-card border border-border rounded-2xl overflow-hidden"
+    >
+      <div className="px-4 sm:px-6 py-4 border-b border-border/50 bg-muted/30">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-primary/10">
+            <Icon className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-sm sm:text-base">{title}</h3>
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
+          </div>
+        </div>
+      </div>
+      <div className="p-4 sm:p-6">{children}</div>
+    </motion.div>
+  );
 
   if (loadingData) {
     return (
-      <div className="flex justify-center items-center p-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p>Loading product data...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 flex items-center justify-center">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <motion.div 
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+            className="h-12 w-12 border-3 border-primary/30 border-t-primary rounded-full mx-auto mb-4"
+          />
+          <p className="text-muted-foreground">Loading product...</p>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onCancel}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <h2 className="text-2xl font-bold">Edit Product</h2>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b border-border/50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={onCancel}
+                className="h-9 w-9 rounded-xl hover:bg-muted"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <h1 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+                  <Package className="h-4 w-4 text-primary" />
+                  Edit Product
+                </h1>
+                <p className="text-xs text-muted-foreground hidden sm:block">Update your product details</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onCancel} className="hidden sm:flex rounded-xl">
+                Cancel
+              </Button>
+              <Button 
+                onClick={form.handleSubmit(onSubmit)} 
+                disabled={loading}
+                className="rounded-xl bg-primary shadow-lg shadow-primary/25"
+              >
+                {loading ? (
+                  <motion.div 
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full"
+                  />
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-1.5" />
+                    <span className="hidden sm:inline">Save Changes</span>
+                    <span className="sm:hidden">Save</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Main Content - Left Column */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* Basic Info */}
+            <SectionCard icon={FileText} title="Basic Information" description="Product name and description">
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="name">Product Name *</Label>
+                  <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Product Name *</Label>
                   <Input
-                    id="name"
                     {...form.register('name')}
                     placeholder="Enter product name"
+                    className="rounded-xl h-11 border-border/50 focus:border-primary"
                   />
                   {form.formState.errors.name && (
-                    <p className="text-red-500 text-sm mt-1">{form.formState.errors.name.message}</p>
+                    <p className="text-destructive text-xs mt-1">{form.formState.errors.name.message}</p>
                   )}
                 </div>
 
                 <div>
-                  <Label htmlFor="description">Description</Label>
+                  <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Description</Label>
                   <Textarea
-                    id="description"
                     {...form.register('description')}
-                    placeholder="Enter product description"
-                    rows={3}
+                    placeholder="Describe your product..."
+                    rows={4}
+                    className="rounded-xl border-border/50 focus:border-primary resize-none"
+                  />
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* Product Details */}
+            <SectionCard icon={Shirt} title="Product Details" description="Material and care instructions">
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Material Composition</Label>
+                  <Textarea
+                    {...form.register('material_composition')}
+                    placeholder="e.g., 100% Cotton, Premium fabric blend..."
+                    rows={2}
+                    className="rounded-xl border-border/50 focus:border-primary resize-none"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="material_composition">Material Composition</Label>
-                    <Textarea
-                      id="material_composition"
-                      {...form.register('material_composition')}
-                      placeholder="e.g., Premium quality fabric blend designed for comfort and durability."
-                      rows={2}
-                    />
-                  </div>
-                  <div>
-                    <CareInstructionsInput
-                      value={form.watch('care_instructions') || ''}
-                      onChange={(value) => form.setValue('care_instructions', value)}
-                    />
-                  </div>
-                </div>
+                <CareInstructionsInput
+                  value={form.watch('care_instructions') || ''}
+                  onChange={(value) => form.setValue('care_instructions', value)}
+                />
+              </div>
+            </SectionCard>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="cost_price">Cost Price (Rs) *</Label>
+            {/* Pricing */}
+            <SectionCard icon={DollarSign} title="Pricing" description="Cost and selling prices">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Cost Price (Rs) *</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
                     <Input
-                      id="cost_price"
                       type="number"
                       step="0.01"
                       {...form.register('cost_price', { valueAsNumber: true })}
                       placeholder="0.00"
+                      className="rounded-xl h-11 pl-8 border-border/50 focus:border-primary"
                     />
-                    {form.formState.errors.cost_price && (
-                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.cost_price.message}</p>
-                    )}
                   </div>
+                  {form.formState.errors.cost_price && (
+                    <p className="text-destructive text-xs mt-1">{form.formState.errors.cost_price.message}</p>
+                  )}
+                </div>
 
-                  <div>
-                    <Label htmlFor="selling_price">Selling Price (Rs)</Label>
+                <div>
+                  <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Selling Price (Rs)</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
                     <Input
-                      id="selling_price"
                       type="number"
                       step="0.01"
                       {...form.register('selling_price', { valueAsNumber: true })}
                       placeholder="0.00"
+                      className="rounded-xl h-11 pl-8 border-border/50 focus:border-primary"
                     />
                   </div>
                 </div>
+              </div>
+            </SectionCard>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="category">Category *</Label>
-                    <Select
-                      value={form.watch('category_id')}
-                      onValueChange={(value) => {
-                        console.log('Category selected:', value);
-                        form.setValue('category_id', value);
-                        form.setValue('subcategory_id', '');
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {form.formState.errors.category_id && (
-                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.category_id.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="subcategory">Subcategory *</Label>
-                    <Select
-                      value={form.watch('subcategory_id')}
-                      onValueChange={(value) => {
-                        console.log('Subcategory selected:', value);
-                        form.setValue('subcategory_id', value);
-                      }}
-                      disabled={!watchedCategoryId || filteredSubcategories.length === 0}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={
-                          !watchedCategoryId 
-                            ? "Select category first" 
-                            : filteredSubcategories.length === 0 
-                              ? "No subcategories available"
-                              : "Select subcategory"
-                        } />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filteredSubcategories.map((subcategory) => (
-                          <SelectItem key={subcategory.id} value={subcategory.id}>
-                            {subcategory.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {form.formState.errors.subcategory_id && (
-                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.subcategory_id.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="is_featured"
-                      checked={form.watch('is_featured')}
-                      onCheckedChange={(checked) => form.setValue('is_featured', checked)}
-                    />
-                    <Label htmlFor="is_featured">Featured</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="has_color_variants"
-                      checked={form.watch('has_color_variants')}
-                      onCheckedChange={(checked) => {
-                        form.setValue('has_color_variants', checked);
-                        if (!checked) {
-                          form.setValue('has_size_variants', false);
-                        }
-                      }}
-                    />
-                    <Label htmlFor="has_color_variants">Colors</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="has_size_variants"
-                      checked={form.watch('has_size_variants')}
-                      onCheckedChange={(checked) => {
-                        form.setValue('has_size_variants', checked);
-                      }}
-                      disabled={!watchedHasColorVariants}
-                    />
-                    <Label 
-                      htmlFor="has_size_variants" 
-                      className={!watchedHasColorVariants ? 'text-gray-400' : ''}
-                    >
-                      Sizes {!watchedHasColorVariants && '(Enable Colors first)'}
-                    </Label>
-                  </div>
+            {/* Organization */}
+            <SectionCard icon={FolderOpen} title="Organization" description="Category and subcategory">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Category *</Label>
+                  <Select
+                    value={form.watch('category_id')}
+                    onValueChange={(value) => {
+                      form.setValue('category_id', value);
+                      form.setValue('subcategory_id', '');
+                    }}
+                  >
+                    <SelectTrigger className="rounded-xl h-11 border-border/50">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
-                  <Label htmlFor="status">Status</Label>
+                  <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Subcategory *</Label>
                   <Select
-                    value={form.watch('status')}
-                    onValueChange={(value: 'active' | 'inactive') => form.setValue('status', value)}
+                    value={form.watch('subcategory_id')}
+                    onValueChange={(value) => form.setValue('subcategory_id', value)}
+                    disabled={!watchedCategoryId || filteredSubcategories.length === 0}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
+                    <SelectTrigger className="rounded-xl h-11 border-border/50">
+                      <SelectValue placeholder={
+                        !watchedCategoryId 
+                          ? "Select category first" 
+                          : "Select subcategory"
+                      } />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
+                      {filteredSubcategories.map((subcategory) => (
+                        <SelectItem key={subcategory.id} value={subcategory.id}>
+                          {subcategory.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+            </SectionCard>
 
-              <div className="space-y-6">
-                {/* Main Product Image - 1:1 Aspect Ratio */}
+            {/* Variants Section */}
+            {(watchedHasColorVariants || watchedHasSizeVariants) && (
+              <EnhancedProductVariantForm
+                productId={productId}
+                hasColorVariants={watchedHasColorVariants}
+                hasSizeVariants={watchedHasSizeVariants}
+                getProductData={() => ({
+                  name: form.getValues('name'),
+                  description: form.getValues('description'),
+                  cost_price: form.getValues('cost_price'),
+                  selling_price: form.getValues('selling_price'),
+                  category_id: form.getValues('category_id'),
+                  subcategory_id: form.getValues('subcategory_id'),
+                  is_featured: form.getValues('is_featured'),
+                  has_color_variants: form.getValues('has_color_variants'),
+                  has_size_variants: form.getValues('has_size_variants'),
+                  status: form.getValues('status'),
+                })}
+                imageFile={imageFile}
+                imagePreview={imagePreview}
+                onSave={() => setShowInventoryPopup(true)}
+                onCancel={onCancel}
+              />
+            )}
+          </div>
+
+          {/* Sidebar - Right Column */}
+          <div className="space-y-6">
+            
+            {/* Status & Visibility */}
+            <SectionCard icon={Sparkles} title="Status">
+              <div className="space-y-4">
                 <div>
-                  <Label className="text-sm font-medium mb-2 block">Main Product Image</Label>
-                  <div className="space-y-3">
-                    {imagePreview ? (
-                      <div className="relative w-full max-w-[280px]">
-                        <div className="aspect-square w-full overflow-hidden rounded-xl border-2 border-border bg-muted/30">
-                          <img
-                            src={imagePreview}
-                            alt="Product preview"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="absolute top-2 right-2 flex gap-1.5">
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="secondary"
-                            className="h-8 w-8 bg-background/90 backdrop-blur-sm shadow-sm"
-                            onClick={() => window.open(imagePreview, '_blank')}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="destructive"
-                            className="h-8 w-8 shadow-sm"
-                            onClick={removeImage}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="absolute bottom-2 left-2">
-                          <span className="text-[10px] bg-primary text-primary-foreground px-2 py-1 rounded-md font-medium">
-                            1:1 Preview
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <label
-                        htmlFor="image-upload"
-                        className="relative w-full max-w-[280px] cursor-pointer block"
-                      >
-                        <div className="aspect-square w-full border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center bg-muted/20 hover:bg-muted/40 transition-colors">
-                          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
-                            <Upload className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                          <p className="text-sm font-medium text-foreground">Upload Main Image</p>
-                          <p className="text-xs text-muted-foreground mt-1">1:1 ratio recommended</p>
-                          <p className="text-xs text-muted-foreground">WebP format, max 2MB</p>
-                        </div>
-                      </label>
-                    )}
-                    <input
-                      id="image-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      disabled={uploadingImage}
-                    />
-                    {imagePreview && (
-                      <label
-                        htmlFor="image-upload"
-                        className={`cursor-pointer inline-flex items-center justify-center px-3 py-1.5 border border-dashed border-border rounded-md text-sm text-muted-foreground hover:bg-muted/50 transition-colors ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <Upload className="h-4 w-4 mr-1.5" />
-                        {uploadingImage ? 'Preparing...' : 'Change Image'}
-                      </label>
-                    )}
-                  </div>
+                  <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Product Status</Label>
+                  <Select
+                    value={form.watch('status')}
+                    onValueChange={(value: 'active' | 'inactive') => form.setValue('status', value)}
+                  >
+                    <SelectTrigger className="rounded-xl h-11 border-border/50">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">
+                        <span className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-green-500" />
+                          Active
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="inactive">
+                        <span className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-muted-foreground" />
+                          Inactive
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                {/* Additional Images Section */}
-                <div className="pt-4 border-t border-border">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50 border border-border/50">
+                  <div className="flex items-center gap-2">
+                    <Star className="h-4 w-4 text-amber-500" />
+                    <span className="text-sm font-medium">Featured Product</span>
+                  </div>
+                  <Switch
+                    checked={form.watch('is_featured')}
+                    onCheckedChange={(checked) => form.setValue('is_featured', checked)}
+                  />
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* Variants Toggle */}
+            <SectionCard icon={Palette} title="Variants" description="Color and size options">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50 border border-border/50">
+                  <div className="flex items-center gap-2">
+                    <Palette className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Color Variants</span>
+                  </div>
+                  <Switch
+                    checked={form.watch('has_color_variants')}
+                    onCheckedChange={(checked) => {
+                      form.setValue('has_color_variants', checked);
+                      if (!checked) form.setValue('has_size_variants', false);
+                    }}
+                  />
+                </div>
+
+                <div className={`flex items-center justify-between p-3 rounded-xl border border-border/50 transition-all ${
+                  watchedHasColorVariants ? 'bg-muted/50' : 'bg-muted/20 opacity-50'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <Ruler className="h-4 w-4 text-primary" />
+                    <div>
+                      <span className="text-sm font-medium">Size Variants</span>
+                      {!watchedHasColorVariants && (
+                        <p className="text-[10px] text-muted-foreground">Enable colors first</p>
+                      )}
+                    </div>
+                  </div>
+                  <Switch
+                    checked={form.watch('has_size_variants')}
+                    onCheckedChange={(checked) => form.setValue('has_size_variants', checked)}
+                    disabled={!watchedHasColorVariants}
+                  />
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* Media */}
+            <SectionCard icon={ImageIcon} title="Media" description="Product images">
+              <div className="space-y-4">
+                {/* Main Image */}
+                <div>
+                  <Label className="text-xs font-medium text-muted-foreground mb-2 block">Main Image</Label>
+                  {imagePreview ? (
+                    <div className="relative">
+                      <div className="aspect-square w-full overflow-hidden rounded-xl border-2 border-border bg-muted/30">
+                        <img
+                          src={imagePreview}
+                          alt="Product"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="absolute top-2 right-2 flex gap-1.5">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="secondary"
+                          className="h-8 w-8 rounded-lg bg-background/90 backdrop-blur-sm shadow-sm"
+                          onClick={() => window.open(imagePreview, '_blank')}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="destructive"
+                          className="h-8 w-8 rounded-lg shadow-sm"
+                          onClick={removeImage}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <div className="absolute bottom-2 left-2">
+                        <span className="text-[10px] bg-primary text-primary-foreground px-2 py-1 rounded-md font-medium">
+                          1:1
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <label htmlFor="image-upload" className="cursor-pointer block">
+                      <div className="aspect-square w-full border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center bg-muted/20 hover:bg-muted/40 transition-colors">
+                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
+                          <Upload className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <p className="text-xs font-medium">Upload Image</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">1:1 ratio • max 2MB</p>
+                      </div>
+                    </label>
+                  )}
+                  <input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={uploadingImage}
+                  />
+                  {imagePreview && (
+                    <label
+                      htmlFor="image-upload"
+                      className="mt-2 cursor-pointer inline-flex items-center justify-center w-full px-3 py-2 border border-dashed border-border rounded-xl text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
+                    >
+                      <Upload className="h-3.5 w-3.5 mr-1.5" />
+                      Change Image
+                    </label>
+                  )}
+                </div>
+
+                {/* Additional Images */}
+                <div className="pt-4 border-t border-border/50">
                   <ProductAdditionalImages
                     productId={productId}
                     onImagesChange={setAdditionalImages}
@@ -706,44 +791,19 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                   />
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </SectionCard>
+          </div>
+        </div>
 
-        {(watchedHasColorVariants || watchedHasSizeVariants) && (
-          <EnhancedProductVariantForm
-            productId={productId}
-            hasColorVariants={watchedHasColorVariants}
-            hasSizeVariants={watchedHasSizeVariants}
-            getProductData={() => ({
-              name: form.getValues('name'),
-              description: form.getValues('description'),
-              cost_price: form.getValues('cost_price'),
-              selling_price: form.getValues('selling_price'),
-              category_id: form.getValues('category_id'),
-              subcategory_id: form.getValues('subcategory_id'),
-              is_featured: form.getValues('is_featured'),
-              has_color_variants: form.getValues('has_color_variants'),
-              has_size_variants: form.getValues('has_size_variants'),
-              status: form.getValues('status'),
-            })}
-            imageFile={imageFile}
-            imagePreview={imagePreview}
-            onSave={() => {
-              // After successful save, open inventory popup
-              setShowInventoryPopup(true);
-            }}
-            onCancel={onCancel}
-          />
-        )}
-
+        {/* Bottom Save Button for Mobile */}
         {!(watchedHasColorVariants || watchedHasSizeVariants) && (
-          <div className="flex justify-end space-x-4">
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Updating...' : 'Update Product'}
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-xl border-t border-border">
+            <Button 
+              onClick={form.handleSubmit(onSubmit)} 
+              disabled={loading}
+              className="w-full rounded-xl h-12 bg-primary shadow-lg shadow-primary/25"
+            >
+              {loading ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
         )}
