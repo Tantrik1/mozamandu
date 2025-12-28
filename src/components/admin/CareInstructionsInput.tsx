@@ -12,11 +12,19 @@ interface CareInstructionsInputProps {
 export function CareInstructionsInput({ value, onChange }: CareInstructionsInputProps) {
   const [instructions, setInstructions] = useState<string[]>([]);
 
-  // Parse initial value - handle newlines
+  // Parse initial value - handle both string and array values
   useEffect(() => {
     if (value) {
-      const parsed = value.split('\n').filter(item => item.trim() !== '');
-      setInstructions(parsed.length > 0 ? parsed : ['']);
+      // Handle if value is already an array
+      if (Array.isArray(value)) {
+        const filtered = value.filter(item => item && item.trim() !== '');
+        setInstructions(filtered.length > 0 ? filtered : ['']);
+      } else if (typeof value === 'string') {
+        const parsed = value.split('\n').filter(item => item.trim() !== '');
+        setInstructions(parsed.length > 0 ? parsed : ['']);
+      } else {
+        setInstructions(['']);
+      }
     } else {
       setInstructions(['']);
     }
