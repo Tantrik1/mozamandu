@@ -41,9 +41,46 @@ export type Database = {
         }
         Relationships: []
       }
+      blog_categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          name: string
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name: string
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name?: string
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       blogs: {
         Row: {
           author_name: string | null
+          category_id: string | null
           content: string
           created_at: string | null
           excerpt: string | null
@@ -66,6 +103,7 @@ export type Database = {
         }
         Insert: {
           author_name?: string | null
+          category_id?: string | null
           content: string
           created_at?: string | null
           excerpt?: string | null
@@ -88,6 +126,7 @@ export type Database = {
         }
         Update: {
           author_name?: string | null
+          category_id?: string | null
           content?: string
           created_at?: string | null
           excerpt?: string | null
@@ -108,7 +147,15 @@ export type Database = {
           updated_at?: string | null
           view_count?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "blogs_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "blog_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       categories: {
         Row: {
