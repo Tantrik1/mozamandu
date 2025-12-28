@@ -631,10 +631,61 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                 </div>
               </div>
 
-              <div>
-                <Label>Product Image</Label>
-                <div className="mt-2 space-y-4">
-                  <div>
+              <div className="space-y-6">
+                {/* Main Product Image - 1:1 Aspect Ratio */}
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Main Product Image</Label>
+                  <div className="space-y-3">
+                    {imagePreview ? (
+                      <div className="relative w-full max-w-[280px]">
+                        <div className="aspect-square w-full overflow-hidden rounded-xl border-2 border-border bg-muted/30">
+                          <img
+                            src={imagePreview}
+                            alt="Product preview"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="absolute top-2 right-2 flex gap-1.5">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="secondary"
+                            className="h-8 w-8 bg-background/90 backdrop-blur-sm shadow-sm"
+                            onClick={() => window.open(imagePreview, '_blank')}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="destructive"
+                            className="h-8 w-8 shadow-sm"
+                            onClick={removeImage}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="absolute bottom-2 left-2">
+                          <span className="text-[10px] bg-primary text-primary-foreground px-2 py-1 rounded-md font-medium">
+                            1:1 Preview
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <label
+                        htmlFor="image-upload"
+                        className="relative w-full max-w-[280px] cursor-pointer block"
+                      >
+                        <div className="aspect-square w-full border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center bg-muted/20 hover:bg-muted/40 transition-colors">
+                          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                            <Upload className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                          <p className="text-sm font-medium text-foreground">Upload Main Image</p>
+                          <p className="text-xs text-muted-foreground mt-1">1:1 ratio recommended</p>
+                          <p className="text-xs text-muted-foreground">WebP format, max 2MB</p>
+                        </div>
+                      </label>
+                    )}
                     <input
                       id="image-upload"
                       type="file"
@@ -643,46 +694,20 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                       className="hidden"
                       disabled={uploadingImage}
                     />
-                    <label
-                      htmlFor="image-upload"
-                      className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      {uploadingImage ? 'Preparing...' : 'Upload Image'}
-                    </label>
+                    {imagePreview && (
+                      <label
+                        htmlFor="image-upload"
+                        className={`cursor-pointer inline-flex items-center justify-center px-3 py-1.5 border border-dashed border-border rounded-md text-sm text-muted-foreground hover:bg-muted/50 transition-colors ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <Upload className="h-4 w-4 mr-1.5" />
+                        {uploadingImage ? 'Preparing...' : 'Change Image'}
+                      </label>
+                    )}
                   </div>
-
-                  {imagePreview && (
-                    <div className="relative">
-                      <img
-                        src={imagePreview}
-                        alt="Product preview"
-                        className="w-full max-w-sm h-48 object-cover rounded-lg border"
-                      />
-                      <div className="absolute top-2 right-2 space-x-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => window.open(imagePreview, '_blank')}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="destructive"
-                          onClick={removeImage}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Additional Images Section */}
-                <div className="mt-6 pt-4 border-t border-border">
+                <div className="pt-4 border-t border-border">
                   <ProductAdditionalImages
                     onImagesChange={setAdditionalImages}
                     maxImages={3}
