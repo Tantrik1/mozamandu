@@ -29,6 +29,8 @@ const ThankYou = lazy(() => import('@/pages/ThankYou'));
 const OrderSummary = lazy(() => import('@/pages/OrderSummary'));
 const CustomerOrderSummary = lazy(() => import('@/pages/CustomerOrderSummary'));
 const ProductDetail = lazy(() => import('@/pages/ProductDetail'));
+const Blog = lazy(() => import('@/pages/Blog'));
+const BlogDetail = lazy(() => import('@/pages/BlogDetail'));
 
 // Preload critical routes on app mount
 const preloadRoutes = () => {
@@ -85,6 +87,8 @@ function App() {
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<TermsConditions />} />
                 <Route path="/shipping" element={<ShippingPolicy />} />
+                <Route path="/blog" element={<Blog />} />
+                <Route path="/blog/:slug" element={<BlogDetail />} />
                 <Route path="/thank-you/:orderId" element={<ThankYou />} />
                 <Route path="/order-summary/:orderId" element={<OrderSummary />} />
                 <Route path="/customer-order-summary/:orderId" element={<RouteGuard requireAuth={true}>

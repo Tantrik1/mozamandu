@@ -24,6 +24,7 @@ import { AdminSettings } from '@/components/admin/AdminSettings';
 import { ModernInventoryManagement } from '@/components/inventory/ModernInventoryManagement';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
 import { AnalyticsSettings } from '@/components/admin/AnalyticsSettings';
+import { BlogManagement } from '@/components/admin/BlogManagement';
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -111,6 +112,7 @@ export default function AdminPage() {
               <Route path="notices" element={<NoticeManagement />} />
               <Route path="top-bar-text" element={<TopBarTextManagement />} />
               <Route path="reviews" element={<ReviewManagement />} />
+              <Route path="blogs" element={<BlogManagement />} />
               <Route path="analytics" element={<AnalyticsDashboard />} />
               <Route path="analytics-settings" element={<AnalyticsSettings />} />
               <Route path="settings" element={<AdminSettings />} />
