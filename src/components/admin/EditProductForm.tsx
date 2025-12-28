@@ -16,6 +16,7 @@ import { EnhancedProductVariantForm } from './EnhancedProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 import { ProductAdditionalImages, type AdditionalImage } from './ProductAdditionalImages';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
+import { CareInstructionsInput } from './CareInstructionsInput';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -468,12 +469,9 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                     />
                   </div>
                   <div>
-                    <Label htmlFor="care_instructions">Care Instructions (one per line)</Label>
-                    <Textarea
-                      id="care_instructions"
-                      {...form.register('care_instructions')}
-                      placeholder="Machine wash cold with similar colors&#10;Do not bleach&#10;Tumble dry low&#10;Iron on low heat if needed"
-                      rows={4}
+                    <CareInstructionsInput
+                      value={form.watch('care_instructions') || ''}
+                      onChange={(value) => form.setValue('care_instructions', value)}
                     />
                   </div>
                 </div>
