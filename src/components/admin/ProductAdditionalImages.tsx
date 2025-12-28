@@ -46,8 +46,7 @@ export function ProductAdditionalImages({
       const { data, error } = await supabase
         .from('product_images')
         .select('id, image_url')
-        .eq('product_id', productId)
-        .order('display_order');
+        .eq('product_id', productId);
 
       if (error) throw error;
 
@@ -187,7 +186,6 @@ export function ProductAdditionalImages({
             .insert({
               product_id: targetProductId,
               image_url: urlData.publicUrl,
-              display_order: i,
             });
 
           if (dbError) throw dbError;
