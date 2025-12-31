@@ -25,6 +25,7 @@ import { ModernInventoryManagement } from '@/components/inventory/ModernInventor
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
 import { AnalyticsSettings } from '@/components/admin/AnalyticsSettings';
 import { BlogManagement } from '@/components/admin/BlogManagement';
+import { BlogPostForm } from '@/components/admin/BlogPostForm';
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -113,6 +114,8 @@ export default function AdminPage() {
               <Route path="top-bar-text" element={<TopBarTextManagement />} />
               <Route path="reviews" element={<ReviewManagement />} />
               <Route path="blogs" element={<BlogManagement />} />
+              <Route path="blogs/new" element={<BlogPostForm />} />
+              <Route path="blogs/edit/:blogId" element={<BlogPostForm />} />
               <Route path="analytics" element={<AnalyticsDashboard />} />
               <Route path="analytics-settings" element={<AnalyticsSettings />} />
               <Route path="settings" element={<AdminSettings />} />
