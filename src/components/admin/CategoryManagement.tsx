@@ -58,11 +58,12 @@ export const CategoryManagement = memo(function CategoryManagement() {
   const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const maxSize = 2 * 1024 * 1024;
+      // Validate file size (max 10MB - will be compressed automatically)
+      const maxSize = 10 * 1024 * 1024;
       if (file.size > maxSize) {
         toast({
           title: "Error",
-          description: `File size exceeds 2MB limit`,
+          description: `File size exceeds 10MB limit`,
           variant: "destructive",
         });
         return;
