@@ -209,12 +209,12 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file size (max 2MB)
-    const maxSize = 2 * 1024 * 1024;
+    // Validate file size (max 10MB - will be compressed automatically)
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
       toast({
         title: 'Error',
-        description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`,
+        description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 10MB`,
         variant: 'destructive',
       });
       return;

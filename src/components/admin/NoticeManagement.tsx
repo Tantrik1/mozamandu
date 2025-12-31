@@ -62,12 +62,12 @@ export function NoticeManagement() {
   const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Validate file size (max 2MB)
-      const maxSize = 2 * 1024 * 1024;
+      // Validate file size (max 10MB - will be compressed automatically)
+      const maxSize = 10 * 1024 * 1024;
       if (file.size > maxSize) {
         toast({
           title: "Error",
-          description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`,
+          description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 10MB`,
           variant: "destructive",
         });
         return;
