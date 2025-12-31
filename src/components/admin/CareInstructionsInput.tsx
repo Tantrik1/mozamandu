@@ -5,17 +5,16 @@ import { Label } from '@/components/ui/label';
 import { Plus, X, GripVertical } from 'lucide-react';
 
 interface CareInstructionsInputProps {
-  value: string;
-  onChange: (value: string) => void;
+  value: string | string[];
+  onChange: (value: string[]) => void;
 }
 
 export function CareInstructionsInput({ value, onChange }: CareInstructionsInputProps) {
-  const [instructions, setInstructions] = useState<string[]>([]);
+  const [instructions, setInstructions] = useState<string[]>(['']);
 
   // Parse initial value - handle both string and array values
   useEffect(() => {
     if (value) {
-      // Handle if value is already an array
       if (Array.isArray(value)) {
         const filtered = value.filter(item => item && item.trim() !== '');
         setInstructions(filtered.length > 0 ? filtered : ['']);
@@ -28,13 +27,13 @@ export function CareInstructionsInput({ value, onChange }: CareInstructionsInput
     } else {
       setInstructions(['']);
     }
-  }, []);
+  }, [value]);
 
   // Update parent when instructions change
   const updateParent = (newInstructions: string[]) => {
     setInstructions(newInstructions);
     const filtered = newInstructions.filter(item => item.trim() !== '');
-    onChange(filtered.join('\n'));
+    onChange(filtered);
   };
 
   const addInstruction = () => {
