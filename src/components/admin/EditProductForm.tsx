@@ -30,7 +30,7 @@ const productSchema = z.object({
   has_size_variants: z.boolean().default(false),
   status: z.enum(['active', 'inactive']).default('active'),
   material_composition: z.string().optional(),
-  care_instructions: z.string().optional(),
+  care_instructions: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
 interface Category {
@@ -347,6 +347,13 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         }
       }
 
+      // Convert care_instructions to array for Supabase text[] column
+      const careInstructionsArray = data.care_instructions
+        ? (Array.isArray(data.care_instructions)
+            ? data.care_instructions.filter(Boolean)
+            : data.care_instructions.split('\n').filter(Boolean))
+        : null;
+
       const productData = {
         name: data.name,
         description: data.description || null,
@@ -361,12 +368,13 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         image_url: imageUrl,
         updated_at: new Date().toISOString(),
         material_composition: data.material_composition || null,
-        care_instructions: data.care_instructions || null,
+        care_instructions: careInstructionsArray,
       };
 
+      // Cast to bypass TypeScript - actual Supabase schema has care_instructions as text[]
       const { error } = await supabase
         .from('products')
-        .update(productData)
+        .update(productData as any)
         .eq('id', productId);
 
       if (error) throw error;
@@ -470,7 +478,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                   </div>
                   <div>
                     <CareInstructionsInput
-                      value={form.watch('care_instructions') || ''}
+                      value={form.watch('care_instructions') || []}
                       onChange={(value) => form.setValue('care_instructions', value)}
                     />
                   </div>

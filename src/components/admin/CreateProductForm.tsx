@@ -30,7 +30,7 @@ const productSchema = z.object({
   has_size_variants: z.boolean().default(false),
   status: z.enum(['active', 'inactive']).default('active'),
   material_composition: z.string().optional(),
-  care_instructions: z.string().optional(),
+  care_instructions: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
 interface Category {
@@ -93,7 +93,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       has_size_variants: false,
       status: 'active',
       material_composition: 'Premium quality fabric blend designed for comfort and durability.',
-      care_instructions: 'Machine wash cold with similar colors\nDo not bleach\nTumble dry low\nIron on low heat if needed',
+      care_instructions: ['Machine wash cold with similar colors', 'Do not bleach', 'Tumble dry low', 'Iron on low heat if needed'],
     },
   });
 
@@ -292,6 +292,13 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
         imageUrl = await uploadImageAndGetUrl();
       }
 
+      // Convert care_instructions to array for Supabase text[] column
+      const careInstructionsArray = data.care_instructions
+        ? (Array.isArray(data.care_instructions)
+            ? data.care_instructions.filter(Boolean)
+            : data.care_instructions.split('\n').filter(Boolean))
+        : ['Machine wash cold with similar colors', 'Do not bleach', 'Tumble dry low', 'Iron on low heat if needed'];
+
       const productData = {
         name: data.name,
         description: data.description || null,
@@ -305,14 +312,15 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
         status: data.status,
         image_url: imageUrl,
         material_composition: data.material_composition || 'Premium quality fabric blend designed for comfort and durability.',
-        care_instructions: data.care_instructions || 'Machine wash cold with similar colors\nDo not bleach\nTumble dry low\nIron on low heat if needed',
+        care_instructions: careInstructionsArray,
       };
 
       console.log('Product data to insert:', productData);
 
+      // Cast to bypass TypeScript - actual Supabase schema has care_instructions as text[]
       const { data: newProduct, error } = await supabase
         .from('products')
-        .insert(productData)
+        .insert(productData as any)
         .select()
         .single();
 
@@ -494,7 +502,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                   </div>
                   <div>
                     <CareInstructionsInput
-                      value={form.watch('care_instructions') || ''}
+                      value={form.watch('care_instructions') || []}
                       onChange={(value) => form.setValue('care_instructions', value)}
                     />
                   </div>
