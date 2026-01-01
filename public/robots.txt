@@ -1,13 +1,42 @@
-
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /checkout
+Disallow: /checkout/*
+Disallow: /dashboard
+Disallow: /dashboard/*
+Disallow: /order/*
+Disallow: /reset-password
 
-# Disallow admin pages
-Disallow: /admin/
-Disallow: /auth/
+# Crawl delay for polite crawling
+Crawl-delay: 1
 
-# Sitemap
+# Sitemap location
 Sitemap: https://mozamandu.com/sitemap.xml
 
-# Crawl-delay
-Crawl-delay: 1
+# Allow important pages
+Allow: /
+Allow: /shop
+Allow: /blog
+Allow: /blog/*
+Allow: /product/*
+Allow: /about
+Allow: /contact
+Allow: /faq
+Allow: /privacy-policy
+Allow: /terms-conditions
+Allow: /shipping-policy
+
+# Allow search engines to index images
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.png$
+Allow: /*.webp$
+Allow: /*.gif$
+
+# Block API endpoints from indexing
+Disallow: /api/*
+
+# Host
+Host: https://mozamandu.com

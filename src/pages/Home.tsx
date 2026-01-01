@@ -1,4 +1,5 @@
 import { lazy, Suspense, memo } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { NoticePopup } from '@/components/notices/NoticePopup';
@@ -41,6 +42,58 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Mozamandu | Best Socks in Nepal | Premium Moja Prices in Nepal</title>
+        <meta name="description" content="Mozamandu - Nepal's #1 online socks store. Buy premium socks in Nepal at best prices. Wide collection of moja (socks) with fast delivery. Best socks prices in Nepal, moja mandu quality." />
+        <meta name="keywords" content="mozamandu, best socks in nepal, premium socks in nepal, socks prices in nepal, moja mandu, moja in nepal, buy socks nepal, moja buy nepal, nepali socks, quality socks kathmandu" />
+        <link rel="canonical" href="https://mozamandu.com" />
+        
+        {/* Open Graph */}
+        <meta property="og:title" content="Mozamandu | Best Socks in Nepal | Premium Moja Prices" />
+        <meta property="og:description" content="Nepal's #1 online socks store. Buy premium socks at best prices. Wide collection of moja with fast delivery across Nepal." />
+        <meta property="og:url" content="https://mozamandu.com" />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content="https://mozamandu.com/lovable-uploads/2d98ffef-154e-49c8-9c1c-39e09f1ea5ae.png" />
+        
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Mozamandu | Best Socks in Nepal" />
+        <meta name="twitter:description" content="Nepal's #1 online socks store. Premium moja at best prices." />
+        
+        {/* Structured Data - ItemList for Products */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            "name": "Best Socks in Nepal - Mozamandu Collection",
+            "description": "Premium socks collection from Mozamandu - Nepal's best socks store",
+            "url": "https://mozamandu.com",
+            "numberOfItems": latestProducts?.length || 0,
+            "itemListElement": latestProducts?.slice(0, 4).map((product, index) => ({
+              "@type": "ListItem",
+              "position": index + 1,
+              "item": {
+                "@type": "Product",
+                "name": product.name,
+                "description": `Premium ${product.name} - Best quality socks in Nepal`,
+                "url": `https://mozamandu.com/product/${product.id}`,
+                "image": product.image_url,
+                "offers": {
+                  "@type": "Offer",
+                  "priceCurrency": "NPR",
+                  "price": product.selling_price || 0,
+                  "availability": "https://schema.org/InStock",
+                  "seller": {
+                    "@type": "Organization",
+                    "name": "Mozamandu"
+                  }
+                }
+              }
+            })) || []
+          })}
+        </script>
+      </Helmet>
+      
       <ModernNavbar />
       <NoticePopup notice={notice} />
       

@@ -1,4 +1,5 @@
-import { memo } from 'react';
+import { memo, useState, useMemo } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -6,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useState, useMemo } from 'react';
 
 interface FAQ {
   id: string;
@@ -40,8 +40,52 @@ const FAQPage = memo(function FAQPage() {
     );
   }, [searchTerm, faqs]);
 
+  // Generate FAQ Schema for SEO
+  const faqSchema = useMemo(() => ({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqs.slice(0, 10).map((faq: FAQ) => ({
+      "@type": "Question",
+      "name": faq.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.answer
+      }
+    }))
+  }), [faqs]);
+
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>FAQ | Mozamandu - Best Socks in Nepal | Moja Questions</title>
+        <meta name="description" content="Frequently asked questions about Mozamandu socks. Learn about socks prices in Nepal, delivery, returns, and moja quality. Best socks FAQ for Nepal." />
+        <meta name="keywords" content="mozamandu faq, socks questions nepal, moja prices nepal, socks delivery nepal, buy socks nepal help" />
+        <link rel="canonical" href="https://mozamandu.com/faq" />
+        
+        {/* Open Graph */}
+        <meta property="og:title" content="FAQ | Mozamandu - Best Socks in Nepal" />
+        <meta property="og:description" content="Find answers about socks prices, delivery, and quality at Mozamandu." />
+        <meta property="og:url" content="https://mozamandu.com/faq" />
+        <meta property="og:type" content="website" />
+        
+        {/* Breadcrumb Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://mozamandu.com" },
+              { "@type": "ListItem", "position": 2, "name": "FAQ", "item": "https://mozamandu.com/faq" }
+            ]
+          })}
+        </script>
+        
+        {/* FAQ Schema for rich results */}
+        <script type="application/ld+json">
+          {JSON.stringify(faqSchema)}
+        </script>
+      </Helmet>
+      
       <ModernNavbar />
       
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
