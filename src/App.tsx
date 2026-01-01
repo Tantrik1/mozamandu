@@ -19,7 +19,6 @@ const InventoryDashboard = lazy(() => import('@/pages/InventoryDashboard'));
 const Checkout = lazy(() => import('@/pages/Checkout'));
 const ShippingPolicy = lazy(() => import('@/pages/ShippingPolicy'));
 const TermsConditions = lazy(() => import('@/pages/TermsConditions'));
-const Products = lazy(() => import('@/pages/Products'));
 const Shop = lazy(() => import('@/pages/Shop'));
 const FAQ = lazy(() => import('@/pages/FAQ'));
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
@@ -80,7 +79,6 @@ function App() {
                 <Route path="/dashboard" element={<RouteGuard requireAuth={true}>
                     <CustomerDashboard />
                   </RouteGuard>} />
-                <Route path="/products" element={<Products />} />
                 <Route path="/shop" element={<Shop />} />
                 <Route path="/product/:productId" element={<ProductDetail />} />
                 <Route path="/faq" element={<FAQ />} />
