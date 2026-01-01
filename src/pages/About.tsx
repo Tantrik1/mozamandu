@@ -1,10 +1,52 @@
-
+import { Helmet } from 'react-helmet-async';
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 
 export default function About() {
   return (
     <div className="min-h-screen bg-gray-50">
+      <Helmet>
+        <title>About Mozamandu | Best Socks Store in Nepal | Moja Mandu</title>
+        <meta name="description" content="Learn about Mozamandu - Nepal's leading online socks store. Quality moja mandu with premium comfort. Based in Kathmandu, delivering best socks across Nepal." />
+        <meta name="keywords" content="about mozamandu, moja mandu, best socks nepal, socks store kathmandu, nepali socks company, premium socks nepal" />
+        <link rel="canonical" href="https://mozamandu.com/about" />
+        
+        {/* Open Graph */}
+        <meta property="og:title" content="About Mozamandu | Best Socks Store in Nepal" />
+        <meta property="og:description" content="Learn about Mozamandu - Nepal's leading online socks store with premium quality moja." />
+        <meta property="og:url" content="https://mozamandu.com/about" />
+        <meta property="og:type" content="website" />
+        
+        {/* Breadcrumb Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://mozamandu.com" },
+              { "@type": "ListItem", "position": 2, "name": "About", "item": "https://mozamandu.com/about" }
+            ]
+          })}
+        </script>
+        
+        {/* AboutPage Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "AboutPage",
+            "name": "About Mozamandu",
+            "description": "Mozamandu is Nepal's premier online store for premium socks. Based in Kathmandu, we offer quality moja with fast delivery across Nepal.",
+            "url": "https://mozamandu.com/about",
+            "mainEntity": {
+              "@type": "Organization",
+              "name": "Mozamandu",
+              "description": "Best socks store in Nepal offering premium quality moja mandu",
+              "foundingLocation": "Kathmandu, Nepal"
+            }
+          })}
+        </script>
+      </Helmet>
+      
       <ModernNavbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

@@ -1,4 +1,4 @@
-
+import { Helmet } from 'react-helmet-async';
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
@@ -6,6 +6,53 @@ import { Mail, Phone, MapPin, Clock } from 'lucide-react';
 export default function Contact() {
   return (
     <div className="min-h-screen bg-gray-50">
+      <Helmet>
+        <title>Contact Mozamandu | Best Socks Shop Nepal | Get in Touch</title>
+        <meta name="description" content="Contact Mozamandu for best socks in Nepal. Reach us for orders, inquiries about moja prices, or support. Based in Kathmandu with fast delivery across Nepal." />
+        <meta name="keywords" content="contact mozamandu, socks shop nepal, moja shop kathmandu, buy socks nepal contact, socks delivery nepal" />
+        <link rel="canonical" href="https://mozamandu.com/contact" />
+        
+        {/* Open Graph */}
+        <meta property="og:title" content="Contact Mozamandu | Best Socks Shop Nepal" />
+        <meta property="og:description" content="Contact us for best socks in Nepal. Fast delivery across Nepal." />
+        <meta property="og:url" content="https://mozamandu.com/contact" />
+        <meta property="og:type" content="website" />
+        
+        {/* Breadcrumb Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://mozamandu.com" },
+              { "@type": "ListItem", "position": 2, "name": "Contact", "item": "https://mozamandu.com/contact" }
+            ]
+          })}
+        </script>
+        
+        {/* ContactPage Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ContactPage",
+            "name": "Contact Mozamandu",
+            "description": "Contact Mozamandu for best socks in Nepal",
+            "url": "https://mozamandu.com/contact",
+            "mainEntity": {
+              "@type": "LocalBusiness",
+              "name": "Mozamandu",
+              "telephone": "+977-9761691276",
+              "email": "info@mozamandu.com",
+              "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "Kathmandu",
+                "addressCountry": "NP"
+              }
+            }
+          })}
+        </script>
+      </Helmet>
+      
       <ModernNavbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

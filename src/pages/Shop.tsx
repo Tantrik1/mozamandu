@@ -1,5 +1,6 @@
 import { useState, useCallback, memo, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { ShopProductCard } from '@/components/shop/ShopProductCard';
@@ -346,6 +347,62 @@ const Shop = memo(function Shop() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Shop Socks in Nepal | Best Moja Prices | Mozamandu</title>
+        <meta name="description" content="Shop premium socks in Nepal at Mozamandu. Best socks prices in Nepal, wide collection of moja (socks) for men, women & kids. Quality moja mandu with fast delivery." />
+        <meta name="keywords" content="mozamandu shop, buy socks nepal, socks prices in nepal, moja in nepal, moja mandu, premium socks nepal, cotton socks nepal, sports socks nepal, formal socks nepal" />
+        <link rel="canonical" href="https://mozamandu.com/shop" />
+        
+        {/* Open Graph */}
+        <meta property="og:title" content="Shop Socks in Nepal | Best Moja Prices | Mozamandu" />
+        <meta property="og:description" content="Shop premium socks in Nepal at best prices. Wide collection of moja with fast delivery." />
+        <meta property="og:url" content="https://mozamandu.com/shop" />
+        <meta property="og:type" content="website" />
+        
+        {/* Breadcrumb Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://mozamandu.com" },
+              { "@type": "ListItem", "position": 2, "name": "Shop", "item": "https://mozamandu.com/shop" }
+            ]
+          })}
+        </script>
+        
+        {/* CollectionPage Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            "name": "Shop Socks in Nepal - Mozamandu",
+            "description": "Browse and shop premium socks in Nepal. Best prices, quality moja with fast delivery across Nepal.",
+            "url": "https://mozamandu.com/shop",
+            "mainEntity": {
+              "@type": "ItemList",
+              "numberOfItems": filteredProducts.length,
+              "itemListElement": filteredProducts.slice(0, 10).map((product, index) => ({
+                "@type": "ListItem",
+                "position": index + 1,
+                "item": {
+                  "@type": "Product",
+                  "name": product.name,
+                  "url": `https://mozamandu.com/product/${product.id}`,
+                  "image": product.image_url,
+                  "offers": {
+                    "@type": "Offer",
+                    "priceCurrency": "NPR",
+                    "price": product.selling_price || product.cost_price,
+                    "availability": "https://schema.org/InStock"
+                  }
+                }
+              }))
+            }
+          })}
+        </script>
+      </Helmet>
+      
       <ModernNavbar />
       
       {/* Category/Subcategory Bar - Visual boxes with images */}
