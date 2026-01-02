@@ -15,17 +15,9 @@ export default defineConfig(({ mode }) => ({
     mode === 'development' && componentTagger(),
   ].filter(Boolean),
   resolve: {
-    alias: [
-      {
-        // Force all app imports to use the runtime/env-backed client
-        find: '@/integrations/supabase/client',
-        replacement: path.resolve(__dirname, './src/integrations/supabase/runtime-client'),
-      },
-      {
-        find: '@',
-        replacement: path.resolve(__dirname, './src'),
-      },
-    ],
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
   },
   build: {
     rollupOptions: {
