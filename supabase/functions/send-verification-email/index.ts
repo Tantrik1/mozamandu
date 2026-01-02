@@ -10,9 +10,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Hardcoded external Supabase URL for consistent connection
+const EXTERNAL_SUPABASE_URL = 'https://huwhbxjlyucamitwwhyg.supabase.co';
+
 // Initialize Supabase client with service role for admin operations
 const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
+  EXTERNAL_SUPABASE_URL,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 

@@ -8,7 +8,7 @@ import { RobustCartProvider } from '@/hooks/useRobustCart';
 import { RouteGuard } from '@/components/RouteGuard';
 import ScrollToTop from '@/components/ScrollToTop';
 import { ProductChatbot } from '@/components/chatbot';
-
+import { verifySupabaseConnection } from '@/utils/supabaseConnection';
 // Lazy load pages with preloading support
 const Home = lazy(() => import('@/pages/Home'));
 const Auth = lazy(() => import('@/pages/Auth'));
@@ -58,9 +58,19 @@ const PageLoader = () => <div className="min-h-screen flex items-center justify-
     <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
   </div>;
 function App() {
-  // Preload critical routes after initial render
+  // Preload critical routes and verify Supabase connection after initial render
   useEffect(() => {
     const timer = setTimeout(preloadRoutes, 100);
+    
+    // Verify Supabase connection on startup (dev only visible in console)
+    if (import.meta.env.DEV) {
+      verifySupabaseConnection().then(result => {
+        if (!result.isCorrectProject) {
+          console.warn('⚠️ App is connected to wrong Supabase project!');
+        }
+      });
+    }
+    
     return () => clearTimeout(timer);
   }, []);
   return <QueryClientProvider client={queryClient}>
