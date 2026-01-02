@@ -43,11 +43,32 @@ export function ProductAdditionalImages({
     if (!productId) return;
     
     try {
-      const { data, error } = await supabase
+      // Try with display_order first
+      let query = supabase
         .from('product_images')
         .select('id, image_url')
-        .eq('product_id', productId)
-        .order('display_order');
+        .eq('product_id', productId);
+
+      const { data, error } = await query.order('display_order');
+
+      // If display_order column doesn't exist, retry without ordering
+      if (error && (error.code === '42703' || error.message?.includes('display_order'))) {
+        console.warn('display_order column not found, fetching without order');
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('product_images')
+          .select('id, image_url')
+          .eq('product_id', productId);
+        
+        if (fallbackError) throw fallbackError;
+        
+        const existingImages: AdditionalImage[] = (fallbackData || []).map(img => ({
+          id: img.id,
+          preview: img.image_url,
+          isNew: false,
+        }));
+        setImages(existingImages);
+        return;
+      }
 
       if (error) throw error;
 

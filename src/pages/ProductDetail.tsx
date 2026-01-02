@@ -108,11 +108,24 @@ const fetchColorVariants = async (productId: string): Promise<ColorVariant[]> =>
 };
 
 const fetchAdditionalImages = async (productId: string): Promise<string[]> => {
-  const { data } = await supabase
+  // Try with display_order first, fallback to no ordering if column doesn't exist
+  let query = supabase
     .from('product_images')
     .select('image_url')
-    .eq('product_id', productId)
-    .order('display_order');
+    .eq('product_id', productId);
+  
+  const { data, error } = await query.order('display_order');
+  
+  // If display_order column doesn't exist, retry without ordering
+  if (error && (error.code === '42703' || error.message?.includes('display_order'))) {
+    console.warn('display_order column not found, fetching without order');
+    const { data: fallbackData } = await supabase
+      .from('product_images')
+      .select('image_url')
+      .eq('product_id', productId);
+    return fallbackData?.map(img => img.image_url) || [];
+  }
+  
   return data?.map(img => img.image_url) || [];
 };
 

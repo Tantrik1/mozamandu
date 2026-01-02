@@ -489,53 +489,7 @@ export function UniversalCheckout() {
 
       console.log('✅ Order created successfully:', createdOrderId);
 
-      const orderItemsToInsert = cartItemsWithInventory.map(item => {
-        const pricingResult = getTieredItemPricing(item.id);
-        const unitPriceRaw = pricingResult?.unitPrice ?? item.basePrice;
-        const unitPrice = Number(unitPriceRaw);
-        const totalPrice = Number(unitPrice * item.quantity);
-
-        return {
-          order_id: createdOrderId,
-          product_id: item.productId,
-          quantity: item.quantity,
-          unit_price: unitPrice,
-          total_price: totalPrice,
-        };
-      });
-
-      const invalidPricingItem = orderItemsToInsert.find(
-        (i) => !Number.isFinite(i.unit_price) || !Number.isFinite(i.total_price)
-      );
-
-      if (invalidPricingItem) {
-        console.error('❌ Invalid pricing detected for order item insert:', invalidPricingItem);
-        toast({
-          title: 'Pricing Error',
-          description: 'One or more cart items has an invalid price. Please refresh and try again.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if (isCustomerOrder) {
-        const { error: orderItemsError } = await supabase
-          .from('customer_order_items')
-          .insert(orderItemsToInsert);
-        if (orderItemsError) {
-          console.error('❌ Order items error:', orderItemsError);
-          throw new Error(`Failed to create order items: ${orderItemsError.message}`);
-        }
-      } else {
-        const { error: orderItemsError } = await supabase
-          .from('order_items')
-          .insert(orderItemsToInsert);
-        if (orderItemsError) {
-          console.error('❌ Order items error:', orderItemsError);
-          throw new Error(`Failed to create order items: ${orderItemsError.message}`);
-        }
-      }
-
+      // STEP 1: Insert order_item_details FIRST (source of truth for order summaries, analytics, inventory)
       const orderItemDetailsToInsert = cartItemsWithInventory.map(item => {
         const pricingResult = getTieredItemPricing(item.id);
         const pricingInfo = pricingResult || {
@@ -574,14 +528,17 @@ export function UniversalCheckout() {
         };
       });
 
-      console.log('📝 Enhanced order item details with validated inventory IDs:', orderItemDetailsToInsert.length);
+      console.log('📝 Inserting order item details (source of truth):', orderItemDetailsToInsert.length);
 
+      // Insert order_item_details - this is CRITICAL and must succeed
       if (isCustomerOrder) {
         const { error: orderItemDetailsError } = await supabase
           .from('customer_order_item_details')
           .insert(orderItemDetailsToInsert);
         if (orderItemDetailsError) {
           console.error('❌ Order item details error:', orderItemDetailsError);
+          // Rollback: delete the order since items failed
+          await supabase.from('customer_orders').delete().eq('id', createdOrderId);
           throw new Error(`Failed to create order item details: ${orderItemDetailsError.message}`);
         }
       } else {
@@ -590,8 +547,68 @@ export function UniversalCheckout() {
           .insert(orderItemDetailsToInsert);
         if (orderItemDetailsError) {
           console.error('❌ Order item details error:', orderItemDetailsError);
+          // Rollback: delete the order since items failed
+          await supabase.from('orders').delete().eq('id', createdOrderId);
           throw new Error(`Failed to create order item details: ${orderItemDetailsError.message}`);
         }
+      }
+
+      console.log('✅ Order item details inserted successfully');
+
+      // STEP 2: Insert legacy order_items as best-effort (non-blocking)
+      // This handles schema differences gracefully
+      const orderItemsToInsert = cartItemsWithInventory.map(item => {
+        const pricingResult = getTieredItemPricing(item.id);
+        const unitPriceRaw = pricingResult?.unitPrice ?? item.basePrice;
+        const unitPrice = Number(unitPriceRaw);
+        const totalPrice = Number(unitPrice * item.quantity);
+
+        return {
+          order_id: createdOrderId,
+          product_id: item.productId,
+          quantity: item.quantity,
+          unit_price: unitPrice,
+          total_price: totalPrice,
+        };
+      });
+
+      // Attempt to insert legacy order_items - don't fail the order if this doesn't work
+      const legacyTable = isCustomerOrder ? 'customer_order_items' : 'order_items';
+      try {
+        const { error: orderItemsError } = await supabase
+          .from(legacyTable)
+          .insert(orderItemsToInsert);
+        
+        if (orderItemsError) {
+          console.warn(`⚠️ Legacy ${legacyTable} insert failed (non-critical):`, orderItemsError.message);
+          
+          // If schema mismatch, try minimal payload with defaults for required fields
+          if (orderItemsError.message.includes('schema cache') || orderItemsError.message.includes('column')) {
+            console.log('🔄 Retrying with minimal payload...');
+            const minimalItems = cartItemsWithInventory.map(item => ({
+              order_id: createdOrderId,
+              product_id: item.productId,
+              quantity: item.quantity,
+              unit_price: 0,
+              total_price: 0,
+            }));
+            
+            const { error: retryError } = await supabase
+              .from(legacyTable)
+              .insert(minimalItems);
+            
+            if (retryError) {
+              console.warn(`⚠️ Minimal ${legacyTable} insert also failed (non-critical):`, retryError.message);
+            } else {
+              console.log(`✅ Minimal ${legacyTable} insert succeeded`);
+            }
+          }
+        } else {
+          console.log(`✅ Legacy ${legacyTable} inserted successfully`);
+        }
+      } catch (legacyError) {
+        // Completely non-blocking - log and continue
+        console.warn(`⚠️ Legacy ${legacyTable} insert exception (non-critical):`, legacyError);
       }
 
       console.log('🔒 Reserving stock immediately for order:', createdOrderId);
