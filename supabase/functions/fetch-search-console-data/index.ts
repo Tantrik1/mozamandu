@@ -141,9 +141,12 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { days = 28 }: SearchConsoleRequest = await req.json();
 
+    // Hardcoded external Supabase URL for consistent connection
+    const EXTERNAL_SUPABASE_URL = 'https://huwhbxjlyucamitwwhyg.supabase.co';
+    
     // Initialize Supabase client with service role
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
+      EXTERNAL_SUPABASE_URL,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
