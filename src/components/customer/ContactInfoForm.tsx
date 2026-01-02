@@ -63,7 +63,7 @@ export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
         console.error('Profile update error:', error);
         toast({
           title: "Error",
-          description: "Failed to update contact information",
+          description: `Failed to update: ${error.message || error.code || JSON.stringify(error)}`,
           variant: "destructive",
         });
         return;
