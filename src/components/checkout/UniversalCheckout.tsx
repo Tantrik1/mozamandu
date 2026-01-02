@@ -491,9 +491,10 @@ export function UniversalCheckout() {
 
       const orderItemsToInsert = cartItemsWithInventory.map(item => {
         const pricingResult = getTieredItemPricing(item.id);
-        const unitPrice = pricingResult?.unitPrice || item.basePrice;
-        const totalPrice = unitPrice * item.quantity;
-        
+        const unitPriceRaw = pricingResult?.unitPrice ?? item.basePrice;
+        const unitPrice = Number(unitPriceRaw);
+        const totalPrice = Number(unitPrice * item.quantity);
+
         return {
           order_id: createdOrderId,
           product_id: item.productId,
@@ -502,6 +503,20 @@ export function UniversalCheckout() {
           total_price: totalPrice,
         };
       });
+
+      const invalidPricingItem = orderItemsToInsert.find(
+        (i) => !Number.isFinite(i.unit_price) || !Number.isFinite(i.total_price)
+      );
+
+      if (invalidPricingItem) {
+        console.error('❌ Invalid pricing detected for order item insert:', invalidPricingItem);
+        toast({
+          title: 'Pricing Error',
+          description: 'One or more cart items has an invalid price. Please refresh and try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       if (isCustomerOrder) {
         const { error: orderItemsError } = await supabase
