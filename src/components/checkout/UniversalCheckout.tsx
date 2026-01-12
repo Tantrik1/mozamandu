@@ -452,7 +452,7 @@ export function UniversalCheckout() {
         remaining_amount: remainingAmount,
         payment_method_id: paymentMethod.id,
         payment_screenshot_url: paymentScreenshotUrl,
-        pricing_breakdown: pricingBreakdown,
+        pricing_breakdown: JSON.parse(JSON.stringify(pricingBreakdown)),
         status: 'pending_payment' as const
       };
 
