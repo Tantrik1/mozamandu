@@ -14,6 +14,8 @@ interface PricingBreakdown {
   pricingMode?: string;
   tieredSubtotal?: number;
   tieredSavings?: number;
+  accurateSavings?: number;
+  accurateSubtotal?: number;
   comboInfo?: {
     combo: { name: string; description: string };
     totalComboSavings: number;
@@ -134,8 +136,9 @@ export default function CustomerOrderSummary() {
   const getPricingModeDisplay = (mode: string) => {
     switch (mode) {
       case 'combo': return { text: 'Combo Price', color: 'bg-purple-100 text-purple-800' };
-      case 'discount': return { text: 'MOQ Discount', color: 'bg-green-100 text-green-800' };
-      case 'moq_discount': return { text: 'MOQ Discount', color: 'bg-green-100 text-green-800' };
+      case 'discount': return { text: 'Volume Discount', color: 'bg-green-100 text-green-800' };
+      case 'moq_discount': return { text: 'Volume Discount', color: 'bg-green-100 text-green-800' };
+      case 'progressive_discount': return { text: 'Progressive Discount', color: 'bg-green-100 text-green-800' };
       default: return { text: 'Normal Price', color: 'bg-gray-100 text-gray-800' };
     }
   };
@@ -223,47 +226,65 @@ export default function CustomerOrderSummary() {
                 <div className="space-y-4">
                   {orderItems.map((item) => {
                     const pricingMode = getPricingModeDisplay(item.pricing_mode);
+                    const pricingDetails = item.pricing_details || {};
+                    const hasProgressivePricing = pricingDetails.progressivePricing || pricingDetails.discountedUnits;
+                    const basePrice = pricingDetails.basePrice || item.unit_price;
+                    
                     return (
-                      <div key={item.id} className="flex justify-between items-start py-4 border-b last:border-b-0">
-                        <div className="flex-1">
-                          <h4 className="font-medium">{item.product_name}</h4>
-                          {item.color_name && (
-                            <p className="text-sm text-gray-600">Color: {item.color_name}</p>
-                          )}
-                          {item.size_name && (
-                            <p className="text-sm text-gray-600">Size: {item.size_name}</p>
-                          )}
-                          {item.sku && (
-                            <p className="text-sm text-gray-500">SKU: {item.sku}</p>
-                          )}
+                      <div key={item.id} className="py-4 border-b last:border-b-0">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <h4 className="font-medium">{item.product_name}</h4>
+                            {item.color_name && (
+                              <p className="text-sm text-gray-600">Color: {item.color_name}</p>
+                            )}
+                            {item.size_name && (
+                              <p className="text-sm text-gray-600">Size: {item.size_name}</p>
+                            )}
+                            {item.sku && (
+                              <p className="text-sm text-gray-500">SKU: {item.sku}</p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">Rs. {item.total_price.toFixed(2)}</p>
+                            {pricingDetails.savings > 0 && basePrice !== item.unit_price && (
+                              <p className="text-xs text-gray-500 line-through">
+                                Rs. {(basePrice * item.quantity).toFixed(2)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Progressive pricing breakdown */}
+                        {hasProgressivePricing && pricingDetails.discountedUnits?.length > 0 ? (
+                          <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
+                            {pricingDetails.unitsAtBase > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">{pricingDetails.unitsAtBase} × Rs. {basePrice.toFixed(2)} (base)</span>
+                                <span>Rs. {pricingDetails.basePriceTotal?.toFixed(2) || (pricingDetails.unitsAtBase * basePrice).toFixed(2)}</span>
+                              </div>
+                            )}
+                            {pricingDetails.discountedUnits.map((tier: any, idx: number) => (
+                              <div key={idx} className="flex justify-between text-green-700">
+                                <span>{tier.units} × Rs. {tier.unitPrice.toFixed(2)} ({tier.tierName})</span>
+                                <span>Rs. {tier.total.toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
                           <p className="text-sm text-gray-600">
                             Qty: {item.quantity} × Rs. {item.unit_price.toFixed(2)}
                           </p>
-                          
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="secondary" className={pricingMode.color}>
-                              {pricingMode.text}
-                            </Badge>
-                            {item.pricing_details?.savings && item.pricing_details.savings > 0 && (
-                              <span className="text-sm text-green-600">
-                                Saved Rs. {item.pricing_details.savings.toFixed(2)}
-                              </span>
-                            )}
-                          </div>
-                          
-                          {item.pricing_details?.tierInfo && (
-                            <p className="text-xs text-blue-600 mt-1">
-                              {item.pricing_details.tierInfo}
-                            </p>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold">Rs. {item.total_price.toFixed(2)}</p>
-                          <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
-                          {item.pricing_details?.basePrice && item.pricing_details.basePrice !== item.unit_price && (
-                            <p className="text-xs text-gray-500 line-through">
-                              Rs. {item.pricing_details.basePrice.toFixed(2)} base
-                            </p>
+                        )}
+                        
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="secondary" className={pricingMode.color}>
+                            {pricingMode.text}
+                          </Badge>
+                          {pricingDetails.savings > 0 && (
+                            <span className="text-sm text-green-600">
+                              Saved Rs. {pricingDetails.savings.toFixed(2)}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -293,17 +314,17 @@ export default function CustomerOrderSummary() {
                         </div>
                       )}
                       
-                      {orderDetails.pricing_breakdown.pricingMode === 'moq_discount' && orderDetails.pricing_breakdown.tieredSavings > 0 && (
+                      {(orderDetails.pricing_breakdown.pricingMode === 'moq_discount' || orderDetails.pricing_breakdown.pricingMode === 'progressive_discount') && (orderDetails.pricing_breakdown.tieredSavings || orderDetails.pricing_breakdown.accurateSavings) > 0 && (
                         <div className="bg-green-50 border border-green-200 rounded p-3 mb-3">
                           <div className="flex items-center gap-2 mb-1">
                             <Package className="h-4 w-4 text-green-600" />
-                            <span className="font-medium text-green-800">MOQ Discount Applied</span>
+                            <span className="font-medium text-green-800">Progressive Volume Discount Applied</span>
                           </div>
                           <p className="text-sm text-green-700">
-                            You reached the minimum order quantity and received tiered pricing discounts.
+                            You received ladder-style pricing - each tier of items gets progressively better discounts.
                           </p>
                           <p className="text-xs text-green-600 mt-1">
-                            Total MOQ savings: Rs. {orderDetails.pricing_breakdown.tieredSavings.toFixed(2)}
+                            Total volume savings: Rs. {(orderDetails.pricing_breakdown.tieredSavings || orderDetails.pricing_breakdown.accurateSavings || 0).toFixed(2)}
                           </p>
                         </div>
                       )}

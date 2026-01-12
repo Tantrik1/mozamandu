@@ -17,6 +17,7 @@ import {
 import { cn } from '@/lib/utils';
 import { StarRating } from './StarRating';
 import { supabase } from '@/integrations/supabase/client';
+import { usePricing } from '@/hooks/usePricing';
 
 interface ColorVariant {
   id: string;
@@ -107,7 +108,9 @@ export const ProductInfo = memo(function ProductInfo({
   const selectedColorName = colorVariants.find(c => c.id === selectedColor)?.color_name;
   const selectedSizeName = sizeVariants.find(s => s.id === selectedSize)?.size_name;
 
-  // Calculate pricing exactly like cart - volume-wise discount per subcategory
+  const { calculateProgressivePricing } = usePricing();
+
+  // Calculate progressive pricing for product detail page
   const pricingCalculation = useMemo(() => {
     const cartSubcategoryQuantity = cartItems
       .filter(item => item.subcategoryId === subcategoryId)
@@ -115,63 +118,62 @@ export const ProductInfo = memo(function ProductInfo({
 
     const totalSubcategoryQuantity = cartSubcategoryQuantity + quantity;
 
-    const tiers = [...discountTiers]
+    // Normalize tiers
+    const normalizedTiers = discountTiers
       .map(t => ({
-        ...t,
-        discount_amount: (t as any).discount_amount ?? (t as any).discount_percentage ?? 0,
+        min_quantity: t.min_quantity,
+        max_quantity: t.max_quantity,
+        discount_amount: Number((t as any).discount_amount ?? (t as any).discount_percentage ?? 0) || 0,
       }))
+      .filter(t => t.discount_amount > 0)
       .sort((a, b) => a.min_quantity - b.min_quantity);
 
-    const firstDiscountTier = tiers.find(t => (t as any).discount_amount > 0) || null;
+    // Use progressive pricing calculation
+    const progressivePricing = calculateProgressivePricing(basePrice, totalSubcategoryQuantity, normalizedTiers);
 
-    const applicableTier = [...tiers]
-      .sort((a, b) => b.min_quantity - a.min_quantity)
-      .find(t => {
-        const discountAmt = (t as any).discount_amount ?? 0;
-        if (discountAmt <= 0) return false;
-        if (totalSubcategoryQuantity < t.min_quantity) return false;
-        if (t.max_quantity !== null && t.max_quantity !== undefined && totalSubcategoryQuantity > t.max_quantity) return false;
-        return true;
-      }) || null;
+    // Find next tier info
+    const firstDiscountTier = normalizedTiers[0] || null;
+    const itemsUntilDiscount = progressivePricing.nextTierInfo?.unitsNeeded || 0;
 
-    const discountAmt = applicableTier ? Number((applicableTier as any).discount_amount) || 0 : 0;
+    // Calculate what the current selection costs (for display)
+    // In progressive pricing, we need to calculate just for the `quantity` items being added
+    const selectionPricing = calculateProgressivePricing(basePrice, quantity, normalizedTiers);
 
-    if (!applicableTier || discountAmt === 0) {
-      const itemsUntilDiscount = firstDiscountTier
-        ? Math.max(0, firstDiscountTier.min_quantity - totalSubcategoryQuantity)
-        : 0;
+    // If cart already has items, we need to calculate the marginal cost of adding these items
+    let unitPrice = basePrice;
+    let totalPrice = basePrice * quantity;
+    let savings = 0;
 
-      return {
-        unitPrice: basePrice,
-        totalPrice: basePrice * quantity,
-        savings: 0,
-        discountPercent: 0,
-        moqReached: false,
-        moqRequired: firstDiscountTier?.min_quantity || 0,
-        itemsUntilDiscount,
-        discountAmount: 0,
-        discountedPrice: basePrice,
-      };
+    if (cartSubcategoryQuantity > 0) {
+      // Calculate what the total would be with and without current selection
+      const withoutSelection = calculateProgressivePricing(basePrice, cartSubcategoryQuantity, normalizedTiers);
+      const withSelection = progressivePricing;
+      
+      totalPrice = withSelection.totalCost - withoutSelection.totalCost;
+      savings = (basePrice * quantity) - totalPrice;
+      unitPrice = quantity > 0 ? totalPrice / quantity : basePrice;
+    } else {
+      totalPrice = selectionPricing.totalCost;
+      savings = selectionPricing.totalSavings;
+      unitPrice = selectionPricing.averagePrice;
     }
 
-    const discountedPrice = Math.max(0, basePrice - discountAmt);
-    const totalCost = discountedPrice * quantity;
-    const savings = discountAmt * quantity;
-
-    const discountPercent = basePrice > 0 ? Math.round((discountAmt / basePrice) * 100) : 0;
+    const discountAmount = savings > 0 ? savings / quantity : 0;
+    const discountPercent = basePrice > 0 ? Math.round((discountAmount / basePrice) * 100) : 0;
 
     return {
-      unitPrice: discountedPrice,
-      totalPrice: totalCost,
+      unitPrice,
+      totalPrice,
       savings,
       discountPercent,
-      moqReached: true,
-      moqRequired: applicableTier.min_quantity,
-      itemsUntilDiscount: 0,
-      discountAmount: discountAmt,
-      discountedPrice,
+      moqReached: progressivePricing.totalSavings > 0,
+      moqRequired: firstDiscountTier?.min_quantity || 0,
+      itemsUntilDiscount,
+      discountAmount,
+      discountedPrice: unitPrice,
+      tierBreakdown: progressivePricing.tierBreakdown,
     };
-  }, [cartItems, subcategoryId, quantity, discountTiers, basePrice]);
+  }, [cartItems, subcategoryId, quantity, discountTiers, basePrice, calculateProgressivePricing]);
 
   // Calculate cart total including current selection for MOQ bypass check
   const cartTotalWithSelection = useMemo(() => {

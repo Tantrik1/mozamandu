@@ -147,11 +147,19 @@ export default function OrderSummary() {
     const firstItem = items[0];
     const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
     const totalPrice = items.reduce((sum, item) => sum + item.total_price, 0);
-    const basePrice = firstItem.pricing_details?.base_price || firstItem.unit_price;
+    
+    // Handle both old and new pricing_details format
+    const pricingDetails = firstItem.pricing_details || {};
+    const basePrice = pricingDetails.basePrice || pricingDetails.base_price || firstItem.unit_price;
+    
+    // Calculate savings from progressive pricing
     const totalSavings = items.reduce((sum, item) => {
-      const basePriceForItem = item.pricing_details?.base_price || item.unit_price;
-      return sum + ((basePriceForItem - item.unit_price) * item.quantity);
+      const details = item.pricing_details || {};
+      return sum + (details.savings || 0);
     }, 0);
+
+    // Check for progressive pricing structure
+    const hasProgressivePricing = pricingDetails.progressivePricing || pricingDetails.discountedUnits;
 
     return (
       <div className="p-4 bg-gray-50 rounded-lg border space-y-3">
@@ -177,39 +185,76 @@ export default function OrderSummary() {
           </div>
         </div>
 
-        {/* Detailed Item Breakdown */}
-        <div className="space-y-2">
-          {items.map((item, index) => (
-            <div key={index} className="flex justify-between items-center p-2 bg-white rounded border">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  {item.pricing_mode === 'discount' && (
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
-                      <Tag className="w-2 h-2 mr-1" />
-                      MOQ
-                    </Badge>
-                  )}
-                  <span className="text-sm">Qty: {item.quantity}</span>
+        {/* Progressive Pricing Breakdown */}
+        {hasProgressivePricing && pricingDetails.discountedUnits?.length > 0 ? (
+          <div className="space-y-2">
+            {/* Units at base price */}
+            {pricingDetails.unitsAtBase > 0 && (
+              <div className="flex justify-between items-center p-2 bg-white rounded border">
+                <div className="flex-1">
+                  <span className="text-sm">{pricingDetails.unitsAtBase} × Rs. {basePrice.toFixed(2)}</span>
+                  <p className="text-xs text-gray-500">Base price</p>
                 </div>
-                <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
+                <div className="text-right">
+                  <p className="font-medium">Rs. {pricingDetails.basePriceTotal?.toFixed(2) || (pricingDetails.unitsAtBase * basePrice).toFixed(2)}</p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="font-medium">Rs. {item.total_price.toFixed(2)}</p>
-                {item.unit_price < (item.pricing_details?.base_price || item.unit_price) && (
-                  <p className="text-xs text-green-600">
-                    Saved: Rs. {((item.pricing_details?.base_price || item.unit_price) - item.unit_price).toFixed(2)} each
-                  </p>
-                )}
+            )}
+            
+            {/* Discounted tiers */}
+            {pricingDetails.discountedUnits.map((tier: any, index: number) => (
+              <div key={index} className="flex justify-between items-center p-2 bg-green-50 rounded border border-green-200">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                      <Tag className="w-2 h-2 mr-1" />
+                      {tier.tierName} tier
+                    </Badge>
+                    <span className="text-sm">{tier.units} × Rs. {tier.unitPrice.toFixed(2)}</span>
+                  </div>
+                  <p className="text-xs text-green-600">Rs. {tier.discountAmount.toFixed(2)} off/item</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium text-green-700">Rs. {tier.total.toFixed(2)}</p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          /* Legacy/Simple Item Breakdown */
+          <div className="space-y-2">
+            {items.map((item, index) => (
+              <div key={index} className="flex justify-between items-center p-2 bg-white rounded border">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    {item.pricing_mode === 'discount' || item.pricing_mode === 'progressive_discount' ? (
+                      <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                        <Tag className="w-2 h-2 mr-1" />
+                        Volume Discount
+                      </Badge>
+                    ) : null}
+                    <span className="text-sm">Qty: {item.quantity}</span>
+                  </div>
+                  <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium">Rs. {item.total_price.toFixed(2)}</p>
+                  {item.pricing_details?.savings > 0 && (
+                    <p className="text-xs text-green-600">
+                      Saved: Rs. {item.pricing_details.savings.toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Total Savings Summary */}
         {totalSavings > 0 && (
           <div className="bg-green-50 p-3 rounded border border-green-200">
             <p className="text-green-800 font-medium">Total Savings: Rs. {totalSavings.toFixed(2)}</p>
-            <p className="text-xs text-green-600">You saved compared to regular pricing</p>
+            <p className="text-xs text-green-600">Progressive volume discount applied</p>
           </div>
         )}
       </div>
