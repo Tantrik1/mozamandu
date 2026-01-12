@@ -300,8 +300,16 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   const uploadAdditionalImages = async (): Promise<void> => {
     // Use the ref to upload images through the component
+    console.log('📸 uploadAdditionalImages called, checking ref...');
+    console.log('📸 additionalImagesRef.current:', additionalImagesRef.current);
+    console.log('📸 hasNewImages:', additionalImagesRef.current?.hasNewImages());
+    
     if (additionalImagesRef.current?.hasNewImages()) {
-      await additionalImagesRef.current.uploadImages(productId);
+      console.log('📸 Uploading additional images for product:', productId);
+      const result = await additionalImagesRef.current.uploadImages(productId);
+      console.log('📸 Upload result:', result);
+    } else {
+      console.log('📸 No new images to upload or ref not available');
     }
   };
 
