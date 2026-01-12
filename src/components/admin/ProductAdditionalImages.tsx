@@ -190,35 +190,62 @@ export function ProductAdditionalImages({
 
           const fileName = `product-additional-${targetProductId}-${Date.now()}-${i}.webp`;
 
-          const { error: uploadError } = await supabase.storage
+          console.log('📤 Uploading additional image:', fileName);
+
+          const { data: uploadData, error: uploadError } = await supabase.storage
             .from('product-images')
             .upload(fileName, optimizedFile, {
               contentType: 'image/webp',
+              upsert: true, // Allow overwriting if file exists
             });
 
-          if (uploadError) throw uploadError;
+          if (uploadError) {
+            console.error('❌ Storage upload error:', uploadError);
+            toast({
+              title: 'Upload Failed',
+              description: `Storage error: ${uploadError.message}`,
+              variant: 'destructive',
+            });
+            throw uploadError;
+          }
+
+          console.log('✅ Storage upload success:', uploadData);
 
           const { data: urlData } = supabase.storage
             .from('product-images')
             .getPublicUrl(fileName);
 
+          console.log('🔗 Public URL:', urlData.publicUrl);
+
           // Save to product_images table
-          const { error: dbError } = await supabase
+          const { data: dbData, error: dbError } = await supabase
             .from('product_images')
             .insert({
               product_id: targetProductId,
               image_url: urlData.publicUrl,
               display_order: i,
-            });
+            })
+            .select()
+            .single();
 
-          if (dbError) throw dbError;
+          if (dbError) {
+            console.error('❌ Database insert error:', dbError);
+            toast({
+              title: 'Database Error',
+              description: `Failed to save image record: ${dbError.message}`,
+              variant: 'destructive',
+            });
+            throw dbError;
+          }
+
+          console.log('✅ Database insert success:', dbData);
 
           // Update image state to mark as uploaded
           setImages(prev => prev.map((p) => 
-            p === img ? { ...p, isNew: false, uploading: false, id: crypto.randomUUID() } : p
+            p === img ? { ...p, isNew: false, uploading: false, id: dbData?.id || crypto.randomUUID() } : p
           ));
-        } catch (error) {
-          console.error('Error uploading additional image:', error);
+        } catch (error: any) {
+          console.error('❌ Error uploading additional image:', error);
           setImages(prev => prev.map((p) => 
             p === img ? { ...p, uploading: false } : p
           ));
