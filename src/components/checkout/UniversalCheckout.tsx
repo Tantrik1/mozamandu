@@ -395,17 +395,20 @@ export function UniversalCheckout() {
             {
               subcategoryId: data.subcategoryId,
               totalQuantity: data.totalQuantity,
-              moqReached: data.moqReached,
-              moqRequired: data.moqRequired,
+              basePrice: data.basePrice,
+              tierBreakdown: data.tierBreakdown,
               totalSavings: data.totalSavings,
+              totalCost: data.totalCost,
               description: data.description,
               itemBreakdown: data.itemBreakdown.map(item => ({
                 itemId: item.itemId,
-                unitPrice: item.unitPrice,
+                basePrice: item.basePrice,
+                unitsAtBase: item.unitsAtBase,
+                basePriceTotal: item.basePriceTotal,
+                discountedUnits: item.discountedUnits,
                 totalPrice: item.totalPrice,
-                appliedTier: item.appliedTier,
-                tierInfo: item.tierInfo || '',
-                savings: item.savings
+                savings: item.savings,
+                averageUnitPrice: item.averageUnitPrice
               }))
             }
           ])
@@ -415,7 +418,7 @@ export function UniversalCheckout() {
         promoDiscount,
         deliveryCharge: deliveryLocation.delivery_price,
         finalTotal: orderFinalTotal,
-        pricingMode: accurateSavings > 0 ? 'moq_discount' : 'normal'
+        pricingMode: accurateSavings > 0 ? 'progressive_discount' : 'normal'
       };
 
       console.log('📋 Enhanced pricing breakdown:', pricingBreakdown);
@@ -462,10 +465,10 @@ export function UniversalCheckout() {
         // Insert into customer_orders table
         const { data: createdOrder, error: orderError } = await supabase
           .from('customer_orders')
-          .insert({
+          .insert([{
             ...baseOrderData,
             user_id: user.id,
-          })
+          }])
           .select()
           .single();
 
@@ -479,7 +482,7 @@ export function UniversalCheckout() {
         // Insert into orders table (guest orders)
         const { data: createdOrder, error: orderError } = await supabase
           .from('orders')
-          .insert(baseOrderData)
+          .insert([baseOrderData])
           .select()
           .single();
 
@@ -497,12 +500,13 @@ export function UniversalCheckout() {
       const orderItemDetailsToInsert = cartItemsWithInventory.map(item => {
         const pricingResult = getTieredItemPricing(item.id);
         const pricingInfo = pricingResult || {
-          unitPrice: item.basePrice,
+          basePrice: item.basePrice,
+          unitsAtBase: item.quantity,
+          basePriceTotal: item.basePrice * item.quantity,
+          discountedUnits: [],
           totalPrice: item.basePrice * item.quantity,
-          appliedTier: 'normal',
           savings: 0,
-          tierInfo: undefined,
-          subcategoryInfo: null
+          averageUnitPrice: item.basePrice,
         };
 
         return {
@@ -513,19 +517,20 @@ export function UniversalCheckout() {
           size_name: item.sizeName || null,
           sku: item.sku,
           quantity: item.quantity,
-          unit_price: pricingInfo.unitPrice,
+          unit_price: pricingInfo.averageUnitPrice,
           total_price: pricingInfo.totalPrice,
-          pricing_mode: pricingInfo.appliedTier || 'normal',
+          pricing_mode: pricingInfo.savings > 0 ? 'progressive_discount' : 'normal',
           pricing_details: {
-            appliedTier: pricingInfo.appliedTier || 'normal',
-            tierInfo: pricingInfo.tierInfo || null,
+            progressivePricing: true,
+            unitsAtBase: pricingInfo.unitsAtBase,
+            basePriceTotal: pricingInfo.basePriceTotal,
+            discountedUnits: pricingInfo.discountedUnits,
             savings: pricingInfo.savings || 0,
             basePrice: item.basePrice,
             subcategoryId: item.subcategoryId,
             discountApplied: (pricingInfo.savings || 0) > 0,
             inventoryId: item.inventoryId,
-            moqPricingApplied: pricingInfo.appliedTier === 'discount',
-            accurateUnitPrice: pricingInfo.unitPrice,
+            averageUnitPrice: pricingInfo.averageUnitPrice,
             accurateTotalPrice: pricingInfo.totalPrice,
             availableStock: item.availableStock
           }
@@ -563,9 +568,8 @@ export function UniversalCheckout() {
       // This handles schema differences gracefully
       const orderItemsToInsert = cartItemsWithInventory.map(item => {
         const pricingResult = getTieredItemPricing(item.id);
-        const unitPriceRaw = pricingResult?.unitPrice ?? item.basePrice;
-        const unitPrice = Number(unitPriceRaw);
-        const totalPrice = Number(unitPrice * item.quantity);
+        const unitPrice = Number(pricingResult?.averageUnitPrice ?? item.basePrice);
+        const totalPrice = Number(pricingResult?.totalPrice ?? (item.basePrice * item.quantity));
 
         return {
           order_id: createdOrderId,

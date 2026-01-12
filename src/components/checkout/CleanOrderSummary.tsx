@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Package, ShoppingBag, TrendingDown } from 'lucide-react';
+import { PricingBreakdown } from '@/components/cart/PricingBreakdown';
 
 interface CartItem {
   id: string;
@@ -21,22 +22,46 @@ interface CartItem {
   inventoryId?: string;
 }
 
+interface TierBreakdown {
+  tierName: string;
+  minQty: number;
+  maxQty: number | null;
+  discountAmount: number;
+  unitPrice: number;
+  unitsInTier: number;
+  tierTotal: number;
+}
+
 interface ItemPricingDetail {
   itemId: string;
-  unitPrice: number;
+  basePrice: number;
+  unitsAtBase: number;
+  basePriceTotal: number;
+  discountedUnits: Array<{
+    tierName: string;
+    units: number;
+    unitPrice: number;
+    discountAmount: number;
+    total: number;
+  }>;
   totalPrice: number;
-  appliedTier: 'normal' | 'discount';
-  tierInfo?: string;
   savings: number;
+  averageUnitPrice: number;
 }
 
 interface SubcategoryPricingInfo {
   subcategoryId: string;
   totalQuantity: number;
-  moqReached: boolean;
-  moqRequired: number;
+  basePrice: number;
+  tierBreakdown: TierBreakdown[];
   itemBreakdown: ItemPricingDetail[];
+  totalCost: number;
   totalSavings: number;
+  nextTierInfo?: {
+    unitsNeeded: number;
+    discountAmount: number;
+    priceAtNextTier: number;
+  };
   description: string;
 }
 
@@ -56,7 +81,7 @@ interface CleanOrderSummaryProps {
   finalTotal: number;
   isSubmitting: boolean;
   onSubmitOrder: () => void;
-  getTieredItemPricing: (itemId: string) => any;
+  getTieredItemPricing: (itemId: string) => (ItemPricingDetail & { subcategoryInfo: SubcategoryPricingInfo }) | null;
 }
 
 export function CleanOrderSummary({
@@ -71,17 +96,10 @@ export function CleanOrderSummary({
   onSubmitOrder,
   getTieredItemPricing,
 }: CleanOrderSummaryProps) {
-  // Calculate subtotal using exact same logic as cart
+  // Calculate subtotal using progressive pricing
   const subtotal = Object.values(subcategoryPricing).reduce((total, subcategory) => {
-    return total + subcategory.itemBreakdown.reduce((subtotal, item) => {
-      return subtotal + item.totalPrice;
-    }, 0);
+    return total + subcategory.totalCost;
   }, 0);
-
-  // Get item pricing details using EXACT same function as cart
-  const getItemPricingDetails = (item: CartItem) => {
-    return getTieredItemPricing(item.id);
-  };
 
   return (
     <Card className="w-full shadow-lg border-0 bg-white">
@@ -98,27 +116,24 @@ export function CleanOrderSummary({
       </CardHeader>
       
       <CardContent className="space-y-6">
-        {/* Cart Items Display - Clean and focused */}
+        {/* Cart Items Display with Progressive Pricing */}
         <div className="space-y-4">
           <h3 className="font-medium text-gray-900 text-sm">
             Items ({cartItems.length})
           </h3>
           
           {cartItems.map((item) => {
-            const pricingInfo = getItemPricingDetails(item);
+            const pricingInfo = getTieredItemPricing(item.id);
             const pricing = pricingInfo || {
-              unitPrice: item.basePrice,
+              unitsAtBase: item.quantity,
+              basePriceTotal: item.basePrice * item.quantity,
+              discountedUnits: [],
               totalPrice: item.basePrice * item.quantity,
-              appliedTier: 'normal' as const,
               savings: 0,
-              tierInfo: undefined,
-              subcategoryInfo: null
+              averageUnitPrice: item.basePrice,
             };
-            const totalItemPrice = pricing.totalPrice;
-            const savings = pricing.savings || 0;
             
-            const discountPerItem = item.basePrice - pricing.unitPrice;
-            const hasDiscount = pricing.appliedTier === 'discount' && discountPerItem > 0;
+            const hasDiscount = pricing.savings > 0;
             
             return (
               <div key={item.id} className="bg-muted/50 rounded-xl p-4 hover:bg-muted/70 transition-colors border">
@@ -165,50 +180,19 @@ export function CleanOrderSummary({
                       </span>
                     </div>
 
-                    {/* Detailed pricing breakdown */}
-                    <div className="bg-background rounded-lg p-3 space-y-2 text-sm border">
-                      {/* Base price row */}
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">Base price:</span>
-                        <span className={hasDiscount ? 'line-through text-muted-foreground' : 'font-medium'}>
-                          Rs.{item.basePrice.toFixed(0)}/item
-                        </span>
-                      </div>
-
-                      {/* Discount row */}
-                      {hasDiscount && (
-                        <div className="flex justify-between items-center text-green-600">
-                          <span>Volume discount:</span>
-                          <span className="font-medium">-Rs.{discountPerItem.toFixed(0)}/item</span>
-                        </div>
-                      )}
-
-                      {/* Final per-item price */}
-                      <div className="flex justify-between items-center pt-2 border-t">
-                        <span className="font-medium">Final price:</span>
-                        <span className="font-bold text-primary">Rs.{pricing.unitPrice.toFixed(0)}/item</span>
-                      </div>
-
-                      {/* Line total */}
-                      <div className="flex justify-between items-center bg-muted/50 -mx-3 -mb-3 px-3 py-2 rounded-b-lg">
-                        <span className="text-muted-foreground">{item.quantity} items total:</span>
-                        <span className="font-bold text-lg text-foreground">Rs.{totalItemPrice.toFixed(0)}</span>
-                      </div>
-                    </div>
-
-                    {/* Savings callout */}
-                    {savings > 0 && (
-                      <div className="mt-2 text-center text-sm text-green-600 font-medium bg-green-500/10 rounded-lg py-1.5">
-                        🎉 You save Rs.{savings.toFixed(0)} on this item!
-                      </div>
-                    )}
-
-                    {/* Tier info */}
-                    {pricing.tierInfo && (
-                      <div className="mt-2 text-[11px] text-muted-foreground bg-muted/30 rounded px-2 py-1">
-                        {pricing.tierInfo}
-                      </div>
-                    )}
+                    {/* Progressive Pricing breakdown */}
+                    <PricingBreakdown
+                      basePrice={item.basePrice}
+                      quantity={item.quantity}
+                      unitsAtBase={pricing.unitsAtBase}
+                      basePriceTotal={pricing.basePriceTotal}
+                      discountedUnits={pricing.discountedUnits}
+                      totalPrice={pricing.totalPrice}
+                      savings={pricing.savings}
+                      nextTierHint={pricingInfo?.subcategoryInfo?.nextTierInfo?.unitsNeeded > 0 
+                        ? `Add ${pricingInfo.subcategoryInfo.nextTierInfo.unitsNeeded} more for Rs.${pricingInfo.subcategoryInfo.nextTierInfo.priceAtNextTier}/item`
+                        : undefined}
+                    />
                   </div>
                 </div>
               </div>
@@ -218,7 +202,7 @@ export function CleanOrderSummary({
 
         <Separator className="my-6" />
 
-        {/* Summary totals - Clean and focused */}
+        {/* Summary totals */}
         <div className="space-y-4 bg-gray-50 rounded-xl p-4">
           <div className="flex justify-between text-base">
             <span className="text-gray-600">Subtotal</span>
@@ -251,13 +235,13 @@ export function CleanOrderSummary({
                 🎉 You saved Rs. {(totalSavings + promoDiscount).toFixed(2)}!
               </div>
               <div className="text-green-600 text-sm mt-1">
-                Great choice! You're getting the best price.
+                Great choice! Progressive discounts applied.
               </div>
             </div>
           )}
         </div>
 
-        {/* Place order button - Prominent and conversion-focused */}
+        {/* Place order button */}
         <div className="space-y-4 pt-4">
           <Button
             onClick={onSubmitOrder}

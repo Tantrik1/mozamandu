@@ -77,21 +77,24 @@ export function CheckoutSuccess({ orderId }: CheckoutSuccessProps) {
     inventoryId: item.inventory_id
   })) || [];
 
-  // Create mock subcategory pricing for order summary
+  // Create mock subcategory pricing for order summary (progressive pricing format)
   const mockSubcategoryPricing = orderStatus?.items ? {
     'order-summary': {
       subcategoryId: 'order-summary',
       totalQuantity: orderStatus.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
-      moqReached: true,
-      moqRequired: 0,
-      comboActive: false,
+      basePrice: orderStatus.items[0] ? parseFloat(orderStatus.items[0].unit_price) : 0,
+      tierBreakdown: [],
       itemBreakdown: orderStatus.items.map((item: any, index: number) => ({
         itemId: `order-item-${index}`,
-        unitPrice: parseFloat(item.unit_price),
+        basePrice: parseFloat(item.unit_price),
+        unitsAtBase: item.quantity,
+        basePriceTotal: parseFloat(item.total_price),
+        discountedUnits: [],
         totalPrice: parseFloat(item.total_price),
-        appliedTier: 'normal' as const,
-        savings: 0
+        savings: 0,
+        averageUnitPrice: parseFloat(item.unit_price)
       })),
+      totalCost: orderStatus.items.reduce((sum: number, item: any) => sum + parseFloat(item.total_price), 0),
       totalSavings: 0,
       description: 'Order completed'
     }
@@ -198,12 +201,18 @@ export function CheckoutSuccess({ orderId }: CheckoutSuccessProps) {
                 const index = parseInt(itemId.replace('order-item-', ''));
                 const item = orderStatus.items?.[index];
                 if (!item) return null;
+                const unitPrice = parseFloat(item.unit_price);
+                const totalPrice = parseFloat(item.total_price);
                 return {
-                  unitPrice: parseFloat(item.unit_price),
-                  totalPrice: parseFloat(item.total_price),
-                  appliedTier: 'normal' as const,
+                  itemId,
+                  basePrice: unitPrice,
+                  unitsAtBase: item.quantity,
+                  basePriceTotal: totalPrice,
+                  discountedUnits: [],
+                  totalPrice,
                   savings: 0,
-                  subcategoryInfo: null
+                  averageUnitPrice: unitPrice,
+                  subcategoryInfo: mockSubcategoryPricing['order-summary'] as any
                 };
               }}
             />

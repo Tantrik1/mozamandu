@@ -1,5 +1,6 @@
 
 import { useMemo } from 'react';
+import { usePricing } from './usePricing';
 
 interface CartItem {
   id: string;
@@ -15,50 +16,91 @@ interface CartItem {
   image_url?: string;
   sku?: string;
   inventoryId?: string;
-  addedOrder: number; // Order in which item was added to cart
+  addedOrder: number; // Order in which item was added to cart (FIFO)
 }
 
 interface DiscountTier {
   min_quantity: number;
   max_quantity: number | null;
   discount_amount?: number;
-  discount_percentage?: number; // For backward compatibility with Lovable Cloud DB
+  discount_percentage?: number; // For backward compatibility
+}
+
+interface TierBreakdown {
+  tierName: string;
+  minQty: number;
+  maxQty: number | null;
+  discountAmount: number;
+  unitPrice: number;
+  unitsInTier: number;
+  tierTotal: number;
 }
 
 interface ItemPricingDetail {
   itemId: string;
-  unitPrice: number;
+  basePrice: number;
+  /** Units at base price for this item */
+  unitsAtBase: number;
+  basePriceTotal: number;
+  /** Discounted units breakdown for this item */
+  discountedUnits: Array<{
+    tierName: string;
+    units: number;
+    unitPrice: number;
+    discountAmount: number;
+    total: number;
+  }>;
+  /** Total for this item after progressive discounts */
   totalPrice: number;
-  appliedTier: 'normal' | 'discount';
-  tierInfo?: string;
+  /** Total savings for this item */
   savings: number;
+  /** Average unit price for this item */
+  averageUnitPrice: number;
 }
 
 interface SubcategoryPricingInfo {
   subcategoryId: string;
   totalQuantity: number;
-  moqReached: boolean;
-  moqRequired: number;
+  basePrice: number;
+  /** Complete tier breakdown for the subcategory */
+  tierBreakdown: TierBreakdown[];
+  /** Per-item pricing details */
   itemBreakdown: ItemPricingDetail[];
+  /** Total cost for this subcategory */
+  totalCost: number;
+  /** Total savings for this subcategory */
   totalSavings: number;
+  /** Next tier info */
+  nextTierInfo?: {
+    unitsNeeded: number;
+    discountAmount: number;
+    priceAtNextTier: number;
+  };
+  /** Display description */
   description: string;
 }
 
 interface UseSubcategoryTieredPricingProps {
   cartItems: CartItem[];
-  discountTiers: { [key: string]: DiscountTier[] };
+  discountTiers: { [subcategoryId: string]: DiscountTier[] };
 }
 
+/**
+ * Progressive Quantity-Based Discount System for Cart
+ * 
+ * Groups items by subcategory and applies ladder-style progressive discounts.
+ * Uses FIFO ordering to determine which units get which tier prices.
+ */
 export function useSubcategoryTieredPricing({ 
   cartItems, 
   discountTiers 
 }: UseSubcategoryTieredPricingProps) {
+  const { calculateProgressivePricing, getUnitPriceAtPosition } = usePricing();
 
-  // Group items by subcategory and calculate FIFO pricing
   const subcategoryPricing = useMemo(() => {
+    // Group items by subcategory
     const subcategoryGroups: { [key: string]: CartItem[] } = {};
     
-    // Group items by subcategory
     cartItems.forEach(item => {
       if (!subcategoryGroups[item.subcategoryId]) {
         subcategoryGroups[item.subcategoryId] = [];
@@ -69,10 +111,12 @@ export function useSubcategoryTieredPricing({
     const pricingInfo: { [key: string]: SubcategoryPricingInfo } = {};
 
     Object.entries(subcategoryGroups).forEach(([subcategoryId, items]) => {
+      // Sort items by addedOrder (FIFO) - earliest added items get base price
+      const sortedItems = [...items].sort((a, b) => a.addedOrder - b.addedOrder);
+      
+      // Normalize tiers
       const tiersRaw = discountTiers[subcategoryId] || [];
-
-      // Normalize tiers: price-based discount only
-      const tiers = (tiersRaw as any[])
+      const normalizedTiers = tiersRaw
         .map((tier) => ({
           min_quantity: Number(tier.min_quantity) || 1,
           max_quantity: tier.max_quantity === null || tier.max_quantity === undefined
@@ -80,68 +124,103 @@ export function useSubcategoryTieredPricing({
             : Number(tier.max_quantity),
           discount_amount: Number(tier.discount_amount ?? tier.discount_percentage ?? 0) || 0,
         }))
-        .filter(t => t.min_quantity >= 1)
+        .filter(t => t.min_quantity >= 1 && t.discount_amount > 0)
         .sort((a, b) => a.min_quantity - b.min_quantity);
 
-      const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+      const totalQuantity = sortedItems.reduce((sum, item) => sum + item.quantity, 0);
+      const basePrice = sortedItems[0]?.basePrice || 0;
 
-      // Highest applicable tier wins (volume-wise discount)
-      const applicableTier = [...tiers]
-        .sort((a, b) => b.min_quantity - a.min_quantity)
-        .find(t =>
-          t.discount_amount > 0 &&
-          totalQuantity >= t.min_quantity &&
-          (t.max_quantity === null || totalQuantity <= t.max_quantity)
-        ) || null;
+      // Calculate overall tier breakdown for the subcategory
+      const overallPricing = calculateProgressivePricing(basePrice, totalQuantity, normalizedTiers);
 
-      const discountAmt = applicableTier?.discount_amount ?? 0;
-      const firstDiscountTier = tiers.find(t => t.discount_amount > 0) || null;
+      // Now distribute the progressive pricing to individual items (FIFO)
+      const itemBreakdown: ItemPricingDetail[] = [];
+      let globalPosition = 0; // Track position across all items
 
-      const itemBreakdown: ItemPricingDetail[] = items.map(item => {
-        const unitPrice = discountAmt > 0
-          ? Math.max(0, item.basePrice - discountAmt)
-          : item.basePrice;
+      for (const item of sortedItems) {
+        let unitsAtBase = 0;
+        let basePriceTotal = 0;
+        const discountedUnits: ItemPricingDetail['discountedUnits'] = [];
+        let itemTotal = 0;
+        let itemSavings = 0;
 
-        const totalPrice = unitPrice * item.quantity;
-        const savings = discountAmt > 0 ? discountAmt * item.quantity : 0;
+        // Process each unit of this item
+        for (let u = 0; u < item.quantity; u++) {
+          globalPosition++;
+          const unitPrice = getUnitPriceAtPosition(item.basePrice, globalPosition, normalizedTiers);
+          const unitSavings = item.basePrice - unitPrice;
 
-        return {
+          if (unitSavings === 0) {
+            // Base price unit
+            unitsAtBase++;
+            basePriceTotal += unitPrice;
+          } else {
+            // Find which tier this belongs to
+            const applicableTier = [...normalizedTiers]
+              .sort((a, b) => b.min_quantity - a.min_quantity)
+              .find(t => globalPosition >= t.min_quantity);
+            
+            if (applicableTier) {
+              const tierKey = `${applicableTier.min_quantity}+`;
+              const existingTier = discountedUnits.find(d => d.tierName === tierKey);
+              
+              if (existingTier) {
+                existingTier.units++;
+                existingTier.total += unitPrice;
+              } else {
+                discountedUnits.push({
+                  tierName: tierKey,
+                  units: 1,
+                  unitPrice,
+                  discountAmount: applicableTier.discount_amount,
+                  total: unitPrice,
+                });
+              }
+            }
+          }
+
+          itemTotal += unitPrice;
+          itemSavings += unitSavings;
+        }
+
+        itemBreakdown.push({
           itemId: item.id,
-          unitPrice,
-          totalPrice,
-          appliedTier: discountAmt > 0 ? 'discount' : 'normal',
-          tierInfo: discountAmt > 0 && applicableTier
-            ? `Qty ${applicableTier.min_quantity}+ : Rs.${discountAmt} off / item`
-            : undefined,
-          savings,
-        };
-      });
+          basePrice: item.basePrice,
+          unitsAtBase,
+          basePriceTotal,
+          discountedUnits,
+          totalPrice: itemTotal,
+          savings: itemSavings,
+          averageUnitPrice: item.quantity > 0 ? itemTotal / item.quantity : item.basePrice,
+        });
+      }
 
-      const totalSavings = itemBreakdown.reduce((sum, item) => sum + item.savings, 0);
-
-      let description = 'Normal pricing';
-      if (discountAmt > 0 && applicableTier) {
-        description = `Volume discount active (Rs.${discountAmt} off / item)`;
-      } else if (firstDiscountTier && totalQuantity < firstDiscountTier.min_quantity) {
-        description = `Add ${firstDiscountTier.min_quantity - totalQuantity} more items for volume discount`;
+      // Build description
+      let description = `Rs. ${overallPricing.averagePrice.toFixed(0)} avg/item`;
+      if (overallPricing.nextTierInfo && overallPricing.nextTierInfo.unitsNeeded > 0) {
+        description = `Add ${overallPricing.nextTierInfo.unitsNeeded} more for Rs. ${overallPricing.nextTierInfo.priceAtNextTier}/item discount`;
+      } else if (overallPricing.totalSavings > 0) {
+        description = `Progressive discount active - Save Rs. ${overallPricing.totalSavings}`;
       }
 
       pricingInfo[subcategoryId] = {
         subcategoryId,
         totalQuantity,
-        moqReached: discountAmt > 0,
-        moqRequired: firstDiscountTier?.min_quantity || 0,
+        basePrice,
+        tierBreakdown: overallPricing.tierBreakdown,
         itemBreakdown,
-        totalSavings,
+        totalCost: overallPricing.totalCost,
+        totalSavings: overallPricing.totalSavings,
+        nextTierInfo: overallPricing.nextTierInfo,
         description,
       };
     });
 
     return pricingInfo;
-  }, [cartItems, discountTiers]);
+  }, [cartItems, discountTiers, calculateProgressivePricing, getUnitPriceAtPosition]);
 
   const getItemPricing = useMemo(() => {
-    return (itemId: string) => {
+    return (itemId: string): (ItemPricingDetail & { subcategoryInfo: SubcategoryPricingInfo }) | null => {
       for (const subcategoryInfo of Object.values(subcategoryPricing)) {
         const itemDetail = subcategoryInfo.itemBreakdown.find(item => item.itemId === itemId);
         if (itemDetail) {
@@ -158,9 +237,7 @@ export function useSubcategoryTieredPricing({
   const getTotalPrice = useMemo(() => {
     return (): number => {
       return Object.values(subcategoryPricing).reduce((total, subcategory) => {
-        return total + subcategory.itemBreakdown.reduce((subtotal, item) => {
-          return subtotal + item.totalPrice;
-        }, 0);
+        return total + subcategory.totalCost;
       }, 0);
     };
   }, [subcategoryPricing]);

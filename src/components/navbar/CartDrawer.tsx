@@ -194,9 +194,10 @@ export function CartDrawer({ isOpen, onClose, disableModifications = false }: Ca
                 {cartItems.map((item) => {
                   const pricingResult = getTieredItemPricing(item.id);
                   const pricing = pricingResult || {
-                    unitPrice: item.basePrice,
+                    unitsAtBase: item.quantity,
+                    basePriceTotal: item.basePrice * item.quantity,
+                    discountedUnits: [],
                     totalPrice: item.basePrice * item.quantity,
-                    appliedTier: 'normal' as const,
                     savings: 0,
                   };
 
@@ -238,11 +239,15 @@ export function CartDrawer({ isOpen, onClose, disableModifications = false }: Ca
                         <div className="mt-2">
                           <PricingBreakdown
                             basePrice={item.basePrice}
-                            discountedPrice={pricing.unitPrice}
                             quantity={item.quantity}
+                            unitsAtBase={pricing.unitsAtBase}
+                            basePriceTotal={pricing.basePriceTotal}
+                            discountedUnits={pricing.discountedUnits}
+                            totalPrice={pricing.totalPrice}
                             savings={pricing.savings}
-                            appliedTier={pricing.appliedTier}
-                            tierInfo={pricingResult?.tierInfo}
+                            nextTierHint={pricingResult?.subcategoryInfo?.nextTierInfo?.unitsNeeded > 0 
+                              ? `Add ${pricingResult.subcategoryInfo.nextTierInfo.unitsNeeded} more for Rs.${pricingResult.subcategoryInfo.nextTierInfo.priceAtNextTier}/item`
+                              : undefined}
                             compact
                           />
                         </div>
