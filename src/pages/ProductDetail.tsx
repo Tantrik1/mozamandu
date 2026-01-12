@@ -112,23 +112,26 @@ const fetchColorVariants = async (productId: string): Promise<ColorVariant[]> =>
 };
 
 const fetchAdditionalImages = async (productId: string): Promise<string[]> => {
-  // Try with display_order first, fallback to no ordering if column doesn't exist
-  let query = supabase
+  // Try product_additional_images table first (external DB structure)
+  try {
+    const { data: additionalData } = await supabase
+      .from('product_additional_images' as any)
+      .select('image_url')
+      .eq('product_id', productId)
+      .order('display_order');
+    
+    if (additionalData && additionalData.length > 0) {
+      return (additionalData as any[]).map(img => img.image_url);
+    }
+  } catch (e) {
+    // Table might not exist, continue to fallback
+  }
+  
+  // Fallback to product_images table (Lovable Cloud structure)
+  const { data } = await supabase
     .from('product_images')
     .select('image_url')
     .eq('product_id', productId);
-  
-  const { data, error } = await query.order('display_order');
-  
-  // If display_order column doesn't exist, retry without ordering
-  if (error && (error.code === '42703' || error.message?.includes('display_order'))) {
-    console.warn('display_order column not found, fetching without order');
-    const { data: fallbackData } = await supabase
-      .from('product_images')
-      .select('image_url')
-      .eq('product_id', productId);
-    return fallbackData?.map(img => img.image_url) || [];
-  }
   
   return data?.map(img => img.image_url) || [];
 };
