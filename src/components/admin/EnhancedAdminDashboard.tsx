@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Clock, Activity, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns';
 import {
   CoreBusinessStats,
   TimeBasedSalesStats,
@@ -43,8 +45,10 @@ interface OrdersCache {
 
 export function EnhancedAdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
-  const [dateFilter, setDateFilter] = useState<DateFilterValue>(createDateFilterValue('last7days'));
+  const [dateFilter, setDateFilter] = useState<DateFilterValue>(createDateFilterValue('allTime'));
   const [revenueChartData, setRevenueChartData] = useState<RevenueDataPoint[]>([]);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const ordersCache = useRef<OrdersCache>({ data: null, timestamp: 0 });
   
   // Core Business Stats
@@ -117,6 +121,12 @@ export function EnhancedAdminDashboard() {
     topCustomers: [] as TopCustomer[]
   });
 
+  // Live clock
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Fetch orders with caching (5 minute cache)
   const fetchOrdersWithCache = async () => {
     const now = Date.now();
@@ -161,6 +171,8 @@ export function EnhancedAdminDashboard() {
         calculateCustomerStats(filteredOrders, allOrders),
         fetchRevenueChartData(filteredOrders)
       ]);
+      
+      setLastRefreshed(new Date());
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -544,55 +556,129 @@ export function EnhancedAdminDashboard() {
   return (
     <div className="min-h-screen bg-background">
       <div className="p-4 md:p-6 space-y-6">
-        {/* Header with Global Date Filter */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-primary/10 via-primary/5 to-background p-6 rounded-xl border">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Dashboard Overview</h1>
-            <p className="text-muted-foreground mt-1">
-              Real-time business insights and analytics
-            </p>
+        {/* Enhanced Header with Global Date Filter */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 rounded-2xl border border-primary/10"
+        >
+          {/* Animated Background Elements */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute -top-1/2 -right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute -bottom-1/2 -left-1/4 w-72 h-72 bg-primary/3 rounded-full blur-3xl" />
           </div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <DashboardDateFilter value={dateFilter} onChange={setDateFilter} />
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => {
-                ordersCache.current = { data: null, timestamp: 0 };
-                fetchAllData();
-              }}
-              disabled={isLoading}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+          
+          <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="hidden sm:flex p-3 rounded-2xl bg-primary/10 border border-primary/20">
+                <Sparkles className="h-7 w-7 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                  Dashboard Overview
+                  <AnimatePresence>
+                    {isLoading && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0 }}
+                      >
+                        <Activity className="h-5 w-5 text-primary animate-pulse" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </h1>
+                <div className="flex items-center gap-3 mt-1">
+                  <p className="text-muted-foreground">
+                    Real-time business insights
+                  </p>
+                  <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-full bg-muted/50 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    {format(currentTime, 'h:mm:ss a')}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <DashboardDateFilter value={dateFilter} onChange={setDateFilter} />
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  ordersCache.current = { data: null, timestamp: 0 };
+                  fetchAllData();
+                }}
+                disabled={isLoading}
+                className="gap-2 bg-background/50 backdrop-blur-sm hover:bg-background/80"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </Button>
+            </div>
           </div>
-        </div>
+
+          {/* Last Updated Indicator */}
+          <div className="relative mt-4 pt-3 border-t border-primary/10">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Last updated: {format(lastRefreshed, 'MMM d, h:mm a')}
+            </div>
+          </div>
+        </motion.div>
 
         {/* Core Business Stats */}
-        <CoreBusinessStats {...coreStats} />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <CoreBusinessStats {...coreStats} />
+        </motion.div>
 
         {/* Revenue Chart - now uses global date filter */}
-        <RevenueChart 
-          data={revenueChartData}
-          period={dateFilter.preset}
-          onPeriodChange={() => {}}
-        />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <RevenueChart 
+            data={revenueChartData}
+            period={dateFilter.preset}
+            onPeriodChange={() => {}}
+          />
+        </motion.div>
 
         {/* Time-Based & Order Performance */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div 
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
           <TimeBasedSalesStats {...timeStats} />
           <OrderPerformanceStats {...orderStats} />
-        </div>
+        </motion.div>
 
         {/* Product Performance & Inventory */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div 
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
           <ProductPerformanceStats {...productStats} />
           <InventoryStats {...inventoryStats} />
-        </div>
+        </motion.div>
 
         {/* Customer Stats */}
-        <CustomerStatsPanel {...customerStats} />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <CustomerStatsPanel {...customerStats} />
+        </motion.div>
       </div>
     </div>
   );
