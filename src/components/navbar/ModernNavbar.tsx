@@ -1,8 +1,9 @@
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, memo, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Store, Search, ShoppingBag, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRobustCart } from '@/hooks/useRobustCart';
+import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { MobileSearch } from './MobileSearch';
 import { CartDrawer } from './CartDrawer';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
 export const ModernNavbar = memo(function ModernNavbar() {
   const {
     user,
@@ -21,13 +23,47 @@ export const ModernNavbar = memo(function ModernNavbar() {
     signOut
   } = useAuth();
   const {
-    getTotalPrice
+    cartItems,
+    getTotalItems
   } = useRobustCart();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [discountTiers, setDiscountTiers] = useState<{ [key: string]: any[] }>({});
+
+  // Fetch discount tiers for accurate cart total calculation
+  useEffect(() => {
+    const fetchDiscountTiers = async () => {
+      try {
+        const { data } = await supabase
+          .from('discount_tiers')
+          .select('*')
+          .order('subcategory_id, min_quantity');
+        
+        if (data) {
+          const tiersBySubcategory: { [key: string]: any[] } = {};
+          data.forEach(tier => {
+            if (!tiersBySubcategory[tier.subcategory_id]) {
+              tiersBySubcategory[tier.subcategory_id] = [];
+            }
+            tiersBySubcategory[tier.subcategory_id].push(tier);
+          });
+          setDiscountTiers(tiersBySubcategory);
+        }
+      } catch (error) {
+        console.error('Error fetching discount tiers:', error);
+      }
+    };
+    fetchDiscountTiers();
+  }, []);
+
+  // Use tiered pricing for accurate cart total
+  const { getTotalPrice: getTieredTotalPrice } = useSubcategoryTieredPricing({
+    cartItems,
+    discountTiers
+  });
 
   // Handle scroll effect
   useEffect(() => {
@@ -39,6 +75,7 @@ export const ModernNavbar = memo(function ModernNavbar() {
     });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
   const handleSignOut = async () => {
     const {
       error
@@ -57,6 +94,7 @@ export const ModernNavbar = memo(function ModernNavbar() {
       navigate('/');
     }
   };
+
   const handleDashboardClick = () => {
     if (userProfile?.role === 'admin') {
       navigate('/admin');
@@ -64,7 +102,9 @@ export const ModernNavbar = memo(function ModernNavbar() {
       navigate('/dashboard');
     }
   };
-  const cartTotal = getTotalPrice();
+
+  // Get accurate cart total with tiered pricing
+  const cartTotal = useMemo(() => getTieredTotalPrice(), [getTieredTotalPrice]);
   return <>
       <div id="site-header" className="sticky top-0 z-50">
         <TopBar />
