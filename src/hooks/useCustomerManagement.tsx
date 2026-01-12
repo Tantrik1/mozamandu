@@ -69,14 +69,28 @@ export function useCustomerManagement() {
   const [isLoadingOrderItems, setIsLoadingOrderItems] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [searchQuery, setSearchQuery] = useState('');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ column: 'created_at', direction: 'desc' });
   const [filters, setFilters] = useState<CustomerFilters>({
     minOrders: null, maxOrders: null, minSpent: null, maxSpent: null,
     dateFrom: null, dateTo: null, status: 'all'
   });
 
-  const applyFiltersAndSort = useCallback((list: Customer[], f: CustomerFilters, s: SortConfig) => {
+  const applyFiltersAndSort = useCallback((list: Customer[], f: CustomerFilters, s: SortConfig, query: string) => {
     let result = [...list];
+    
+    // Apply search query first
+    if (query) {
+      const q = query.toLowerCase();
+      result = result.filter(c => 
+        c.email.toLowerCase().includes(q) || 
+        c.full_name?.toLowerCase().includes(q) || 
+        c.phone?.includes(q) || 
+        c.contact_number?.includes(q) ||
+        c.whatsapp?.includes(q) ||
+        c.whatsapp_number?.includes(q)
+      );
+    }
     
     if (f.minOrders !== null) result = result.filter(c => c.total_orders >= f.minOrders!);
     if (f.maxOrders !== null) result = result.filter(c => c.total_orders <= f.maxOrders!);
@@ -208,29 +222,35 @@ export function useCustomerManagement() {
       const allCustomers = [...customersWithStats, ...guestCustomers];
       
       setCustomers(allCustomers);
-      applyFiltersAndSort(allCustomers, filters, sortConfig);
+      applyFiltersAndSort(allCustomers, filters, sortConfig, searchQuery);
     } catch (e) { 
       console.error(e); 
       toast.error('Failed to load customers'); 
     } finally { 
       setLoading(false); 
     }
-  }, [filters, sortConfig, applyFiltersAndSort]);
+  }, [filters, sortConfig, searchQuery, applyFiltersAndSort]);
 
   const updateFilters = useCallback((f: CustomerFilters) => { 
     setFilters(f); 
-    applyFiltersAndSort(customers, f, sortConfig); 
-  }, [customers, sortConfig, applyFiltersAndSort]);
+    applyFiltersAndSort(customers, f, sortConfig, searchQuery); 
+  }, [customers, sortConfig, searchQuery, applyFiltersAndSort]);
   
   const updateSort = useCallback((s: SortConfig) => { 
     setSortConfig(s); 
-    applyFiltersAndSort(customers, filters, s); 
-  }, [customers, filters, applyFiltersAndSort]);
+    applyFiltersAndSort(customers, filters, s, searchQuery); 
+  }, [customers, filters, searchQuery, applyFiltersAndSort]);
+  
+  const updateSearch = useCallback((q: string) => {
+    setSearchQuery(q);
+    applyFiltersAndSort(customers, filters, sortConfig, q);
+  }, [customers, filters, sortConfig, applyFiltersAndSort]);
   
   const clearFilters = useCallback(() => { 
     const d: CustomerFilters = { minOrders: null, maxOrders: null, minSpent: null, maxSpent: null, dateFrom: null, dateTo: null, status: 'all' }; 
     setFilters(d); 
-    applyFiltersAndSort(customers, d, sortConfig); 
+    setSearchQuery('');
+    applyFiltersAndSort(customers, d, sortConfig, ''); 
   }, [customers, sortConfig, applyFiltersAndSort]);
 
   const paginatedCustomers = filteredCustomers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -347,13 +367,14 @@ export function useCustomerManagement() {
   }, [filteredCustomers]);
 
   useEffect(() => { fetchCustomers(); }, []);
-  useEffect(() => { if (customers.length) applyFiltersAndSort(customers, filters, sortConfig); }, [customers]);
+  useEffect(() => { if (customers.length) applyFiltersAndSort(customers, filters, sortConfig, searchQuery); }, [customers]);
 
   return { 
     customers, filteredCustomers, paginatedCustomers, customerOrders, orderItems, 
     loading, isLoadingOrders, isLoadingOrderItems, 
     currentPage, setCurrentPage, pageSize, setPageSize, totalPages, 
     sortConfig, updateSort, filters, updateFilters, clearFilters, 
+    searchQuery, updateSearch,
     fetchCustomers, fetchCustomerOrders, fetchOrderItems, exportToCSV 
   };
 }
