@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Package, ShoppingBag } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Package, ShoppingBag, TrendingDown } from 'lucide-react';
 
 interface CartItem {
   id: string;
@@ -117,8 +117,11 @@ export function CleanOrderSummary({
             const totalItemPrice = pricing.totalPrice;
             const savings = pricing.savings || 0;
             
+            const discountPerItem = item.basePrice - pricing.unitPrice;
+            const hasDiscount = pricing.appliedTier === 'discount' && discountPerItem > 0;
+            
             return (
-              <div key={item.id} className="bg-gray-50 rounded-xl p-4 hover:bg-gray-100 transition-colors">
+              <div key={item.id} className="bg-muted/50 rounded-xl p-4 hover:bg-muted/70 transition-colors border">
                 <div className="flex items-start gap-4">
                   {/* Product Image */}
                   {item.imageUrl && (
@@ -132,56 +135,80 @@ export function CleanOrderSummary({
                   )}
                   
                   <div className="flex-1 min-w-0">
-                    {/* Product Info */}
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-gray-900 text-sm mb-1 truncate">
-                          {item.productName}
-                        </h4>
-                        
-                        {/* Compact variant details */}
-                        <div className="flex flex-wrap gap-2 text-xs text-gray-600 mb-2">
-                          {item.colorName && (
-                            <span className="bg-white px-2 py-1 rounded-md border">
-                              {item.colorName}
-                            </span>
-                          )}
-                          {item.sizeName && (
-                            <span className="bg-white px-2 py-1 rounded-md border">
-                              {item.sizeName}
-                            </span>
-                          )}
-                          <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md border border-blue-200">
-                            Qty: {item.quantity}
-                          </span>
-                        </div>
-                        
-                        {/* Pricing details - Clean format */}
-                        {pricing.tierInfo && (
-                          <div className="text-xs text-blue-600 mb-2 bg-blue-50 p-2 rounded-md border border-blue-100">
-                            <div className="font-medium mb-1">Pricing:</div>
-                            <div>{pricing.tierInfo}</div>
-                          </div>
-                        )}
-                        
-                        {/* Price per item */}
-                        <div className="text-xs text-gray-600">
-                          Rs. {pricing.unitPrice.toFixed(2)} avg per item
-                        </div>
+                    {/* Product header */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="font-semibold text-foreground text-sm truncate">
+                        {item.productName}
+                      </h4>
+                      {hasDiscount && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 bg-green-500/10 text-green-600 border-green-200 shrink-0">
+                          <TrendingDown className="w-3 h-3 mr-1" />
+                          Volume
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    {/* Variant badges */}
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {item.colorName && (
+                        <span className="text-xs bg-background px-2 py-0.5 rounded border">
+                          {item.colorName}
+                        </span>
+                      )}
+                      {item.sizeName && (
+                        <span className="text-xs bg-background px-2 py-0.5 rounded border">
+                          {item.sizeName}
+                        </span>
+                      )}
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20">
+                        × {item.quantity}
+                      </span>
+                    </div>
+
+                    {/* Detailed pricing breakdown */}
+                    <div className="bg-background rounded-lg p-3 space-y-2 text-sm border">
+                      {/* Base price row */}
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Base price:</span>
+                        <span className={hasDiscount ? 'line-through text-muted-foreground' : 'font-medium'}>
+                          Rs.{item.basePrice.toFixed(0)}/item
+                        </span>
                       </div>
-                      
-                      {/* Price and Savings - Right aligned */}
-                      <div className="text-right flex-shrink-0">
-                        <div className="font-bold text-lg text-gray-900 mb-1">
-                          Rs. {totalItemPrice.toFixed(2)}
+
+                      {/* Discount row */}
+                      {hasDiscount && (
+                        <div className="flex justify-between items-center text-green-600">
+                          <span>Volume discount:</span>
+                          <span className="font-medium">-Rs.{discountPerItem.toFixed(0)}/item</span>
                         </div>
-                        {savings > 0 && (
-                          <div className="text-sm text-green-600 font-medium">
-                            Save Rs. {savings.toFixed(2)}
-                          </div>
-                        )}
+                      )}
+
+                      {/* Final per-item price */}
+                      <div className="flex justify-between items-center pt-2 border-t">
+                        <span className="font-medium">Final price:</span>
+                        <span className="font-bold text-primary">Rs.{pricing.unitPrice.toFixed(0)}/item</span>
+                      </div>
+
+                      {/* Line total */}
+                      <div className="flex justify-between items-center bg-muted/50 -mx-3 -mb-3 px-3 py-2 rounded-b-lg">
+                        <span className="text-muted-foreground">{item.quantity} items total:</span>
+                        <span className="font-bold text-lg text-foreground">Rs.{totalItemPrice.toFixed(0)}</span>
                       </div>
                     </div>
+
+                    {/* Savings callout */}
+                    {savings > 0 && (
+                      <div className="mt-2 text-center text-sm text-green-600 font-medium bg-green-500/10 rounded-lg py-1.5">
+                        🎉 You save Rs.{savings.toFixed(0)} on this item!
+                      </div>
+                    )}
+
+                    {/* Tier info */}
+                    {pricing.tierInfo && (
+                      <div className="mt-2 text-[11px] text-muted-foreground bg-muted/30 rounded px-2 py-1">
+                        {pricing.tierInfo}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

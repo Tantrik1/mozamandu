@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingBag, Plus, Minus, X, AlertTriangle, Tag, ArrowRight, Trash2 } from 'lucide-react';
+import { ShoppingBag, Plus, Minus, X, AlertTriangle, ArrowRight, Trash2 } from 'lucide-react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { PricingBreakdown } from '@/components/cart/PricingBreakdown';
 
 interface SubcategoryRequirement {
   subcategoryId: string;
@@ -233,22 +234,17 @@ export function CartDrawer({ isOpen, onClose, disableModifications = false }: Ca
                           </div>
                         )}
 
-                        {/* Price */}
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="font-semibold text-sm">
-                            Rs.{pricing.totalPrice.toFixed(0)}
-                          </span>
-                          {pricing.appliedTier === 'discount' && (
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-green-500/10 text-green-600 border-green-200">
-                              <Tag className="w-2.5 h-2.5 mr-1" />
-                              MOQ
-                            </Badge>
-                          )}
-                          {pricing.savings > 0 && (
-                            <span className="text-[10px] text-green-600">
-                              Save Rs.{pricing.savings.toFixed(0)}
-                            </span>
-                          )}
+                        {/* Price Breakdown */}
+                        <div className="mt-2">
+                          <PricingBreakdown
+                            basePrice={item.basePrice}
+                            discountedPrice={pricing.unitPrice}
+                            quantity={item.quantity}
+                            savings={pricing.savings}
+                            appliedTier={pricing.appliedTier}
+                            tierInfo={pricingResult?.tierInfo}
+                            compact
+                          />
                         </div>
 
                         {/* Quantity Controls */}

@@ -1,15 +1,15 @@
-
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, Plus, Minus, X, AlertTriangle, Tag } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, AlertTriangle } from 'lucide-react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { PricingBreakdown } from '@/components/cart/PricingBreakdown';
 
 interface SubcategoryRequirement {
   subcategoryId: string;
@@ -206,41 +206,17 @@ export function CartSidebar({ disableModifications = false }: { disableModificat
                             )}
                           </div>
 
-                          {/* Pricing Information */}
-                          <div className="mt-2 space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold text-red-600">
-                                Rs.{itemTotal.toFixed(2)}
-                              </span>
-                              {pricing.appliedTier === 'discount' && (
-                                <Badge variant="secondary" className="text-xs px-2 py-0 bg-blue-100 text-blue-800 border border-blue-200">
-                                  <Tag className="w-2 h-2 mr-1" />
-                                  MOQ Discount
-                                </Badge>
-                              )}
-                              {pricing.appliedTier === 'normal' && (
-                                <Badge variant="outline" className="text-xs px-2 py-0 bg-gray-50 text-gray-700">
-                                  Normal
-                                </Badge>
-                              )}
-                              {pricing.savings > 0 && (
-                                <span className="text-xs text-green-600">
-                                  Save Rs.{pricing.savings.toFixed(2)}
-                                </span>
-                              )}
-                            </div>
-                            
-                            <p className="text-xs text-gray-600">
-                              Rs.{pricing.unitPrice.toFixed(2)} avg per item
-                            </p>
-                            
-                            {/* Show tier info */}
-                            {pricingResult?.tierInfo && (
-                              <div className="text-xs text-gray-500 mt-1 bg-blue-50 p-2 rounded">
-                                <div className="font-medium">Pricing details:</div>
-                                <div className="ml-2">{pricingResult.tierInfo}</div>
-                              </div>
-                            )}
+                          {/* Pricing Breakdown */}
+                          <div className="mt-2">
+                            <PricingBreakdown
+                              basePrice={item.basePrice}
+                              discountedPrice={pricing.unitPrice}
+                              quantity={item.quantity}
+                              savings={pricing.savings}
+                              appliedTier={pricing.appliedTier}
+                              tierInfo={pricingResult?.tierInfo}
+                              compact
+                            />
                           </div>
 
                           {/* Quantity Controls */}
