@@ -102,11 +102,10 @@ export const ReviewManagement = memo(function ReviewManagement() {
 
   const updateReviewMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const updateData = { status, updated_at: new Date().toISOString(), is_approved: status === 'approved' };
-      
+      // Only update status and updated_at (is_approved column may not exist in external DB)
       const { error } = await supabase
         .from('product_reviews')
-        .update(updateData)
+        .update({ status, updated_at: new Date().toISOString() })
         .eq('id', id);
       
       if (error) throw error;
