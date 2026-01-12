@@ -32,6 +32,9 @@ export function CustomerManagement() {
     filters,
     updateFilters,
     clearFilters,
+    // Search
+    searchQuery,
+    updateSearch,
     // Actions
     fetchCustomers,
     fetchCustomerOrders,
@@ -39,7 +42,6 @@ export function CustomerManagement() {
     exportToCSV
   } = useCustomerManagement();
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<typeof customers[0] | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -96,7 +98,7 @@ export function CustomerManagement() {
         <Input
           placeholder="Search by name, email, or phone..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => updateSearch(e.target.value)}
           className="pl-10"
         />
       </div>
@@ -112,7 +114,6 @@ export function CustomerManagement() {
       <CustomerTable
         customers={filteredCustomers}
         paginatedCustomers={paginatedCustomers}
-        searchQuery={searchQuery}
         onViewCustomer={handleViewCustomer}
         onRefresh={fetchCustomers}
         currentPage={currentPage}

@@ -12,7 +12,6 @@ import type { Customer, SortConfig } from '@/hooks/useCustomerManagement';
 interface CustomerTableProps {
   customers: Customer[];
   paginatedCustomers: Customer[];
-  searchQuery: string;
   onViewCustomer: (customer: Customer) => void;
   onRefresh: () => void;
   currentPage: number;
@@ -25,18 +24,12 @@ interface CustomerTableProps {
 }
 
 export function CustomerTable({ 
-  customers, paginatedCustomers, searchQuery, onViewCustomer, onRefresh, 
+  customers, paginatedCustomers, onViewCustomer, onRefresh, 
   currentPage, setCurrentPage, pageSize, setPageSize, totalPages, 
   sortConfig, onSortChange 
 }: CustomerTableProps) {
   const getPhone = (c: Customer) => c.phone || c.contact_number;
   const getWhatsapp = (c: Customer) => c.whatsapp || c.whatsapp_number;
-
-  const filtered = paginatedCustomers.filter(c => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return c.email.toLowerCase().includes(q) || c.full_name?.toLowerCase().includes(q) || getPhone(c)?.includes(q) || getWhatsapp(c)?.includes(q);
-  });
 
   const handleSort = (col: SortConfig['column']) => onSortChange({ 
     column: col, 
@@ -62,7 +55,7 @@ export function CustomerTable({
     toast.success('Contact info copied'); 
   };
 
-  if (!filtered.length && !searchQuery) {
+  if (!paginatedCustomers.length && !customers.length) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
@@ -113,11 +106,11 @@ export function CustomerTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!filtered.length ? (
+              {!paginatedCustomers.length ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No match</TableCell>
                 </TableRow>
-              ) : filtered.map(c => (
+              ) : paginatedCustomers.map(c => (
                 <TableRow key={c.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
