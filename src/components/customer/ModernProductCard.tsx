@@ -83,7 +83,10 @@ export const ModernProductCard = memo(function ModernProductCard({ product, subc
     initialData: subcategorySellingPrice,
   });
 
-  const basePrice = product.selling_price || realtimeSubcategoryPrice;
+  // If selling_price is 0 or null, fall back to subcategory min_selling_price
+  const basePrice = (product.selling_price && product.selling_price > 0)
+    ? product.selling_price
+    : realtimeSubcategoryPrice;
   const hasVolumeDiscount = discountTiers.length > 0;
 
   // Use React Query for product color variants (shared cache with shop page)

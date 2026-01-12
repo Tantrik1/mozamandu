@@ -57,8 +57,11 @@ export const HomeProductCard = memo(function HomeProductCard({
 
   const selectedColor = colorVariants.find(c => c.id === selectedColorId);
   const displayImage = selectedColor?.image_url || product.image_url;
+  // If selling_price is 0 or null, fall back to subcategory min_selling_price, then cost_price
   const displayPrice =
-    product.selling_price ?? product.subcategory?.min_selling_price ?? product.cost_price ?? 0;
+    (product.selling_price && product.selling_price > 0)
+      ? product.selling_price
+      : (product.subcategory?.min_selling_price ?? product.cost_price ?? 0);
 
   return (
     <Link
