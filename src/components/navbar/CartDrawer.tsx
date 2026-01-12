@@ -78,11 +78,15 @@ export function CartDrawer({ isOpen, onClose, disableModifications = false }: Ca
       
       if (data) {
         const tiersBySubcategory: { [key: string]: any[] } = {};
-        data.forEach(tier => {
+        data.forEach((tier: any) => {
           if (!tiersBySubcategory[tier.subcategory_id]) {
             tiersBySubcategory[tier.subcategory_id] = [];
           }
-          tiersBySubcategory[tier.subcategory_id].push(tier);
+          // Support both discount_amount and discount_percentage columns
+          tiersBySubcategory[tier.subcategory_id].push({
+            ...tier,
+            discount_amount: tier.discount_amount ?? tier.discount_percentage ?? 0
+          });
         });
         setDiscountTiers(tiersBySubcategory);
       }
