@@ -9,7 +9,10 @@ import {
   ProductPerformanceStats,
   InventoryStats,
   CustomerStatsPanel,
-  RevenueChart
+  RevenueChart,
+  DashboardDateFilter,
+  createDateFilterValue,
+  type DateFilterValue
 } from './dashboard';
 
 interface RevenueDataPoint {
@@ -40,7 +43,7 @@ interface OrdersCache {
 
 export function EnhancedAdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
-  const [revenuePeriod, setRevenuePeriod] = useState('week');
+  const [dateFilter, setDateFilter] = useState<DateFilterValue>(createDateFilterValue('last7days'));
   const [revenueChartData, setRevenueChartData] = useState<RevenueDataPoint[]>([]);
   const ordersCache = useRef<OrdersCache>({ data: null, timestamp: 0 });
   
@@ -133,32 +136,41 @@ export function EnhancedAdminDashboard() {
     return orders || [];
   };
 
+  // Filter orders by date range
+  const filterOrdersByDateRange = (orders: any[]) => {
+    return orders.filter(o => {
+      const orderDate = new Date(o.created_at);
+      return orderDate >= dateFilter.startDate && orderDate <= dateFilter.endDate;
+    });
+  };
+
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     try {
       // Fetch orders once and share across stats
-      const orders = await fetchOrdersWithCache();
+      const allOrders = await fetchOrdersWithCache();
+      const filteredOrders = filterOrdersByDateRange(allOrders);
       
-      // Run all stat calculations in parallel
+      // Run all stat calculations in parallel with filtered orders
       await Promise.all([
-        calculateCoreBusinessStats(orders),
-        calculateTimeBasedStats(orders),
-        calculateOrderStats(orders),
-        fetchProductStats(),
+        calculateCoreBusinessStats(filteredOrders),
+        calculateTimeBasedStats(filteredOrders, allOrders),
+        calculateOrderStats(filteredOrders),
+        fetchProductStats(filteredOrders),
         fetchInventoryStats(),
-        calculateCustomerStats(orders),
-        fetchRevenueChartData(orders)
+        calculateCustomerStats(filteredOrders, allOrders),
+        fetchRevenueChartData(filteredOrders)
       ]);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [revenuePeriod]);
+  }, [dateFilter]);
 
   useEffect(() => {
     fetchAllData();
-    // Refresh every 5 minutes instead of every 5 minutes to reduce load
+    // Refresh every 5 minutes
     const interval = setInterval(fetchAllData, 300000);
     return () => clearInterval(interval);
   }, [fetchAllData]);
@@ -207,74 +219,68 @@ export function EnhancedAdminDashboard() {
     });
   };
 
-  const calculateTimeBasedStats = async (orders: any[]) => {
+  const calculateTimeBasedStats = async (filteredOrders: any[], allOrders: any[]) => {
+    // Calculate stats for the selected date range
+    const validOrders = filteredOrders.filter(o => o.status !== 'cancelled');
+    const allValidOrders = allOrders.filter(o => o.status !== 'cancelled');
+    
+    // Get current period stats
+    const periodRevenue = validOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const periodOrders = validOrders.length;
+    
+    // Calculate comparison with previous period of same length
+    const periodDays = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const prevPeriodEnd = new Date(dateFilter.startDate);
+    prevPeriodEnd.setDate(prevPeriodEnd.getDate() - 1);
+    const prevPeriodStart = new Date(prevPeriodEnd);
+    prevPeriodStart.setDate(prevPeriodStart.getDate() - periodDays);
+    
+    const prevPeriodOrders = allValidOrders.filter(o => {
+      const date = new Date(o.created_at);
+      return date >= prevPeriodStart && date <= prevPeriodEnd;
+    });
+    const prevPeriodRevenue = prevPeriodOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    
+    const revenueGrowth = prevPeriodRevenue > 0 
+      ? ((periodRevenue - prevPeriodRevenue) / prevPeriodRevenue) * 100 
+      : periodRevenue > 0 ? 100 : 0;
+
+    const ordersGrowth = prevPeriodOrders.length > 0 
+      ? ((periodOrders - prevPeriodOrders.length) / prevPeriodOrders.length) * 100 
+      : periodOrders > 0 ? 100 : 0;
+
+    // Calculate quick reference stats from all orders (not filtered)
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    const last7Days = new Date(today);
-    last7Days.setDate(last7Days.getDate() - 7);
-    const last30Days = new Date(today);
-    last30Days.setDate(last30Days.getDate() - 30);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const yearStart = new Date(now.getFullYear(), 0, 1);
-    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-    const validOrders = orders.filter(o => o.status !== 'cancelled');
-
-    const todayRevenue = validOrders
+    const todayRevenue = allValidOrders
       .filter(o => new Date(o.created_at) >= today)
       .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-    const yesterdayRevenue = validOrders
+    const yesterdayRevenue = allValidOrders
       .filter(o => {
         const date = new Date(o.created_at);
         return date >= yesterday && date < today;
       })
       .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-    const last7DaysRevenue = validOrders
-      .filter(o => new Date(o.created_at) >= last7Days)
-      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-
-    const last30DaysRevenue = validOrders
-      .filter(o => new Date(o.created_at) >= last30Days)
-      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-
-    const mtdRevenue = validOrders
+    const mtdRevenue = allValidOrders
       .filter(o => new Date(o.created_at) >= monthStart)
       .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-    const ytdRevenue = validOrders
+    const ytdRevenue = allValidOrders
       .filter(o => new Date(o.created_at) >= yearStart)
       .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-
-    const prevMonthRevenue = validOrders
-      .filter(o => {
-        const date = new Date(o.created_at);
-        return date >= prevMonthStart && date < monthStart;
-      })
-      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-
-    const revenueGrowth = prevMonthRevenue > 0 
-      ? ((mtdRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 
-      : mtdRevenue > 0 ? 100 : 0;
-
-    const currentMonthOrders = validOrders.filter(o => new Date(o.created_at) >= monthStart).length;
-    const prevMonthOrders = validOrders.filter(o => {
-      const date = new Date(o.created_at);
-      return date >= prevMonthStart && date < monthStart;
-    }).length;
-
-    const ordersGrowth = prevMonthOrders > 0 
-      ? ((currentMonthOrders - prevMonthOrders) / prevMonthOrders) * 100 
-      : currentMonthOrders > 0 ? 100 : 0;
 
     setTimeStats({
       todayRevenue,
       yesterdayRevenue,
-      last7DaysRevenue,
-      last30DaysRevenue,
+      last7DaysRevenue: periodRevenue,
+      last30DaysRevenue: periodRevenue,
       mtdRevenue,
       ytdRevenue,
       revenueGrowth,
@@ -304,13 +310,17 @@ export function EnhancedAdminDashboard() {
     });
   };
 
-  const fetchProductStats = async () => {
+  const fetchProductStats = async (filteredOrders: any[]) => {
+    // Get order IDs from filtered orders to filter product stats
+    const orderIds = filteredOrders.map(o => o.id);
+    
     // Parallel fetch for product stats
     const [orderItemsResponse, inventoryResponse] = await Promise.all([
       supabase
         .from('customer_order_item_details')
-        .select('product_name, quantity, total_price')
-        .limit(500),
+        .select('product_name, quantity, total_price, order_id')
+        .in('order_id', orderIds.length > 0 ? orderIds : ['none'])
+        .limit(1000),
       supabase
         .from('product_inventory')
         .select('product_name, available_stock, low_stock_threshold, updated_at')
@@ -391,7 +401,7 @@ export function EnhancedAdminDashboard() {
     }
   };
 
-  const calculateCustomerStats = async (orders: any[]) => {
+  const calculateCustomerStats = async (filteredOrders: any[], allOrders: any[]) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -405,10 +415,12 @@ export function EnhancedAdminDashboard() {
       .from('profiles')
       .select('id')
       .eq('role', 'customer')
-      .gte('created_at', thirtyDaysAgo.toISOString())
+      .gte('created_at', dateFilter.startDate.toISOString())
+      .lte('created_at', dateFilter.endDate.toISOString())
       .limit(100);
 
-    const validOrders = orders.filter(o => o.status !== 'cancelled');
+    const validOrders = filteredOrders.filter(o => o.status !== 'cancelled');
+    const allValidOrders = allOrders.filter(o => o.status !== 'cancelled');
     const newCustomers = recentProfiles?.length || 0;
 
     type CustomerData = { count: number; total: number; name: string };
@@ -440,7 +452,7 @@ export function EnhancedAdminDashboard() {
 
     const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
     const activeCustomers = new Set(
-      validOrders
+      allValidOrders
         .filter(o => new Date(o.created_at || '') >= sixtyDaysAgo)
         .map(o => o.customer_email)
     ).size;
@@ -473,55 +485,24 @@ export function EnhancedAdminDashboard() {
   };
 
   const fetchRevenueChartData = async (orders: any[]) => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    let startDate: Date;
+    // Use the date filter for chart data - orders are already filtered
+    const validOrders = orders.filter(o => o.status !== 'cancelled');
+    
+    // Determine grouping based on date range span
+    const daysDiff = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
     let groupBy: 'hour' | 'day' | 'week' | 'month' = 'day';
-
-    switch (revenuePeriod) {
-      case 'today':
-        startDate = today;
-        groupBy = 'hour';
-        break;
-      case 'yesterday':
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 1);
-        groupBy = 'hour';
-        break;
-      case 'week':
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 7);
-        groupBy = 'day';
-        break;
-      case 'month':
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 30);
-        groupBy = 'day';
-        break;
-      case '3months':
-        startDate = new Date(today);
-        startDate.setMonth(startDate.getMonth() - 3);
-        groupBy = 'week';
-        break;
-      case 'all':
-        startDate = new Date('2020-01-01');
-        groupBy = 'month';
-        break;
-      default:
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 7);
-        groupBy = 'day';
+    
+    if (daysDiff <= 1) {
+      groupBy = 'hour';
+    } else if (daysDiff <= 14) {
+      groupBy = 'day';
+    } else if (daysDiff <= 90) {
+      groupBy = 'week';
+    } else {
+      groupBy = 'month';
     }
 
-    const filteredOrders = orders.filter(o => {
-      if (o.status === 'cancelled') return false;
-      const orderDate = new Date(o.created_at);
-      if (orderDate < startDate) return false;
-      if (revenuePeriod === 'yesterday' && orderDate >= today) return false;
-      return true;
-    });
-
-    const grouped = filteredOrders.reduce((acc, order) => {
+    const grouped = validOrders.reduce((acc, order) => {
       let key: string;
       const date = new Date(order.created_at);
       
@@ -563,36 +544,39 @@ export function EnhancedAdminDashboard() {
   return (
     <div className="min-h-screen bg-background">
       <div className="p-4 md:p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between bg-gradient-to-r from-primary/10 via-primary/5 to-background p-6 rounded-xl border">
+        {/* Header with Global Date Filter */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-primary/10 via-primary/5 to-background p-6 rounded-xl border">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Dashboard Overview</h1>
             <p className="text-muted-foreground mt-1">
               Real-time business insights and analytics
             </p>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => {
-              ordersCache.current = { data: null, timestamp: 0 };
-              fetchAllData();
-            }}
-            disabled={isLoading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <DashboardDateFilter value={dateFilter} onChange={setDateFilter} />
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                ordersCache.current = { data: null, timestamp: 0 };
+                fetchAllData();
+              }}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         {/* Core Business Stats */}
         <CoreBusinessStats {...coreStats} />
 
-        {/* Revenue Chart */}
+        {/* Revenue Chart - now uses global date filter */}
         <RevenueChart 
           data={revenueChartData}
-          period={revenuePeriod}
-          onPeriodChange={setRevenuePeriod}
+          period={dateFilter.preset}
+          onPeriodChange={() => {}}
         />
 
         {/* Time-Based & Order Performance */}
