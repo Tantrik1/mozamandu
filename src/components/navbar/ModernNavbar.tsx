@@ -48,12 +48,7 @@ export const ModernNavbar = memo(function ModernNavbar() {
             if (!tiersBySubcategory[tier.subcategory_id]) {
               tiersBySubcategory[tier.subcategory_id] = [];
             }
-            // Normalize: map discount_percentage to discount_amount for compatibility
-            const tierAny = tier as any;
-            tiersBySubcategory[tier.subcategory_id].push({
-              ...tier,
-              discount_amount: tierAny.discount_amount ?? tier.discount_percentage ?? 0,
-            });
+            tiersBySubcategory[tier.subcategory_id].push(tier);
           });
           setDiscountTiers(tiersBySubcategory);
         }

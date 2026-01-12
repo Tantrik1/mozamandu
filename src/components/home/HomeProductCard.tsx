@@ -17,7 +17,7 @@ interface ProductBase {
   selling_price: number | null;
   cost_price?: number;
   image_url: string | null;
-  subcategory?: { name: string; min_selling_price?: number | null } | null;
+  subcategory?: { name: string } | null;
 }
 
 interface HomeProductCardProps {
@@ -25,7 +25,6 @@ interface HomeProductCardProps {
   className?: string;
   badge?: React.ReactNode;
   priceSlot?: React.ReactNode;
-  subcategorySellingPrice?: number | null;
 }
 
 export const HomeProductCard = memo(function HomeProductCard({
@@ -33,7 +32,6 @@ export const HomeProductCard = memo(function HomeProductCard({
   className,
   badge,
   priceSlot,
-  subcategorySellingPrice,
 }: HomeProductCardProps) {
   const [selectedColorId, setSelectedColorId] = useState<string | null>(null);
 
@@ -120,7 +118,7 @@ export const HomeProductCard = memo(function HomeProductCard({
         </h3>
         {priceSlot ?? (
           <p className="text-lg font-bold text-foreground">
-            Rs. {(product.selling_price || subcategorySellingPrice || product.subcategory?.min_selling_price || 0).toLocaleString()}
+            Rs. {product.selling_price?.toLocaleString() || '0'}
           </p>
         )}
       </div>

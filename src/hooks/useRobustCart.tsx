@@ -190,15 +190,6 @@ export function RobustCartProvider({ children }: { children: React.ReactNode }) 
     colorVariantId?: string;
     sizeVariantId?: string;
   }) => {
-    // Validate unitPrice - must be a positive number
-    if (!unitPrice || unitPrice <= 0 || isNaN(unitPrice)) {
-      toast({
-        title: 'Invalid Price',
-        description: 'This product has no valid price. Please contact support.',
-        variant: 'destructive',
-      });
-      return false;
-    }
     try {
       setLoading(true);
 

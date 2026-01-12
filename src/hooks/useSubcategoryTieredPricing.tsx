@@ -98,10 +98,7 @@ export function useSubcategoryTieredPricing({
       const sortedItems = [...items].sort((a, b) => a.addedOrder - b.addedOrder);
       const totalQuantity = sortedItems.reduce((sum, item) => sum + item.quantity, 0);
       const moqReached = totalQuantity >= moqTier.min_quantity;
-      // Safely get discount amount with fallback to 0, prevent NaN
-      const discountAmount = moqTier.discount_amount ?? 0;
-      const safeDiscountAmount = isNaN(discountAmount) ? 0 : discountAmount;
-      const discountedPrice = Math.max(0, sortedItems[0].basePrice - safeDiscountAmount);
+      const discountedPrice = Math.max(0, sortedItems[0].basePrice - moqTier.discount_amount);
 
       const itemBreakdown: ItemPricingDetail[] = [];
       let processedQuantity = 0;
@@ -129,7 +126,7 @@ export function useSubcategoryTieredPricing({
           const normalCost = normalPriceQuantity * item.basePrice;
           const discountCost = discountPriceQuantity * discountedPrice;
           const totalCost = normalCost + discountCost;
-          const savings = discountPriceQuantity * safeDiscountAmount;
+          const savings = discountPriceQuantity * moqTier.discount_amount;
 
           let tierInfo = '';
           if (normalPriceQuantity > 0 && discountPriceQuantity > 0) {
