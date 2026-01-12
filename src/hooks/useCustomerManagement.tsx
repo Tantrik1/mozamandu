@@ -42,6 +42,18 @@ export interface OrderItem {
   unit_price: number;
   total_price: number;
   sku: string | null;
+  pricing_mode: string | null;
+  pricing_details: {
+    basePrice?: number;
+    savings?: number;
+    tierBreakdown?: Array<{
+      tierName: string;
+      unitsInTier: number;
+      unitPrice: number;
+      tierTotal: number;
+      discountAmount: number;
+    }>;
+  } | null;
 }
 
 export interface CustomerFilters {
@@ -333,7 +345,9 @@ export function useCustomerManagement() {
       const items: OrderItem[] = (data || []).map(i => ({ 
         id: i.id, product_name: i.product_name, color_name: i.color_name, 
         size_name: i.size_name, quantity: i.quantity, unit_price: i.unit_price, 
-        total_price: i.total_price, sku: i.sku 
+        total_price: i.total_price, sku: i.sku,
+        pricing_mode: i.pricing_mode || null,
+        pricing_details: i.pricing_details as OrderItem['pricing_details']
       }));
       setOrderItems(prev => ({ ...prev, [orderId]: items }));
       return items;
