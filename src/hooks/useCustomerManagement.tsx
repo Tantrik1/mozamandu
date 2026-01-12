@@ -16,6 +16,7 @@ export interface Customer {
   created_at: string;
   total_orders: number;
   total_spent: number;
+  is_guest: boolean;
 }
 
 export interface CustomerOrder {
@@ -106,9 +107,14 @@ export function useCustomerManagement() {
       const { data: profiles, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
       if (error) throw error;
 
-      const { data: coData } = await supabase.from('customer_orders').select('user_id, total_amount, customer_email, contact_number');
-      const { data: goData } = await supabase.from('orders').select('customer_email, contact_number, total_amount');
+      const { data: coData } = await supabase.from('customer_orders').select('user_id, total_amount, customer_email, customer_name, contact_number, whatsapp_number, delivery_address, created_at');
+      const { data: goData } = await supabase.from('orders').select('customer_email, customer_name, contact_number, whatsapp_number, delivery_address, total_amount, created_at');
 
+      // Track which emails/phones belong to registered customers
+      const registeredEmails = new Set((profiles || []).map(p => p.email?.toLowerCase()).filter(Boolean));
+      const registeredPhones = new Set((profiles || []).map(p => p.phone).filter(Boolean));
+
+      // Build registered customers with stats
       const customersWithStats: Customer[] = (profiles || []).filter(p => p.role === 'customer').map(p => {
         const pAny = p as any;
         const phone = p.phone || pAny.contact_number;
@@ -121,12 +127,88 @@ export function useCustomerManagement() {
           phone: p.phone || pAny.contact_number || null, whatsapp: p.whatsapp || pAny.whatsapp_number || null,
           contact_number: pAny.contact_number || p.phone || null, whatsapp_number: pAny.whatsapp_number || p.whatsapp || null,
           address: p.address || null, role: p.role || 'customer', created_at: p.created_at || new Date().toISOString(),
-          total_orders: allOrders.length, total_spent: allOrders.reduce((s, o) => s + (o.total_amount || 0), 0)
+          total_orders: allOrders.length, total_spent: allOrders.reduce((s, o) => s + (o.total_amount || 0), 0),
+          is_guest: false
         };
       });
+
+      // Find guest buyers from orders table (not linked to any profile)
+      const guestOrdersMap = new Map<string, { orders: typeof goData; firstOrder: any }>();
       
-      setCustomers(customersWithStats);
-      applyFiltersAndSort(customersWithStats, filters, sortConfig);
+      (goData || []).forEach(order => {
+        const email = order.customer_email?.toLowerCase();
+        const phone = order.contact_number;
+        
+        // Skip if this order belongs to a registered customer
+        if (email && registeredEmails.has(email)) return;
+        if (phone && registeredPhones.has(phone)) return;
+        
+        // Use email or phone as unique key for guest
+        const key = email || phone || '';
+        if (!key) return;
+        
+        if (!guestOrdersMap.has(key)) {
+          guestOrdersMap.set(key, { orders: [order], firstOrder: order });
+        } else {
+          const existing = guestOrdersMap.get(key)!;
+          existing.orders.push(order);
+          // Keep earliest order as first order
+          if (new Date(order.created_at) < new Date(existing.firstOrder.created_at)) {
+            existing.firstOrder = order;
+          }
+        }
+      });
+
+      // Also check customer_orders for guests (orders without user_id)
+      (coData || []).forEach(order => {
+        if (order.user_id) return; // Has user_id, not a guest
+        
+        const email = order.customer_email?.toLowerCase();
+        const phone = order.contact_number;
+        
+        if (email && registeredEmails.has(email)) return;
+        if (phone && registeredPhones.has(phone)) return;
+        
+        const key = email || phone || '';
+        if (!key) return;
+        
+        if (!guestOrdersMap.has(key)) {
+          guestOrdersMap.set(key, { orders: [order as any], firstOrder: order });
+        } else {
+          const existing = guestOrdersMap.get(key)!;
+          existing.orders.push(order as any);
+          if (new Date(order.created_at!) < new Date(existing.firstOrder.created_at)) {
+            existing.firstOrder = order;
+          }
+        }
+      });
+
+      // Convert guest orders to Customer objects
+      const guestCustomers: Customer[] = Array.from(guestOrdersMap.entries()).map(([key, data]) => {
+        const firstOrder = data.firstOrder;
+        const totalSpent = data.orders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+        
+        return {
+          id: `guest_${key}`, // Unique ID for guests
+          email: firstOrder.customer_email || '',
+          full_name: firstOrder.customer_name || null,
+          phone: firstOrder.contact_number || null,
+          whatsapp: firstOrder.whatsapp_number || null,
+          contact_number: firstOrder.contact_number || null,
+          whatsapp_number: firstOrder.whatsapp_number || null,
+          address: firstOrder.delivery_address || null,
+          role: 'guest',
+          created_at: firstOrder.created_at || new Date().toISOString(),
+          total_orders: data.orders.length,
+          total_spent: totalSpent,
+          is_guest: true
+        };
+      });
+
+      const allCustomers = [...customersWithStats, ...guestCustomers];
+      
+      setCustomers(allCustomers);
+      applyFiltersAndSort(allCustomers, filters, sortConfig);
     } catch (e) { 
       console.error(e); 
       toast.error('Failed to load customers'); 
@@ -160,14 +242,48 @@ export function useCustomerManagement() {
       const customer = customers.find(c => c.id === customerId);
       if (!customer) return;
       const phone = customer.phone || customer.contact_number;
+      const isGuest = customer.is_guest;
       
-      const { data: co } = await supabase.from('customer_orders').select('*')
-        .or(`user_id.eq.${customerId},customer_email.ilike.${customer.email}${phone ? `,contact_number.eq.${phone}` : ''}`)
-        .order('created_at', { ascending: false });
+      let co: any[] = [];
+      let go: any[] = [];
       
-      const { data: go } = await supabase.from('orders').select('*')
-        .or(`customer_email.ilike.${customer.email}${phone ? `,contact_number.eq.${phone}` : ''}`)
-        .order('created_at', { ascending: false });
+      if (isGuest) {
+        // For guests, only search by email/phone
+        if (customer.email) {
+          const { data: coEmail } = await supabase.from('customer_orders').select('*')
+            .ilike('customer_email', customer.email)
+            .order('created_at', { ascending: false });
+          co = coEmail || [];
+          
+          const { data: goEmail } = await supabase.from('orders').select('*')
+            .ilike('customer_email', customer.email)
+            .order('created_at', { ascending: false });
+          go = goEmail || [];
+        }
+        
+        if (phone && !customer.email) {
+          const { data: coPhone } = await supabase.from('customer_orders').select('*')
+            .eq('contact_number', phone)
+            .order('created_at', { ascending: false });
+          co = coPhone || [];
+          
+          const { data: goPhone } = await supabase.from('orders').select('*')
+            .eq('contact_number', phone)
+            .order('created_at', { ascending: false });
+          go = goPhone || [];
+        }
+      } else {
+        // For registered customers, include user_id matching
+        const { data: coData } = await supabase.from('customer_orders').select('*')
+          .or(`user_id.eq.${customerId},customer_email.ilike.${customer.email}${phone ? `,contact_number.eq.${phone}` : ''}`)
+          .order('created_at', { ascending: false });
+        co = coData || [];
+        
+        const { data: goData } = await supabase.from('orders').select('*')
+          .or(`customer_email.ilike.${customer.email}${phone ? `,contact_number.eq.${phone}` : ''}`)
+          .order('created_at', { ascending: false });
+        go = goData || [];
+      }
       
       const all = [
         ...(co || []).map(o => ({ ...o, source: 'customer_orders' as const })), 
@@ -211,12 +327,13 @@ export function useCustomerManagement() {
   };
 
   const exportToCSV = useCallback(() => {
-    const headers = ['Name', 'Email', 'Phone', 'WhatsApp', 'Address', 'Total Orders', 'Total Spent', 'Joined Date'];
+    const headers = ['Name', 'Email', 'Phone', 'WhatsApp', 'Address', 'Total Orders', 'Total Spent', 'Joined Date', 'Type'];
     const rows = filteredCustomers.map(c => [
       c.full_name || '', c.email, c.phone || c.contact_number || '', 
       c.whatsapp || c.whatsapp_number || '', c.address || '', 
       c.total_orders.toString(), c.total_spent.toFixed(2), 
-      new Date(c.created_at).toLocaleDateString()
+      new Date(c.created_at).toLocaleDateString(),
+      c.is_guest ? 'Guest' : 'Registered'
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });

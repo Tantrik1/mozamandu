@@ -59,6 +59,7 @@ export function CustomerDialog({
   };
 
   const badges = [];
+  if (customer.is_guest) badges.push({ label: 'Guest Buyer', variant: 'outline' as const, className: 'bg-orange-50 text-orange-700 border-orange-200' });
   if (customer.total_orders >= 5) badges.push({ label: 'Frequent Buyer', variant: 'default' as const });
   if (customer.total_spent >= 10000) badges.push({ label: 'VIP', variant: 'destructive' as const });
   if (customer.total_orders > 1) badges.push({ label: 'Repeat', variant: 'secondary' as const });
@@ -77,7 +78,7 @@ export function CustomerDialog({
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-lg">Customer Information</CardTitle>
                 <div className="flex gap-2">
-                  {badges.map((b, i) => <Badge key={i} variant={b.variant}>{b.label}</Badge>)}
+                  {badges.map((b, i) => <Badge key={i} variant={b.variant} className={(b as any).className}>{b.label}</Badge>)}
                 </div>
               </div>
             </CardHeader>
@@ -90,7 +91,7 @@ export function CustomerDialog({
                   {customer.address && <div><span className="text-sm text-muted-foreground">Address</span><p className="font-medium">{customer.address}</p></div>}
                 </div>
                 <div className="space-y-2">
-                  <div><span className="text-sm text-muted-foreground">Member For</span><p className="font-medium">{memberSince}</p></div>
+                  <div><span className="text-sm text-muted-foreground">{customer.is_guest ? 'First Order' : 'Member For'}</span><p className="font-medium">{memberSince}</p></div>
                   <div><span className="text-sm text-muted-foreground">Total Orders</span><p className="font-medium">{customer.total_orders}</p></div>
                   <div><span className="text-sm text-muted-foreground">Total Spent</span><p className="font-medium">Rs. {customer.total_spent.toLocaleString('en-IN')}</p></div>
                   <div><span className="text-sm text-muted-foreground">Avg Order</span><p className="font-medium">Rs. {avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p></div>

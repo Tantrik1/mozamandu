@@ -120,8 +120,17 @@ export function CustomerTable({
               ) : filtered.map(c => (
                 <TableRow key={c.id}>
                   <TableCell>
-                    <p className="font-medium">{c.full_name || 'Unnamed'}</p>
-                    <p className="text-sm text-muted-foreground">{c.email}</p>
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <p className="font-medium">{c.full_name || 'Unnamed'}</p>
+                        <p className="text-sm text-muted-foreground">{c.email}</p>
+                      </div>
+                      {c.is_guest && (
+                        <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                          Guest
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-sm">
                     {getPhone(c) && <p>📞 {getPhone(c)}</p>}
