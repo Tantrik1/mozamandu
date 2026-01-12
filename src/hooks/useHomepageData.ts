@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 const fetchLatestProducts = async () => {
   const { data } = await supabase
     .from('products')
-    .select(`id, name, selling_price, image_url, has_color_variants, subcategory:subcategories(name)`)
+    .select(`id, name, selling_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price)`)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
     .limit(4); // Reduced from 8 for faster initial load
@@ -25,7 +25,7 @@ const fetchMostSoldProducts = async () => {
 
   const { data: products } = await supabase
     .from('products')
-    .select(`id, name, selling_price, image_url, has_color_variants, subcategory:subcategories(name)`)
+    .select(`id, name, selling_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price)`)
     .eq('status', 'active')
     .limit(12);
 
@@ -59,7 +59,7 @@ const fetchFAQs = async () => {
 const fetchFeaturedProducts = async () => {
   const { data } = await supabase
     .from('products')
-    .select(`id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name)`)
+    .select(`id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price)`)
     .eq('status', 'active')
     .eq('is_featured', true)
     .limit(4);
