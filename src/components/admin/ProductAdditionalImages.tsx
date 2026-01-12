@@ -1,10 +1,9 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { createClient } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, X, Eye, ImagePlus, Loader2 } from 'lucide-react';
+import { X, Eye, ImagePlus, Loader2, Upload } from 'lucide-react';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
 
 interface AdditionalImage {
@@ -13,6 +12,7 @@ interface AdditionalImage {
   preview: string;
   isNew: boolean;
   uploading?: boolean;
+  storagePath?: string;
 }
 
 interface ProductAdditionalImagesProps {
@@ -26,13 +26,8 @@ export interface ProductAdditionalImagesRef {
   hasNewImages: () => boolean;
 }
 
-const BUCKET_NAME = 'product-additional-images';
-
-// External Supabase storage client for product additional images
-const EXTERNAL_SUPABASE_URL = 'https://huwhbxjlyucamitwwhyg.supabase.co';
-const EXTERNAL_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1d2hieGpseXVjYW1pdHd3aHlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2NTg4NTcsImV4cCI6MjA2NjIzNDg1N30.cB3YipySfkizYpvwUPd9xlBlq_haPznmEpPgcbAwovQ';
-
-const externalSupabase = createClient(EXTERNAL_SUPABASE_URL, EXTERNAL_SUPABASE_ANON_KEY);
+// Use existing product-images bucket with subfolder for additional images
+const BUCKET_NAME = 'product-images';
 
 export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, ProductAdditionalImagesProps>(
   function ProductAdditionalImagesComponent({ productId, onImagesChange, maxImages = 3 }, ref) {
@@ -74,12 +69,13 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
             // Optimize image with compression
             const { file: optimizedFile } = await prepareImageForUpload(img.file, PRODUCT_COMPRESSION);
 
-            const fileName = `${targetProductId}/${Date.now()}-${i}.webp`;
+            // Use subfolder structure: additional/{productId}/{timestamp}.webp
+            const fileName = `additional/${targetProductId}/${Date.now()}-${i}.webp`;
 
-            console.log('📤 Uploading additional image to external bucket:', BUCKET_NAME, 'file:', fileName);
+            console.log('📤 Uploading additional image to bucket:', BUCKET_NAME, 'file:', fileName);
 
-            // Use external Supabase for storage upload
-            const { data: uploadData, error: uploadError } = await externalSupabase.storage
+            // Upload to storage using standard supabase client
+            const { data: uploadData, error: uploadError } = await supabase.storage
               .from(BUCKET_NAME)
               .upload(fileName, optimizedFile, {
                 contentType: 'image/webp',
@@ -98,14 +94,14 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
 
             console.log('✅ Storage upload success:', uploadData);
 
-            // Get public URL from external Supabase
-            const { data: urlData } = externalSupabase.storage
+            // Get public URL
+            const { data: urlData } = supabase.storage
               .from(BUCKET_NAME)
               .getPublicUrl(fileName);
 
             console.log('🔗 Public URL:', urlData.publicUrl);
 
-            // Save to product_additional_images table (using external Supabase for DB operations)
+            // Save to product_additional_images table (cast to any for external table)
             const insertData = {
               product_id: targetProductId,
               image_url: urlData.publicUrl,
@@ -113,7 +109,7 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
               display_order: i,
             };
 
-            const { data: dbData, error: dbError } = await externalSupabase
+            const { data: dbData, error: dbError } = await (supabase as any)
               .from('product_additional_images')
               .insert(insertData)
               .select()
@@ -133,7 +129,13 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
 
             // Update image state to mark as uploaded
             setImages(prev => prev.map((p) => 
-              p === img ? { ...p, isNew: false, uploading: false, id: dbData?.id || crypto.randomUUID() } : p
+              p === img ? { 
+                ...p, 
+                isNew: false, 
+                uploading: false, 
+                id: dbData?.id || crypto.randomUUID(),
+                storagePath: fileName 
+              } : p
             ));
 
             toast({
@@ -173,21 +175,22 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
       if (!productId) return;
       
       try {
-        // Use external Supabase for fetching from product_additional_images table
-        const result = await externalSupabase
+        // Cast to any for external table access
+        const { data, error } = await (supabase as any)
           .from('product_additional_images')
-          .select('id, image_url, display_order')
+          .select('id, image_url, storage_path, display_order')
           .eq('product_id', productId)
           .order('display_order', { ascending: true });
 
-        if (result.error) {
-          console.error('Error fetching additional images:', result.error);
+        if (error) {
+          console.error('Error fetching additional images:', error);
           return;
         }
 
-        const existingImages: AdditionalImage[] = (result.data || []).map((img: any) => ({
+        const existingImages: AdditionalImage[] = (data || []).map((img: any) => ({
           id: img.id,
           preview: img.image_url,
+          storagePath: img.storage_path,
           isNew: false,
         }));
 
@@ -255,10 +258,22 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
     const removeImage = async (index: number) => {
       const imageToRemove = images[index];
       
-      if (imageToRemove.id && productId) {
+      if (imageToRemove.id) {
         try {
-          // Use external Supabase to delete from product_additional_images table
-          const { error } = await externalSupabase
+          // Delete from storage if we have the storage path
+          if (imageToRemove.storagePath) {
+            const { error: storageError } = await supabase.storage
+              .from(BUCKET_NAME)
+              .remove([imageToRemove.storagePath]);
+            
+            if (storageError) {
+              console.warn('Storage delete warning:', storageError);
+              // Continue even if storage delete fails
+            }
+          }
+
+          // Delete from database (cast to any for external table)
+          const { error } = await (supabase as any)
             .from('product_additional_images')
             .delete()
             .eq('id', imageToRemove.id);
