@@ -21,9 +21,9 @@ interface DiscountTier {
   id?: string;
   min_quantity: number;
   max_quantity: number | null;
-  discount_percentage?: number;
-  discount_amount?: number;
+  discount_amount: number;
 }
+
 
 interface Subcategory {
   id: string;
@@ -293,14 +293,13 @@ export function SubcategoryManagement() {
 
       if (discountTiers.length > 0) {
         // Insert new tiers - use discount_amount for price-based discounts
-        const tiersToInsert = discountTiers.map(tier => ({
+        const tiersToInsert = discountTiers.map((tier) => ({
           subcategory_id: subcategoryId,
           min_quantity: tier.min_quantity,
           max_quantity: tier.max_quantity,
-          discount_amount: tier.discount_amount ?? 0,
-          // Keep percentage column at 0 (legacy/backward compatibility only)
-          discount_percentage: 0,
+          discount_amount: Number(tier.discount_amount) || 0,
         }));
+
 
         const { error: tiersError } = await supabase
           .from('discount_tiers')

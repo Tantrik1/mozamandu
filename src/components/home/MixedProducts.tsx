@@ -11,19 +11,20 @@ interface Product {
   image_url: string | null;
   selling_price: number | null;
   cost_price: number;
-  subcategory: { name: string } | null;
+  subcategory: { name: string; min_selling_price?: number | null } | null;
 }
 
 const fetchMixedProducts = async () => {
   const { data } = await supabase
     .from('products')
-    .select('id, name, image_url, selling_price, cost_price, subcategory:subcategories(name)')
+    .select('id, name, image_url, selling_price, cost_price, subcategory:subcategories(name, min_selling_price)')
     .eq('status', 'active')
     .limit(8); // Reduced limit
-  
+
   // Shuffle the products for random order
   return (data || []).sort(() => Math.random() - 0.5).slice(0, 4); // Show only 4
 };
+
 
 export const MixedProducts = memo(function MixedProducts() {
   const { data: products = [], isLoading } = useQuery({
@@ -67,62 +68,68 @@ export const MixedProducts = memo(function MixedProducts() {
 
         {/* Products Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-8">
-          {products.map((product) => (
-            <Link
-              key={product.id}
-              to={`/product/${product.id}`}
-              className="group"
-            >
-              <div className="relative aspect-square rounded-2xl overflow-hidden bg-card border border-border/50 shadow-sm hover:shadow-xl transition-all duration-500">
-                {product.image_url ? (
-                  <img
-                    src={product.image_url}
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                    loading="lazy"
-                    decoding="async"
-                    width={300}
-                    height={300}
-                  />
-                ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center">
-                    <Package className="w-12 h-12 text-muted-foreground/50" />
+          {products.map((product) => {
+            const displayPrice =
+              product.selling_price ?? product.subcategory?.min_selling_price ?? product.cost_price;
+
+            return (
+              <Link
+                key={product.id}
+                to={`/product/${product.id}`}
+                className="group"
+              >
+                <div className="relative aspect-square rounded-2xl overflow-hidden bg-card border border-border/50 shadow-sm hover:shadow-xl transition-all duration-500">
+                  {product.image_url ? (
+                    <img
+                      src={product.image_url}
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      loading="lazy"
+                      decoding="async"
+                      width={300}
+                      height={300}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                      <Package className="w-12 h-12 text-muted-foreground/50" />
+                    </div>
+                  )}
+
+                  {/* Hover Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                  {/* Category Badge */}
+                  {product.subcategory?.name && (
+                    <div className="absolute top-3 left-3">
+                      <span className="bg-background/80 backdrop-blur-sm text-xs font-medium px-2 py-1 rounded-full text-foreground">
+                        {product.subcategory.name}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Product Info on Hover */}
+                  <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                    <h3 className="text-white font-semibold text-sm line-clamp-1 mb-1">
+                      {product.name}
+                    </h3>
+                    <p className="text-white/80 text-sm font-medium">
+                      Rs. {displayPrice.toLocaleString()}
+                    </p>
                   </div>
-                )}
-                
-                {/* Hover Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                
-                {/* Category Badge */}
-                {product.subcategory?.name && (
-                  <div className="absolute top-3 left-3">
-                    <span className="bg-background/80 backdrop-blur-sm text-xs font-medium px-2 py-1 rounded-full text-foreground">
-                      {product.subcategory.name}
-                    </span>
-                  </div>
-                )}
-                
-                {/* Product Info on Hover */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                  <h3 className="text-white font-semibold text-sm line-clamp-1 mb-1">
-                    {product.name}
-                  </h3>
-                  <p className="text-white/80 text-sm font-medium">
-                    Rs. {(product.selling_price || product.cost_price).toLocaleString()}
+                </div>
+
+                {/* Product Info Below Image (Mobile) */}
+                <div className="mt-3 lg:hidden">
+                  <h3 className="font-medium text-foreground text-sm line-clamp-1">{product.name}</h3>
+                  <p className="text-primary font-semibold text-sm">
+                    Rs. {displayPrice.toLocaleString()}
                   </p>
                 </div>
-              </div>
-              
-              {/* Product Info Below Image (Mobile) */}
-              <div className="mt-3 lg:hidden">
-                <h3 className="font-medium text-foreground text-sm line-clamp-1">{product.name}</h3>
-                <p className="text-primary font-semibold text-sm">
-                  Rs. {(product.selling_price || product.cost_price).toLocaleString()}
-                </p>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
+
 
         {/* Shop More CTA */}
         <div className="text-center">
