@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { SmartProductVariantForm } from './SmartProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
-import { ProductAdditionalImages, type AdditionalImage } from './ProductAdditionalImages';
+import { ProductAdditionalImages, type AdditionalImage, type ProductAdditionalImagesRef } from './ProductAdditionalImages';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
 import { CareInstructionsInput } from './CareInstructionsInput';
 
@@ -76,7 +76,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const [showInventoryPopup, setShowInventoryPopup] = useState(false);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const [additionalImages, setAdditionalImages] = useState<AdditionalImage[]>([]);
-  const additionalImagesRef = useRef<{ uploadImages: (productId: string) => Promise<boolean> } | null>(null);
+  const additionalImagesRef = useRef<ProductAdditionalImagesRef>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -244,41 +244,9 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   };
 
   const uploadAdditionalImages = async (productId: string): Promise<void> => {
-    const newImages = additionalImages.filter(img => img.isNew && img.file);
-    
-    for (let i = 0; i < newImages.length; i++) {
-      const img = newImages[i];
-      if (!img.file) continue;
-
-      try {
-        const { file: optimizedFile } = await prepareImageForUpload(img.file, PRODUCT_COMPRESSION);
-
-        const fileName = `product-additional-${productId}-${Date.now()}-${i}.webp`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('product-images')
-          .upload(fileName, optimizedFile, {
-            contentType: 'image/webp',
-          });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from('product-images')
-          .getPublicUrl(fileName);
-
-        await supabase
-          .from('product_images')
-          .insert({
-            product_id: productId,
-            image_url: urlData.publicUrl,
-            storage_path: fileName,
-            is_primary: false,
-            image_type: 'additional',
-          });
-      } catch (error) {
-        console.error('Error uploading additional image:', error);
-      }
+    // Use the ref to upload images through the component
+    if (additionalImagesRef.current?.hasNewImages()) {
+      await additionalImagesRef.current.uploadImages(productId);
     }
   };
 
@@ -692,6 +660,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                 {/* Additional Images Section */}
                 <div className="mt-6 pt-4 border-t border-border">
                   <ProductAdditionalImages
+                    ref={additionalImagesRef}
                     onImagesChange={setAdditionalImages}
                     maxImages={3}
                   />
