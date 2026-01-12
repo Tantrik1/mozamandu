@@ -105,17 +105,16 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
 
             console.log('🔗 Public URL:', urlData.publicUrl);
 
-            // Save to product_images table (still using main supabase client for DB operations)
+            // Save to product_additional_images table (using external Supabase for DB operations)
             const insertData = {
               product_id: targetProductId,
               image_url: urlData.publicUrl,
-              is_primary: false,
-              image_type: 'gallery',
               storage_path: fileName,
+              display_order: i,
             };
 
-            const { data: dbData, error: dbError } = await supabase
-              .from('product_images')
+            const { data: dbData, error: dbError } = await externalSupabase
+              .from('product_additional_images')
               .insert(insertData)
               .select()
               .single();
@@ -174,22 +173,19 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
       if (!productId) return;
       
       try {
-        const result = await supabase
-          .from('product_images')
-          .select('id, image_url, image_type')
-          .eq('product_id', productId);
+        // Use external Supabase for fetching from product_additional_images table
+        const result = await externalSupabase
+          .from('product_additional_images')
+          .select('id, image_url, display_order')
+          .eq('product_id', productId)
+          .order('display_order', { ascending: true });
 
         if (result.error) {
           console.error('Error fetching additional images:', result.error);
           return;
         }
 
-        // Filter for gallery type images
-        const galleryImages = (result.data || []).filter(
-          (img: any) => img.image_type === 'gallery'
-        );
-
-        const existingImages: AdditionalImage[] = galleryImages.map((img: any) => ({
+        const existingImages: AdditionalImage[] = (result.data || []).map((img: any) => ({
           id: img.id,
           preview: img.image_url,
           isNew: false,
@@ -261,8 +257,9 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
       
       if (imageToRemove.id && productId) {
         try {
-          const { error } = await supabase
-            .from('product_images')
+          // Use external Supabase to delete from product_additional_images table
+          const { error } = await externalSupabase
+            .from('product_additional_images')
             .delete()
             .eq('id', imageToRemove.id);
 
