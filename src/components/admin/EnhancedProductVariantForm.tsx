@@ -60,6 +60,7 @@ interface EnhancedProductVariantFormProps {
   getProductData: () => ProductData;
   imageFile: File | null;
   imagePreview: string | null;
+  onBeforeSave?: () => Promise<void>;
   onSave: () => void;
   onCancel: () => void;
 }
@@ -71,6 +72,7 @@ export function EnhancedProductVariantForm({
   getProductData,
   imageFile,
   imagePreview,
+  onBeforeSave,
   onSave,
   onCancel,
 }: EnhancedProductVariantFormProps) {
@@ -373,6 +375,12 @@ export function EnhancedProductVariantForm({
   const handleSave = async () => {
     setLoading(true);
     try {
+      // Step 0: Run onBeforeSave callback (for additional images upload, etc.)
+      if (onBeforeSave) {
+        console.log('Running onBeforeSave callback...');
+        await onBeforeSave();
+      }
+
       // Step 1: Update product information first
       console.log('Updating product information...');
       await updateProductInformation();

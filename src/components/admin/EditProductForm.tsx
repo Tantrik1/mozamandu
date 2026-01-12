@@ -690,6 +690,14 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             })}
             imageFile={imageFile}
             imagePreview={imagePreview}
+            onBeforeSave={async () => {
+              // Upload additional images before variant form save completes
+              console.log('📸 onBeforeSave called - uploading additional images');
+              if (additionalImagesRef.current?.hasNewImages()) {
+                console.log('📸 Has new images, uploading...');
+                await additionalImagesRef.current.uploadImages(productId);
+              }
+            }}
             onSave={() => {
               // After successful save, open inventory popup
               setShowInventoryPopup(true);
