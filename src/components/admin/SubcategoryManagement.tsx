@@ -273,35 +273,47 @@ export function SubcategoryManagement() {
     }
 
     // Handle discount tiers
-    if (subcategoryId && discountTiers.length > 0) {
-      // Delete existing tiers if editing
+    if (subcategoryId) {
+      // Always delete existing tiers when editing (also allows clearing all tiers)
       if (editingSubcategory) {
-        await supabase
+        const { error: deleteError } = await supabase
           .from('discount_tiers')
           .delete()
           .eq('subcategory_id', subcategoryId);
+
+        if (deleteError) {
+          toast({
+            title: "Error",
+            description: `Failed to update discount tiers: ${deleteError.message}`,
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
-      // Insert new tiers - use discount_amount for price-based discounts
-      const tiersToInsert = discountTiers.map(tier => ({
-        subcategory_id: subcategoryId,
-        min_quantity: tier.min_quantity,
-        max_quantity: tier.max_quantity,
-        discount_amount: tier.discount_amount ?? 0,
-        // Also set discount_percentage for Lovable Cloud compatibility (same value for now)
-        discount_percentage: tier.discount_amount ?? 0
-      }));
+      if (discountTiers.length > 0) {
+        // Insert new tiers - use discount_amount for price-based discounts
+        const tiersToInsert = discountTiers.map(tier => ({
+          subcategory_id: subcategoryId,
+          min_quantity: tier.min_quantity,
+          max_quantity: tier.max_quantity,
+          discount_amount: tier.discount_amount ?? 0,
+          // Keep percentage column at 0 (legacy/backward compatibility only)
+          discount_percentage: 0,
+        }));
 
-      const { error: tiersError } = await supabase
-        .from('discount_tiers')
-        .insert(tiersToInsert as any);
+        const { error: tiersError } = await supabase
+          .from('discount_tiers')
+          .insert(tiersToInsert as any);
 
-      if (tiersError) {
-        toast({
-          title: "Warning",
-          description: "Subcategory saved but discount tiers failed to save",
-          variant: "destructive",
-        });
+        if (tiersError) {
+          toast({
+            title: "Error",
+            description: `Discount tiers failed to save: ${tiersError.message}`,
+            variant: "destructive",
+          });
+          return;
+        }
       }
     }
 

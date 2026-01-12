@@ -18,11 +18,11 @@ interface Product {
   id: string;
   name: string;
   image_url?: string;
-  selling_price?: number;
+  selling_price: number | null;
   cost_price: number;
   is_featured?: boolean;
   has_color_variants?: boolean;
-  subcategory?: { name: string };
+  subcategory?: { name: string; min_selling_price?: number | null };
 }
 
 interface ShopProductCardProps {
@@ -33,10 +33,10 @@ interface ShopProductCardProps {
 export function ShopProductCard({ product, className }: ShopProductCardProps) {
   const [selectedColorId, setSelectedColorId] = useState<string | null>(null);
   
-  const price = product.selling_price || product.cost_price;
-  const hasDiscount = product.selling_price && product.selling_price < product.cost_price;
+  const price = product.selling_price ?? product.subcategory?.min_selling_price ?? product.cost_price;
+  const hasDiscount = price < product.cost_price;
   const discountPercent = hasDiscount 
-    ? Math.round((1 - product.selling_price! / product.cost_price) * 100) 
+    ? Math.round((1 - price / product.cost_price) * 100) 
     : 0;
 
   // Fetch color variants with hex codes

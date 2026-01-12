@@ -290,7 +290,8 @@ export default function ProductDetail() {
   };
 
   const currentCartQuantity = getCartQuantity();
-  const basePrice = product?.selling_price || subcategory?.min_selling_price || 0;
+  const basePrice =
+    product?.selling_price ?? subcategory?.min_selling_price ?? product?.cost_price ?? 0;
 
   // Calculate total subcategory quantity with current selection
   const getTotalSubcategoryQuantityWithCurrent = () => {
@@ -304,8 +305,10 @@ export default function ProductDetail() {
   const getApplicableTier = (totalQty: number) => {
     const sortedTiers = [...discountTiersData].sort((a, b) => b.min_quantity - a.min_quantity);
     for (const tier of sortedTiers) {
-      if (totalQty >= tier.min_quantity && 
-          (tier.max_quantity === null || totalQty <= tier.max_quantity)) {
+      if (
+        totalQty >= tier.min_quantity &&
+        (tier.max_quantity === null || totalQty <= tier.max_quantity)
+      ) {
         return tier;
       }
     }
@@ -320,8 +323,8 @@ export default function ProductDetail() {
     : basePrice;
   
   const savings = applicableTier ? applicableTier.discount_amount * quantity : 0;
-  const discountPercent = applicableTier 
-    ? Math.round((applicableTier.discount_amount / basePrice) * 100) 
+  const discountPercent = applicableTier && basePrice > 0
+    ? Math.round((applicableTier.discount_amount / basePrice) * 100)
     : 0;
 
   const handleAddToCart = async () => {
@@ -336,7 +339,7 @@ export default function ProductDetail() {
         quantity,
         colorVariantId: selectedColor || undefined,
         sizeVariantId: selectedSize || undefined,
-        unitPrice: product.selling_price || subcategory?.min_selling_price || 0,
+        unitPrice: basePrice,
       });
       // Reset quantity after adding
       setQuantity(1);
@@ -356,13 +359,13 @@ export default function ProductDetail() {
       quantity,
       colorVariantId: selectedColor || undefined,
       sizeVariantId: selectedSize || undefined,
-      unitPrice: product.selling_price || subcategory?.min_selling_price || 0,
+      unitPrice: basePrice,
     });
     
     if (!added) return;
     
     const currentCartTotal = cartItems.reduce((total, item) => total + item.totalPrice, 0);
-    const itemPrice = product.selling_price || subcategory?.min_selling_price || 0;
+    const itemPrice = basePrice;
     const newTotal = currentCartTotal + (itemPrice * quantity);
     
     if (newTotal >= 1000) {

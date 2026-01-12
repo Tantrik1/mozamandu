@@ -32,21 +32,26 @@ interface Product {
   id: string;
   name: string;
   image_url?: string;
-  selling_price?: number;
+  selling_price: number | null;
   cost_price: number;
   subcategory_id: string;
   category_id: string;
   has_color_variants?: boolean;
   is_featured?: boolean;
   created_at?: string;
-  subcategory?: { name: string };
+  subcategory?: { name: string; min_selling_price?: number | null };
 }
+
+const getDisplayPrice = (p: Product) =>
+  p.selling_price ?? p.subcategory?.min_selling_price ?? p.cost_price;
 
 // Fetch ALL products (default view)
 const fetchAllProducts = async () => {
   const { data } = await supabase
     .from('products')
-    .select('id, name, image_url, selling_price, cost_price, subcategory_id, category_id, is_featured, has_color_variants, created_at, subcategory:subcategories(name)')
+    .select(
+      'id, name, image_url, selling_price, cost_price, subcategory_id, category_id, is_featured, has_color_variants, created_at, subcategory:subcategories(name, min_selling_price)'
+    )
     .eq('status', 'active')
     .order('created_at', { ascending: false });
   return data || [];
@@ -174,7 +179,7 @@ const Shop = memo(function Shop() {
 
     // Price filter
     result = result.filter(p => {
-      const price = p.selling_price || p.cost_price;
+      const price = getDisplayPrice(p);
       return price >= priceRange[0] && price <= priceRange[1];
     });
 
@@ -184,10 +189,10 @@ const Shop = memo(function Shop() {
         result.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
         break;
       case 'price_low':
-        result.sort((a, b) => (a.selling_price || a.cost_price) - (b.selling_price || b.cost_price));
+        result.sort((a, b) => getDisplayPrice(a) - getDisplayPrice(b));
         break;
       case 'price_high':
-        result.sort((a, b) => (b.selling_price || b.cost_price) - (a.selling_price || a.cost_price));
+        result.sort((a, b) => getDisplayPrice(b) - getDisplayPrice(a));
         break;
       case 'name':
         result.sort((a, b) => a.name.localeCompare(b.name));
