@@ -290,8 +290,11 @@ export default function ProductDetail() {
   };
 
   const currentCartQuantity = getCartQuantity();
+  // If selling_price is 0 or null, fall back to subcategory min_selling_price, then cost_price
   const basePrice =
-    product?.selling_price ?? subcategory?.min_selling_price ?? product?.cost_price ?? 0;
+    (product?.selling_price && product.selling_price > 0)
+      ? product.selling_price
+      : (subcategory?.min_selling_price ?? product?.cost_price ?? 0);
 
   // Calculate total subcategory quantity with current selection
   const getTotalSubcategoryQuantityWithCurrent = () => {
