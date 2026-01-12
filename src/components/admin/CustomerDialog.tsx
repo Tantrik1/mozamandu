@@ -152,34 +152,57 @@ export function CustomerDialog({
                                 </>
                               ) : (
                                 <>
-                                  {/* Order Items */}
+                                  {/* Order Items with Tier Breakdown */}
                                   {items.length > 0 && (
                                     <div>
                                       <h4 className="font-medium mb-2 flex items-center gap-2">
                                         <Package className="h-4 w-4" />Items
                                       </h4>
-                                      <Table>
-                                        <TableHeader>
-                                          <TableRow>
-                                            <TableHead>Product</TableHead>
-                                            <TableHead>Variant</TableHead>
-                                            <TableHead className="text-right">Qty</TableHead>
-                                            <TableHead className="text-right">Price</TableHead>
-                                            <TableHead className="text-right">Total</TableHead>
-                                          </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                          {items.map(i => (
-                                            <TableRow key={i.id}>
-                                              <TableCell className="font-medium">{i.product_name}</TableCell>
-                                              <TableCell>{[i.color_name, i.size_name].filter(Boolean).join(' / ') || '-'}</TableCell>
-                                              <TableCell className="text-right">{i.quantity}</TableCell>
-                                              <TableCell className="text-right">Rs. {i.unit_price}</TableCell>
-                                              <TableCell className="text-right">Rs. {i.total_price}</TableCell>
-                                            </TableRow>
-                                          ))}
-                                        </TableBody>
-                                      </Table>
+                                      <div className="space-y-3">
+                                        {items.map(item => (
+                                          <div key={item.id} className="bg-background rounded-lg border p-3">
+                                            <div className="flex justify-between items-start mb-2">
+                                              <div className="flex-1">
+                                                <p className="font-medium">{item.product_name}</p>
+                                                {(item.color_name || item.size_name) && (
+                                                  <p className="text-sm text-muted-foreground">
+                                                    {[item.color_name, item.size_name].filter(Boolean).join(' / ')}
+                                                  </p>
+                                                )}
+                                              </div>
+                                              <div className="text-right">
+                                                <p className="font-semibold">Rs. {item.total_price.toLocaleString('en-IN')}</p>
+                                                <p className="text-sm text-muted-foreground">{item.quantity} × Rs. {item.unit_price.toLocaleString('en-IN')}</p>
+                                              </div>
+                                            </div>
+                                            
+                                            {/* Tier-based pricing breakdown */}
+                                            {item.pricing_details?.tierBreakdown && item.pricing_details.tierBreakdown.length > 0 && (
+                                              <div className="mt-2 pt-2 border-t border-dashed">
+                                                <p className="text-xs font-medium text-muted-foreground mb-1">Progressive Pricing Breakdown:</p>
+                                                <div className="space-y-1">
+                                                  {item.pricing_details.tierBreakdown.map((tier, idx) => (
+                                                    <div key={idx} className={`flex justify-between text-xs ${tier.discountAmount > 0 ? 'text-green-600' : 'text-muted-foreground'}`}>
+                                                      <span>
+                                                        {tier.unitsInTier} × Rs. {tier.unitPrice.toLocaleString('en-IN')}
+                                                        {tier.discountAmount > 0 && (
+                                                          <span className="ml-1 opacity-75">({tier.tierName})</span>
+                                                        )}
+                                                      </span>
+                                                      <span>Rs. {tier.tierTotal.toLocaleString('en-IN')}</span>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                                {item.pricing_details.savings && item.pricing_details.savings > 0 && (
+                                                  <div className="mt-1 text-xs text-green-600 font-medium">
+                                                    💰 Saved Rs. {item.pricing_details.savings.toLocaleString('en-IN')} with volume discount
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
                                     </div>
                                   )}
 
