@@ -3,8 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export interface AnalyticsSettings {
+  // Tracking IDs
   google_analytics_id?: string;
   facebook_pixel_id?: string;
+  // Search Console credentials
+  google_service_account_email?: string;
+  google_private_key?: string;
+  google_search_console_site_url?: string;
   is_active: boolean;
 }
 
@@ -45,6 +50,9 @@ export function useAnalyticsSettings() {
       setSettings({
         google_analytics_id: settingsMap['google_analytics_id'] || undefined,
         facebook_pixel_id: settingsMap['facebook_pixel_id'] || undefined,
+        google_service_account_email: settingsMap['google_service_account_email'] || undefined,
+        google_private_key: settingsMap['google_private_key'] || undefined,
+        google_search_console_site_url: settingsMap['google_search_console_site_url'] || undefined,
         is_active: settingsMap['is_active'] === 'true' || Object.keys(settingsMap).length > 0,
       });
     } catch (error) {
@@ -100,6 +108,15 @@ export function useAnalyticsSettings() {
       if (newSettings.facebook_pixel_id !== undefined) {
         await upsertSetting('facebook_pixel_id', newSettings.facebook_pixel_id || '');
       }
+      if (newSettings.google_service_account_email !== undefined) {
+        await upsertSetting('google_service_account_email', newSettings.google_service_account_email || '');
+      }
+      if (newSettings.google_private_key !== undefined) {
+        await upsertSetting('google_private_key', newSettings.google_private_key || '', true);
+      }
+      if (newSettings.google_search_console_site_url !== undefined) {
+        await upsertSetting('google_search_console_site_url', newSettings.google_search_console_site_url || '');
+      }
       if (newSettings.is_active !== undefined) {
         await upsertSetting('is_active', newSettings.is_active ? 'true' : 'false');
       }
@@ -127,7 +144,14 @@ export function useAnalyticsSettings() {
       setSaving(true);
       
       // Delete specific analytics-related keys
-      const keysToDelete = ['google_analytics_id', 'facebook_pixel_id', 'is_active'];
+      const keysToDelete = [
+        'google_analytics_id', 
+        'facebook_pixel_id', 
+        'google_service_account_email',
+        'google_private_key',
+        'google_search_console_site_url',
+        'is_active'
+      ];
       
       for (const key of keysToDelete) {
         // Use raw query to avoid TypeScript issues with external schema
