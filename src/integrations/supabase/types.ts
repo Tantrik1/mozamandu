@@ -541,6 +541,7 @@ export type Database = {
       discount_tiers: {
         Row: {
           created_at: string | null
+          discount_amount: number
           discount_percentage: number
           id: string
           is_active: boolean | null
@@ -552,6 +553,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          discount_amount?: number
           discount_percentage?: number
           id?: string
           is_active?: boolean | null
@@ -563,6 +565,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          discount_amount?: number
           discount_percentage?: number
           id?: string
           is_active?: boolean | null
