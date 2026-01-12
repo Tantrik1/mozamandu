@@ -87,9 +87,13 @@ const fetchDiscountTiers = async (subcategoryId: string): Promise<DiscountTier[]
     .select('*')
     .eq('subcategory_id', subcategoryId)
     .order('min_quantity');
-  return (data || []).map(tier => ({
-    ...tier,
-    discount_amount: tier.discount_percentage,
+  // Support both discount_amount (external DB) and discount_percentage (Lovable Cloud) columns
+  return (data || []).map((tier: any) => ({
+    id: tier.id,
+    min_quantity: tier.min_quantity,
+    max_quantity: tier.max_quantity,
+    // Prefer discount_amount, fallback to discount_percentage for backward compatibility
+    discount_amount: tier.discount_amount ?? tier.discount_percentage ?? 0,
   })) as DiscountTier[];
 };
 

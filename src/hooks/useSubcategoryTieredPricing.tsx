@@ -21,7 +21,8 @@ interface CartItem {
 interface DiscountTier {
   min_quantity: number;
   max_quantity: number | null;
-  discount_amount: number;
+  discount_amount?: number;
+  discount_percentage?: number; // For backward compatibility with Lovable Cloud DB
 }
 
 interface ItemPricingDetail {
@@ -69,11 +70,17 @@ export function useSubcategoryTieredPricing({
 
     Object.entries(subcategoryGroups).forEach(([subcategoryId, items]) => {
       const tiers = discountTiers[subcategoryId];
+      // Get discount amount - support both discount_amount and discount_percentage columns
+      const getDiscountAmount = (tier: any): number => {
+        return tier?.discount_amount ?? tier?.discount_percentage ?? 0;
+      };
+      
       const moqTier = tiers?.find(tier => tier.min_quantity > 1) || tiers?.[0];
+      const discountAmt = moqTier ? getDiscountAmount(moqTier) : 0;
       
       // NORMAL/MOQ MODE: Regular tiered pricing
-      if (!moqTier) {
-        // No discount tiers, all normal pricing
+      if (!moqTier || discountAmt === 0) {
+        // No discount tiers or zero discount, all normal pricing
         const itemBreakdown: ItemPricingDetail[] = items.map(item => ({
           itemId: item.id,
           unitPrice: item.basePrice,
@@ -86,7 +93,7 @@ export function useSubcategoryTieredPricing({
           subcategoryId,
           totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
           moqReached: false,
-          moqRequired: 0,
+          moqRequired: moqTier?.min_quantity || 0,
           itemBreakdown,
           totalSavings: 0,
           description: 'Normal pricing'
@@ -98,7 +105,7 @@ export function useSubcategoryTieredPricing({
       const sortedItems = [...items].sort((a, b) => a.addedOrder - b.addedOrder);
       const totalQuantity = sortedItems.reduce((sum, item) => sum + item.quantity, 0);
       const moqReached = totalQuantity >= moqTier.min_quantity;
-      const discountedPrice = Math.max(0, sortedItems[0].basePrice - moqTier.discount_amount);
+      const discountedPrice = Math.max(0, sortedItems[0].basePrice - discountAmt);
 
       const itemBreakdown: ItemPricingDetail[] = [];
       let processedQuantity = 0;
@@ -126,7 +133,7 @@ export function useSubcategoryTieredPricing({
           const normalCost = normalPriceQuantity * item.basePrice;
           const discountCost = discountPriceQuantity * discountedPrice;
           const totalCost = normalCost + discountCost;
-          const savings = discountPriceQuantity * moqTier.discount_amount;
+          const savings = discountPriceQuantity * discountAmt;
 
           let tierInfo = '';
           if (normalPriceQuantity > 0 && discountPriceQuantity > 0) {

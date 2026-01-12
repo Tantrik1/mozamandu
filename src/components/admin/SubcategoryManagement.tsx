@@ -114,12 +114,13 @@ export function SubcategoryManagement() {
       });
       return [];
     }
-    return (data || []).map(tier => ({
+    // Support both discount_amount (external DB) and discount_percentage (Lovable Cloud) columns
+    return (data || []).map((tier: any) => ({
       id: tier.id,
       min_quantity: tier.min_quantity,
       max_quantity: tier.max_quantity,
-      discount_percentage: tier.discount_percentage,
-      discount_amount: tier.discount_percentage // Use discount_percentage as discount_amount for compatibility
+      // Prefer discount_amount, fallback to discount_percentage for backward compatibility
+      discount_amount: tier.discount_amount ?? tier.discount_percentage ?? 0
     }));
   };
 
@@ -281,17 +282,19 @@ export function SubcategoryManagement() {
           .eq('subcategory_id', subcategoryId);
       }
 
-      // Insert new tiers
+      // Insert new tiers - use discount_amount for price-based discounts
       const tiersToInsert = discountTiers.map(tier => ({
         subcategory_id: subcategoryId,
         min_quantity: tier.min_quantity,
         max_quantity: tier.max_quantity,
-        discount_amount: tier.discount_amount
+        discount_amount: tier.discount_amount ?? 0,
+        // Also set discount_percentage for Lovable Cloud compatibility (same value for now)
+        discount_percentage: tier.discount_amount ?? 0
       }));
 
       const { error: tiersError } = await supabase
         .from('discount_tiers')
-        .insert(tiersToInsert);
+        .insert(tiersToInsert as any);
 
       if (tiersError) {
         toast({
@@ -563,20 +566,20 @@ export function SubcategoryManagement() {
                           />
                         </div>
                         <div>
-                          <Label>Discount ($)</Label>
+                          <Label>Discount Amount (Rs.)</Label>
                           <Input
                             type="number"
                             step="0.01"
                             min="0"
                             value={tier.discount_amount}
                             onChange={(e) => updateDiscountTier(index, 'discount_amount', parseFloat(e.target.value) || 0)}
-                            placeholder="e.g., 2"
+                            placeholder="e.g., 50"
                           />
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Quantities {tier.min_quantity} {tier.max_quantity ? `to ${tier.max_quantity}` : 'and above'}: 
-                        ${tier.discount_amount} discount per item
+                        Rs. {tier.discount_amount} discount per item
                       </p>
                     </CardContent>
                   </Card>

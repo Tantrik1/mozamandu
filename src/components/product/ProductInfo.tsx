@@ -35,7 +35,8 @@ interface DiscountTier {
   id: string;
   min_quantity: number;
   max_quantity: number | null;
-  discount_amount: number;
+  discount_amount?: number;
+  discount_percentage?: number; // For backward compatibility
 }
 
 interface CartItem {
@@ -120,20 +121,29 @@ export const ProductInfo = memo(function ProductInfo({
     const sortedTiers = [...discountTiers].sort((a, b) => b.min_quantity - a.min_quantity);
     const moqTier = sortedTiers.find(tier => tier.min_quantity > 1) || sortedTiers[0];
     
-    if (!moqTier) {
+    // Get discount amount - support both discount_amount and discount_percentage columns
+    const getDiscountAmount = (tier: any): number => {
+      return tier?.discount_amount ?? tier?.discount_percentage ?? 0;
+    };
+    
+    const discountAmt = moqTier ? getDiscountAmount(moqTier) : 0;
+    
+    if (!moqTier || discountAmt === 0) {
       return {
         unitPrice: basePrice,
         totalPrice: basePrice * quantity,
         savings: 0,
         discountPercent: 0,
         moqReached: false,
-        moqRequired: 0,
-        itemsUntilDiscount: 0
+        moqRequired: moqTier?.min_quantity || 0,
+        itemsUntilDiscount: moqTier ? Math.max(0, moqTier.min_quantity - totalSubcategoryQuantity) : 0,
+        discountAmount: 0,
+        discountedPrice: basePrice
       };
     }
     
     const moqReached = totalSubcategoryQuantity >= moqTier.min_quantity;
-    const discountedPrice = basePrice - moqTier.discount_amount;
+    const discountedPrice = Math.max(0, basePrice - discountAmt);
     
     // Calculate FIFO pricing for current items
     let totalCost = 0;
@@ -154,9 +164,9 @@ export const ProductInfo = memo(function ProductInfo({
     }
     
     const avgUnitPrice = totalCost / quantity;
-    const savings = discountPriceQty * moqTier.discount_amount;
-    const discountPercent = moqTier.discount_amount > 0 
-      ? Math.round((moqTier.discount_amount / basePrice) * 100) 
+    const savings = discountPriceQty * discountAmt;
+    const discountPercent = discountAmt > 0 
+      ? Math.round((discountAmt / basePrice) * 100) 
       : 0;
     
     return {
@@ -167,7 +177,7 @@ export const ProductInfo = memo(function ProductInfo({
       moqReached,
       moqRequired: moqTier.min_quantity,
       itemsUntilDiscount: moqReached ? 0 : moqTier.min_quantity - totalSubcategoryQuantity,
-      discountAmount: moqTier.discount_amount,
+      discountAmount: discountAmt,
       discountedPrice
     };
   }, [cartItems, subcategoryId, quantity, discountTiers, basePrice]);
@@ -292,6 +302,8 @@ export const ProductInfo = memo(function ProductInfo({
                 .reduce((sum, item) => sum + item.quantity, 0);
               const totalQty = cartSubcategoryQty + quantity;
               const isActive = totalQty >= tier.min_quantity;
+              // Support both discount_amount and discount_percentage columns
+              const tierDiscountAmount = tier.discount_amount ?? (tier as any).discount_percentage ?? 0;
               
               return (
                 <div 
@@ -311,7 +323,7 @@ export const ProductInfo = memo(function ProductInfo({
                     "font-medium",
                     isActive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
                   )}>
-                    Rs. {tier.discount_amount} off/item
+                    Rs. {tierDiscountAmount} off/item
                     {isActive && <Check className="w-3.5 h-3.5 inline ml-1" />}
                   </span>
                 </div>
