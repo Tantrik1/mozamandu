@@ -217,16 +217,39 @@ export function ProductAdditionalImages({
 
           console.log('🔗 Public URL:', urlData.publicUrl);
 
-          // Save to product_images table
-          const { data: dbData, error: dbError } = await supabase
+          // Save to product_images table - try with display_order first, fallback without
+          let dbData: any = null;
+          let dbError: any = null;
+
+          // First try with display_order column
+          const insertWithOrder = await supabase
             .from('product_images')
             .insert({
               product_id: targetProductId,
               image_url: urlData.publicUrl,
               display_order: i,
-            })
+            } as any)
             .select()
             .single();
+
+          if (insertWithOrder.error && insertWithOrder.error.code === '42703') {
+            // display_order column doesn't exist, insert without it
+            console.warn('⚠️ display_order column not found, inserting without it');
+            const insertWithoutOrder = await supabase
+              .from('product_images')
+              .insert({
+                product_id: targetProductId,
+                image_url: urlData.publicUrl,
+              } as any)
+              .select()
+              .single();
+            
+            dbData = insertWithoutOrder.data;
+            dbError = insertWithoutOrder.error;
+          } else {
+            dbData = insertWithOrder.data;
+            dbError = insertWithOrder.error;
+          }
 
           if (dbError) {
             console.error('❌ Database insert error:', dbError);
@@ -244,6 +267,11 @@ export function ProductAdditionalImages({
           setImages(prev => prev.map((p) => 
             p === img ? { ...p, isNew: false, uploading: false, id: dbData?.id || crypto.randomUUID() } : p
           ));
+
+          toast({
+            title: 'Image Uploaded',
+            description: `Additional image ${i + 1} saved successfully`,
+          });
         } catch (error: any) {
           console.error('❌ Error uploading additional image:', error);
           setImages(prev => prev.map((p) => 
