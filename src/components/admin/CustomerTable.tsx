@@ -8,8 +8,10 @@ interface Customer {
   id: string;
   email: string;
   full_name: string | null;
-  contact_number: string | null;
-  whatsapp_number: string | null;
+  phone: string | null;           // Lovable Cloud column
+  whatsapp: string | null;        // Lovable Cloud column
+  contact_number: string | null;  // External Supabase column
+  whatsapp_number: string | null; // External Supabase column
   role: string;
   created_at: string;
   total_orders: number;
@@ -26,12 +28,19 @@ interface CustomerTableProps {
 export function CustomerTable({ customers, searchQuery, onViewCustomer, onRefresh }: CustomerTableProps) {
   const filteredCustomers = customers.filter(customer => {
     const searchLower = searchQuery.toLowerCase();
+    // Use whichever phone column exists
+    const customerPhone = customer.contact_number || customer.phone || '';
+    
     return (
       customer.email.toLowerCase().includes(searchLower) ||
       (customer.full_name && customer.full_name.toLowerCase().includes(searchLower)) ||
-      (customer.contact_number && customer.contact_number.includes(searchQuery))
+      customerPhone.includes(searchQuery)
     );
   });
+
+  // Helper to get phone/whatsapp from either column
+  const getPhone = (customer: Customer) => customer.contact_number || customer.phone;
+  const getWhatsapp = (customer: Customer) => customer.whatsapp_number || customer.whatsapp;
 
   return (
     <Card>
@@ -68,16 +77,16 @@ export function CustomerTable({ customers, searchQuery, onViewCustomer, onRefres
                   </TableCell>
                   <TableCell>
                     <div className="space-y-1">
-                      {customer.contact_number && (
+                      {getPhone(customer) && (
                         <div className="flex items-center gap-1 text-sm">
                           <Phone className="h-3 w-3 text-muted-foreground" />
-                          <span className="truncate">{customer.contact_number}</span>
+                          <span className="truncate">{getPhone(customer)}</span>
                         </div>
                       )}
-                      {customer.whatsapp_number && (
+                      {getWhatsapp(customer) && (
                         <div className="flex items-center gap-1 text-sm text-emerald-600">
                           <Phone className="h-3 w-3" />
-                          <span className="truncate">{customer.whatsapp_number}</span>
+                          <span className="truncate">{getWhatsapp(customer)}</span>
                         </div>
                       )}
                     </div>
