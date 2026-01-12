@@ -323,6 +323,17 @@ export default function ProductDetail() {
   const handleAddToCart = async () => {
     if (!product) return;
     
+    // Validate price before adding to cart
+    const unitPrice = product.selling_price || subcategory?.min_selling_price || 0;
+    if (unitPrice <= 0) {
+      toast({
+        title: 'Price Not Available',
+        description: 'This product does not have a valid price. Please contact support.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setActionLoading(true);
     try {
       // useRobustCart already shows toast on success/failure
@@ -332,7 +343,7 @@ export default function ProductDetail() {
         quantity,
         colorVariantId: selectedColor || undefined,
         sizeVariantId: selectedSize || undefined,
-        unitPrice: product.selling_price || subcategory?.min_selling_price || 0,
+        unitPrice,
       });
       // Reset quantity after adding
       setQuantity(1);
@@ -346,13 +357,24 @@ export default function ProductDetail() {
   const handleBuyNow = async () => {
     if (!product) return;
     
+    // Validate price before adding to cart
+    const unitPrice = product.selling_price || subcategory?.min_selling_price || 0;
+    if (unitPrice <= 0) {
+      toast({
+        title: 'Price Not Available',
+        description: 'This product does not have a valid price. Please contact support.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     const added = await addToCart({
       productId: product.id,
       productName: product.name,
       quantity,
       colorVariantId: selectedColor || undefined,
       sizeVariantId: selectedSize || undefined,
-      unitPrice: product.selling_price || subcategory?.min_selling_price || 0,
+      unitPrice,
     });
     
     if (!added) return;
