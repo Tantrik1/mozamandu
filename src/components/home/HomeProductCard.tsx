@@ -17,7 +17,7 @@ interface ProductBase {
   selling_price: number | null;
   cost_price?: number;
   image_url: string | null;
-  subcategory?: { name: string } | null;
+  subcategory?: { name: string; min_selling_price?: number | null } | null;
 }
 
 interface HomeProductCardProps {
@@ -57,6 +57,8 @@ export const HomeProductCard = memo(function HomeProductCard({
 
   const selectedColor = colorVariants.find(c => c.id === selectedColorId);
   const displayImage = selectedColor?.image_url || product.image_url;
+  const displayPrice =
+    product.selling_price ?? product.subcategory?.min_selling_price ?? product.cost_price ?? 0;
 
   return (
     <Link
@@ -117,9 +119,7 @@ export const HomeProductCard = memo(function HomeProductCard({
           {product.name}
         </h3>
         {priceSlot ?? (
-          <p className="text-lg font-bold text-foreground">
-            Rs. {product.selling_price?.toLocaleString() || '0'}
-          </p>
+          <p className="text-lg font-bold text-foreground">Rs. {displayPrice.toLocaleString()}</p>
         )}
       </div>
     </Link>

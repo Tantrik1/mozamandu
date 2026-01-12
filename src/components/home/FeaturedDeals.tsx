@@ -10,7 +10,7 @@ interface Product {
   selling_price: number | null;
   cost_price: number;
   image_url: string | null;
-  subcategory: { name: string } | null;
+  subcategory: { name: string; min_selling_price?: number | null } | null;
   has_color_variants?: boolean;
 }
 
@@ -62,9 +62,13 @@ export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
           {products.map((product, index) => {
-            const discount = product.cost_price && product.selling_price 
-              ? Math.round(((product.cost_price - product.selling_price) / product.cost_price) * 100)
+            const comparePrice = product.selling_price ?? product.subcategory?.min_selling_price ?? null;
+            const discount = comparePrice != null
+              ? Math.round(((product.cost_price - comparePrice) / product.cost_price) * 100)
               : 0;
+
+            const displayPrice =
+              product.selling_price ?? product.subcategory?.min_selling_price ?? product.cost_price ?? 0;
 
             return (
               <div
@@ -88,7 +92,7 @@ export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }
                   priceSlot={
                     <div className="flex items-center gap-2">
                       <p className="text-lg font-bold text-primary">
-                        Rs. {product.selling_price?.toLocaleString() || '0'}
+                        Rs. {displayPrice.toLocaleString()}
                       </p>
                       {discount > 0 && (
                         <p className="text-sm text-muted-foreground line-through">

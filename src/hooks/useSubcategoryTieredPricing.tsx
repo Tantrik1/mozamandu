@@ -69,104 +69,71 @@ export function useSubcategoryTieredPricing({
     const pricingInfo: { [key: string]: SubcategoryPricingInfo } = {};
 
     Object.entries(subcategoryGroups).forEach(([subcategoryId, items]) => {
-      const tiers = discountTiers[subcategoryId];
-      // Get discount amount - support both discount_amount and discount_percentage columns
-      const getDiscountAmount = (tier: any): number => {
-        return tier?.discount_amount ?? tier?.discount_percentage ?? 0;
-      };
-      
-      const moqTier = tiers?.find(tier => tier.min_quantity > 1) || tiers?.[0];
-      const discountAmt = moqTier ? getDiscountAmount(moqTier) : 0;
-      
-      // NORMAL/MOQ MODE: Regular tiered pricing
-      if (!moqTier || discountAmt === 0) {
-        // No discount tiers or zero discount, all normal pricing
-        const itemBreakdown: ItemPricingDetail[] = items.map(item => ({
+      const tiersRaw = discountTiers[subcategoryId] || [];
+
+      // Normalize tiers: price-based discount only
+      const tiers = (tiersRaw as any[])
+        .map((tier) => ({
+          min_quantity: Number(tier.min_quantity) || 1,
+          max_quantity: tier.max_quantity === null || tier.max_quantity === undefined
+            ? null
+            : Number(tier.max_quantity),
+          discount_amount: Number(tier.discount_amount ?? tier.discount_percentage ?? 0) || 0,
+        }))
+        .filter(t => t.min_quantity >= 1)
+        .sort((a, b) => a.min_quantity - b.min_quantity);
+
+      const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+
+      // Highest applicable tier wins (volume-wise discount)
+      const applicableTier = [...tiers]
+        .sort((a, b) => b.min_quantity - a.min_quantity)
+        .find(t =>
+          t.discount_amount > 0 &&
+          totalQuantity >= t.min_quantity &&
+          (t.max_quantity === null || totalQuantity <= t.max_quantity)
+        ) || null;
+
+      const discountAmt = applicableTier?.discount_amount ?? 0;
+      const firstDiscountTier = tiers.find(t => t.discount_amount > 0) || null;
+
+      const itemBreakdown: ItemPricingDetail[] = items.map(item => {
+        const unitPrice = discountAmt > 0
+          ? Math.max(0, item.basePrice - discountAmt)
+          : item.basePrice;
+
+        const totalPrice = unitPrice * item.quantity;
+        const savings = discountAmt > 0 ? discountAmt * item.quantity : 0;
+
+        return {
           itemId: item.id,
-          unitPrice: item.basePrice,
-          totalPrice: item.basePrice * item.quantity,
-          appliedTier: 'normal',
-          savings: 0
-        }));
-
-        pricingInfo[subcategoryId] = {
-          subcategoryId,
-          totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
-          moqReached: false,
-          moqRequired: moqTier?.min_quantity || 0,
-          itemBreakdown,
-          totalSavings: 0,
-          description: 'Normal pricing'
+          unitPrice,
+          totalPrice,
+          appliedTier: discountAmt > 0 ? 'discount' : 'normal',
+          tierInfo: discountAmt > 0 && applicableTier
+            ? `Qty ${applicableTier.min_quantity}+ : Rs.${discountAmt} off / item`
+            : undefined,
+          savings,
         };
-        return;
-      }
-
-      // Sort items by addedOrder to implement FIFO pricing
-      const sortedItems = [...items].sort((a, b) => a.addedOrder - b.addedOrder);
-      const totalQuantity = sortedItems.reduce((sum, item) => sum + item.quantity, 0);
-      const moqReached = totalQuantity >= moqTier.min_quantity;
-      const discountedPrice = Math.max(0, sortedItems[0].basePrice - discountAmt);
-
-      const itemBreakdown: ItemPricingDetail[] = [];
-      let processedQuantity = 0;
-
-      // Process each item in FIFO order
-      sortedItems.forEach(item => {
-        const itemStartPosition = processedQuantity + 1;
-        const itemEndPosition = processedQuantity + item.quantity;
-        
-        if (!moqReached) {
-          // MOQ not reached, all normal price
-          itemBreakdown.push({
-            itemId: item.id,
-            unitPrice: item.basePrice,
-            totalPrice: item.basePrice * item.quantity,
-            appliedTier: 'normal',
-            tierInfo: `Items ${itemStartPosition}-${itemEndPosition}: Normal price (MOQ ${moqTier.min_quantity} not reached)`,
-            savings: 0
-          });
-        } else {
-          // MOQ reached, calculate mixed pricing for this item
-          const normalPriceQuantity = Math.max(0, Math.min(item.quantity, moqTier.min_quantity - processedQuantity));
-          const discountPriceQuantity = item.quantity - normalPriceQuantity;
-          
-          const normalCost = normalPriceQuantity * item.basePrice;
-          const discountCost = discountPriceQuantity * discountedPrice;
-          const totalCost = normalCost + discountCost;
-          const savings = discountPriceQuantity * discountAmt;
-
-          let tierInfo = '';
-          if (normalPriceQuantity > 0 && discountPriceQuantity > 0) {
-            tierInfo = `Items ${itemStartPosition}-${itemStartPosition + normalPriceQuantity - 1}: Rs.${item.basePrice} each, Items ${itemStartPosition + normalPriceQuantity}-${itemEndPosition}: Rs.${discountedPrice} each (MOQ discount)`;
-          } else if (normalPriceQuantity > 0) {
-            tierInfo = `Items ${itemStartPosition}-${itemEndPosition}: Rs.${item.basePrice} each (before MOQ)`;
-          } else {
-            tierInfo = `Items ${itemStartPosition}-${itemEndPosition}: Rs.${discountedPrice} each (MOQ discount applied)`;
-          }
-
-          itemBreakdown.push({
-            itemId: item.id,
-            unitPrice: totalCost / item.quantity, // Average price for this item
-            totalPrice: totalCost,
-            appliedTier: discountPriceQuantity > 0 ? 'discount' : 'normal',
-            tierInfo,
-            savings
-          });
-        }
-
-        processedQuantity += item.quantity;
       });
+
+      const totalSavings = itemBreakdown.reduce((sum, item) => sum + item.savings, 0);
+
+      let description = 'Normal pricing';
+      if (discountAmt > 0 && applicableTier) {
+        description = `Volume discount active (Rs.${discountAmt} off / item)`;
+      } else if (firstDiscountTier && totalQuantity < firstDiscountTier.min_quantity) {
+        description = `Add ${firstDiscountTier.min_quantity - totalQuantity} more items for volume discount`;
+      }
 
       pricingInfo[subcategoryId] = {
         subcategoryId,
         totalQuantity,
-        moqReached,
-        moqRequired: moqTier.min_quantity,
+        moqReached: discountAmt > 0,
+        moqRequired: firstDiscountTier?.min_quantity || 0,
         itemBreakdown,
-        totalSavings: itemBreakdown.reduce((sum, item) => sum + item.savings, 0),
-        description: moqReached 
-          ? `MOQ ${moqTier.min_quantity} reached - volume discount active` 
-          : `Need ${moqTier.min_quantity - totalQuantity} more items for volume discount`
+        totalSavings,
+        description,
       };
     });
 

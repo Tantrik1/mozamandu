@@ -107,78 +107,69 @@ export const ProductInfo = memo(function ProductInfo({
   const selectedColorName = colorVariants.find(c => c.id === selectedColor)?.color_name;
   const selectedSizeName = sizeVariants.find(s => s.id === selectedSize)?.size_name;
 
-  // Calculate pricing exactly like cart - FIFO based on subcategory quantity
+  // Calculate pricing exactly like cart - volume-wise discount per subcategory
   const pricingCalculation = useMemo(() => {
-    // Get total quantity in cart for this subcategory
     const cartSubcategoryQuantity = cartItems
       .filter(item => item.subcategoryId === subcategoryId)
       .reduce((sum, item) => sum + item.quantity, 0);
-    
-    // Total quantity including current selection
+
     const totalSubcategoryQuantity = cartSubcategoryQuantity + quantity;
-    
-    // Find applicable tier
-    const sortedTiers = [...discountTiers].sort((a, b) => b.min_quantity - a.min_quantity);
-    const moqTier = sortedTiers.find(tier => tier.min_quantity > 1) || sortedTiers[0];
-    
-    // Get discount amount - support both discount_amount and discount_percentage columns
-    const getDiscountAmount = (tier: any): number => {
-      return tier?.discount_amount ?? tier?.discount_percentage ?? 0;
-    };
-    
-    const discountAmt = moqTier ? getDiscountAmount(moqTier) : 0;
-    
-    if (!moqTier || discountAmt === 0) {
+
+    const tiers = [...discountTiers]
+      .map(t => ({
+        ...t,
+        discount_amount: (t as any).discount_amount ?? (t as any).discount_percentage ?? 0,
+      }))
+      .sort((a, b) => a.min_quantity - b.min_quantity);
+
+    const firstDiscountTier = tiers.find(t => (t as any).discount_amount > 0) || null;
+
+    const applicableTier = [...tiers]
+      .sort((a, b) => b.min_quantity - a.min_quantity)
+      .find(t => {
+        const discountAmt = (t as any).discount_amount ?? 0;
+        if (discountAmt <= 0) return false;
+        if (totalSubcategoryQuantity < t.min_quantity) return false;
+        if (t.max_quantity !== null && t.max_quantity !== undefined && totalSubcategoryQuantity > t.max_quantity) return false;
+        return true;
+      }) || null;
+
+    const discountAmt = applicableTier ? Number((applicableTier as any).discount_amount) || 0 : 0;
+
+    if (!applicableTier || discountAmt === 0) {
+      const itemsUntilDiscount = firstDiscountTier
+        ? Math.max(0, firstDiscountTier.min_quantity - totalSubcategoryQuantity)
+        : 0;
+
       return {
         unitPrice: basePrice,
         totalPrice: basePrice * quantity,
         savings: 0,
         discountPercent: 0,
         moqReached: false,
-        moqRequired: moqTier?.min_quantity || 0,
-        itemsUntilDiscount: moqTier ? Math.max(0, moqTier.min_quantity - totalSubcategoryQuantity) : 0,
+        moqRequired: firstDiscountTier?.min_quantity || 0,
+        itemsUntilDiscount,
         discountAmount: 0,
-        discountedPrice: basePrice
+        discountedPrice: basePrice,
       };
     }
-    
-    const moqReached = totalSubcategoryQuantity >= moqTier.min_quantity;
+
     const discountedPrice = Math.max(0, basePrice - discountAmt);
-    
-    // Calculate FIFO pricing for current items
-    let totalCost = 0;
-    let normalPriceQty = 0;
-    let discountPriceQty = 0;
-    
-    if (moqReached) {
-      // Items before MOQ threshold at normal price
-      normalPriceQty = Math.max(0, Math.min(quantity, moqTier.min_quantity - cartSubcategoryQuantity));
-      // Items after MOQ threshold at discounted price
-      discountPriceQty = quantity - normalPriceQty;
-      
-      totalCost = (normalPriceQty * basePrice) + (discountPriceQty * discountedPrice);
-    } else {
-      // MOQ not reached, all at normal price
-      normalPriceQty = quantity;
-      totalCost = quantity * basePrice;
-    }
-    
-    const avgUnitPrice = totalCost / quantity;
-    const savings = discountPriceQty * discountAmt;
-    const discountPercent = discountAmt > 0 
-      ? Math.round((discountAmt / basePrice) * 100) 
-      : 0;
-    
+    const totalCost = discountedPrice * quantity;
+    const savings = discountAmt * quantity;
+
+    const discountPercent = basePrice > 0 ? Math.round((discountAmt / basePrice) * 100) : 0;
+
     return {
-      unitPrice: avgUnitPrice,
+      unitPrice: discountedPrice,
       totalPrice: totalCost,
       savings,
       discountPercent,
-      moqReached,
-      moqRequired: moqTier.min_quantity,
-      itemsUntilDiscount: moqReached ? 0 : moqTier.min_quantity - totalSubcategoryQuantity,
+      moqReached: true,
+      moqRequired: applicableTier.min_quantity,
+      itemsUntilDiscount: 0,
       discountAmount: discountAmt,
-      discountedPrice
+      discountedPrice,
     };
   }, [cartItems, subcategoryId, quantity, discountTiers, basePrice]);
 
