@@ -1,6 +1,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, UserCheck, Wallet, TrendingUp, UserPlus, Repeat } from 'lucide-react';
+import { Users, UserCheck, Wallet, TrendingUp, UserPlus, Repeat, UserX } from 'lucide-react';
 import type { Customer } from '@/hooks/useCustomerManagement';
 
 interface CustomerStatsProps {
@@ -9,6 +9,8 @@ interface CustomerStatsProps {
 
 export function CustomerStats({ customers }: CustomerStatsProps) {
   const totalCustomers = customers.length;
+  const registeredCustomers = customers.filter(c => !c.is_guest).length;
+  const guestCustomers = customers.filter(c => c.is_guest).length;
   const activeCustomers = customers.filter(c => c.total_orders > 0).length;
   const totalRevenue = customers.reduce((sum, c) => sum + c.total_spent, 0);
   const totalOrders = customers.reduce((sum, c) => sum + c.total_orders, 0);
@@ -30,13 +32,19 @@ export function CustomerStats({ customers }: CustomerStatsProps) {
       title: 'Total Customers',
       value: totalCustomers.toString(),
       icon: Users,
-      description: 'All registered customers'
+      description: `${registeredCustomers} registered, ${guestCustomers} guests`
     },
     {
       title: 'Active Customers',
       value: `${activeCustomers} (${activeRate}%)`,
       icon: UserCheck,
       description: 'Customers with orders'
+    },
+    {
+      title: 'Guest Buyers',
+      value: guestCustomers.toString(),
+      icon: UserX,
+      description: 'Non-registered buyers'
     },
     {
       title: 'Total Revenue',
@@ -65,7 +73,7 @@ export function CustomerStats({ customers }: CustomerStatsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
       {stats.map((stat) => (
         <Card key={stat.title}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
