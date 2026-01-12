@@ -5,8 +5,10 @@ interface Customer {
   id: string;
   email: string;
   full_name: string | null;
-  contact_number: string | null;
-  whatsapp_number: string | null;
+  phone: string | null;           // Lovable Cloud column
+  whatsapp: string | null;        // Lovable Cloud column
+  contact_number: string | null;  // External Supabase column
+  whatsapp_number: string | null; // External Supabase column
   role: string;
   created_at: string;
   total_orders: number;

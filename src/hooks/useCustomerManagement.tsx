@@ -7,8 +7,10 @@ interface Customer {
   id: string;
   email: string;
   full_name: string | null;
-  phone: string | null;
-  whatsapp: string | null;
+  phone: string | null;           // Lovable Cloud column
+  whatsapp: string | null;        // Lovable Cloud column
+  contact_number: string | null;  // External Supabase column
+  whatsapp_number: string | null; // External Supabase column
   role: string;
   created_at: string;
   total_orders: number;
@@ -21,12 +23,15 @@ interface CustomerOrder {
   total_amount: number;
   status: string;
   created_at: string;
+  promocode_used?: string;
+  source?: string;
 }
 
 export function useCustomerManagement() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerOrders, setCustomerOrders] = useState<CustomerOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -95,6 +100,13 @@ export function useCustomerManagement() {
           try {
             console.log(`🔍 Processing customer ${profile.email} (${profile.id})...`);
             
+            // Cast to any to access columns that may exist in external Supabase but not in Lovable Cloud types
+            const profileAny = profile as any;
+            
+            // Get phone from either column (Lovable Cloud: phone, External: contact_number)
+            const customerPhone = profile.phone || profileAny.contact_number || null;
+            const customerWhatsapp = profile.whatsapp || profileAny.whatsapp_number || null;
+            
             // Find orders associated with this customer by multiple methods:
             // 1. Direct user_id match
             // 2. Email match (for guest orders)
@@ -110,11 +122,11 @@ export function useCustomerManagement() {
                 return order.customer_email.toLowerCase() === profile.email.toLowerCase();
               }
               
-              // Phone number match for guest orders
-              if (order.user_id === null && order.contact_number && profile.phone) {
+              // Phone number match for guest orders (using resolved phone value)
+              if (order.user_id === null && order.contact_number && customerPhone) {
                 // Clean phone numbers for comparison
                 const orderPhone = order.contact_number.replace(/\D/g, '');
-                const profilePhone = profile.phone.replace(/\D/g, '');
+                const profilePhone = customerPhone.replace(/\D/g, '');
                 return orderPhone === profilePhone;
               }
               
@@ -125,16 +137,16 @@ export function useCustomerManagement() {
             const totalSpent = customerOrders.reduce((sum: number, order: any) => sum + Number(order.total_amount || 0), 0);
 
             console.log(`✅ Customer ${profile.email}: ${totalOrders} orders, Rs. ${totalSpent.toFixed(2)} spent`);
-            console.log(`   - Direct user_id matches: ${customerOrders.filter((o: any) => o.user_id === profile.id).length}`);
-            console.log(`   - Email matches: ${customerOrders.filter((o: any) => o.user_id === null && o.customer_email?.toLowerCase() === profile.email?.toLowerCase()).length}`);
-            console.log(`   - Phone matches: ${customerOrders.filter((o: any) => o.user_id === null && o.contact_number && profile.phone && o.contact_number.replace(/\D/g, '') === profile.phone.replace(/\D/g, '')).length}`);
 
             return {
               id: profile.id,
               email: profile.email || '',
               full_name: profile.full_name,
-              phone: profile.phone,
-              whatsapp: profile.whatsapp,
+              // Store both column variants for compatibility
+              phone: customerPhone,
+              whatsapp: customerWhatsapp,
+              contact_number: customerPhone,
+              whatsapp_number: customerWhatsapp,
               role: profile.role || 'customer',
               created_at: profile.created_at || '',
               total_orders: totalOrders,
@@ -142,12 +154,18 @@ export function useCustomerManagement() {
             };
           } catch (error) {
             console.error('❌ Error processing customer profile', profile.id, ':', error);
+            const profileAny = profile as any;
+            const customerPhone = profile.phone || profileAny.contact_number || null;
+            const customerWhatsapp = profile.whatsapp || profileAny.whatsapp_number || null;
+            
             return {
               id: profile.id,
               email: profile.email || '',
               full_name: profile.full_name,
-              phone: profile.phone,
-              whatsapp: profile.whatsapp,
+              phone: customerPhone,
+              whatsapp: customerWhatsapp,
+              contact_number: customerPhone,
+              whatsapp_number: customerWhatsapp,
               role: profile.role || 'customer',
               created_at: profile.created_at || '',
               total_orders: 0,
@@ -177,93 +195,121 @@ export function useCustomerManagement() {
 
   const fetchCustomerOrders = async (customerId: string) => {
     console.log('🔍 Fetching comprehensive orders for customer:', customerId);
+    setIsLoadingOrders(true);
     
-    // Get customer profile for email/phone matching
-    const { data: customerProfile } = await supabase
-      .from('profiles')
-      .select('email, phone')
-      .eq('id', customerId)
-      .single();
+    try {
+      // Get customer profile for email/phone matching - select all possible columns
+      const { data: customerProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', customerId)
+        .single();
 
-    if (!customerProfile) {
-      console.error('Customer profile not found');
+      if (profileError || !customerProfile) {
+        console.error('Customer profile not found:', profileError);
+        toast({
+          title: "Error",
+          description: "Customer profile not found",
+          variant: "destructive",
+        });
+        setCustomerOrders([]);
+        setIsLoadingOrders(false);
+        return;
+      }
+
+      // Cast to any to access columns that may exist in external Supabase but not in Lovable Cloud types
+      const profileAny = customerProfile as any;
+      
+      // Get phone from either column (Lovable Cloud: phone, External: contact_number)
+      const customerPhone = customerProfile.phone || profileAny.contact_number || null;
+      const customerEmail = customerProfile.email;
+
+      console.log(`📧 Customer email: ${customerEmail}, phone: ${customerPhone}`);
+
+      // Try both tables with comprehensive matching
+      const [customerOrdersResult, ordersResult] = await Promise.all([
+        supabase
+          .from('customer_orders')
+          .select('id, order_number, total_amount, status, created_at, user_id, customer_email, contact_number, promocode_used')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('orders')
+          .select('id, order_number, total_amount, status, created_at, customer_email, contact_number, promocode_used')
+          .order('created_at', { ascending: false })
+      ]);
+
+      let allOrders: any[] = [];
+      
+      // Process customer_orders
+      if (!customerOrdersResult.error && customerOrdersResult.data) {
+        const matchingOrders = customerOrdersResult.data.filter(order => {
+          // Direct user_id match
+          if (order.user_id === customerId) return true;
+          
+          // Email match for guest orders
+          if (order.user_id === null && order.customer_email && customerEmail) {
+            return order.customer_email.toLowerCase() === customerEmail.toLowerCase();
+          }
+          
+          // Phone number match for guest orders (using resolved phone value)
+          if (order.user_id === null && order.contact_number && customerPhone) {
+            const orderPhone = order.contact_number.replace(/\D/g, '');
+            const profilePhone = customerPhone.replace(/\D/g, '');
+            return orderPhone === profilePhone;
+          }
+          
+          return false;
+        });
+        
+        allOrders = [...allOrders, ...matchingOrders.map(order => ({ ...order, source: 'customer_orders' }))];
+      }
+      
+      // Process orders (guest orders table - no user_id column)
+      if (!ordersResult.error && ordersResult.data) {
+        const matchingOrders = ordersResult.data.filter(order => {
+          // Email match for guest orders
+          if (order.customer_email && customerEmail) {
+            return order.customer_email.toLowerCase() === customerEmail.toLowerCase();
+          }
+          
+          // Phone number match for guest orders (using resolved phone value)
+          if (order.contact_number && customerPhone) {
+            const orderPhone = order.contact_number.replace(/\D/g, '');
+            const profilePhone = customerPhone.replace(/\D/g, '');
+            return orderPhone === profilePhone;
+          }
+          
+          return false;
+        });
+        
+        allOrders = [...allOrders, ...matchingOrders.map(order => ({ ...order, source: 'orders' }))];
+      }
+
+      // Remove duplicates based on order_number and total_amount
+      const uniqueOrders = allOrders.filter((order, index, self) => 
+        index === self.findIndex(o => 
+          o.order_number === order.order_number && 
+          o.total_amount === order.total_amount &&
+          o.created_at === order.created_at
+        )
+      );
+
+      console.log(`✅ Found ${uniqueOrders.length} orders for customer ${customerEmail}`);
+      console.log(`   - From customer_orders: ${uniqueOrders.filter(o => o.source === 'customer_orders').length}`);
+      console.log(`   - From orders: ${uniqueOrders.filter(o => o.source === 'orders').length}`);
+      
+      setCustomerOrders(uniqueOrders);
+    } catch (error) {
+      console.error('❌ Error fetching customer orders:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch customer orders",
+        variant: "destructive",
+      });
       setCustomerOrders([]);
-      return;
+    } finally {
+      setIsLoadingOrders(false);
     }
-
-    // Try both tables with comprehensive matching
-    const [customerOrdersResult, ordersResult] = await Promise.all([
-      supabase
-        .from('customer_orders')
-        .select('id, order_number, total_amount, status, created_at, user_id, customer_email, contact_number, promocode_used')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('orders')
-        .select('id, order_number, total_amount, status, created_at, customer_email, contact_number, promocode_used')
-        .order('created_at', { ascending: false })
-    ]);
-
-    let allOrders: any[] = [];
-    
-    // Process customer_orders
-    if (!customerOrdersResult.error && customerOrdersResult.data) {
-      const matchingOrders = customerOrdersResult.data.filter(order => {
-        // Direct user_id match
-        if (order.user_id === customerId) return true;
-        
-        // Email match for guest orders
-        if (order.user_id === null && order.customer_email && customerProfile.email) {
-          return order.customer_email.toLowerCase() === customerProfile.email.toLowerCase();
-        }
-        
-        // Phone number match for guest orders
-        if (order.user_id === null && order.contact_number && customerProfile.phone) {
-          const orderPhone = order.contact_number.replace(/\D/g, '');
-          const profilePhone = customerProfile.phone.replace(/\D/g, '');
-          return orderPhone === profilePhone;
-        }
-        
-        return false;
-      });
-      
-      allOrders = [...allOrders, ...matchingOrders.map(order => ({ ...order, source: 'customer_orders' }))];
-    }
-    
-    // Process orders (guest orders table - no user_id column)
-    if (!ordersResult.error && ordersResult.data) {
-      const matchingOrders = ordersResult.data.filter(order => {
-        // Email match for guest orders
-        if (order.customer_email && customerProfile.email) {
-          return order.customer_email.toLowerCase() === customerProfile.email.toLowerCase();
-        }
-        
-        // Phone number match for guest orders
-        if (order.contact_number && customerProfile.phone) {
-          const orderPhone = order.contact_number.replace(/\D/g, '');
-          const profilePhone = customerProfile.phone.replace(/\D/g, '');
-          return orderPhone === profilePhone;
-        }
-        
-        return false;
-      });
-      
-      allOrders = [...allOrders, ...matchingOrders.map(order => ({ ...order, source: 'orders' }))];
-    }
-
-    // Remove duplicates based on order_number and total_amount
-    const uniqueOrders = allOrders.filter((order, index, self) => 
-      index === self.findIndex(o => 
-        o.order_number === order.order_number && 
-        o.total_amount === order.total_amount &&
-        o.created_at === order.created_at
-      )
-    );
-
-    console.log(`✅ Found ${uniqueOrders.length} orders for customer ${customerProfile.email}`);
-    console.log(`   - From customer_orders: ${uniqueOrders.filter(o => o.source === 'customer_orders').length}`);
-    console.log(`   - From orders: ${uniqueOrders.filter(o => o.source === 'orders').length}`);
-    
-    setCustomerOrders(uniqueOrders);
   };
 
   useEffect(() => {
@@ -274,6 +320,7 @@ export function useCustomerManagement() {
     customers,
     customerOrders,
     loading,
+    isLoadingOrders,
     fetchCustomers,
     fetchCustomerOrders,
   };

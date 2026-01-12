@@ -2,13 +2,16 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Customer {
   id: string;
   email: string;
   full_name: string | null;
-  contact_number: string | null;
-  whatsapp_number: string | null;
+  phone: string | null;           // Lovable Cloud column
+  whatsapp: string | null;        // Lovable Cloud column
+  contact_number: string | null;  // External Supabase column
+  whatsapp_number: string | null; // External Supabase column
   role: string;
   created_at: string;
   total_orders: number;
@@ -30,10 +33,15 @@ interface CustomerDialogProps {
   onClose: () => void;
   customer: Customer | null;
   customerOrders: CustomerOrder[];
+  isLoadingOrders?: boolean;
 }
 
-export function CustomerDialog({ isOpen, onClose, customer, customerOrders }: CustomerDialogProps) {
+export function CustomerDialog({ isOpen, onClose, customer, customerOrders, isLoadingOrders = false }: CustomerDialogProps) {
   if (!customer) return null;
+
+  // Helper to get phone/whatsapp from either column
+  const getPhone = () => customer.contact_number || customer.phone || 'N/A';
+  const getWhatsapp = () => customer.whatsapp_number || customer.whatsapp || 'N/A';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -56,8 +64,8 @@ export function CustomerDialog({ isOpen, onClose, customer, customerOrders }: Cu
                 <p><strong>Role:</strong> {customer.role || 'customer'}</p>
               </div>
               <div>
-                <p><strong>Contact:</strong> {customer.contact_number || 'N/A'}</p>
-                <p><strong>WhatsApp:</strong> {customer.whatsapp_number || 'N/A'}</p>
+                <p><strong>Contact:</strong> {getPhone()}</p>
+                <p><strong>WhatsApp:</strong> {getWhatsapp()}</p>
                 <p><strong>Joined:</strong> {new Date(customer.created_at).toLocaleDateString()}</p>
               </div>
               <div className="md:col-span-2">
@@ -70,10 +78,18 @@ export function CustomerDialog({ isOpen, onClose, customer, customerOrders }: Cu
           {/* Customer Orders */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Order History ({customerOrders.length} orders)</CardTitle>
+              <CardTitle className="text-lg">
+                Order History {!isLoadingOrders && `(${customerOrders.length} orders)`}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              {customerOrders.length > 0 ? (
+              {isLoadingOrders ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : customerOrders.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
