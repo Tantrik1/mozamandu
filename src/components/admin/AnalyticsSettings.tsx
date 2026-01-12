@@ -13,7 +13,6 @@ export function AnalyticsSettings() {
   const { settings, loading, saving, saveSettings, deleteSettings } = useAnalyticsSettings();
   const [formData, setFormData] = useState({
     google_analytics_id: '',
-    facebook_pixel_id: '',
     google_service_account_email: '',
     google_private_key: '',
     google_search_console_site_url: '',
@@ -24,7 +23,6 @@ export function AnalyticsSettings() {
     if (settings && !initialLoadDone.current) {
       setFormData({
         google_analytics_id: settings.google_analytics_id || '',
-        facebook_pixel_id: settings.facebook_pixel_id || '',
         google_service_account_email: settings.google_service_account_email || '',
         google_private_key: settings.google_private_key || '',
         google_search_console_site_url: settings.google_search_console_site_url || '',
@@ -37,7 +35,6 @@ export function AnalyticsSettings() {
     e.preventDefault();
     await saveSettings({
       google_analytics_id: formData.google_analytics_id,
-      facebook_pixel_id: formData.facebook_pixel_id,
       is_active: true,
     });
   };
@@ -57,7 +54,6 @@ export function AnalyticsSettings() {
       await deleteSettings();
       setFormData({
         google_analytics_id: '',
-        facebook_pixel_id: '',
         google_service_account_email: '',
         google_private_key: '',
         google_search_console_site_url: '',
@@ -74,7 +70,7 @@ export function AnalyticsSettings() {
     );
   }
 
-  const isTrackingConfigured = !!(settings.google_analytics_id || settings.facebook_pixel_id);
+  const isTrackingConfigured = !!settings.google_analytics_id;
   const isSearchConsoleConfigured = !!(
     settings.google_service_account_email &&
     settings.google_private_key &&
@@ -82,17 +78,16 @@ export function AnalyticsSettings() {
   );
   const isConfigured = isTrackingConfigured || isSearchConsoleConfigured;
 
-  // Mask the private key for display
   const maskedPrivateKey = settings.google_private_key
     ? '••••••••••••••••••••' + settings.google_private_key.slice(-20)
     : '';
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Analytics Settings</h1>
-        <p className="text-muted-foreground">
-          Configure tracking pixels and Search Console integration
+        <h1 className="text-xl md:text-2xl font-bold">Analytics Settings</h1>
+        <p className="text-sm md:text-base text-muted-foreground">
+          Configure Google Analytics and Search Console integration
         </p>
       </div>
 
@@ -100,19 +95,19 @@ export function AnalyticsSettings() {
         <Alert className="border-green-200 bg-green-50">
           <CheckCircle className="h-4 w-4 text-green-600" />
           <AlertTitle className="text-green-800">Analytics Configured</AlertTitle>
-          <AlertDescription className="text-green-700">
+          <AlertDescription className="text-green-700 text-sm">
             {isTrackingConfigured && isSearchConsoleConfigured
-              ? 'Tracking pixels and Search Console are configured.'
+              ? 'Google Analytics and Search Console are configured.'
               : isTrackingConfigured
-              ? 'Tracking pixels are configured. Search Console is not configured.'
-              : 'Search Console is configured. Tracking pixels are not configured.'}
+              ? 'Google Analytics is configured. Search Console is not configured.'
+              : 'Search Console is configured. Google Analytics is not configured.'}
           </AlertDescription>
         </Alert>
       ) : (
         <Alert className="border-yellow-200 bg-yellow-50">
           <AlertCircle className="h-4 w-4 text-yellow-600" />
           <AlertTitle className="text-yellow-800">Analytics Not Configured</AlertTitle>
-          <AlertDescription className="text-yellow-700">
+          <AlertDescription className="text-yellow-700 text-sm">
             Please configure your analytics settings below to enable tracking and reporting.
           </AlertDescription>
         </Alert>
@@ -120,56 +115,43 @@ export function AnalyticsSettings() {
 
       <Tabs defaultValue="tracking" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="tracking" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Tracking Pixels
+          <TabsTrigger value="tracking" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+            <BarChart3 className="h-3 w-3 md:h-4 md:w-4" />
+            <span className="hidden sm:inline">Google</span> Analytics
           </TabsTrigger>
-          <TabsTrigger value="search-console" className="flex items-center gap-2">
-            <Search className="h-4 w-4" />
+          <TabsTrigger value="search-console" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+            <Search className="h-3 w-3 md:h-4 md:w-4" />
             Search Console
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="tracking" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Tracking Configuration
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                <Settings className="h-4 w-4 md:h-5 md:w-5" />
+                Google Analytics Configuration
               </CardTitle>
-              <CardDescription>
-                Enter your tracking IDs to enable analytics on your site.
+              <CardDescription className="text-xs md:text-sm">
+                Enter your Google Analytics tracking ID to enable site analytics.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmitTracking} className="space-y-6">
+            <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
+              <form onSubmit={handleSubmitTracking} className="space-y-4 md:space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="google_analytics_id">Google Analytics ID</Label>
+                  <Label htmlFor="google_analytics_id" className="text-sm">Google Analytics ID</Label>
                   <Input
                     id="google_analytics_id"
-                    placeholder="G-XXXXXXXXXX or UA-XXXXXXXX-X"
+                    placeholder="G-XXXXXXXXXX"
                     value={formData.google_analytics_id}
                     onChange={(e) => setFormData({ ...formData, google_analytics_id: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Your Google Analytics 4 measurement ID (starts with G-) or Universal Analytics ID (starts with UA-)
+                    Your Google Analytics 4 measurement ID (starts with G-)
                   </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="facebook_pixel_id">Facebook Pixel ID</Label>
-                  <Input
-                    id="facebook_pixel_id"
-                    placeholder="XXXXXXXXXXXXXXXX"
-                    value={formData.facebook_pixel_id}
-                    onChange={(e) => setFormData({ ...formData, facebook_pixel_id: e.target.value })}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Your Facebook Pixel ID for tracking conversions and events
-                  </p>
-                </div>
-
-                <Button type="submit" disabled={saving}>
+                <Button type="submit" disabled={saving} className="w-full sm:w-auto">
                   {saving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -178,7 +160,7 @@ export function AnalyticsSettings() {
                   ) : (
                     <>
                       <Save className="mr-2 h-4 w-4" />
-                      Save Tracking Settings
+                      Save Settings
                     </>
                   )}
                 </Button>
@@ -189,33 +171,33 @@ export function AnalyticsSettings() {
 
         <TabsContent value="search-console" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="h-5 w-5" />
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                <Search className="h-4 w-4 md:h-5 md:w-5" />
                 Google Search Console Configuration
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs md:text-sm">
                 Configure your Google Search Console API credentials for SEO data.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
               {isSearchConsoleConfigured && (
-                <Alert className="mb-6 border-blue-200 bg-blue-50">
+                <Alert className="mb-4 md:mb-6 border-blue-200 bg-blue-50">
                   <CheckCircle className="h-4 w-4 text-blue-600" />
-                  <AlertTitle className="text-blue-800">Search Console Connected</AlertTitle>
+                  <AlertTitle className="text-blue-800 text-sm">Search Console Connected</AlertTitle>
                   <AlertDescription className="text-blue-700">
-                    <div className="mt-2 space-y-1 text-sm">
-                      <p><strong>Email:</strong> {settings.google_service_account_email}</p>
-                      <p><strong>Site URL:</strong> {settings.google_search_console_site_url}</p>
-                      <p><strong>Private Key:</strong> {maskedPrivateKey}</p>
+                    <div className="mt-2 space-y-1 text-xs">
+                      <p className="break-all"><strong>Email:</strong> {settings.google_service_account_email}</p>
+                      <p className="break-all"><strong>Site URL:</strong> {settings.google_search_console_site_url}</p>
+                      <p className="break-all"><strong>Private Key:</strong> {maskedPrivateKey}</p>
                     </div>
                   </AlertDescription>
                 </Alert>
               )}
 
-              <form onSubmit={handleSubmitSearchConsole} className="space-y-6">
+              <form onSubmit={handleSubmitSearchConsole} className="space-y-4 md:space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="google_service_account_email">Service Account Email</Label>
+                  <Label htmlFor="google_service_account_email" className="text-sm">Service Account Email</Label>
                   <Input
                     id="google_service_account_email"
                     type="email"
@@ -229,7 +211,7 @@ export function AnalyticsSettings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="google_private_key">Private Key</Label>
+                  <Label htmlFor="google_private_key" className="text-sm">Private Key</Label>
                   <Textarea
                     id="google_private_key"
                     placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
@@ -244,7 +226,7 @@ export function AnalyticsSettings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="google_search_console_site_url">Search Console Site URL</Label>
+                  <Label htmlFor="google_search_console_site_url" className="text-sm">Search Console Site URL</Label>
                   <Input
                     id="google_search_console_site_url"
                     placeholder="https://your-website.com"
@@ -256,7 +238,7 @@ export function AnalyticsSettings() {
                   </p>
                 </div>
 
-                <Button type="submit" disabled={saving}>
+                <Button type="submit" disabled={saving} className="w-full sm:w-auto">
                   {saving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -265,7 +247,7 @@ export function AnalyticsSettings() {
                   ) : (
                     <>
                       <Save className="mr-2 h-4 w-4" />
-                      Save Search Console Settings
+                      Save Settings
                     </>
                   )}
                 </Button>
@@ -277,14 +259,14 @@ export function AnalyticsSettings() {
 
       {isConfigured && (
         <Card className="border-destructive/20">
-          <CardHeader>
-            <CardTitle className="text-destructive">Danger Zone</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-4 md:p-6">
+            <CardTitle className="text-destructive text-base md:text-lg">Danger Zone</CardTitle>
+            <CardDescription className="text-xs md:text-sm">
               Delete all analytics settings. This action cannot be undone.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button variant="destructive" onClick={handleDelete} disabled={saving}>
+          <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
+            <Button variant="destructive" onClick={handleDelete} disabled={saving} className="w-full sm:w-auto">
               <Trash2 className="mr-2 h-4 w-4" />
               Delete All Settings
             </Button>
