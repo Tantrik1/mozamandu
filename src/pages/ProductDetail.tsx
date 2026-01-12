@@ -113,18 +113,15 @@ const fetchColorVariants = async (productId: string): Promise<ColorVariant[]> =>
 
 const fetchAdditionalImages = async (productId: string): Promise<string[]> => {
   // Try product_additional_images table first (external DB structure)
-  try {
-    const { data: additionalData } = await supabase
-      .from('product_additional_images' as any)
-      .select('image_url')
-      .eq('product_id', productId)
-      .order('display_order');
-    
-    if (additionalData && additionalData.length > 0) {
-      return (additionalData as any[]).map(img => img.image_url);
-    }
-  } catch (e) {
-    // Table might not exist, continue to fallback
+  const { data: additionalData, error: additionalError } = await supabase
+    .from('product_additional_images' as any)
+    .select('image_url')
+    .eq('product_id', productId)
+    .order('display_order');
+  
+  // If the table exists and has data, use it
+  if (!additionalError && additionalData && additionalData.length > 0) {
+    return (additionalData as any[]).map(img => img.image_url);
   }
   
   // Fallback to product_images table (Lovable Cloud structure)
