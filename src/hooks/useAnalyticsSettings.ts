@@ -8,6 +8,13 @@ export interface AnalyticsSettings {
   is_active: boolean;
 }
 
+interface SettingRow {
+  id: string;
+  setting_key: string;
+  setting_value: string;
+  is_encrypted: boolean;
+}
+
 export function useAnalyticsSettings() {
   const [settings, setSettings] = useState<AnalyticsSettings>({ is_active: false });
   const [loading, setLoading] = useState(true);
@@ -17,20 +24,29 @@ export function useAnalyticsSettings() {
   const fetchSettings = async () => {
     try {
       setLoading(true);
+      
+      // Fetch all settings as key-value pairs (matching external DB schema)
       const { data, error } = await supabase
         .from('analytics_settings')
-        .select('google_analytics_id, facebook_pixel_id, is_active')
-        .maybeSingle();
+        .select('*');
 
       if (error) throw error;
 
-      if (data) {
-        setSettings({
-          google_analytics_id: data.google_analytics_id || undefined,
-          facebook_pixel_id: data.facebook_pixel_id || undefined,
-          is_active: data.is_active ?? false,
-        });
-      }
+      // Convert key-value pairs to settings object
+      // The external DB uses: id, setting_key, setting_value, is_encrypted
+      const settingsMap: Record<string, string> = {};
+      const rows = data as unknown as SettingRow[];
+      (rows || []).forEach((row) => {
+        if (row.setting_key && row.setting_value) {
+          settingsMap[row.setting_key] = row.setting_value;
+        }
+      });
+
+      setSettings({
+        google_analytics_id: settingsMap['google_analytics_id'] || undefined,
+        facebook_pixel_id: settingsMap['facebook_pixel_id'] || undefined,
+        is_active: settingsMap['is_active'] === 'true' || Object.keys(settingsMap).length > 0,
+      });
     } catch (error) {
       console.error('Error fetching analytics settings:', error);
     } finally {
@@ -38,40 +54,54 @@ export function useAnalyticsSettings() {
     }
   };
 
+  const upsertSetting = async (key: string, value: string, isEncrypted: boolean = false) => {
+    // Check if setting exists using filter to avoid TypeScript issues
+    const { data: existing } = await supabase
+      .from('analytics_settings')
+      .select('id')
+      .filter('setting_key', 'eq', key)
+      .maybeSingle();
+
+    if (existing) {
+      // Update existing
+      const updateData = {
+        setting_value: value,
+        is_encrypted: isEncrypted,
+      };
+      const { error } = await supabase
+        .from('analytics_settings')
+        .update(updateData as any)
+        .filter('setting_key', 'eq', key);
+      
+      if (error) throw error;
+    } else if (value) {
+      // Insert new (only if value is not empty)
+      const insertData = {
+        setting_key: key,
+        setting_value: value,
+        is_encrypted: isEncrypted,
+      };
+      const { error } = await supabase
+        .from('analytics_settings')
+        .insert(insertData as any);
+      
+      if (error) throw error;
+    }
+  };
+
   const saveSettings = async (newSettings: Partial<AnalyticsSettings>) => {
     try {
       setSaving(true);
 
-      // Check if a record exists
-      const { data: existing } = await supabase
-        .from('analytics_settings')
-        .select('id')
-        .maybeSingle();
-
-      if (existing) {
-        // Update existing record
-        const { error } = await supabase
-          .from('analytics_settings')
-          .update({
-            google_analytics_id: newSettings.google_analytics_id || null,
-            facebook_pixel_id: newSettings.facebook_pixel_id || null,
-            is_active: newSettings.is_active ?? true,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id);
-
-        if (error) throw error;
-      } else {
-        // Insert new record
-        const { error } = await supabase
-          .from('analytics_settings')
-          .insert({
-            google_analytics_id: newSettings.google_analytics_id || null,
-            facebook_pixel_id: newSettings.facebook_pixel_id || null,
-            is_active: newSettings.is_active ?? true,
-          });
-
-        if (error) throw error;
+      // Save each setting as a key-value pair
+      if (newSettings.google_analytics_id !== undefined) {
+        await upsertSetting('google_analytics_id', newSettings.google_analytics_id || '');
+      }
+      if (newSettings.facebook_pixel_id !== undefined) {
+        await upsertSetting('facebook_pixel_id', newSettings.facebook_pixel_id || '');
+      }
+      if (newSettings.is_active !== undefined) {
+        await upsertSetting('is_active', newSettings.is_active ? 'true' : 'false');
       }
 
       toast({
@@ -95,12 +125,17 @@ export function useAnalyticsSettings() {
   const deleteSettings = async () => {
     try {
       setSaving(true);
-      const { error } = await supabase
-        .from('analytics_settings')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
-
-      if (error) throw error;
+      
+      // Delete specific analytics-related keys
+      const keysToDelete = ['google_analytics_id', 'facebook_pixel_id', 'is_active'];
+      
+      for (const key of keysToDelete) {
+        // Use raw query to avoid TypeScript issues with external schema
+        await supabase
+          .from('analytics_settings')
+          .delete()
+          .filter('setting_key', 'eq', key);
+      }
 
       toast({
         title: 'Settings Deleted',
