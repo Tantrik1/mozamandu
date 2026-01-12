@@ -43,36 +43,27 @@ export function ProductAdditionalImages({
     if (!productId) return;
     
     try {
-      // Try with display_order first
-      let query = supabase
+      // Fetch product images - external DB schema has: id, product_id, image_url, color_variant_id, is_primary, image_type, storage_path
+      // Filter for gallery images only (additional images)
+      const result = await supabase
         .from('product_images')
         .select('id, image_url')
         .eq('product_id', productId);
 
-      const { data, error } = await query.order('display_order');
+      const data = result.data as any[];
+      const error = result.error;
 
-      // If display_order column doesn't exist, retry without ordering
-      if (error && (error.code === '42703' || error.message?.includes('display_order'))) {
-        console.warn('display_order column not found, fetching without order');
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('product_images')
-          .select('id, image_url')
-          .eq('product_id', productId);
-        
-        if (fallbackError) throw fallbackError;
-        
-        const existingImages: AdditionalImage[] = (fallbackData || []).map(img => ({
-          id: img.id,
-          preview: img.image_url,
-          isNew: false,
-        }));
-        setImages(existingImages);
+      if (error) {
+        console.error('Error fetching additional images:', error);
         return;
       }
 
-      if (error) throw error;
+      // Filter for gallery type images if the column exists
+      const galleryImages = data?.filter((img: any) => 
+        img.image_type === 'gallery' || !img.image_type
+      ) || data || [];
 
-      const existingImages: AdditionalImage[] = (data || []).map(img => ({
+      const existingImages: AdditionalImage[] = galleryImages.map((img: any) => ({
         id: img.id,
         preview: img.image_url,
         isNew: false,
@@ -217,39 +208,41 @@ export function ProductAdditionalImages({
 
           console.log('🔗 Public URL:', urlData.publicUrl);
 
-          // Save to product_images table - try with display_order first, fallback without
-          let dbData: any = null;
-          let dbError: any = null;
-
-          // First try with display_order column
-          const insertWithOrder = await supabase
+          // Save to product_images table - using external DB schema
+          // External schema has: product_id, image_url, color_variant_id, is_primary, image_type, storage_path
+          const { data: dbData, error: dbError } = await supabase
             .from('product_images')
             .insert({
               product_id: targetProductId,
               image_url: urlData.publicUrl,
-              display_order: i,
+              is_primary: false,
+              image_type: 'gallery',
+              storage_path: fileName,
             } as any)
             .select()
             .single();
 
-          if (insertWithOrder.error && insertWithOrder.error.code === '42703') {
-            // display_order column doesn't exist, insert without it
-            console.warn('⚠️ display_order column not found, inserting without it');
-            const insertWithoutOrder = await supabase
-              .from('product_images')
-              .insert({
-                product_id: targetProductId,
-                image_url: urlData.publicUrl,
-              } as any)
-              .select()
-              .single();
-            
-            dbData = insertWithoutOrder.data;
-            dbError = insertWithoutOrder.error;
-          } else {
-            dbData = insertWithOrder.data;
-            dbError = insertWithOrder.error;
+          if (dbError) {
+            console.error('❌ Database insert error:', dbError);
+            toast({
+              title: 'Database Error',
+              description: `Failed to save image record: ${dbError.message}`,
+              variant: 'destructive',
+            });
+            throw dbError;
           }
+
+          console.log('✅ Database insert success:', dbData);
+
+          // Update image state to mark as uploaded
+          setImages(prev => prev.map((p) => 
+            p === img ? { ...p, isNew: false, uploading: false, id: dbData?.id || crypto.randomUUID() } : p
+          ));
+
+          toast({
+            title: 'Image Uploaded',
+            description: `Additional image ${i + 1} saved successfully`,
+          });
 
           if (dbError) {
             console.error('❌ Database insert error:', dbError);
