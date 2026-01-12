@@ -1,5 +1,6 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +27,12 @@ export interface ProductAdditionalImagesRef {
 }
 
 const BUCKET_NAME = 'product-additional-images';
+
+// External Supabase storage client for product additional images
+const EXTERNAL_SUPABASE_URL = 'https://huwhbxjlyucamitwwhyg.supabase.co';
+const EXTERNAL_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1d2hieGpseXVjYW1pdHd3aHlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5MDc3NjUsImV4cCI6MjA2MDQ4Mzc2NX0.oj0cFJNIHsRDphEqM5b3Is24cXVjbJ87LECv1LyGSLQ';
+
+const externalSupabase = createClient(EXTERNAL_SUPABASE_URL, EXTERNAL_SUPABASE_ANON_KEY);
 
 export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, ProductAdditionalImagesProps>(
   function ProductAdditionalImagesComponent({ productId, onImagesChange, maxImages = 3 }, ref) {
@@ -69,9 +76,10 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
 
             const fileName = `${targetProductId}/${Date.now()}-${i}.webp`;
 
-            console.log('📤 Uploading additional image to bucket:', BUCKET_NAME, 'file:', fileName);
+            console.log('📤 Uploading additional image to external bucket:', BUCKET_NAME, 'file:', fileName);
 
-            const { data: uploadData, error: uploadError } = await supabase.storage
+            // Use external Supabase for storage upload
+            const { data: uploadData, error: uploadError } = await externalSupabase.storage
               .from(BUCKET_NAME)
               .upload(fileName, optimizedFile, {
                 contentType: 'image/webp',
@@ -90,13 +98,14 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
 
             console.log('✅ Storage upload success:', uploadData);
 
-            const { data: urlData } = supabase.storage
+            // Get public URL from external Supabase
+            const { data: urlData } = externalSupabase.storage
               .from(BUCKET_NAME)
               .getPublicUrl(fileName);
 
             console.log('🔗 Public URL:', urlData.publicUrl);
 
-            // Save to product_images table
+            // Save to product_images table (still using main supabase client for DB operations)
             const insertData = {
               product_id: targetProductId,
               image_url: urlData.publicUrl,
