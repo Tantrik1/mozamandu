@@ -185,37 +185,37 @@ export function CustomerDialog({
 
                                   {/* Pricing & Address */}
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                      <h4 className="font-medium mb-2 flex items-center gap-2">
-                                        <CreditCard className="h-4 w-4" />Pricing
+                                    <div className="bg-muted/50 rounded-lg p-3">
+                                      <h4 className="font-medium mb-3 flex items-center gap-2">
+                                        <CreditCard className="h-4 w-4" />Pricing Breakdown
                                       </h4>
-                                      <div className="space-y-1 text-sm">
+                                      <div className="space-y-2 text-sm">
                                         <div className="flex justify-between">
                                           <span className="text-muted-foreground">Subtotal</span>
-                                          <span>Rs. {o.subtotal?.toLocaleString('en-IN') || '-'}</span>
+                                          <span className="font-medium">Rs. {o.subtotal?.toLocaleString('en-IN') || '0'}</span>
                                         </div>
                                         <div className="flex justify-between">
-                                          <span className="text-muted-foreground">Delivery</span>
-                                          <span>Rs. {o.delivery_charge?.toLocaleString('en-IN') || '0'}</span>
+                                          <span className="text-muted-foreground">Delivery Charge</span>
+                                          <span className="font-medium">Rs. {o.delivery_charge?.toLocaleString('en-IN') || '0'}</span>
                                         </div>
-                                        {o.promocode_discount && o.promocode_discount > 0 && (
+                                        {(o.promocode_discount !== undefined && o.promocode_discount !== null && o.promocode_discount > 0) && (
                                           <div className="flex justify-between text-green-600">
-                                            <span>Discount</span>
-                                            <span>-Rs. {o.promocode_discount.toLocaleString('en-IN')}</span>
+                                            <span>Promo Discount</span>
+                                            <span className="font-medium">-Rs. {o.promocode_discount.toLocaleString('en-IN')}</span>
                                           </div>
                                         )}
-                                        <div className="flex justify-between font-medium pt-2 border-t">
-                                          <span>Total</span>
+                                        <div className="flex justify-between font-semibold pt-2 border-t border-border">
+                                          <span>Total Amount</span>
                                           <span>Rs. {o.total_amount.toLocaleString('en-IN')}</span>
                                         </div>
                                       </div>
                                     </div>
                                     {o.delivery_address && (
-                                      <div>
-                                        <h4 className="font-medium mb-2 flex items-center gap-2">
-                                          <MapPin className="h-4 w-4" />Address
+                                      <div className="bg-muted/50 rounded-lg p-3">
+                                        <h4 className="font-medium mb-3 flex items-center gap-2">
+                                          <MapPin className="h-4 w-4" />Delivery Address
                                         </h4>
-                                        <p className="text-sm text-muted-foreground">{o.delivery_address}</p>
+                                        <p className="text-sm">{o.delivery_address}</p>
                                       </div>
                                     )}
                                   </div>
