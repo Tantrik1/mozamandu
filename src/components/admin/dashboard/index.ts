@@ -5,3 +5,5 @@ export { ProductPerformanceStats } from './ProductPerformanceStats';
 export { InventoryStats } from './InventoryStats';
 export { CustomerStatsPanel } from './CustomerStatsPanel';
 export { RevenueChart } from './RevenueChart';
+export { DashboardDateFilter, createDateFilterValue, getDateRangeFromPreset } from './DashboardDateFilter';
+export type { DateFilterValue, DateFilterPreset } from './DashboardDateFilter';
