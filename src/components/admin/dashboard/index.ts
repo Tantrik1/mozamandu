@@ -6,4 +6,6 @@ export { InventoryStats } from './InventoryStats';
 export { CustomerStatsPanel } from './CustomerStatsPanel';
 export { RevenueChart } from './RevenueChart';
 export { DashboardDateFilter, createDateFilterValue, getDateRangeFromPreset } from './DashboardDateFilter';
+export { OrderSourceBreakdown } from './OrderSourceBreakdown';
 export type { DateFilterValue, DateFilterPreset } from './DashboardDateFilter';
+export type { OrderSourceFilter } from './OrderSourceBreakdown';
