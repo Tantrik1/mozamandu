@@ -127,7 +127,7 @@ export function EnhancedAdminDashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch orders with caching (5 minute cache)
+  // Fetch orders with caching (5 minute cache) - includes both customer and guest orders
   const fetchOrdersWithCache = async () => {
     const now = Date.now();
     const cacheAge = now - ordersCache.current.timestamp;
@@ -136,14 +136,29 @@ export function EnhancedAdminDashboard() {
       return ordersCache.current.data;
     }
 
-    const { data: orders } = await supabase
-      .from('customer_orders')
-      .select('id, created_at, total_amount, subtotal, status, payment_percentage, customer_email, customer_name, delivery_charge')
-      .order('created_at', { ascending: false })
-      .limit(1000);
+    // Fetch from BOTH order tables in parallel
+    const [customerOrdersRes, guestOrdersRes] = await Promise.all([
+      supabase
+        .from('customer_orders')
+        .select('id, created_at, total_amount, subtotal, status, customer_email, customer_name, delivery_charge')
+        .order('created_at', { ascending: false })
+        .limit(1000),
+      supabase
+        .from('orders')
+        .select('id, created_at, total_amount, subtotal, status, customer_email, customer_name, delivery_charge')
+        .order('created_at', { ascending: false })
+        .limit(1000)
+    ]);
 
-    ordersCache.current = { data: orders || [], timestamp: now };
-    return orders || [];
+    // Combine with source tag for proper item fetching later
+    const customerOrders = (customerOrdersRes.data || []).map(o => ({ ...o, source: 'customer' as const }));
+    const guestOrders = (guestOrdersRes.data || []).map(o => ({ ...o, source: 'guest' as const }));
+    
+    const allOrders = [...customerOrders, ...guestOrders]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    ordersCache.current = { data: allOrders, timestamp: now };
+    return allOrders;
   };
 
   // Filter orders by date range
@@ -323,15 +338,21 @@ export function EnhancedAdminDashboard() {
   };
 
   const fetchProductStats = async (filteredOrders: any[]) => {
-    // Get order IDs from filtered orders to filter product stats
-    const orderIds = filteredOrders.map(o => o.id);
+    // Separate order IDs by source for fetching from correct tables
+    const customerOrderIds = filteredOrders.filter(o => o.source === 'customer').map(o => o.id);
+    const guestOrderIds = filteredOrders.filter(o => o.source === 'guest').map(o => o.id);
     
-    // Parallel fetch for product stats
-    const [orderItemsResponse, inventoryResponse] = await Promise.all([
+    // Parallel fetch for product stats from BOTH order item tables
+    const [customerItemsRes, guestItemsRes, inventoryResponse] = await Promise.all([
       supabase
         .from('customer_order_item_details')
         .select('product_name, quantity, total_price, order_id')
-        .in('order_id', orderIds.length > 0 ? orderIds : ['none'])
+        .in('order_id', customerOrderIds.length > 0 ? customerOrderIds : ['none'])
+        .limit(1000),
+      supabase
+        .from('order_item_details')
+        .select('product_name, quantity, total_price, order_id')
+        .in('order_id', guestOrderIds.length > 0 ? guestOrderIds : ['none'])
         .limit(1000),
       supabase
         .from('product_inventory')
@@ -339,6 +360,11 @@ export function EnhancedAdminDashboard() {
         .eq('is_active', true)
         .limit(500)
     ]);
+    
+    // Combine order items from both sources
+    const orderItemsResponse = {
+      data: [...(customerItemsRes.data || []), ...(guestItemsRes.data || [])]
+    };
 
     const orderItems = orderItemsResponse.data || [];
     const inventory = inventoryResponse.data || [];
@@ -417,8 +443,8 @@ export function EnhancedAdminDashboard() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Fetch only count for customers
-    const { count: totalCustomers } = await supabase
+    // Fetch only count for registered customers
+    const { count: registeredCustomers } = await supabase
       .from('profiles')
       .select('*', { count: 'exact', head: true })
       .eq('role', 'customer');
@@ -434,6 +460,14 @@ export function EnhancedAdminDashboard() {
     const validOrders = filteredOrders.filter(o => o.status !== 'cancelled');
     const allValidOrders = allOrders.filter(o => o.status !== 'cancelled');
     const newCustomers = recentProfiles?.length || 0;
+    
+    // Count unique guest customers by email (from guest orders)
+    const guestOrders = allValidOrders.filter(o => o.source === 'guest');
+    const uniqueGuestEmails = new Set(guestOrders.map(o => o.customer_email?.toLowerCase()).filter(Boolean));
+    const guestCustomersCount = uniqueGuestEmails.size;
+    
+    // Total customers = registered + unique guests
+    const totalCustomers = (registeredCustomers || 0) + guestCustomersCount;
 
     type CustomerData = { count: number; total: number; name: string };
     const customerOrderCounts = validOrders.reduce((acc, o) => {
