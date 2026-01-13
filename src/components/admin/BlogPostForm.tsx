@@ -6,15 +6,18 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, FileText, Search, Settings2, Image, Save, Eye } from 'lucide-react';
+import { ArrowLeft, FileText, Search, Settings2, Image, Save, Eye, HelpCircle, Package } from 'lucide-react';
 import browserImageCompression from 'browser-image-compression';
+import { RichTextEditor } from './RichTextEditor';
+import { BlogFAQsManager } from './BlogFAQsManager';
+import { BlogProductsManager } from './BlogProductsManager';
 
 interface BlogCategory {
   id: string;
@@ -231,7 +234,7 @@ export function BlogPostForm() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -264,7 +267,7 @@ export function BlogPostForm() {
       <Card>
         <CardContent className="pt-6">
           <Tabs defaultValue="content">
-            <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsList className="grid w-full grid-cols-5 mb-6">
               <TabsTrigger value="content" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Content
@@ -272,6 +275,14 @@ export function BlogPostForm() {
               <TabsTrigger value="seo" className="flex items-center gap-2">
                 <Search className="h-4 w-4" />
                 SEO
+              </TabsTrigger>
+              <TabsTrigger value="faqs" className="flex items-center gap-2">
+                <HelpCircle className="h-4 w-4" />
+                FAQs
+              </TabsTrigger>
+              <TabsTrigger value="products" className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Products
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings2 className="h-4 w-4" />
@@ -336,14 +347,11 @@ export function BlogPostForm() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="content">Content *</Label>
-                <Textarea
-                  id="content"
-                  value={formData.content}
-                  onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-                  placeholder="Write your blog content here... (Markdown supported)"
-                  rows={16}
-                  className="font-mono"
+                <Label>Content *</Label>
+                <RichTextEditor
+                  content={formData.content}
+                  onChange={(content) => setFormData(prev => ({ ...prev, content }))}
+                  placeholder="Write your blog content here..."
                 />
               </div>
 
@@ -484,6 +492,30 @@ export function BlogPostForm() {
                   rows={2}
                 />
               </div>
+            </TabsContent>
+
+            <TabsContent value="faqs" className="space-y-6">
+              {blogId ? (
+                <BlogFAQsManager blogId={blogId} />
+              ) : (
+                <div className="text-center py-12 text-muted-foreground border rounded-lg border-dashed">
+                  <HelpCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="font-medium">Save the blog first</p>
+                  <p className="text-sm">You can add FAQs after creating the blog post</p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="products" className="space-y-6">
+              {blogId ? (
+                <BlogProductsManager blogId={blogId} />
+              ) : (
+                <div className="text-center py-12 text-muted-foreground border rounded-lg border-dashed">
+                  <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="font-medium">Save the blog first</p>
+                  <p className="text-sm">You can link products after creating the blog post</p>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-6">

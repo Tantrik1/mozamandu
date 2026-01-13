@@ -1,16 +1,22 @@
 import { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ModernNavbar } from '@/components/navbar/ModernNavbar';
 import { Footer } from '@/components/layout/Footer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calendar, Clock, User, ArrowLeft, Share2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { Calendar, Clock, User, ArrowLeft, Share2, HelpCircle, ShoppingBag } from 'lucide-react';
 import { format } from 'date-fns';
 import { Helmet } from 'react-helmet-async';
-import ReactMarkdown from 'react-markdown';
 import { useToast } from '@/hooks/use-toast';
 
 interface BlogCategory {
@@ -40,10 +46,30 @@ interface Blog {
   category_id: string | null;
 }
 
+interface BlogFAQ {
+  id: string;
+  question: string;
+  answer: string;
+  display_order: number;
+}
+
+interface BlogProduct {
+  id: string;
+  product_id: string;
+  display_order: number;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  image_url: string | null;
+  selling_price: number | null;
+  status: string;
+}
+
 export default function BlogDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const { data: blog, isLoading, error } = useQuery({
     queryKey: ['blog', slug],
@@ -92,6 +118,54 @@ export default function BlogDetail() {
     enabled: !!blog?.category_id,
   });
 
+  // Fetch blog FAQs
+  const { data: faqs = [] } = useQuery({
+    queryKey: ['blog-faqs-public', blog?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('blog_faqs')
+        .select('id, question, answer, display_order')
+        .eq('blog_id', blog?.id)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      if (error) throw error;
+      return data as BlogFAQ[];
+    },
+    enabled: !!blog?.id,
+  });
+
+  // Fetch blog products
+  const { data: blogProducts = [] } = useQuery({
+    queryKey: ['blog-products-public', blog?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('blog_products')
+        .select('id, product_id, display_order')
+        .eq('blog_id', blog?.id)
+        .order('display_order', { ascending: true });
+      if (error) throw error;
+      return data as BlogProduct[];
+    },
+    enabled: !!blog?.id,
+  });
+
+  // Fetch product details
+  const { data: products = [] } = useQuery({
+    queryKey: ['products-for-blog', blogProducts.map(bp => bp.product_id)],
+    queryFn: async () => {
+      if (blogProducts.length === 0) return [];
+      const productIds = blogProducts.map(bp => bp.product_id);
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, image_url, selling_price, status')
+        .in('id', productIds)
+        .eq('status', 'active');
+      if (error) throw error;
+      return data as Product[];
+    },
+    enabled: blogProducts.length > 0,
+  });
+
   const { data: relatedBlogs = [] } = useQuery({
     queryKey: ['related-blogs', blog?.id, blog?.category_id],
     queryFn: async () => {
@@ -102,7 +176,6 @@ export default function BlogDetail() {
         .neq('id', blog?.id)
         .limit(3);
       
-      // Prioritize same category
       if (blog?.category_id) {
         query = query.eq('category_id', blog.category_id);
       }
@@ -126,6 +199,20 @@ export default function BlogDetail() {
       toast({ title: 'Link copied to clipboard!' });
     }
   };
+
+  // Generate FAQ schema for SEO
+  const faqSchema = faqs.length > 0 ? {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqs.map(faq => ({
+      "@type": "Question",
+      "name": faq.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.answer
+      }
+    }))
+  } : null;
 
   if (isLoading) {
     return (
@@ -180,7 +267,7 @@ export default function BlogDetail() {
         <meta property="article:author" content={blog.author_name} />
         <link rel="canonical" href={`https://mozamandu.com/blog/${blog.slug}`} />
         
-        {/* Structured Data */}
+        {/* Blog Structured Data */}
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
@@ -208,6 +295,13 @@ export default function BlogDetail() {
             }
           })}
         </script>
+
+        {/* FAQ Structured Data */}
+        {faqSchema && (
+          <script type="application/ld+json">
+            {JSON.stringify(faqSchema)}
+          </script>
+        )}
       </Helmet>
 
       <ModernNavbar />
@@ -279,9 +373,73 @@ export default function BlogDetail() {
           )}
 
           {/* Content */}
-          <div className="prose prose-lg max-w-none prose-headings:font-bold prose-a:text-primary prose-img:rounded-lg">
-            <ReactMarkdown>{blog.content}</ReactMarkdown>
-          </div>
+          <div 
+            className="prose prose-lg max-w-none prose-headings:font-bold prose-a:text-primary prose-img:rounded-lg"
+            dangerouslySetInnerHTML={{ __html: blog.content }}
+          />
+
+          {/* Featured Products Section */}
+          {products.length > 0 && (
+            <section className="mt-12 p-6 bg-muted/30 rounded-xl">
+              <div className="flex items-center gap-2 mb-6">
+                <ShoppingBag className="h-5 w-5 text-primary" />
+                <h2 className="text-xl font-bold">Featured Products</h2>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {products.map((product) => (
+                  <Link key={product.id} to={`/product/${product.id}`}>
+                    <Card className="overflow-hidden hover:shadow-lg transition-shadow group">
+                      <div className="aspect-square overflow-hidden bg-muted">
+                        {product.image_url ? (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <ShoppingBag className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <CardContent className="p-3">
+                        <p className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">
+                          {product.name}
+                        </p>
+                        {product.selling_price && (
+                          <p className="text-primary font-bold mt-1">
+                            Rs. {product.selling_price}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* FAQs Section */}
+          {faqs.length > 0 && (
+            <section className="mt-12">
+              <div className="flex items-center gap-2 mb-6">
+                <HelpCircle className="h-5 w-5 text-primary" />
+                <h2 className="text-xl font-bold">Frequently Asked Questions</h2>
+              </div>
+              <Accordion type="single" collapsible className="w-full">
+                {faqs.map((faq, index) => (
+                  <AccordionItem key={faq.id} value={faq.id}>
+                    <AccordionTrigger className="text-left font-medium">
+                      {faq.question}
+                    </AccordionTrigger>
+                    <AccordionContent className="text-muted-foreground">
+                      {faq.answer}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </section>
+          )}
 
           {/* Author Box */}
           <div className="mt-12 p-6 bg-muted/30 rounded-xl">
