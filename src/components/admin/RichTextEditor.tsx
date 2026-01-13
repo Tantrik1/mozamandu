@@ -5,7 +5,7 @@ import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -38,6 +38,9 @@ interface RichTextEditorProps {
 }
 
 export function RichTextEditor({ content, onChange, placeholder = 'Start writing...' }: RichTextEditorProps) {
+  const initialContentRef = useRef(content);
+  const hasInitializedRef = useRef(false);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -64,7 +67,7 @@ export function RichTextEditor({ content, onChange, placeholder = 'Start writing
         types: ['heading', 'paragraph'],
       }),
     ],
-    content,
+    content: initialContentRef.current,
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none min-h-[400px] p-4 focus:outline-none',
@@ -75,11 +78,20 @@ export function RichTextEditor({ content, onChange, placeholder = 'Start writing
     },
   });
 
+  // Only update content when editing a different blog post (content changes externally)
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
+    if (editor && !hasInitializedRef.current && content) {
       editor.commands.setContent(content);
+      hasInitializedRef.current = true;
     }
   }, [content, editor]);
+
+  // Reset initialization when component unmounts
+  useEffect(() => {
+    return () => {
+      hasInitializedRef.current = false;
+    };
+  }, []);
 
   if (!editor) return null;
 
