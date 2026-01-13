@@ -17,20 +17,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     let isMounted = true;
 
-    // Get initial session immediately
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!isMounted) return;
-      
-      if (session?.user?.email_confirmed_at) {
-        setSession(session);
-        setUser(session.user);
-        // Fetch profile in background, don't block
-        authService.fetchUserProfile(session.user.id).then(profile => {
+    // Get initial session and profile before setting loading to false
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!isMounted) return;
+        
+        if (session?.user?.email_confirmed_at) {
+          setSession(session);
+          setUser(session.user);
+          // Wait for profile before setting loading to false
+          const profile = await authService.fetchUserProfile(session.user.id);
           if (isMounted) setUserProfile(profile);
-        });
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
-      setIsLoading(false);
-    });
+    };
+
+    initializeAuth();
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
