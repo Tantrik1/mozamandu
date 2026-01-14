@@ -12,18 +12,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Search, Percent, Calendar, DollarSign, Tag } from 'lucide-react';
 
+// Interface matching your external Supabase schema (no discount_type, no max_discount)
 interface Promocode {
   id: string;
   code: string;
-  description: string;
+  description: string | null;
   discount_percentage: number;
-  discount_type: string;
-  minimum_order_amount: number;
-  max_discount: number | null;
+  minimum_order_amount: number | null;
   usage_limit: number | null;
   is_active: boolean;
-  valid_from: string;
-  valid_until: string;
+  valid_from: string | null;
+  valid_until: string | null;
   used_count: number;
   created_at: string;
 }
@@ -38,10 +37,8 @@ export function PromocodeManagement() {
   const [formData, setFormData] = useState({
     code: '',
     description: '',
-    discount_type: 'percentage',
     discount_percentage: 0,
     minimum_order_amount: 0,
-    max_discount: null as number | null,
     usage_limit: null as number | null,
     is_active: true,
     valid_from: '',
@@ -64,10 +61,10 @@ export function PromocodeManagement() {
     console.log('🔍 Fetching promocodes and calculating usage...');
     
     try {
-      // Fetch promocodes
+      // Fetch promocodes - only select columns that exist in your table
       const { data: promoData, error: promoError } = await supabase
         .from('promocodes')
-        .select('*')
+        .select('id, code, description, discount_percentage, minimum_order_amount, usage_limit, is_active, valid_from, valid_until, used_count, created_at')
         .order('created_at', { ascending: false });
 
       if (promoError) {
@@ -80,7 +77,7 @@ export function PromocodeManagement() {
         return;
       }
 
-      const promocodesList = promoData || [];
+      const promocodesList = (promoData || []) as Promocode[];
       console.log(`📋 Fetched ${promocodesList.length} promocodes`);
 
       // Fetch ALL orders from both tables to calculate promo usage
@@ -141,13 +138,12 @@ export function PromocodeManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Only include fields that exist in your external Supabase table
     const promocodeData = {
       code: formData.code.toUpperCase(),
-      description: formData.description,
-      discount_type: formData.discount_type,
+      description: formData.description || null,
       discount_percentage: formData.discount_percentage,
-      minimum_order_amount: formData.minimum_order_amount,
-      max_discount: formData.max_discount || null,
+      minimum_order_amount: formData.minimum_order_amount || 0,
       usage_limit: formData.usage_limit || null,
       is_active: formData.is_active,
       valid_from: formData.valid_from || null,
@@ -157,14 +153,16 @@ export function PromocodeManagement() {
     let error;
     
     if (editingPromocode) {
+      // Cast to any to bypass TypeScript - external Supabase doesn't have discount_type/max_discount
       ({ error } = await supabase
         .from('promocodes')
-        .update(promocodeData)
+        .update(promocodeData as any)
         .eq('id', editingPromocode.id));
     } else {
+      // Cast to any to bypass TypeScript - external Supabase doesn't have discount_type/max_discount
       ({ error } = await supabase
         .from('promocodes')
-        .insert([promocodeData]));
+        .insert([promocodeData as any]));
     }
 
     if (error) {
@@ -191,10 +189,8 @@ export function PromocodeManagement() {
     setFormData({
       code: promocode.code,
       description: promocode.description || '',
-      discount_type: promocode.discount_type || 'percentage',
       discount_percentage: promocode.discount_percentage,
       minimum_order_amount: promocode.minimum_order_amount || 0,
-      max_discount: promocode.max_discount,
       usage_limit: promocode.usage_limit,
       is_active: promocode.is_active,
       valid_from: promocode.valid_from ? new Date(promocode.valid_from).toISOString().split('T')[0] : '',
@@ -222,7 +218,7 @@ export function PromocodeManagement() {
         title: "Success",
         description: "Promocode deleted successfully",
       });
-      fetchPromocodesAndUsage(); // Refresh data with usage calculation
+      fetchPromocodesAndUsage();
     }
   };
 
@@ -230,10 +226,8 @@ export function PromocodeManagement() {
     setFormData({
       code: '',
       description: '',
-      discount_type: 'percentage',
       discount_percentage: 0,
       minimum_order_amount: 0,
-      max_discount: null,
       usage_limit: null,
       is_active: true,
       valid_from: '',
@@ -247,7 +241,7 @@ export function PromocodeManagement() {
     (promocode.description && promocode.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const isExpired = (validUntil: string) => {
+  const isExpired = (validUntil: string | null) => {
     return validUntil && new Date(validUntil) < new Date();
   };
 
@@ -298,52 +292,18 @@ export function PromocodeManagement() {
                 </div>
                 
                 <div>
-                  <Label htmlFor="discount_type">Discount Type *</Label>
-                  <select
-                    id="discount_type"
-                    value={formData.discount_type}
-                    onChange={(e) => setFormData({ ...formData, discount_type: e.target.value })}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    <option value="percentage">Percentage (%)</option>
-                    <option value="fixed">Fixed Amount (Rs.)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="discount_percentage">
-                    {formData.discount_type === 'fixed' ? 'Discount Amount (Rs.) *' : 'Discount Percentage (%) *'}
-                  </Label>
+                  <Label htmlFor="discount_percentage">Discount Percentage (%) *</Label>
                   <Input
                     id="discount_percentage"
                     type="number"
-                    min="0"
-                    max={formData.discount_type === 'percentage' ? 100 : undefined}
+                    min="0.01"
+                    max="100"
                     step="0.01"
                     value={formData.discount_percentage}
                     onChange={(e) => setFormData({ ...formData, discount_percentage: parseFloat(e.target.value) || 0 })}
                     required
-                    placeholder={formData.discount_type === 'fixed' ? 'Enter discount amount' : 'Enter discount percentage'}
+                    placeholder="Enter discount percentage"
                   />
-                </div>
-
-                <div>
-                  <Label htmlFor="max_discount">Max Discount (Rs.)</Label>
-                  <Input
-                    id="max_discount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.max_discount || ''}
-                    onChange={(e) => setFormData({ ...formData, max_discount: e.target.value ? parseFloat(e.target.value) : null })}
-                    placeholder="Optional cap on discount"
-                    disabled={formData.discount_type === 'fixed'}
-                  />
-                  {formData.discount_type === 'percentage' && (
-                    <p className="text-xs text-muted-foreground mt-1">Limits max discount for percentage codes</p>
-                  )}
                 </div>
               </div>
 
@@ -558,17 +518,9 @@ export function PromocodeManagement() {
               <CardContent className="space-y-3">
                 <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
                   <div className="text-2xl font-bold text-green-600">
-                    {promocode.discount_type === 'fixed' 
-                      ? `Rs. ${promocode.discount_percentage} OFF`
-                      : `${promocode.discount_percentage}% OFF`
-                    }
+                    {promocode.discount_percentage}% OFF
                   </div>
-                  {promocode.max_discount && promocode.discount_type !== 'fixed' && (
-                    <div className="text-sm text-amber-600">
-                      Max: Rs. {promocode.max_discount}
-                    </div>
-                  )}
-                  {promocode.minimum_order_amount > 0 && (
+                  {promocode.minimum_order_amount && promocode.minimum_order_amount > 0 && (
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                       Min. order: Rs. {promocode.minimum_order_amount}
                     </div>

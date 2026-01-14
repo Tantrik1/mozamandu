@@ -3,14 +3,13 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
+// Interface matching your external Supabase schema (no discount_type, no max_discount)
 interface PromoCode {
   id: string;
   code: string;
   description: string | null;
   discount_percentage: number;
-  discount_type: string;
-  minimum_order_amount: number;
-  max_discount: number | null;
+  minimum_order_amount: number | null;
   usage_limit: number | null;
   valid_from: string | null;
   valid_until: string | null;
@@ -29,23 +28,9 @@ export function usePromoCode() {
   const [isPromoApplied, setIsPromoApplied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Calculate actual discount amount based on discount type and max_discount cap
+  // Calculate actual discount amount (percentage-based only for external Supabase)
   const calculateDiscount = (promo: PromoCode, orderTotal: number): number => {
-    let discount = 0;
-    
-    if (promo.discount_type === 'fixed') {
-      discount = promo.discount_percentage; // For fixed type, this field contains the fixed amount
-    } else {
-      // Percentage discount
-      discount = (orderTotal * promo.discount_percentage) / 100;
-    }
-    
-    // Apply max_discount cap if set
-    if (promo.max_discount && discount > promo.max_discount) {
-      discount = promo.max_discount;
-    }
-    
-    return discount;
+    return (orderTotal * promo.discount_percentage) / 100;
   };
 
   // Check current usage of a promo code across both order tables
@@ -122,10 +107,10 @@ export function usePromoCode() {
     setIsLoading(true);
 
     try {
-      // Fetch promo code from database
+      // Fetch promo code from database - only select columns that exist in your table
       const { data: promo, error } = await supabase
         .from('promocodes')
-        .select('*')
+        .select('id, code, description, discount_percentage, minimum_order_amount, usage_limit, valid_from, valid_until, is_active')
         .eq('code', promoCode.toUpperCase())
         .eq('is_active', true)
         .single();
@@ -140,7 +125,7 @@ export function usePromoCode() {
       }
 
       // Validate the promo code
-      const validation = await validatePromoCode(promo, orderTotal);
+      const validation = await validatePromoCode(promo as PromoCode, orderTotal);
       
       if (!validation.isValid) {
         toast({
@@ -152,20 +137,12 @@ export function usePromoCode() {
       }
 
       // Calculate discount
-      const discount = calculateDiscount(promo, orderTotal);
+      const discount = calculateDiscount(promo as PromoCode, orderTotal);
       
       // Build success message
-      let successMessage = '';
-      if (promo.discount_type === 'fixed') {
-        successMessage = `Rs. ${promo.discount_percentage} discount applied`;
-      } else {
-        successMessage = `${promo.discount_percentage}% discount applied`;
-        if (promo.max_discount && discount >= promo.max_discount) {
-          successMessage += ` (max Rs. ${promo.max_discount})`;
-        }
-      }
+      const successMessage = `${promo.discount_percentage}% discount applied (Rs. ${discount.toFixed(2)} off)`;
 
-      setAppliedPromo(promo);
+      setAppliedPromo(promo as PromoCode);
       setIsPromoApplied(true);
       
       toast({
