@@ -6,66 +6,201 @@ import { toast } from '@/hooks/use-toast';
 interface PromoCode {
   id: string;
   code: string;
+  description: string | null;
   discount_percentage: number;
+  discount_type: string;
   minimum_order_amount: number;
+  max_discount: number | null;
+  usage_limit: number | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  is_active: boolean;
+}
+
+interface PromoValidationResult {
+  isValid: boolean;
+  error?: string;
+  currentUsage?: number;
 }
 
 export function usePromoCode() {
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<PromoCode | null>(null);
   const [isPromoApplied, setIsPromoApplied] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const applyPromoCode = async (totalWithDelivery: number) => {
-    if (!promoCode || isPromoApplied) return;
-
-    const { data: promo, error } = await supabase
-      .from('promocodes')
-      .select('*')
-      .eq('code', promoCode.toUpperCase())
-      .eq('is_active', true)
-      .single();
-
-    if (error || !promo) {
-      toast({
-        title: "Invalid Promo Code",
-        description: "Promo code not found or expired",
-        variant: "destructive",
-      });
-      return;
+  // Calculate actual discount amount based on discount type and max_discount cap
+  const calculateDiscount = (promo: PromoCode, orderTotal: number): number => {
+    let discount = 0;
+    
+    if (promo.discount_type === 'fixed') {
+      discount = promo.discount_percentage; // For fixed type, this field contains the fixed amount
+    } else {
+      // Percentage discount
+      discount = (orderTotal * promo.discount_percentage) / 100;
     }
+    
+    // Apply max_discount cap if set
+    if (promo.max_discount && discount > promo.max_discount) {
+      discount = promo.max_discount;
+    }
+    
+    return discount;
+  };
 
-    // Check expiration date
+  // Check current usage of a promo code across both order tables
+  const checkPromoUsage = async (code: string): Promise<number> => {
+    try {
+      const [customerOrdersResult, ordersResult] = await Promise.all([
+        supabase
+          .from('customer_orders')
+          .select('id')
+          .ilike('promocode_used', code),
+        supabase
+          .from('orders')
+          .select('id')
+          .ilike('promocode_used', code)
+      ]);
+
+      const customerOrdersCount = customerOrdersResult.data?.length || 0;
+      const ordersCount = ordersResult.data?.length || 0;
+      
+      return customerOrdersCount + ordersCount;
+    } catch (error) {
+      console.error('Error checking promo usage:', error);
+      return 0;
+    }
+  };
+
+  // Validate promo code with all checks
+  const validatePromoCode = async (promo: PromoCode, orderTotal: number): Promise<PromoValidationResult> => {
     const now = new Date();
+
+    // Check if promo has started (valid_from)
+    if (promo.valid_from && new Date(promo.valid_from) > now) {
+      return {
+        isValid: false,
+        error: `This promo code is not active yet. It starts on ${new Date(promo.valid_from).toLocaleDateString()}`
+      };
+    }
+
+    // Check if promo has expired (valid_until)
     if (promo.valid_until && new Date(promo.valid_until) < now) {
-      toast({
-        title: "Invalid Promo Code",
-        description: "Promo code has expired",
-        variant: "destructive",
-      });
-      return;
+      return {
+        isValid: false,
+        error: 'This promo code has expired'
+      };
     }
 
-    if (promo.minimum_order_amount && totalWithDelivery < promo.minimum_order_amount) {
-      toast({
-        title: "Invalid Promo Code",
-        description: `Minimum order amount is Rs. ${promo.minimum_order_amount}`,
-        variant: "destructive",
-      });
-      return;
+    // Check minimum order amount
+    if (promo.minimum_order_amount && orderTotal < promo.minimum_order_amount) {
+      return {
+        isValid: false,
+        error: `Minimum order amount is Rs. ${promo.minimum_order_amount}`
+      };
     }
 
-    setAppliedPromo(promo);
-    setIsPromoApplied(true);
-    toast({
-      title: "Promo Code Applied!",
-      description: `${promo.discount_percentage}% discount applied`,
-    });
+    // Check usage limit
+    if (promo.usage_limit) {
+      const currentUsage = await checkPromoUsage(promo.code);
+      if (currentUsage >= promo.usage_limit) {
+        return {
+          isValid: false,
+          error: 'This promo code has reached its usage limit',
+          currentUsage
+        };
+      }
+      return { isValid: true, currentUsage };
+    }
+
+    return { isValid: true };
+  };
+
+  const applyPromoCode = async (orderTotal: number): Promise<boolean> => {
+    if (!promoCode.trim() || isPromoApplied || isLoading) return false;
+
+    setIsLoading(true);
+
+    try {
+      // Fetch promo code from database
+      const { data: promo, error } = await supabase
+        .from('promocodes')
+        .select('*')
+        .eq('code', promoCode.toUpperCase())
+        .eq('is_active', true)
+        .single();
+
+      if (error || !promo) {
+        toast({
+          title: "Invalid Promo Code",
+          description: "Promo code not found or is inactive",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      // Validate the promo code
+      const validation = await validatePromoCode(promo, orderTotal);
+      
+      if (!validation.isValid) {
+        toast({
+          title: "Invalid Promo Code",
+          description: validation.error,
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      // Calculate discount
+      const discount = calculateDiscount(promo, orderTotal);
+      
+      // Build success message
+      let successMessage = '';
+      if (promo.discount_type === 'fixed') {
+        successMessage = `Rs. ${promo.discount_percentage} discount applied`;
+      } else {
+        successMessage = `${promo.discount_percentage}% discount applied`;
+        if (promo.max_discount && discount >= promo.max_discount) {
+          successMessage += ` (max Rs. ${promo.max_discount})`;
+        }
+      }
+
+      setAppliedPromo(promo);
+      setIsPromoApplied(true);
+      
+      toast({
+        title: "Promo Code Applied!",
+        description: successMessage,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error applying promo code:', error);
+      toast({
+        title: "Error",
+        description: "Failed to apply promo code. Please try again.",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const removePromoCode = () => {
     setAppliedPromo(null);
     setIsPromoApplied(false);
     setPromoCode('');
+    toast({
+      title: "Promo Code Removed",
+      description: "The promo code has been removed from your order.",
+    });
+  };
+
+  // Get discount amount for the current applied promo
+  const getDiscountAmount = (orderTotal: number): number => {
+    if (!appliedPromo) return 0;
+    return calculateDiscount(appliedPromo, orderTotal);
   };
 
   return {
@@ -73,7 +208,10 @@ export function usePromoCode() {
     setPromoCode,
     appliedPromo,
     isPromoApplied,
+    isLoading,
     applyPromoCode,
-    removePromoCode
+    removePromoCode,
+    getDiscountAmount,
+    calculateDiscount
   };
 }
