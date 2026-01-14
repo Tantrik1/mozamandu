@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@4.0.0";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
@@ -9,21 +8,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Use Lovable Cloud Supabase URL and service role key
-const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
 interface WelcomeEmailRequest {
   userId: string;
   email: string;
   fullName: string;
 }
 
-// Default welcome promo config - used if DB lookup fails
-const DEFAULT_PROMO_CODE = 'WELCOME5';
-const DEFAULT_DISCOUNT_PERCENT = 5;
+// Hardcoded welcome promo - no database lookup needed
+// This avoids cross-Supabase connection issues since edge functions
+// run on Lovable Cloud but your data is in external Supabase
+const PROMO_CODE = 'WELCOME5';
+const DISCOUNT_PERCENT = 5;
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -35,32 +30,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Welcome email request received:', { userId, email, fullName });
 
-    // Try to get the welcome promocode from database
-    let promoCode = DEFAULT_PROMO_CODE;
-    let discountPercent = DEFAULT_DISCOUNT_PERCENT;
-    
-    try {
-      const { data: promocode, error: promoError } = await supabase
-        .from('promocodes')
-        .select('code, discount_percentage')
-        .eq('code', 'WELCOME5')
-        .eq('is_active', true)
-        .single();
-
-      if (!promoError && promocode) {
-        promoCode = promocode.code;
-        discountPercent = promocode.discount_percentage;
-        console.log('Found WELCOME5 promocode in database:', { promoCode, discountPercent });
-      } else {
-        console.warn('WELCOME5 promocode not found, using defaults:', promoError?.message);
-      }
-    } catch (dbError) {
-      console.warn('Error fetching promocode, using defaults:', dbError);
-    }
-
     const customerName = fullName || email.split('@')[0];
 
-    // Send welcome email
+    // Send welcome email with hardcoded promo values
     const emailResponse = await resend.emails.send({
       from: "Mozamandu <welcome@mozamandu.com>",
       to: [email],
@@ -106,11 +78,11 @@ const handler = async (req: Request): Promise<Response> => {
                               🎁 Your Exclusive Welcome Gift
                             </p>
                             <p style="font-size: 28px; font-weight: bold; color: #111827; margin: 0 0 16px 0;">
-                              ${discountPercent}% OFF Your First Order!
+                              ${DISCOUNT_PERCENT}% OFF Your First Order!
                             </p>
                             <div style="background-color: #dc2626; display: inline-block; padding: 16px 32px; border-radius: 8px; margin: 8px 0;">
                               <span style="font-size: 28px; font-weight: bold; color: #ffffff; letter-spacing: 4px; font-family: monospace;">
-                                ${promoCode}
+                                ${PROMO_CODE}
                               </span>
                             </div>
                             <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">
