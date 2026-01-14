@@ -69,8 +69,10 @@ export function UniversalCheckout() {
     setPromoCode,
     appliedPromo,
     isPromoApplied,
+    isLoading: isPromoLoading,
     applyPromoCode,
-    removePromoCode
+    removePromoCode,
+    getDiscountAmount
   } = usePromoCode();
 
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
@@ -157,7 +159,7 @@ export function UniversalCheckout() {
   const calculatePromoDiscount = () => {
     if (appliedPromo) {
       const accurateSubtotal = getTieredTotalPrice();
-      const discount = (accurateSubtotal * appliedPromo.discount_percentage) / 100;
+      const discount = getDiscountAmount(accurateSubtotal);
       setPromoDiscount(discount);
       console.log('🔢 Promo calculation - Subtotal:', accurateSubtotal, 'Discount:', discount);
     } else {
@@ -165,13 +167,17 @@ export function UniversalCheckout() {
     }
   };
 
-  const handlePromoCodeApplied = (promoCode: PromoCode) => {
+  const handleApplyPromoCode = async () => {
     const totalWithDelivery = getTieredTotalPrice() + (deliveryLocation ? deliveryLocation.delivery_price : 0);
-    applyPromoCode(totalWithDelivery);
+    const success = await applyPromoCode(totalWithDelivery);
+    if (success) {
+      calculatePromoDiscount();
+    }
   };
 
-  const handlePromoCodeRemoved = () => {
+  const handleRemovePromoCode = () => {
     removePromoCode();
+    setPromoDiscount(0);
   };
 
   const handlePaymentScreenshotUpload = (url: string) => {
@@ -710,15 +716,14 @@ export function UniversalCheckout() {
           </Card>
 
           <PromoCodeSection
-            onDiscountApplied={setPromoDiscount}
-            onPromoCodeUsed={(code) => {}}
-            orderTotal={getTieredTotalPrice() + (deliveryLocation ? deliveryLocation.delivery_price : 0)}
             promoCode={promoCode}
             setPromoCode={setPromoCode}
             appliedPromo={appliedPromo}
             isPromoApplied={isPromoApplied}
-            onApplyPromo={() => handlePromoCodeApplied(appliedPromo!)}
-            onRemovePromo={handlePromoCodeRemoved}
+            isLoading={isPromoLoading}
+            onApplyPromo={handleApplyPromoCode}
+            onRemovePromo={handleRemovePromoCode}
+            discountAmount={promoDiscount}
           />
 
           <Card className="shadow-sm border-border">

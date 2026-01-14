@@ -9,19 +9,21 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Hardcoded external Supabase URL for consistent connection
-const EXTERNAL_SUPABASE_URL = 'https://huwhbxjlyucamitwwhyg.supabase.co';
+// Use Lovable Cloud Supabase URL and service role key
+const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-const supabase = createClient(
-  EXTERNAL_SUPABASE_URL,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-);
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface WelcomeEmailRequest {
   userId: string;
   email: string;
   fullName: string;
 }
+
+// Default welcome promo config - used if DB lookup fails
+const DEFAULT_PROMO_CODE = 'WELCOME5';
+const DEFAULT_DISCOUNT_PERCENT = 5;
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -33,20 +35,28 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Welcome email request received:', { userId, email, fullName });
 
-    // Get the welcome promocode
-    const { data: promocode, error: promoError } = await supabase
-      .from('promocodes')
-      .select('code, discount_percentage')
-      .eq('code', 'WELCOME5')
-      .eq('is_active', true)
-      .single();
+    // Try to get the welcome promocode from database
+    let promoCode = DEFAULT_PROMO_CODE;
+    let discountPercent = DEFAULT_DISCOUNT_PERCENT;
+    
+    try {
+      const { data: promocode, error: promoError } = await supabase
+        .from('promocodes')
+        .select('code, discount_percentage')
+        .eq('code', 'WELCOME5')
+        .eq('is_active', true)
+        .single();
 
-    if (promoError) {
-      console.warn('Could not fetch promocode:', promoError);
+      if (!promoError && promocode) {
+        promoCode = promocode.code;
+        discountPercent = promocode.discount_percentage;
+        console.log('Found WELCOME5 promocode in database:', { promoCode, discountPercent });
+      } else {
+        console.warn('WELCOME5 promocode not found, using defaults:', promoError?.message);
+      }
+    } catch (dbError) {
+      console.warn('Error fetching promocode, using defaults:', dbError);
     }
-
-    const promoCode = promocode?.code || 'WELCOME5';
-    const discountPercent = promocode?.discount_percentage || 5;
 
     const customerName = fullName || email.split('@')[0];
 
