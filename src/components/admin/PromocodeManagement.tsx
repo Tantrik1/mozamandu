@@ -12,14 +12,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Search, Percent, Calendar, DollarSign, Tag } from 'lucide-react';
 
-// Interface matching your external Supabase schema (no discount_type, no max_discount)
+// Interface matching your external Supabase schema
 interface Promocode {
   id: string;
   code: string;
   description: string | null;
   discount_percentage: number;
   minimum_order_amount: number | null;
-  usage_limit: number | null;
   is_active: boolean;
   valid_from: string | null;
   valid_until: string | null;
@@ -39,7 +38,6 @@ export function PromocodeManagement() {
     description: '',
     discount_percentage: 0,
     minimum_order_amount: 0,
-    usage_limit: null as number | null,
     is_active: true,
     valid_from: '',
     valid_until: '',
@@ -61,10 +59,10 @@ export function PromocodeManagement() {
     console.log('🔍 Fetching promocodes and calculating usage...');
     
     try {
-      // Fetch promocodes - only select columns that exist in your table
+      // Fetch promocodes - select only columns that exist in your external table
       const { data: promoData, error: promoError } = await supabase
         .from('promocodes')
-        .select('id, code, description, discount_percentage, minimum_order_amount, usage_limit, is_active, valid_from, valid_until, used_count, created_at')
+        .select('id, code, description, discount_percentage, minimum_order_amount, is_active, valid_from, valid_until, used_count, created_at')
         .order('created_at', { ascending: false });
 
       if (promoError) {
@@ -144,7 +142,6 @@ export function PromocodeManagement() {
       description: formData.description || null,
       discount_percentage: formData.discount_percentage,
       minimum_order_amount: formData.minimum_order_amount || 0,
-      usage_limit: formData.usage_limit || null,
       is_active: formData.is_active,
       valid_from: formData.valid_from || null,
       valid_until: formData.valid_until || null,
@@ -191,7 +188,6 @@ export function PromocodeManagement() {
       description: promocode.description || '',
       discount_percentage: promocode.discount_percentage,
       minimum_order_amount: promocode.minimum_order_amount || 0,
-      usage_limit: promocode.usage_limit,
       is_active: promocode.is_active,
       valid_from: promocode.valid_from ? new Date(promocode.valid_from).toISOString().split('T')[0] : '',
       valid_until: promocode.valid_until ? new Date(promocode.valid_until).toISOString().split('T')[0] : '',
@@ -228,7 +224,6 @@ export function PromocodeManagement() {
       description: '',
       discount_percentage: 0,
       minimum_order_amount: 0,
-      usage_limit: null,
       is_active: true,
       valid_from: '',
       valid_until: '',
@@ -318,33 +313,17 @@ export function PromocodeManagement() {
                 />
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="minimum_order_amount">Minimum Order Amount (Rs.)</Label>
-                  <Input
-                    id="minimum_order_amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.minimum_order_amount}
-                    onChange={(e) => setFormData({ ...formData, minimum_order_amount: parseFloat(e.target.value) || 0 })}
-                    placeholder="Enter minimum order amount"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="usage_limit">Usage Limit</Label>
-                  <Input
-                    id="usage_limit"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formData.usage_limit || ''}
-                    onChange={(e) => setFormData({ ...formData, usage_limit: e.target.value ? parseInt(e.target.value) : null })}
-                    placeholder="Leave empty for unlimited"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Max number of times this code can be used</p>
-                </div>
+              <div>
+                <Label htmlFor="minimum_order_amount">Minimum Order Amount (Rs.)</Label>
+                <Input
+                  id="minimum_order_amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.minimum_order_amount}
+                  onChange={(e) => setFormData({ ...formData, minimum_order_amount: parseFloat(e.target.value) || 0 })}
+                  placeholder="Enter minimum order amount"
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -523,11 +502,6 @@ export function PromocodeManagement() {
                   {promocode.minimum_order_amount && promocode.minimum_order_amount > 0 && (
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                       Min. order: Rs. {promocode.minimum_order_amount}
-                    </div>
-                  )}
-                  {promocode.usage_limit && (
-                    <div className="text-sm text-blue-600">
-                      Limit: {promoUsageData[promocode.code] || 0}/{promocode.usage_limit} uses
                     </div>
                   )}
                 </div>

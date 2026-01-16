@@ -3,14 +3,13 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
-// Interface matching your external Supabase schema (no discount_type, no max_discount)
+// Interface matching your external Supabase schema (percentage-based only)
 interface PromoCode {
   id: string;
   code: string;
   description: string | null;
   discount_percentage: number;
   minimum_order_amount: number | null;
-  usage_limit: number | null;
   valid_from: string | null;
   valid_until: string | null;
   is_active: boolean;
@@ -19,7 +18,6 @@ interface PromoCode {
 interface PromoValidationResult {
   isValid: boolean;
   error?: string;
-  currentUsage?: number;
 }
 
 export function usePromoCode() {
@@ -28,33 +26,9 @@ export function usePromoCode() {
   const [isPromoApplied, setIsPromoApplied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Calculate actual discount amount (percentage-based only for external Supabase)
+  // Calculate actual discount amount (percentage-based only)
   const calculateDiscount = (promo: PromoCode, orderTotal: number): number => {
     return (orderTotal * promo.discount_percentage) / 100;
-  };
-
-  // Check current usage of a promo code across both order tables
-  const checkPromoUsage = async (code: string): Promise<number> => {
-    try {
-      const [customerOrdersResult, ordersResult] = await Promise.all([
-        supabase
-          .from('customer_orders')
-          .select('id')
-          .ilike('promocode_used', code),
-        supabase
-          .from('orders')
-          .select('id')
-          .ilike('promocode_used', code)
-      ]);
-
-      const customerOrdersCount = customerOrdersResult.data?.length || 0;
-      const ordersCount = ordersResult.data?.length || 0;
-      
-      return customerOrdersCount + ordersCount;
-    } catch (error) {
-      console.error('Error checking promo usage:', error);
-      return 0;
-    }
   };
 
   // Validate promo code with all checks
@@ -85,19 +59,6 @@ export function usePromoCode() {
       };
     }
 
-    // Check usage limit
-    if (promo.usage_limit) {
-      const currentUsage = await checkPromoUsage(promo.code);
-      if (currentUsage >= promo.usage_limit) {
-        return {
-          isValid: false,
-          error: 'This promo code has reached its usage limit',
-          currentUsage
-        };
-      }
-      return { isValid: true, currentUsage };
-    }
-
     return { isValid: true };
   };
 
@@ -110,7 +71,7 @@ export function usePromoCode() {
       // Fetch promo code from database - only select columns that exist in your table
       const { data: promo, error } = await supabase
         .from('promocodes')
-        .select('id, code, description, discount_percentage, minimum_order_amount, usage_limit, valid_from, valid_until, is_active')
+        .select('id, code, description, discount_percentage, minimum_order_amount, valid_from, valid_until, is_active')
         .eq('code', promoCode.toUpperCase())
         .eq('is_active', true)
         .single();
