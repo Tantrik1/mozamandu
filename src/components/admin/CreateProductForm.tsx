@@ -15,6 +15,7 @@ import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { SmartProductVariantForm } from './SmartProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 import { ProductAdditionalImages, type AdditionalImage, type ProductAdditionalImagesRef } from './ProductAdditionalImages';
+import { ProductSEOSection } from './ProductSEOSection';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
 import { CareInstructionsInput } from './CareInstructionsInput';
 
@@ -31,6 +32,12 @@ const productSchema = z.object({
   status: z.enum(['active', 'inactive']).default('active'),
   material_composition: z.string().optional(),
   care_instructions: z.union([z.string(), z.array(z.string())]).optional(),
+  // SEO fields
+  meta_title: z.string().max(60).optional(),
+  meta_description: z.string().max(160).optional(),
+  meta_keywords: z.string().optional(),
+  og_title: z.string().max(60).optional(),
+  og_description: z.string().max(160).optional(),
 });
 
 interface Category {
@@ -94,6 +101,12 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       status: 'active',
       material_composition: 'Premium quality fabric blend designed for comfort and durability.',
       care_instructions: ['Machine wash cold with similar colors', 'Do not bleach', 'Tumble dry low', 'Iron on low heat if needed'],
+      // SEO defaults
+      meta_title: '',
+      meta_description: '',
+      meta_keywords: '',
+      og_title: '',
+      og_description: '',
     },
   });
 
@@ -267,6 +280,11 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
             : data.care_instructions.split('\n').filter(Boolean))
         : ['Machine wash cold with similar colors', 'Do not bleach', 'Tumble dry low', 'Iron on low heat if needed'];
 
+      // Convert meta_keywords string to array for Supabase text[] column
+      const metaKeywordsArray = data.meta_keywords
+        ? data.meta_keywords.split(',').map(k => k.trim()).filter(Boolean)
+        : null;
+
       const productData = {
         name: data.name,
         description: data.description || null,
@@ -281,6 +299,12 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
         image_url: imageUrl,
         material_composition: data.material_composition || 'Premium quality fabric blend designed for comfort and durability.',
         care_instructions: careInstructionsArray,
+        // SEO fields
+        meta_title: data.meta_title || null,
+        meta_description: data.meta_description || null,
+        meta_keywords: metaKeywordsArray,
+        og_title: data.og_title || null,
+        og_description: data.og_description || null,
       };
 
       console.log('Product data to insert:', productData);
@@ -669,6 +693,24 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
             </div>
           </CardContent>
         </Card>
+
+        {/* SEO Settings Section */}
+        <ProductSEOSection
+          metaTitle={form.watch('meta_title') || ''}
+          metaDescription={form.watch('meta_description') || ''}
+          metaKeywords={form.watch('meta_keywords') || ''}
+          ogTitle={form.watch('og_title') || ''}
+          ogDescription={form.watch('og_description') || ''}
+          productName={form.watch('name') || ''}
+          productDescription={form.watch('description') || ''}
+          sellingPrice={form.watch('selling_price') || 0}
+          categoryName={categories.find(c => c.id === form.watch('category_id'))?.name}
+          onMetaTitleChange={(v) => form.setValue('meta_title', v)}
+          onMetaDescriptionChange={(v) => form.setValue('meta_description', v)}
+          onMetaKeywordsChange={(v) => form.setValue('meta_keywords', v)}
+          onOgTitleChange={(v) => form.setValue('og_title', v)}
+          onOgDescriptionChange={(v) => form.setValue('og_description', v)}
+        />
 
         {(watchedHasColorVariants || watchedHasSizeVariants) && (
           <SmartProductVariantForm
