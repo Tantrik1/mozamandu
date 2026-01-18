@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { SimilarProducts, MoreSubcategories, ProductReviews } from '@/components/product';
@@ -14,6 +15,8 @@ import { getProductStockSummary } from '@/utils/stockCalculation';
 import { toast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { Package, Home as HomeIcon } from 'lucide-react';
+
+const SITE_URL = 'https://mozamandu.com';
 
 interface Product {
   id: string;
@@ -30,6 +33,13 @@ interface Product {
   status: string;
   material_composition: string | null;
   care_instructions: string | null;
+  // SEO fields
+  meta_title?: string | null;
+  meta_description?: string | null;
+  meta_keywords?: string[] | null;
+  og_title?: string | null;
+  og_description?: string | null;
+  og_image_url?: string | null;
 }
 
 interface ColorVariant {
@@ -442,8 +452,140 @@ export default function ProductDetail() {
     );
   }
 
+  // Generate SEO data
+  const canonicalUrl = `${SITE_URL}/product/${productId}`;
+  const categoryName = subcategory?.category?.name || '';
+  const subcategoryName = subcategory?.name || '';
+  
+  // Cast product to include SEO fields (added manually to external Supabase)
+  const productWithSEO = product as Product;
+  
+  // Meta title - use product's custom meta_title or generate from name
+  const seoTitle = productWithSEO.meta_title || `${product.name}${categoryName ? ` - ${categoryName}` : ''} | Buy at Mozamandu Nepal`;
+  
+  // Meta description - use custom or generate from product description
+  const seoDescription = productWithSEO.meta_description || 
+    (product.description 
+      ? `Buy ${product.name} at Rs. ${discountedPrice}. ${product.description.replace(/<[^>]*>/g, '').slice(0, 100)}... Shop at Mozamandu Nepal.`
+      : `Buy ${product.name} at the best price of Rs. ${discountedPrice}. Premium quality products with fast delivery across Nepal.`
+    ).slice(0, 160);
+  
+  // Keywords
+  const seoKeywords = productWithSEO.meta_keywords?.join(', ') || 
+    `${product.name}, ${categoryName}, ${subcategoryName}, buy online, nepal, mozamandu`.toLowerCase();
+  
+  // Open Graph
+  const ogTitle = productWithSEO.og_title || seoTitle;
+  const ogDescription = productWithSEO.og_description || seoDescription;
+  const ogImage = productWithSEO.og_image_url || product.image_url || images[0] || '';
+  
+  // Build all product images for schema
+  const allProductImages = images.filter(Boolean);
+  
+  // Product Schema JSON-LD
+  const productSchema = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": product.name,
+    "description": product.description?.replace(/<[^>]*>/g, '') || seoDescription,
+    "image": allProductImages,
+    "brand": {
+      "@type": "Brand",
+      "name": "Mozamandu"
+    },
+    "sku": productId,
+    "mpn": productId,
+    "offers": {
+      "@type": "Offer",
+      "url": canonicalUrl,
+      "priceCurrency": "NPR",
+      "price": discountedPrice,
+      "priceValidUntil": new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      "availability": productStock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      "seller": {
+        "@type": "Organization",
+        "name": "Mozamandu"
+      }
+    },
+    ...(ratingData && ratingData.review_count > 0 && {
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": ratingData.average_rating.toFixed(1),
+        "reviewCount": ratingData.review_count,
+        "bestRating": "5",
+        "worstRating": "1"
+      }
+    })
+  };
+  
+  // Breadcrumb Schema JSON-LD
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": SITE_URL
+      },
+      ...(categoryName ? [{
+        "@type": "ListItem",
+        "position": 2,
+        "name": categoryName,
+        "item": `${SITE_URL}/shop?category=${encodeURIComponent(categoryName)}`
+      }] : []),
+      ...(subcategoryName ? [{
+        "@type": "ListItem",
+        "position": categoryName ? 3 : 2,
+        "name": subcategoryName,
+        "item": `${SITE_URL}/shop?subcategory=${subcategory?.id}`
+      }] : []),
+      {
+        "@type": "ListItem",
+        "position": (categoryName ? 3 : 2) + (subcategoryName ? 1 : 0),
+        "name": product.name
+      }
+    ]
+  };
+
   return (
     <div className="min-h-screen bg-background">
+      {/* SEO Meta Tags */}
+      <Helmet>
+        <title>{seoTitle}</title>
+        <meta name="description" content={seoDescription} />
+        <meta name="keywords" content={seoKeywords} />
+        <link rel="canonical" href={canonicalUrl} />
+        
+        {/* Open Graph */}
+        <meta property="og:type" content="product" />
+        <meta property="og:title" content={ogTitle} />
+        <meta property="og:description" content={ogDescription} />
+        <meta property="og:image" content={ogImage} />
+        <meta property="og:url" content={canonicalUrl} />
+        <meta property="og:site_name" content="Mozamandu" />
+        <meta property="product:price:amount" content={String(discountedPrice)} />
+        <meta property="product:price:currency" content="NPR" />
+        <meta property="product:availability" content={productStock > 0 ? "in stock" : "out of stock"} />
+        
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={ogTitle} />
+        <meta name="twitter:description" content={ogDescription} />
+        <meta name="twitter:image" content={ogImage} />
+        
+        {/* Product Schema JSON-LD */}
+        <script type="application/ld+json">
+          {JSON.stringify(productSchema)}
+        </script>
+        
+        {/* Breadcrumb Schema JSON-LD */}
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbSchema)}
+        </script>
+      </Helmet>
+
       <ModernNavbar />
       
       <main className="max-w-7xl mx-auto px-4 py-6 lg:py-10">

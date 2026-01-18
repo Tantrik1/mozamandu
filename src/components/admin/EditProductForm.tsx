@@ -15,6 +15,7 @@ import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { EnhancedProductVariantForm } from './EnhancedProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 import { ProductAdditionalImages, type AdditionalImage, type ProductAdditionalImagesRef } from './ProductAdditionalImages';
+import { ProductSEOSection } from './ProductSEOSection';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
 import { CareInstructionsInput } from './CareInstructionsInput';
 
@@ -31,6 +32,12 @@ const productSchema = z.object({
   status: z.enum(['active', 'inactive']).default('active'),
   material_composition: z.string().optional(),
   care_instructions: z.union([z.string(), z.array(z.string())]).optional(),
+  // SEO fields
+  meta_title: z.string().max(60).optional(),
+  meta_description: z.string().max(160).optional(),
+  meta_keywords: z.string().optional(),
+  og_title: z.string().max(60).optional(),
+  og_description: z.string().max(160).optional(),
 });
 
 interface Category {
@@ -79,6 +86,11 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       status: 'active',
       material_composition: '',
       care_instructions: '',
+      meta_title: '',
+      meta_description: '',
+      meta_keywords: '',
+      og_title: '',
+      og_description: '',
     },
   });
 
@@ -193,6 +205,11 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         status: (product.status === 'active' || product.status === 'inactive') ? product.status : 'active',
         material_composition: product.material_composition || '',
         care_instructions: product.care_instructions || '',
+        meta_title: (product as any).meta_title || '',
+        meta_description: (product as any).meta_description || '',
+        meta_keywords: (product as any).meta_keywords?.join(', ') || '',
+        og_title: (product as any).og_title || '',
+        og_description: (product as any).og_description || '',
       });
 
       setImagePreview(product.image_url);
@@ -331,6 +348,11 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             : data.care_instructions.split('\n').filter(Boolean))
         : null;
 
+      // Convert meta_keywords string to array for Supabase text[] column
+      const metaKeywordsArray = data.meta_keywords
+        ? data.meta_keywords.split(',').map(k => k.trim()).filter(Boolean)
+        : null;
+
       const productData = {
         name: data.name,
         description: data.description || null,
@@ -346,6 +368,12 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         updated_at: new Date().toISOString(),
         material_composition: data.material_composition || null,
         care_instructions: careInstructionsArray,
+        // SEO fields
+        meta_title: data.meta_title || null,
+        meta_description: data.meta_description || null,
+        meta_keywords: metaKeywordsArray,
+        og_title: data.og_title || null,
+        og_description: data.og_description || null,
       };
 
       // Cast to bypass TypeScript - actual Supabase schema has care_instructions as text[]
