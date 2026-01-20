@@ -9,6 +9,7 @@ import { ProductImageGallery } from '@/components/product/ProductImageGallery';
 import { ProductInfo } from '@/components/product/ProductInfo';
 import { ProductDetailsAccordion } from '@/components/product/ProductDetailsAccordion';
 import { Button } from '@/components/ui/button';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { supabase } from '@/integrations/supabase/client';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { getProductStockSummary } from '@/utils/stockCalculation';
@@ -691,6 +692,25 @@ export default function ProductDetail() {
               materialComposition={product.material_composition}
               careInstructions={product.care_instructions}
             />
+
+            {/* Product FAQs Section */}
+            {productFAQs.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-foreground">Frequently Asked Questions</h3>
+                <Accordion type="single" collapsible className="w-full">
+                  {productFAQs.map((faq, index) => (
+                    <AccordionItem key={faq.id} value={`faq-${index}`} className="border-b border-border">
+                      <AccordionTrigger className="text-left text-sm font-medium text-foreground hover:no-underline py-4">
+                        {faq.question}
+                      </AccordionTrigger>
+                      <AccordionContent className="text-sm text-muted-foreground pb-4">
+                        {faq.answer}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </div>
+            )}
           </div>
         </div>
       </main>
