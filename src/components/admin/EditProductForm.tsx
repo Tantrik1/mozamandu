@@ -16,6 +16,7 @@ import { EnhancedProductVariantForm } from './EnhancedProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 import { ProductAdditionalImages, type AdditionalImage, type ProductAdditionalImagesRef } from './ProductAdditionalImages';
 import { ProductSEOSection } from './ProductSEOSection';
+import { ProductFAQsManager } from './ProductFAQsManager';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
 import { CareInstructionsInput } from './CareInstructionsInput';
 
@@ -716,6 +717,9 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
           onOgTitleChange={(value) => form.setValue('og_title', value)}
           onOgDescriptionChange={(value) => form.setValue('og_description', value)}
         />
+
+        {/* Product FAQs Section */}
+        <ProductFAQsManager productId={productId} />
 
         {(watchedHasColorVariants || watchedHasSizeVariants) && (
           <EnhancedProductVariantForm
