@@ -158,6 +158,28 @@ const fetchProductRating = async (productId: string) => {
   return { average_rating: totalRating / data.length, review_count: data.length };
 };
 
+interface ProductFAQ {
+  id: string;
+  question: string;
+  answer: string;
+  is_active: boolean;
+}
+
+const fetchProductFAQs = async (productId: string): Promise<ProductFAQ[]> => {
+  const { data, error } = await supabase
+    .from('product_faqs' as any)
+    .select('id, question, answer, is_active')
+    .eq('product_id', productId)
+    .eq('is_active', true)
+    .order('display_order', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching product FAQs:', error);
+    return [];
+  }
+  return (data as unknown) as ProductFAQ[];
+};
+
 export default function ProductDetail() {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
@@ -218,6 +240,14 @@ export default function ProductDetail() {
     queryFn: () => fetchProductRating(productId!),
     enabled: !!productId,
     staleTime: 2 * 60 * 1000,
+  });
+
+  // Fetch product FAQs for FAQ schema
+  const { data: productFAQs = [] } = useQuery({
+    queryKey: ['product-faqs-public', productId],
+    queryFn: () => fetchProductFAQs(productId!),
+    enabled: !!productId,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Build image gallery
@@ -549,6 +579,20 @@ export default function ProductDetail() {
     ]
   };
 
+  // FAQ Schema JSON-LD (for Google rich results)
+  const faqSchema = productFAQs.length > 0 ? {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": productFAQs.map(faq => ({
+      "@type": "Question",
+      "name": faq.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.answer
+      }
+    }))
+  } : null;
+
   return (
     <div className="min-h-screen bg-background">
       {/* SEO Meta Tags */}
@@ -584,6 +628,13 @@ export default function ProductDetail() {
         <script type="application/ld+json">
           {JSON.stringify(breadcrumbSchema)}
         </script>
+        
+        {/* FAQ Schema JSON-LD */}
+        {faqSchema && (
+          <script type="application/ld+json">
+            {JSON.stringify(faqSchema)}
+          </script>
+        )}
       </Helmet>
 
       <ModernNavbar />
