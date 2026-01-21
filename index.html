@@ -14,7 +14,8 @@
     <link rel="preconnect" href="https://www.google-analytics.com" crossorigin />
     <link rel="dns-prefetch" href="https://www.google-analytics.com" />
     
-    <!-- Hero image preload removed - only needed on homepage, causes warnings on other routes -->
+    <!-- Preload hero image for LCP optimization on homepage -->
+    <link rel="preload" as="image" href="/src/assets/hero-background.webp" type="image/webp" fetchpriority="high" />
     
     <!-- Non-render-blocking font loading -->
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
