@@ -2,20 +2,19 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import heroBackground from "@/assets/hero-background.webp";
+
 export function HeroSection() {
   return (
     <section className="relative h-[60vh] min-h-[320px] max-h-[500px] md:h-[60vh] md:min-h-[300px] md:max-h-[400px] lg:h-[70vh] lg:min-h-[600px] lg:max-h-[650px] flex items-center justify-center overflow-hidden">
-      {/* Hero Background Image - Using img tag for better LCP optimization */}
-      {/* eslint-disable-next-line react/no-unknown-property */}
+      {/* Hero Background Image - Using imported WebP for better caching and optimization */}
       <img
         alt="Mozamandu Premium Socks Collection"
-        // @ts-ignore - fetchpriority is a valid HTML attribute
-        fetchpriority="high"
+        fetchPriority="high"
         decoding="sync"
         width={1920}
         height={1080}
         className="absolute inset-0 w-full h-full object-cover object-center md:object-center"
-        src="/lovable-uploads/9fa2db76-897b-4d35-a08b-c01f9668b543.webp"
+        src={heroBackground}
       />
 
       {/* Content */}

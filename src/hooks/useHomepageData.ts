@@ -83,11 +83,11 @@ const fetchNotice = async () => {
   return data;
 };
 
-// Main hook - prioritized data fetching
+// Main hook - prioritized data fetching with deferred loading for below-the-fold
 export function useHomepageData() {
   const results = useQueries({
     queries: [
-      // Priority 1: Above-the-fold content
+      // Priority 1: Above-the-fold content - fetch immediately
       {
         queryKey: ['homepage', 'latestProducts'],
         queryFn: fetchLatestProducts,
@@ -101,31 +101,35 @@ export function useHomepageData() {
         staleTime: 5 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
       },
-      // Priority 3: Below-the-fold content
+      // Priority 3: Below-the-fold content - deferred to reduce initial load
       {
         queryKey: ['homepage', 'mostSold'],
         queryFn: fetchMostSoldProducts,
         staleTime: 5 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
+        refetchOnMount: false,
       },
       {
         queryKey: ['homepage', 'faqs'],
         queryFn: fetchFAQs,
         staleTime: 30 * 60 * 1000,
         gcTime: 60 * 60 * 1000,
+        refetchOnMount: false,
       },
       {
         queryKey: ['homepage', 'featured'],
         queryFn: fetchFeaturedProducts,
         staleTime: 5 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
+        refetchOnMount: false,
       },
-      // Priority 4: Deferred content
+      // Priority 4: Deferred content - notice popup
       {
         queryKey: ['homepage', 'notice'],
         queryFn: fetchNotice,
         staleTime: 5 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
+        refetchOnMount: false,
       },
     ],
   });
