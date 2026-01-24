@@ -53,7 +53,7 @@ export default function Home() {
         <meta property="og:description" content="Nepal's #1 online socks store. Buy premium socks at best prices. Wide collection of moja with fast delivery across Nepal." />
         <meta property="og:url" content="https://mozamandu.com" />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content="https://mozamandu.com/lovable-uploads/2d98ffef-154e-49c8-9c1c-39e09f1ea5ae.png" />
+        <meta property="og:image" content="https://mozamandu.com/lovable-uploads/84f1077a-8761-4272-88fd-ec35838bbd2b.png" />
         
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
