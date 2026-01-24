@@ -84,7 +84,57 @@ export default function Blog() {
         <meta name="description" content="Discover tips on choosing the best socks in Nepal, seasonal guides, and updates from Mozamandu - Nepal's premium sock destination." />
         <meta property="og:title" content="Blog - Mozamandu" />
         <meta property="og:description" content="Discover tips on choosing the best socks in Nepal, seasonal guides, and updates from Mozamandu." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://mozamandu.com/blog" />
+        <meta property="og:image" content="https://mozamandu.com/lovable-uploads/84f1077a-8761-4272-88fd-ec35838bbd2b.png" />
         <link rel="canonical" href="https://mozamandu.com/blog" />
+        
+        {/* BreadcrumbList Schema */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://mozamandu.com" },
+              { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://mozamandu.com/blog" }
+            ]
+          })}
+        </script>
+        
+        {/* Blog CollectionPage Schema */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            "name": "Mozamandu Blog - Socks Tips & Updates",
+            "description": "Discover tips on choosing the best socks in Nepal, seasonal guides, and updates from Mozamandu.",
+            "url": "https://mozamandu.com/blog",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "Mozamandu",
+              "url": "https://mozamandu.com"
+            },
+            "mainEntity": {
+              "@type": "ItemList",
+              "numberOfItems": blogs.length,
+              "itemListElement": blogs.slice(0, 10).map((blog, index) => ({
+                "@type": "ListItem",
+                "position": index + 1,
+                "item": {
+                  "@type": "BlogPosting",
+                  "headline": blog.title,
+                  "url": `https://mozamandu.com/blog/${blog.slug}`,
+                  "image": blog.featured_image_url,
+                  "datePublished": blog.published_at || blog.created_at,
+                  "author": {
+                    "@type": "Person",
+                    "name": blog.author_name
+                  }
+                }
+              }))
+            }
+          })}
+        </script>
       </Helmet>
 
       <ModernNavbar />

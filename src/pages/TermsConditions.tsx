@@ -1,10 +1,55 @@
-
+import { Helmet } from 'react-helmet-async';
 import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 
 export default function TermsConditions() {
   return (
     <div className="min-h-screen bg-gray-50">
+      <Helmet>
+        <title>Terms and Conditions | Mozamandu Nepal</title>
+        <meta name="description" content="Read Mozamandu's terms and conditions for using our online socks store in Nepal. Learn about orders, payments, delivery, returns, and more." />
+        <link rel="canonical" href="https://mozamandu.com/terms-conditions" />
+        <meta property="og:title" content="Terms and Conditions | Mozamandu Nepal" />
+        <meta property="og:description" content="Read Mozamandu's terms and conditions for using our online socks store in Nepal." />
+        <meta property="og:url" content="https://mozamandu.com/terms-conditions" />
+        <meta property="og:type" content="website" />
+        
+        {/* BreadcrumbList Schema */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://mozamandu.com" },
+              { "@type": "ListItem", "position": 2, "name": "Terms and Conditions", "item": "https://mozamandu.com/terms-conditions" }
+            ]
+          })}
+        </script>
+        
+        {/* WebPage Schema */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebPage",
+            "name": "Terms and Conditions",
+            "description": "Terms and conditions for using Mozamandu online store in Nepal.",
+            "url": "https://mozamandu.com/terms-conditions",
+            "dateModified": "2025-01-01",
+            "inLanguage": "en",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "Mozamandu",
+              "url": "https://mozamandu.com"
+            },
+            "publisher": {
+              "@type": "Organization",
+              "name": "Mozamandu",
+              "url": "https://mozamandu.com"
+            }
+          })}
+        </script>
+      </Helmet>
+      
       <ModernNavbar />
       <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
