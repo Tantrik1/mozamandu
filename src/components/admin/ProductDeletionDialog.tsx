@@ -270,7 +270,26 @@ export function ProductDeletionDialog({
       
       if (orderItemsError) throw orderItemsError;
 
-      // 4. Delete product inventory
+      // 4. Delete product FAQs, blog products, and reviews (Bug 5 fix)
+      const { error: faqsError } = await supabase
+        .from('product_faqs')
+        .delete()
+        .eq('product_id', productId);
+      if (faqsError) throw faqsError;
+
+      const { error: blogProductsError } = await supabase
+        .from('blog_products')
+        .delete()
+        .eq('product_id', productId);
+      if (blogProductsError) throw blogProductsError;
+
+      const { error: reviewsError } = await supabase
+        .from('product_reviews')
+        .delete()
+        .eq('product_id', productId);
+      if (reviewsError) throw reviewsError;
+
+      // 5. Delete product inventory
       const { error: inventoryError } = await supabase
         .from('product_inventory')
         .delete()
@@ -278,7 +297,7 @@ export function ProductDeletionDialog({
       
       if (inventoryError) throw inventoryError;
 
-      // 4. Delete size variants related to color variants of this product
+      // 6. Delete size variants related to color variants of this product
       const { data: colorVariants } = await supabase
         .from('color_variants')
         .select('id')

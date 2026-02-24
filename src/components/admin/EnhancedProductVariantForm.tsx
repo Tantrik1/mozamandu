@@ -8,6 +8,7 @@ import { Trash2, Plus, Upload, Eye, X, Save, AlertTriangle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
 
 interface SizeVariant {
   id?: string;
@@ -51,6 +52,14 @@ interface ProductData {
   has_color_variants?: boolean;
   has_size_variants?: boolean;
   status?: 'active' | 'inactive';
+  // Phase 1: Include ALL product fields
+  material_composition?: string;
+  care_instructions?: string | string[];
+  meta_title?: string;
+  meta_description?: string;
+  meta_keywords?: string;
+  og_title?: string;
+  og_description?: string;
 }
 
 interface EnhancedProductVariantFormProps {
@@ -90,7 +99,6 @@ export function EnhancedProductVariantForm({
   const fetchExistingData = async () => {
     setLoading(true);
     try {
-      // Fetch product info
       const { data: product, error: productError } = await supabase
         .from('products')
         .select('*')
@@ -100,12 +108,10 @@ export function EnhancedProductVariantForm({
       if (productError) throw productError;
       setProductInfo(product);
 
-      // Fetch existing color variants and size variants
       if (hasColorVariants) {
         await fetchExistingVariants();
       }
 
-      // Fetch existing inventory records
       await fetchExistingInventory();
     } catch (error) {
       console.error('Error fetching existing data:', error);
@@ -183,7 +189,6 @@ export function EnhancedProductVariantForm({
       sku += '-' + sizeName.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 2);
     }
     
-    // Add unique identifier
     const timestamp = Date.now().toString().slice(-4);
     return sku + '-' + timestamp;
   };
@@ -205,17 +210,16 @@ export function EnhancedProductVariantForm({
     setColorVariants(updated);
   };
 
-  const markColorVariantForDeletion = (index: number) => {
-    const variant = colorVariants[index];
+  // Bug 6 fix: Use stable ID-based lookup instead of filtered index
+  const markColorVariantForDeletion = (variant: ColorVariant) => {
     if (variant.id) {
-      // Existing variant - mark for deletion
-      const updated = [...colorVariants];
-      updated[index] = { ...updated[index], toDelete: true };
-      setColorVariants(updated);
+      // Existing variant - mark for deletion by ID
+      setColorVariants(prev => prev.map(v => 
+        v.id === variant.id ? { ...v, toDelete: true } : v
+      ));
     } else {
-      // New variant - remove immediately
-      const updated = colorVariants.filter((_, i) => i !== index);
-      setColorVariants(updated);
+      // New variant - remove immediately (find by reference)
+      setColorVariants(prev => prev.filter(v => v !== variant));
     }
   };
 
@@ -241,7 +245,6 @@ export function EnhancedProductVariantForm({
   const markSizeVariantForDeletion = (colorIndex: number, sizeIndex: number) => {
     const sizeVariant = colorVariants[colorIndex].size_variants[sizeIndex];
     if (sizeVariant.id) {
-      // Existing variant - mark for deletion
       const updated = [...colorVariants];
       updated[colorIndex].size_variants[sizeIndex] = {
         ...updated[colorIndex].size_variants[sizeIndex],
@@ -249,13 +252,13 @@ export function EnhancedProductVariantForm({
       };
       setColorVariants(updated);
     } else {
-      // New variant - remove immediately
       const updated = [...colorVariants];
       updated[colorIndex].size_variants = updated[colorIndex].size_variants.filter((_, i) => i !== sizeIndex);
       setColorVariants(updated);
     }
   };
 
+  // Phase 1: Use WebP optimization for color variant images
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>, colorIndex: number) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -264,12 +267,15 @@ export function EnhancedProductVariantForm({
     setUploading(prev => ({ ...prev, [uploadKey]: true }));
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `product-${productId}-color-${colorIndex}-${Date.now()}.${fileExt}`;
+      // Optimize image to WebP before uploading
+      const { file: optimizedFile } = await prepareImageForUpload(file, PRODUCT_COMPRESSION);
+      const fileName = `product-${productId}-color-${colorIndex}-${Date.now()}.webp`;
 
       const { data, error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(fileName, file);
+        .upload(fileName, optimizedFile, {
+          contentType: 'image/webp',
+        });
 
       if (uploadError) throw uploadError;
 
@@ -281,7 +287,7 @@ export function EnhancedProductVariantForm({
 
       toast({
         title: 'Success',
-        description: 'Image uploaded successfully',
+        description: 'Image uploaded successfully (optimized to WebP)',
       });
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -299,16 +305,19 @@ export function EnhancedProductVariantForm({
     updateColorVariant(colorIndex, 'image_url', null);
   };
 
+  // Phase 1: Use WebP optimization for main product image
   const uploadImageAndGetUrl = async (): Promise<string | null> => {
     if (!imageFile) return null;
 
     try {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `product-${Date.now()}.${fileExt}`;
+      const { file: optimizedFile } = await prepareImageForUpload(imageFile, PRODUCT_COMPRESSION);
+      const fileName = `product-${Date.now()}.webp`;
 
       const { data, error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(fileName, imageFile);
+        .upload(fileName, optimizedFile, {
+          contentType: 'image/webp',
+        });
 
       if (uploadError) throw uploadError;
 
@@ -328,6 +337,7 @@ export function EnhancedProductVariantForm({
     }
   };
 
+  // Phase 1: Save ALL product fields including SEO, care instructions, material
   const updateProductInformation = async () => {
     try {
       const productData = getProductData();
@@ -341,6 +351,18 @@ export function EnhancedProductVariantForm({
         }
       }
 
+      // Convert care_instructions to array for DB
+      const careInstructionsArray = productData.care_instructions
+        ? (Array.isArray(productData.care_instructions)
+            ? productData.care_instructions.filter(Boolean)
+            : String(productData.care_instructions).split('\n').filter(Boolean))
+        : null;
+
+      // Convert meta_keywords string to array for DB
+      const metaKeywordsArray = productData.meta_keywords
+        ? productData.meta_keywords.split(',').map(k => k.trim()).filter(Boolean)
+        : null;
+
       const updateData = {
         name: productData.name,
         description: productData.description,
@@ -353,6 +375,13 @@ export function EnhancedProductVariantForm({
         color_has_size_variants: productData.has_size_variants,
         status: productData.status,
         image_url: imageUrl,
+        material_composition: productData.material_composition || null,
+        care_instructions: careInstructionsArray,
+        meta_title: productData.meta_title || null,
+        meta_description: productData.meta_description || null,
+        meta_keywords: metaKeywordsArray,
+        og_title: productData.og_title || null,
+        og_description: productData.og_description || null,
         updated_at: new Date().toISOString(),
       };
 
@@ -360,7 +389,7 @@ export function EnhancedProductVariantForm({
 
       const { error } = await supabase
         .from('products')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', productId);
 
       if (error) throw error;
@@ -372,24 +401,74 @@ export function EnhancedProductVariantForm({
     }
   };
 
+  // Phase 5: Validate variants before saving
+  const validateVariants = (): string | null => {
+    const activeVariants = colorVariants.filter(v => !v.toDelete);
+    
+    if (activeVariants.length === 0) {
+      return 'At least one color variant is required.';
+    }
+
+    const colorNames = new Set<string>();
+    for (const variant of activeVariants) {
+      const name = variant.color_name.trim();
+      if (!name) {
+        return 'All color variants must have a name.';
+      }
+      const lowerName = name.toLowerCase();
+      if (colorNames.has(lowerName)) {
+        return `Duplicate color name: "${name}". Each color must be unique.`;
+      }
+      colorNames.add(lowerName);
+
+      if (hasSizeVariants) {
+        const activeSizes = variant.size_variants.filter(s => !s.toDelete);
+        if (activeSizes.length === 0) {
+          return `Color "${name}" must have at least one size variant.`;
+        }
+        const sizeNames = new Set<string>();
+        for (const size of activeSizes) {
+          const sizeName = size.size_name.trim();
+          if (!sizeName) {
+            return `All size variants for color "${name}" must have a name.`;
+          }
+          const lowerSize = sizeName.toLowerCase();
+          if (sizeNames.has(lowerSize)) {
+            return `Duplicate size "${sizeName}" in color "${name}".`;
+          }
+          sizeNames.add(lowerSize);
+        }
+      }
+    }
+
+    return null;
+  };
+
   const handleSave = async () => {
+    // Phase 5: Run validation first
+    const validationError = validateVariants();
+    if (validationError) {
+      toast({
+        title: 'Validation Error',
+        description: validationError,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      // Step 0: Run onBeforeSave callback (for additional images upload, etc.)
       if (onBeforeSave) {
         console.log('Running onBeforeSave callback...');
         await onBeforeSave();
       }
 
-      // Step 1: Update product information first
       console.log('Updating product information...');
       await updateProductInformation();
 
-      // Step 2: Handle variant deletions
       console.log('Handling variant deletions...');
       await handleDeletions();
 
-      // Step 3: Handle variant updates and creates
       console.log('Handling variant upserts...');
       await handleUpserts();
 
@@ -412,40 +491,43 @@ export function EnhancedProductVariantForm({
     }
   };
 
+  // Phase 2: Fix deletion to clean up ALL size variants for deleted colors
   const handleDeletions = async () => {
     // Delete marked size variants first
     for (const colorVariant of colorVariants) {
-      for (const sizeVariant of colorVariant.size_variants) {
-        if (sizeVariant.toDelete && sizeVariant.id) {
-          // Delete associated inventory records
-          await supabase
-            .from('product_inventory')
-            .delete()
-            .eq('size_variant_id', sizeVariant.id);
-
-          // Delete size variant
-          await supabase
-            .from('size_variants')
-            .delete()
-            .eq('id', sizeVariant.id);
-        }
-      }
-    }
-
-    // Delete marked color variants
-    for (const colorVariant of colorVariants) {
       if (colorVariant.toDelete && colorVariant.id) {
-        // Delete associated inventory records
+        // This color is being deleted - delete ALL its size variants from DB
         await supabase
           .from('product_inventory')
           .delete()
           .eq('color_variant_id', colorVariant.id);
 
-        // Delete color variant (will cascade to size variants)
+        // Delete all size variants belonging to this color (not just marked ones)
+        await supabase
+          .from('size_variants')
+          .delete()
+          .eq('color_variant_id', colorVariant.id);
+
+        // Delete the color variant itself
         await supabase
           .from('color_variants')
           .delete()
           .eq('id', colorVariant.id);
+      } else {
+        // Color is NOT being deleted - only delete individually marked sizes
+        for (const sizeVariant of colorVariant.size_variants) {
+          if (sizeVariant.toDelete && sizeVariant.id) {
+            await supabase
+              .from('product_inventory')
+              .delete()
+              .eq('size_variant_id', sizeVariant.id);
+
+            await supabase
+              .from('size_variants')
+              .delete()
+              .eq('id', sizeVariant.id);
+          }
+        }
       }
     }
   };
@@ -491,7 +573,6 @@ export function EnhancedProductVariantForm({
       const colorId = normalizedColorName ? (colorIdByName.get(normalizedColorName) || null) : null;
 
       if (colorVariant.isNew || !colorVariantId) {
-        // Create new color variant
         const { data: newColor, error } = await supabase
           .from('color_variants')
           .insert({
@@ -507,7 +588,6 @@ export function EnhancedProductVariantForm({
         if (error) throw error;
         colorVariantId = newColor.id;
       } else {
-        // Update existing color variant
         const { error } = await supabase
           .from('color_variants')
           .update({
@@ -521,12 +601,10 @@ export function EnhancedProductVariantForm({
         if (error) throw error;
       }
 
-      // Handle size variants
       for (const sizeVariant of colorVariant.size_variants) {
         if (sizeVariant.toDelete) continue;
 
         if (sizeVariant.isNew || !sizeVariant.id) {
-          // Create new size variant
           const { error } = await supabase
             .from('size_variants')
             .insert({
@@ -537,7 +615,6 @@ export function EnhancedProductVariantForm({
 
           if (error) throw error;
         } else {
-          // Update existing size variant
           const { error } = await supabase
             .from('size_variants')
             .update({
@@ -550,11 +627,6 @@ export function EnhancedProductVariantForm({
         }
       }
     }
-  };
-
-  const manageInventoryRecords = async () => {
-    // After saving variants, automatically trigger inventory management
-    // This will be called after variants are saved successfully
   };
 
   if (loading) {
@@ -572,6 +644,11 @@ export function EnhancedProductVariantForm({
     return null;
   }
 
+  // Bug 6 fix: Get actual index in full array for update functions
+  const visibleVariants = colorVariants
+    .map((v, originalIndex) => ({ variant: v, originalIndex }))
+    .filter(({ variant }) => !variant.toDelete);
+
   return (
     <div className="space-y-6">
       <Card>
@@ -586,18 +663,18 @@ export function EnhancedProductVariantForm({
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {colorVariants.filter(v => !v.toDelete).map((colorVariant, colorIndex) => (
-              <div key={colorVariant.id || colorIndex} className="border rounded-lg p-4">
+            {visibleVariants.map(({ variant: colorVariant, originalIndex }, displayIndex) => (
+              <div key={colorVariant.id || `new-${originalIndex}`} className="border rounded-lg p-4">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">Color {colorIndex + 1}</Badge>
+                    <Badge variant="outline">Color {displayIndex + 1}</Badge>
                     {colorVariant.isNew && <Badge variant="secondary">New</Badge>}
                   </div>
                   <Button
                     type="button"
                     variant="destructive"
                     size="sm"
-                    onClick={() => markColorVariantForDeletion(colorIndex)}
+                    onClick={() => markColorVariantForDeletion(colorVariant)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -608,7 +685,7 @@ export function EnhancedProductVariantForm({
                     <Label>Color Name *</Label>
                     <Input
                       value={colorVariant.color_name}
-                      onChange={(e) => updateColorVariant(colorIndex, 'color_name', e.target.value)}
+                      onChange={(e) => updateColorVariant(originalIndex, 'color_name', e.target.value)}
                       placeholder="Enter color name"
                     />
 
@@ -618,12 +695,12 @@ export function EnhancedProductVariantForm({
                         <Input
                           type="color"
                           value={colorVariant.color_hex || '#000000'}
-                          onChange={(e) => updateColorVariant(colorIndex, 'color_hex', e.target.value)}
+                          onChange={(e) => updateColorVariant(originalIndex, 'color_hex', e.target.value)}
                           className="w-16 h-10"
                         />
                         <Input
                           value={colorVariant.color_hex || ''}
-                          onChange={(e) => updateColorVariant(colorIndex, 'color_hex', e.target.value)}
+                          onChange={(e) => updateColorVariant(originalIndex, 'color_hex', e.target.value)}
                           placeholder="#000000"
                           className="flex-1"
                         />
@@ -635,18 +712,18 @@ export function EnhancedProductVariantForm({
                     <Label>Color Image</Label>
                     <div className="space-y-2">
                       <input
-                        id={`image-upload-${colorIndex}`}
+                        id={`image-upload-${originalIndex}`}
                         type="file"
                         accept="image/*"
-                        onChange={(e) => handleImageUpload(e, colorIndex)}
+                        onChange={(e) => handleImageUpload(e, originalIndex)}
                         className="hidden"
                       />
                       <label
-                        htmlFor={`image-upload-${colorIndex}`}
-                        className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploading[`color-${colorIndex}`] ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        htmlFor={`image-upload-${originalIndex}`}
+                        className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploading[`color-${originalIndex}`] ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <Upload className="h-4 w-4 mr-2" />
-                        {uploading[`color-${colorIndex}`] ? 'Uploading...' : 'Upload Image'}
+                        {uploading[`color-${originalIndex}`] ? 'Uploading...' : 'Upload Image'}
                       </label>
 
                       {colorVariant.image_url && (
@@ -669,7 +746,7 @@ export function EnhancedProductVariantForm({
                               type="button"
                               size="sm"
                               variant="destructive"
-                              onClick={() => removeImage(colorIndex)}
+                              onClick={() => removeImage(originalIndex)}
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -688,7 +765,7 @@ export function EnhancedProductVariantForm({
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => addSizeVariant(colorIndex)}
+                        onClick={() => addSizeVariant(originalIndex)}
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         Add Size
@@ -696,18 +773,21 @@ export function EnhancedProductVariantForm({
                     </div>
                     
                     <div className="space-y-2">
-                      {colorVariant.size_variants.filter(s => !s.toDelete).map((sizeVariant, sizeIndex) => (
-                        <div key={sizeVariant.id || sizeIndex} className="flex items-center space-x-2">
+                      {colorVariant.size_variants
+                        .map((sv, sizeOrigIdx) => ({ sv, sizeOrigIdx }))
+                        .filter(({ sv }) => !sv.toDelete)
+                        .map(({ sv: sizeVariant, sizeOrigIdx }) => (
+                        <div key={sizeVariant.id || `new-size-${sizeOrigIdx}`} className="flex items-center space-x-2">
                           <Input
                             placeholder="Size name"
                             value={sizeVariant.size_name}
-                            onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_name', e.target.value)}
+                            onChange={(e) => updateSizeVariant(originalIndex, sizeOrigIdx, 'size_name', e.target.value)}
                             className="flex-1"
                           />
                           <Input
                             placeholder="Size code"
                             value={sizeVariant.size_code || ''}
-                            onChange={(e) => updateSizeVariant(colorIndex, sizeIndex, 'size_code', e.target.value)}
+                            onChange={(e) => updateSizeVariant(originalIndex, sizeOrigIdx, 'size_code', e.target.value)}
                             className="w-24"
                           />
                           {sizeVariant.isNew && <Badge variant="secondary" className="text-xs">New</Badge>}
@@ -715,7 +795,7 @@ export function EnhancedProductVariantForm({
                             type="button"
                             variant="destructive"
                             size="sm"
-                            onClick={() => markSizeVariantForDeletion(colorIndex, sizeIndex)}
+                            onClick={() => markSizeVariantForDeletion(originalIndex, sizeOrigIdx)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -727,7 +807,7 @@ export function EnhancedProductVariantForm({
               </div>
             ))}
             
-            {colorVariants.filter(v => !v.toDelete).length === 0 && (
+            {visibleVariants.length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 <p>No color variants added yet.</p>
                 <Button type="button" onClick={addColorVariant} className="mt-2">
