@@ -133,11 +133,18 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
           console.log('Size variants for color', colorVariant.color_name, ':', sizeVariants);
 
           for (const sizeVariant of sizeVariants || []) {
-            // Find existing inventory for this color+size combination
-            const existingItem = existingInventory.find(item => 
+            // Bug 3 fix: Try matching by ID first, then fallback to color_name + size_name
+            let existingItem = existingInventory.find(item => 
               item.color_variant_id === colorVariant.id && 
               item.size_variant_id === sizeVariant.id
             );
+            if (!existingItem) {
+              existingItem = existingInventory.find(item =>
+                item.color_name === colorVariant.color_name &&
+                item.size_name === sizeVariant.size_name &&
+                item.product_id === productId
+              );
+            }
 
             items.push({
               id: existingItem?.id,
@@ -145,7 +152,7 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
               product_name: product.name,
               color_name: colorVariant.color_name,
               size_name: sizeVariant.size_name,
-              stock_quantity: existingItem?.stock_quantity || 0,
+              stock_quantity: existingItem?.stock_quantity ?? 0,
               cost_price: existingItem?.cost_price || product.cost_price,
               selling_price: existingItem?.selling_price || product.selling_price || product.cost_price,
               low_stock_threshold: existingItem?.low_stock_threshold || 10,
@@ -156,17 +163,24 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
           }
         } else {
           // Color variant without sizes
-          // Find existing inventory for this color
-          const existingItem = existingInventory.find(item => 
+          // Bug 3 fix: fallback matching by color_name
+          let existingItem = existingInventory.find(item => 
             item.color_variant_id === colorVariant.id && !item.size_variant_id
           );
+          if (!existingItem) {
+            existingItem = existingInventory.find(item =>
+              item.color_name === colorVariant.color_name &&
+              !item.size_variant_id &&
+              item.product_id === productId
+            );
+          }
 
           items.push({
             id: existingItem?.id,
             sku: existingItem?.sku || generateSKU(product.name, colorVariant.color_name),
             product_name: product.name,
             color_name: colorVariant.color_name,
-            stock_quantity: existingItem?.stock_quantity || 0,
+            stock_quantity: existingItem?.stock_quantity ?? 0,
             cost_price: existingItem?.cost_price || product.cost_price,
             selling_price: existingItem?.selling_price || product.selling_price || product.cost_price,
             low_stock_threshold: existingItem?.low_stock_threshold || 10,

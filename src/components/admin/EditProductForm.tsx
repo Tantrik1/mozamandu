@@ -737,6 +737,13 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
               has_color_variants: form.getValues('has_color_variants'),
               has_size_variants: form.getValues('has_size_variants'),
               status: form.getValues('status'),
+              material_composition: form.getValues('material_composition'),
+              care_instructions: form.getValues('care_instructions'),
+              meta_title: form.getValues('meta_title'),
+              meta_description: form.getValues('meta_description'),
+              meta_keywords: form.getValues('meta_keywords'),
+              og_title: form.getValues('og_title'),
+              og_description: form.getValues('og_description'),
             })}
             imageFile={imageFile}
             imagePreview={imagePreview}
