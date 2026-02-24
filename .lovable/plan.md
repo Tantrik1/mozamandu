@@ -1,44 +1,43 @@
 
-# Fix: Variant Deletion Fails Due to Foreign Key Constraints
 
-## Root Cause
+# Fix: Variant Deletion Still Failing on FK Constraint
 
-The external database has foreign key constraints that the current deletion code doesn't account for. Specifically, when trying to delete a `product_inventory` record, these tables may reference it:
+## Root Cause (Confirmed)
 
-1. `inventory_transactions.inventory_id` references `product_inventory.id`
-2. `order_item_details.product_inventory_id` references `product_inventory.id`
-3. `customer_order_item_details.product_inventory_id` references `product_inventory.id`
+The current code tries to:
+1. Nullify `product_inventory_id` in `order_item_details` 
+2. Then delete `product_inventory`
 
-The current code tries to delete `product_inventory` records first, but those deletes silently fail because `inventory_transactions` (and possibly order item details) still reference them. Then `size_variants` and `color_variants` deletes also fail because `product_inventory` still references them.
+Step 1 **silently fails** -- the Supabase client returns no error when an UPDATE affects 0 rows due to RLS restrictions. So step 2 hits the FK constraint and throws.
 
-The errors are only logged to console, not thrown, so the save appears to "succeed" but nothing is actually deleted. When the page refreshes, the variants reappear.
+## Solution: Soft-Delete Instead of Hard-Delete
 
-## Fix
+Instead of trying to delete `product_inventory` records (which requires clearing ALL FK references from order history tables), **soft-delete** them:
+- Set `is_active = false` on the inventory records
+- Nullify `color_variant_id` and `size_variant_id` to unlink them from the variants being deleted
+- Then delete `size_variants` and `color_variants` as before
 
-Update `handleDeletions` in `EnhancedProductVariantForm.tsx` to delete in the correct order respecting ALL foreign key dependencies:
+This completely avoids touching `order_item_details` or `customer_order_item_details`.
 
-```text
-Deletion order for each color variant:
-1. Get all product_inventory IDs for this color
-2. Delete inventory_transactions referencing those inventory IDs
-3. Nullify order_item_details.product_inventory_id (can't delete order history)
-4. Nullify customer_order_item_details.product_inventory_id
-5. Delete product_inventory records
-6. Delete size_variants
-7. Delete color_variants
-```
-
-For individual size variant deletion, the same chain applies but scoped to a single size.
-
-Additionally, all error checks will THROW instead of just logging, so failures are visible to the user.
-
-## Technical Details
+## Technical Changes
 
 **File:** `src/components/admin/EnhancedProductVariantForm.tsx`
 
-The `handleDeletions` function (lines 495-566) will be rewritten to:
-- Fetch inventory IDs for the variant being deleted
-- Delete `inventory_transactions` by those inventory IDs
-- SET NULL on `order_item_details.product_inventory_id` and `customer_order_item_details.product_inventory_id` (preserves order history while removing the FK reference)
-- Then proceed with the existing deletion chain (inventory, sizes, colors)
-- Throw errors instead of only logging them
+Replace `cleanupAndDeleteInventory` with a `softDeleteInventory` function that:
+1. Updates matching `product_inventory` records: `is_active = false`, `color_variant_id = null`, `size_variant_id = null`
+2. Deletes `inventory_transactions` for those records (these have no downstream FKs)
+3. Proceeds to delete `size_variants` and `color_variants` normally
+
+The deletion order becomes:
+```text
+1. Soft-delete product_inventory (set is_active=false, nullify variant IDs)
+2. Delete inventory_transactions (optional cleanup, no FK issues)
+3. Delete size_variants
+4. Delete color_variants
+```
+
+This is safer because:
+- Order history references remain intact (no nullification needed)
+- Inventory records become inactive orphans (harmless)
+- No FK constraints are violated
+
