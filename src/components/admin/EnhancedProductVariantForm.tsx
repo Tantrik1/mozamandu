@@ -493,39 +493,72 @@ export function EnhancedProductVariantForm({
 
   // Phase 2: Fix deletion to clean up ALL size variants for deleted colors
   const handleDeletions = async () => {
-    // Delete marked size variants first
     for (const colorVariant of colorVariants) {
       if (colorVariant.toDelete && colorVariant.id) {
-        // This color is being deleted - delete ALL its size variants from DB
-        await supabase
+        // Get all size variant IDs for this color to clean up inventory references
+        const { data: sizeVariants } = await supabase
+          .from('size_variants')
+          .select('id')
+          .eq('color_variant_id', colorVariant.id);
+
+        // Delete inventory records by size_variant_id (covers FK references)
+        if (sizeVariants && sizeVariants.length > 0) {
+          const sizeIds = sizeVariants.map(s => s.id);
+          const { error: invSizeErr } = await supabase
+            .from('product_inventory')
+            .delete()
+            .in('size_variant_id', sizeIds);
+          if (invSizeErr) console.error('Error deleting inventory by size_variant_id:', invSizeErr);
+        }
+
+        // Delete remaining inventory records by color_variant_id
+        const { error: invColorErr } = await supabase
           .from('product_inventory')
           .delete()
           .eq('color_variant_id', colorVariant.id);
+        if (invColorErr) console.error('Error deleting inventory by color_variant_id:', invColorErr);
 
-        // Delete all size variants belonging to this color (not just marked ones)
-        await supabase
+        // Delete all size variants belonging to this color
+        const { error: sizeErr } = await supabase
           .from('size_variants')
           .delete()
           .eq('color_variant_id', colorVariant.id);
+        if (sizeErr) {
+          console.error('Error deleting size variants:', sizeErr);
+          throw new Error(`Failed to delete size variants: ${sizeErr.message}`);
+        }
 
         // Delete the color variant itself
-        await supabase
+        const { error: colorErr } = await supabase
           .from('color_variants')
           .delete()
           .eq('id', colorVariant.id);
+        if (colorErr) {
+          console.error('Error deleting color variant:', colorErr);
+          throw new Error(`Failed to delete color variant: ${colorErr.message}`);
+        }
+
+        console.log(`Deleted color variant ${colorVariant.color_name} (${colorVariant.id})`);
       } else {
         // Color is NOT being deleted - only delete individually marked sizes
         for (const sizeVariant of colorVariant.size_variants) {
           if (sizeVariant.toDelete && sizeVariant.id) {
-            await supabase
+            const { error: invErr } = await supabase
               .from('product_inventory')
               .delete()
               .eq('size_variant_id', sizeVariant.id);
+            if (invErr) console.error('Error deleting inventory for size:', invErr);
 
-            await supabase
+            const { error: sizeErr } = await supabase
               .from('size_variants')
               .delete()
               .eq('id', sizeVariant.id);
+            if (sizeErr) {
+              console.error('Error deleting size variant:', sizeErr);
+              throw new Error(`Failed to delete size variant: ${sizeErr.message}`);
+            }
+
+            console.log(`Deleted size variant ${sizeVariant.size_name} (${sizeVariant.id})`);
           }
         }
       }
