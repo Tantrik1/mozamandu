@@ -1,128 +1,71 @@
 
 
-# Fix: Category/Subcategory Status Not Respected in Product Listings and Search
+# Fix Product Deletion: Archive Instead of Hard Delete
 
 ## Problem
-
-When a category or subcategory is set to inactive (status = 'off'), products belonging to them **still appear** across the entire website. This affects:
-
-- Shop page product grid
-- Homepage sections (Latest, Featured, Most Sold, Mixed)
-- Global search (desktop and mobile)
-- "View all results" search on shop page
-
-Additionally, search results show subcategories whose **parent category is inactive**.
-
-## Root Cause
-
-All product-fetching queries only check `products.status = 'active'` but never verify that the parent subcategory (`status = 'on'`) or grandparent category (`status = 'on'`) is also active. Search queries for subcategories check subcategory status but not parent category status.
+Product deletion fails because the cascade delete logic encounters foreign key constraint errors across multiple related tables. The current approach tries to hard-delete everything (images, inventory, transactions, order items, variants, and the product itself), which is fragile and data-destructive.
 
 ## Solution
+Replace hard deletion with a **soft-delete/archive** approach:
+1. Instead of deleting the product, set its `status` to `'inactive'`
+2. Add an **Active/Inactive tab system** in Product Management so admins can see archived products
+3. Allow re-activating archived products
+4. Customer-facing pages already filter by `status = 'active'`, so inactive products are automatically hidden
 
-### 1. Create a shared utility to get active subcategory IDs
+## Changes
 
-Add a helper function that returns only subcategory IDs where both the subcategory AND its parent category are active. This is a single query we can reuse everywhere.
+### 1. ProductDeletionDialog.tsx -- Replace delete with archive
+- Replace `handleDirectDelete()` with `handleArchiveProduct()` that simply updates `products.status` to `'inactive'`
+- No need to delete related records (inventory, variants, orders stay intact)
+- Update dialog text from "Delete" to "Archive/Deactivate"
+- Remove the complex cascade deletion logic entirely
 
-**File:** `src/utils/stockCalculation.ts` (add new export)
+### 2. ProductManagement.tsx -- Add Active/Inactive tabs
+- Add a status filter tab (Active / Inactive / All) at the top of the product list
+- Default to showing "Active" products
+- Show inactive products in a separate tab with a "Reactivate" button
+- Change the delete button behavior to trigger archiving
+- Add a "Reactivate" action for inactive products that sets status back to `'active'`
 
-```text
-getActiveSubcategoryIds() -> string[]
-  - Fetch subcategories where status = 'on'
-  - Join categories and filter where category status = 'on'
-  - Return array of valid subcategory IDs
-  - Cache-friendly (called once per page load via React Query)
-```
-
-### 2. Filter products in all fetch functions
-
-**Files to change:**
-- `src/hooks/useHomepageData.ts` -- fetchLatestProducts, fetchMostSoldProducts, fetchFeaturedProducts
-- `src/pages/Shop.tsx` -- fetchAllProducts
-- `src/components/home/MixedProducts.tsx` -- fetchMixedProducts
-- `src/components/customer/LatestProducts.tsx` -- fetchLatestProducts
-
-In each, after fetching products, filter by checking `product.subcategory_id` is in the active subcategory IDs list. Or better: add `.in('subcategory_id', activeIds)` directly to the Supabase query.
-
-### 3. Fix search to exclude inactive categories/subcategories/products
-
-**Files to change:**
-- `src/components/navbar/GlobalSearch.tsx`
-- `src/components/navbar/MobileSearch.tsx`
-
-Changes:
-- **Subcategory search**: Also verify the parent category has `status = 'on'` (currently only checks subcategory status). Use `!inner` join: `subcategories!inner(... category:categories!inner(...))` with `.eq('category.status', 'on')`.
-- **Product search**: Filter products whose subcategory is active. Fetch active subcategory IDs first, then add `.in('subcategory_id', activeIds)` to the product query.
-
-### 4. Filter in CategorySubcategoryBar
-
-**File:** `src/components/shop/CategorySubcategoryBar.tsx`
-
-Already filters by `status = 'on'` for both categories and subcategories -- no change needed here.
+### 3. ProductDetailView.tsx -- Update delete action
+- The "Delete" button in detail view will also trigger the archive flow (same dialog)
+- Show product status prominently (Active/Inactive badge)
 
 ## Technical Details
 
-### New utility function
-
+### Archive function (replaces cascade delete)
 ```typescript
-// src/utils/stockCalculation.ts
-export const getActiveSubcategoryIds = async (): Promise<string[]> => {
-  const { data } = await supabase
-    .from('subcategories')
-    .select('id, category:categories!inner(status)')
-    .eq('status', 'on')
-    .eq('categories.status', 'on');
-  return (data || []).map(s => s.id);
-};
-```
-
-### Updated fetch pattern (example: fetchAllProducts)
-
-```typescript
-const fetchAllProducts = async () => {
-  const activeSubIds = await getActiveSubcategoryIds();
-  if (activeSubIds.length === 0) return [];
-  
-  const { data } = await supabase
+const handleArchiveProduct = async () => {
+  const { error } = await supabase
     .from('products')
-    .select('...')
-    .eq('status', 'active')
-    .in('subcategory_id', activeSubIds)
-    .order('created_at', { ascending: false });
-  // ... stock filtering continues as before
+    .update({ status: 'inactive', updated_at: new Date().toISOString() })
+    .eq('id', productId);
+  // Show success toast, call onConfirm()
 };
 ```
 
-### Updated search pattern (example: GlobalSearch product query)
-
+### Reactivate function (new)
 ```typescript
-const activeSubIds = await getActiveSubcategoryIds();
-
-// Products - only from active subcategories
-const { data: products } = await supabase
-  .from('products')
-  .select('id, name, image_url, selling_price, subcategory:subcategories(name)')
-  .eq('status', 'active')
-  .in('subcategory_id', activeSubIds)
-  .ilike('name', searchTerm)
-  .limit(8);
-
-// Subcategories - only those with active parent category
-const { data: subcategories } = await supabase
-  .from('subcategories')
-  .select('id, name, image_url, category:categories!inner(name)')
-  .eq('status', 'on')
-  .eq('categories.status', 'on')
-  .ilike('name', searchTerm)
-  .limit(5);
+const handleReactivate = async (productId: string) => {
+  const { error } = await supabase
+    .from('products')
+    .update({ status: 'active', updated_at: new Date().toISOString() })
+    .eq('id', productId);
+  // Refresh product list
+};
 ```
+
+### Product Management tab filtering
+- Add `statusFilter` state: `'active' | 'inactive' | 'all'`
+- Filter products by status in `filteredProducts`
+- Render tabs using existing UI components
+
+### Customer-facing visibility
+- All product-fetching queries already filter `.eq('status', 'active')`, so archived products are automatically hidden from the website -- no additional changes needed on the customer side.
 
 ## Files Modified
 
-1. `src/utils/stockCalculation.ts` -- Add `getActiveSubcategoryIds()` utility
-2. `src/hooks/useHomepageData.ts` -- Filter all 3 product fetchers by active subcategories
-3. `src/pages/Shop.tsx` -- Filter `fetchAllProducts` by active subcategories
-4. `src/components/home/MixedProducts.tsx` -- Filter by active subcategories
-5. `src/components/customer/LatestProducts.tsx` -- Filter by active subcategories
-6. `src/components/navbar/GlobalSearch.tsx` -- Filter products and subcategories by active status
-7. `src/components/navbar/MobileSearch.tsx` -- Same search fixes
+1. **`src/components/admin/ProductDeletionDialog.tsx`** -- Replace cascade delete with simple status update to `'inactive'`; update UI text
+2. **`src/components/admin/ProductManagement.tsx`** -- Add Active/Inactive/All tabs; add reactivate button for inactive products; update delete button label to "Archive"
+3. **`src/components/admin/ProductDetailView.tsx`** -- Show status badge; update delete button label
 
