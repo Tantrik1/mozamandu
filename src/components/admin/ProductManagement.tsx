@@ -9,8 +9,9 @@ import { CreateProductForm } from './CreateProductForm';
 import { EditProductForm } from './EditProductForm';
 import { ProductDetailView } from './ProductDetailView';
 import { ProductDeletionDialog } from './ProductDeletionDialog';
-import { Pencil, Trash2, Plus, Search, Package, Eye, Filter } from 'lucide-react';
+import { Pencil, Trash2, Plus, Search, Package, Eye, Filter, Archive, RotateCcw } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getProductStockSummary } from '@/utils/stockCalculation';
 
 interface Product {
@@ -43,6 +44,7 @@ export function ProductManagement() {
   const [viewingProductId, setViewingProductId] = useState<string | null>(null);
   const [productStocks, setProductStocks] = useState<Record<string, number>>({});
   const [deletingProduct, setDeletingProduct] = useState<{ id: string; name: string } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -183,7 +185,34 @@ export function ProductManagement() {
     setViewingProductId(null);
   };
 
+  const handleReactivate = async (productId: string) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ status: 'active', updated_at: new Date().toISOString() })
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Product Reactivated',
+        description: 'Product is now visible on the store.',
+      });
+      fetchProducts();
+    } catch (error) {
+      console.error('Error reactivating product:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reactivate product',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const filteredProducts = products.filter(product => {
+    // Status filter
+    const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
+
     // Search filter
     const matchesSearch = 
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -196,8 +225,11 @@ export function ProductManagement() {
     // Subcategory filter
     const matchesSubcategory = !subcategoryFilter || subcategoryFilter === 'all' || product.subcategory_id === subcategoryFilter;
     
-    return matchesSearch && matchesCategory && matchesSubcategory;
+    return matchesStatus && matchesSearch && matchesCategory && matchesSubcategory;
   });
+
+  const activeCount = products.filter(p => p.status === 'active').length;
+  const inactiveCount = products.filter(p => p.status === 'inactive').length;
 
   if (loading) {
     return <div className="flex justify-center p-8">Loading products...</div>;
@@ -245,6 +277,14 @@ export function ProductManagement() {
           Add Product
         </Button>
       </div>
+
+      <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'active' | 'inactive' | 'all')}>
+        <TabsList>
+          <TabsTrigger value="active">Active ({activeCount})</TabsTrigger>
+          <TabsTrigger value="inactive">Inactive ({inactiveCount})</TabsTrigger>
+          <TabsTrigger value="all">All ({products.length})</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <div className="flex flex-col lg:flex-row gap-4">
         <div className="relative flex-1">
@@ -349,13 +389,23 @@ export function ProductManagement() {
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleDelete(product.id, product.name)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {product.status === 'active' ? (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDelete(product.id, product.name)}
+                    >
+                      <Archive className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleReactivate(product.id)}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
 
                 {/* Status badge */}
