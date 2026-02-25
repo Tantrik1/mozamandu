@@ -155,12 +155,12 @@ export function EnhancedAdminDashboard() {
     const [customerOrdersRes, guestOrdersRes] = await Promise.all([
       supabase
         .from('customer_orders')
-        .select('id, created_at, total_amount, subtotal, status, customer_email, customer_name, delivery_charge')
+        .select('id, created_at, total_amount, subtotal, status, customer_email, customer_name, delivery_charge, paid_amount')
         .order('created_at', { ascending: false })
         .limit(1000),
       supabase
         .from('orders')
-        .select('id, created_at, total_amount, subtotal, status, customer_email, customer_name, delivery_charge')
+        .select('id, created_at, total_amount, subtotal, status, customer_email, customer_name, delivery_charge, paid_amount')
         .order('created_at', { ascending: false })
         .limit(1000)
     ]);
@@ -295,7 +295,6 @@ export function EnhancedAdminDashboard() {
   };
 
   const calculateTimeBasedStats = async (filteredOrders: any[], allOrders: any[]) => {
-    // Calculate stats for the selected date range
     const validOrders = filteredOrders.filter(o => o.status !== 'cancelled');
     const allValidOrders = allOrders.filter(o => o.status !== 'cancelled');
     
@@ -324,11 +323,15 @@ export function EnhancedAdminDashboard() {
       ? ((periodOrders - prevPeriodOrders.length) / prevPeriodOrders.length) * 100 
       : periodOrders > 0 ? 100 : 0;
 
-    // Calculate quick reference stats from all orders (not filtered)
+    // Calculate actual time-based stats from ALL orders (not filtered by date picker)
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const yearStart = new Date(now.getFullYear(), 0, 1);
 
@@ -343,6 +346,14 @@ export function EnhancedAdminDashboard() {
       })
       .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
+    const last7DaysRevenue = allValidOrders
+      .filter(o => new Date(o.created_at) >= sevenDaysAgo)
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+    const last30DaysRevenue = allValidOrders
+      .filter(o => new Date(o.created_at) >= thirtyDaysAgo)
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
     const mtdRevenue = allValidOrders
       .filter(o => new Date(o.created_at) >= monthStart)
       .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
@@ -354,8 +365,8 @@ export function EnhancedAdminDashboard() {
     setTimeStats({
       todayRevenue,
       yesterdayRevenue,
-      last7DaysRevenue: periodRevenue,
-      last30DaysRevenue: periodRevenue,
+      last7DaysRevenue,
+      last30DaysRevenue,
       mtdRevenue,
       ytdRevenue,
       revenueGrowth,
@@ -369,8 +380,12 @@ export function EnhancedAdminDashboard() {
     const shippedOrders = orders.filter(o => o.status === 'on_delivery').length;
     const deliveredOrders = orders.filter(o => o.status === 'delivered').length;
     const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
-    const prepaidOrders = orders.filter(o => o.payment_percentage === 100).length;
-    const codOrders = orders.filter(o => o.payment_percentage < 100 && o.status !== 'cancelled').length;
+    
+    // COD = orders with paid_amount < total_amount (partial/no payment upfront)
+    // Prepaid = orders with paid_amount >= total_amount
+    const nonCancelledOrders = orders.filter(o => o.status !== 'cancelled');
+    const prepaidOrders = nonCancelledOrders.filter(o => Number(o.paid_amount || 0) >= Number(o.total_amount || 0) && Number(o.total_amount || 0) > 0).length;
+    const codOrders = nonCancelledOrders.length - prepaidOrders;
 
     setOrderStats({
       paidOrders,
@@ -381,7 +396,7 @@ export function EnhancedAdminDashboard() {
       returnedOrders: 0,
       codOrders,
       prepaidOrders,
-      failedPayments: Math.floor(cancelledOrders * 0.3)
+      failedPayments: 0
     });
   };
 
@@ -471,9 +486,10 @@ export function EnhancedAdminDashboard() {
       const totalStock = inventory.reduce((sum, i) => sum + i.stock_quantity, 0);
       const totalReserved = inventory.reduce((sum, i) => sum + i.reserved_stock, 0);
 
-      const stockTurnoverRatio = availableStockUnits > 0 ? totalReserved / availableStockUnits : 0;
+      // Turnover = total units sold (reserved as proxy) relative to average stock
+      const stockTurnoverRatio = totalStock > 0 ? totalReserved / (totalStock * 0.5) : 0;
       const inventoryFillRate = totalStock > 0 ? (availableStockUnits / totalStock) * 100 : 0;
-      const avgDaysInventoryHeld = stockTurnoverRatio > 0 ? 365 / (stockTurnoverRatio * 12) : 30;
+      const avgDaysInventoryHeld = stockTurnoverRatio > 0 ? Math.round(365 / stockTurnoverRatio) : 0;
 
       setInventoryStats({
         totalSKUs,
@@ -628,9 +644,14 @@ export function EnhancedAdminDashboard() {
     }, {} as Record<string, RevenueDataPoint>);
 
     const sortedData: RevenueDataPoint[] = Object.values(grouped);
-    if (groupBy === 'hour') {
-      sortedData.sort((a, b) => parseInt(a.period) - parseInt(b.period));
-    }
+    // Sort chart data chronologically
+    sortedData.sort((a, b) => {
+      if (groupBy === 'hour') {
+        return parseInt(a.period) - parseInt(b.period);
+      }
+      // For day/week/month, parse the date strings for proper ordering
+      return new Date(a.period + ', 2025').getTime() - new Date(b.period + ', 2025').getTime();
+    });
 
     setRevenueChartData(sortedData);
   };
