@@ -493,36 +493,29 @@ export function EnhancedProductVariantForm({
 
   // Phase 2: Fix deletion to clean up ALL size variants for deleted colors
   // Helper: clean up all FK references to inventory IDs, then delete the inventory records
-  const cleanupAndDeleteInventory = async (inventoryIds: string[]) => {
+  // Soft-delete inventory: deactivate and unlink from variants (avoids FK constraint issues)
+  const softDeleteInventory = async (inventoryIds: string[]) => {
     if (inventoryIds.length === 0) return;
 
-    // 1. Delete inventory_transactions referencing these inventory IDs
+    // 1. Soft-delete: set is_active=false, nullify variant links
+    const { error: softDeleteErr } = await supabase
+      .from('product_inventory')
+      .update({
+        is_active: false,
+        color_variant_id: null,
+        size_variant_id: null,
+      })
+      .in('id', inventoryIds);
+    if (softDeleteErr) throw new Error(`Failed to soft-delete inventory: ${softDeleteErr.message}`);
+
+    // 2. Clean up inventory_transactions (no downstream FKs)
     const { error: txnErr } = await supabase
       .from('inventory_transactions')
       .delete()
       .in('inventory_id', inventoryIds);
-    if (txnErr) throw new Error(`Failed to delete inventory transactions: ${txnErr.message}`);
-
-    // 2. Nullify order_item_details.product_inventory_id (preserve order history)
-    const { error: oidErr } = await supabase
-      .from('order_item_details')
-      .update({ product_inventory_id: null })
-      .in('product_inventory_id', inventoryIds);
-    if (oidErr) throw new Error(`Failed to nullify order_item_details: ${oidErr.message}`);
-
-    // 3. Nullify customer_order_item_details.product_inventory_id
-    const { error: coidErr } = await supabase
-      .from('customer_order_item_details')
-      .update({ product_inventory_id: null })
-      .in('product_inventory_id', inventoryIds);
-    if (coidErr) throw new Error(`Failed to nullify customer_order_item_details: ${coidErr.message}`);
-
-    // 4. Now safe to delete the product_inventory records
-    const { error: invErr } = await supabase
-      .from('product_inventory')
-      .delete()
-      .in('id', inventoryIds);
-    if (invErr) throw new Error(`Failed to delete product_inventory: ${invErr.message}`);
+    if (txnErr) {
+      console.warn('Non-critical: failed to delete inventory transactions:', txnErr.message);
+    }
   };
 
   const handleDeletions = async () => {
@@ -538,7 +531,7 @@ export function EnhancedProductVariantForm({
         const inventoryIds = (inventoryRecords || []).map(r => r.id);
 
         // Clean up FK references and delete inventory
-        await cleanupAndDeleteInventory(inventoryIds);
+        await softDeleteInventory(inventoryIds);
 
         // Delete all size variants belonging to this color
         const { error: sizeErr } = await supabase
@@ -567,7 +560,7 @@ export function EnhancedProductVariantForm({
             if (fetchErr) throw new Error(`Failed to fetch inventory for size variant: ${fetchErr.message}`);
 
             const sizeInvIds = (sizeInvRecords || []).map(r => r.id);
-            await cleanupAndDeleteInventory(sizeInvIds);
+            await softDeleteInventory(sizeInvIds);
 
             const { error: sizeErr } = await supabase
               .from('size_variants')
