@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ModernProductCard } from './ModernProductCard';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { getBatchProductStock } from '@/utils/stockCalculation';
+import { getBatchProductStock, getActiveSubcategoryIds } from '@/utils/stockCalculation';
 
 interface Product {
   id: string;
@@ -31,6 +31,8 @@ const LatestProducts = memo(() => {
 
   const fetchLatestProducts = useMemo(() => async () => {
     try {
+      const activeSubIds = await getActiveSubcategoryIds();
+      if (activeSubIds.length === 0) { setLoading(false); return; }
       const { data, error } = await supabase
         .from('products')
         .select(`
@@ -38,8 +40,9 @@ const LatestProducts = memo(() => {
           subcategories(name, min_selling_price)
         `)
         .eq('status', 'active')
+        .in('subcategory_id', activeSubIds)
         .order('created_at', { ascending: false })
-        .limit(6); // Reduced from 8 to 6
+        .limit(6);
 
       if (error) throw error;
 
