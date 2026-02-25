@@ -9,6 +9,7 @@ import { SortBottomSheet, SortOption } from '@/components/shop/SortBottomSheet';
 import { CategorySubcategoryBar } from '@/components/shop/CategorySubcategoryBar';
 import { FilterSummaryStrip } from '@/components/shop/FilterSummaryStrip';
 import { EmptyState } from '@/components/shop/EmptyState';
+import { DesktopShopSidebar } from '@/components/shop/DesktopShopSidebar';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
@@ -310,6 +311,15 @@ const Shop = memo(function Shop() {
     );
   }, []);
 
+  const handleDesktopSearch = useCallback((value: string) => {
+    setLocalSearch(value);
+    if (value.length >= 2) {
+      setSearchParams({ search: value });
+    } else if (value.length === 0) {
+      setSearchParams({});
+    }
+  }, [setSearchParams]);
+
   const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
     Object.entries(updates).forEach(([key, value]) => {
@@ -417,32 +427,34 @@ const Shop = memo(function Shop() {
       
       <ModernNavbar />
       
-      {/* Category/Subcategory Bar - Visual boxes with images */}
-      <CategorySubcategoryBar
-        categories={categories}
-        selectedCategoryId={selectedCategoryId}
-        onCategorySelect={(id) => {
-          setSelectedCategoryId(id);
-          setSelectedSubcategoryId(null);
-          updateUrlParams({ category: id, subcategory: null });
-          setIsFiltering(true);
-          setTimeout(() => setIsFiltering(false), 300);
-        }}
-        selectedSubcategoryId={selectedSubcategoryId}
-        onSubcategorySelect={(id) => {
-          setSelectedSubcategoryId(id);
-          updateUrlParams({ subcategory: id });
-          setIsFiltering(true);
-          setTimeout(() => setIsFiltering(false), 300);
-        }}
-        onMoreFilters={() => setFilterSheetOpen(true)}
-        activeFilterCount={filterCount}
-        topOffset={headerHeight}
-      />
+      {/* Category/Subcategory Bar - mobile/tablet only */}
+      <div className="lg:hidden">
+        <CategorySubcategoryBar
+          categories={categories}
+          selectedCategoryId={selectedCategoryId}
+          onCategorySelect={(id) => {
+            setSelectedCategoryId(id);
+            setSelectedSubcategoryId(null);
+            updateUrlParams({ category: id, subcategory: null });
+            setIsFiltering(true);
+            setTimeout(() => setIsFiltering(false), 300);
+          }}
+          selectedSubcategoryId={selectedSubcategoryId}
+          onSubcategorySelect={(id) => {
+            setSelectedSubcategoryId(id);
+            updateUrlParams({ subcategory: id });
+            setIsFiltering(true);
+            setTimeout(() => setIsFiltering(false), 300);
+          }}
+          onMoreFilters={() => setFilterSheetOpen(true)}
+          activeFilterCount={filterCount}
+          topOffset={headerHeight}
+        />
+      </div>
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        {/* Header with Search */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+        {/* Header with Search - mobile/tablet only */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 lg:hidden">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold">
               {searchQuery ? `Results for "${searchQuery}"` : 'Shop'}
@@ -462,6 +474,13 @@ const Shop = memo(function Shop() {
           </form>
         </div>
 
+        {/* Desktop title */}
+        <div className="hidden lg:block mb-4">
+          <h1 className="text-2xl font-bold">
+            {searchQuery ? `Results for "${searchQuery}"` : 'Shop'}
+          </h1>
+        </div>
+
         {/* Filter Summary Strip */}
         <FilterSummaryStrip
           filters={appliedFilters}
@@ -471,35 +490,70 @@ const Shop = memo(function Shop() {
           className="mb-4"
         />
 
-        {/* Product Grid */}
-        <main className="flex-1 min-w-0">
-            {productsLoading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 transition-opacity duration-300">
-                {[...Array(8)].map((_, i) => (
-                  <div key={i} className="space-y-3">
-                    <Skeleton className="aspect-square rounded-xl" />
-                    <Skeleton className="h-4 w-2/3" />
-                    <Skeleton className="h-4 w-1/3" />
-                  </div>
-                ))}
-              </div>
-            ) : filteredProducts.length > 0 ? (
-              <div className={cn(
-                "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 transition-opacity duration-300",
-                isFiltering && "opacity-50"
-              )}>
-                {filteredProducts.map((product) => (
-                  <ShopProductCard key={product.id} product={product} />
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                hasFilters={filterCount > 0 || searchQuery.length > 0}
-                onClearFilters={handleClearAllFilters}
-                suggestions={emptySuggestions}
-              />
-            )}
-        </main>
+        {/* Two-column layout on desktop */}
+        <div className="lg:flex lg:gap-8">
+          {/* Desktop Sidebar */}
+          <DesktopShopSidebar
+            searchValue={localSearch}
+            onSearchChange={handleDesktopSearch}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            categories={categories}
+            selectedCategoryId={selectedCategoryId}
+            selectedSubcategoryId={selectedSubcategoryId}
+            onCategorySelect={(id) => {
+              setSelectedCategoryId(id);
+              setSelectedSubcategoryId(null);
+              updateUrlParams({ category: id, subcategory: null });
+              setIsFiltering(true);
+              setTimeout(() => setIsFiltering(false), 300);
+            }}
+            onSubcategorySelect={(id) => {
+              setSelectedSubcategoryId(id);
+              updateUrlParams({ subcategory: id });
+              setIsFiltering(true);
+              setTimeout(() => setIsFiltering(false), 300);
+            }}
+            availableColors={availableColors}
+            selectedColorIds={selectedColorIds}
+            onColorToggle={handleColorToggle}
+            priceRange={priceRange}
+            onPriceRangeApply={setPriceRange}
+            onClearAll={handleClearAllFilters}
+            hasActiveFilters={filterCount > 0 || searchQuery.length > 0}
+            resultCount={filteredProducts.length}
+          />
+
+          {/* Product Grid */}
+          <main className="flex-1 min-w-0">
+              {productsLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4 transition-opacity duration-300">
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="space-y-3">
+                      <Skeleton className="aspect-square rounded-xl" />
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-4 w-1/3" />
+                    </div>
+                  ))}
+                </div>
+              ) : filteredProducts.length > 0 ? (
+                <div className={cn(
+                  "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4 transition-opacity duration-300",
+                  isFiltering && "opacity-50"
+                )}>
+                  {filteredProducts.map((product) => (
+                    <ShopProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  hasFilters={filterCount > 0 || searchQuery.length > 0}
+                  onClearFilters={handleClearAllFilters}
+                  suggestions={emptySuggestions}
+                />
+              )}
+          </main>
+        </div>
       </div>
 
       {/* Filter Bottom Sheet */}
