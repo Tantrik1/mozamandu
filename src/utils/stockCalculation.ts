@@ -38,6 +38,77 @@ export interface StockCalculationResult {
   }>;
 }
 
+// Batch fetch stock for multiple products - returns a map of productId -> totalAvailableStock
+export async function getBatchProductStock(productIds: string[]): Promise<Record<string, number>> {
+  if (productIds.length === 0) return {};
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('product_id, available_stock')
+      .in('product_id', productIds)
+      .eq('is_active', true);
+
+    if (error) throw error;
+
+    const stockMap: Record<string, number> = {};
+    (data || []).forEach(item => {
+      stockMap[item.product_id] = (stockMap[item.product_id] || 0) + (item.available_stock || 0);
+    });
+    return stockMap;
+  } catch (error) {
+    console.error('Error fetching batch product stock:', error);
+    return {};
+  }
+}
+
+// Batch fetch stock grouped by color_variant_id
+export async function getBatchVariantStock(productId: string): Promise<Record<string, number>> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('color_variant_id, size_variant_id, available_stock')
+      .eq('product_id', productId)
+      .eq('is_active', true);
+
+    if (error) throw error;
+
+    const colorStockMap: Record<string, number> = {};
+    (data || []).forEach(item => {
+      if (item.color_variant_id) {
+        colorStockMap[item.color_variant_id] = (colorStockMap[item.color_variant_id] || 0) + (item.available_stock || 0);
+      }
+    });
+    return colorStockMap;
+  } catch (error) {
+    console.error('Error fetching batch variant stock:', error);
+    return {};
+  }
+}
+
+// Batch fetch stock grouped by size_variant_id for a specific color
+export async function getSizeVariantStock(colorVariantId: string): Promise<Record<string, number>> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('size_variant_id, available_stock')
+      .eq('color_variant_id', colorVariantId)
+      .eq('is_active', true);
+
+    if (error) throw error;
+
+    const sizeStockMap: Record<string, number> = {};
+    (data || []).forEach(item => {
+      if (item.size_variant_id) {
+        sizeStockMap[item.size_variant_id] = (sizeStockMap[item.size_variant_id] || 0) + (item.available_stock || 0);
+      }
+    });
+    return sizeStockMap;
+  } catch (error) {
+    console.error('Error fetching size variant stock:', error);
+    return {};
+  }
+}
+
 export async function getProductStockSummary(productId: string): Promise<number> {
   try {
     const { data, error } = await supabase

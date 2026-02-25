@@ -1,7 +1,15 @@
 import { useQueries } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getBatchProductStock } from '@/utils/stockCalculation';
 
 // Fetch functions - optimized with minimal data
+// Helper to filter out zero-stock products
+const filterInStock = async (products: any[]) => {
+  if (products.length === 0) return products;
+  const stockMap = await getBatchProductStock(products.map(p => p.id));
+  return products.filter(p => (stockMap[p.id] || 0) > 0);
+};
+
 const fetchLatestProducts = async () => {
   const { data } = await supabase
     .from('products')
@@ -10,8 +18,8 @@ const fetchLatestProducts = async () => {
     )
     .eq('status', 'active')
     .order('created_at', { ascending: false })
-    .limit(4); // Reduced from 8 for faster initial load
-  return data || [];
+    .limit(8);
+  return filterInStock(data || []);
 };
 
 const fetchMostSoldProducts = async () => {
@@ -35,10 +43,11 @@ const fetchMostSoldProducts = async () => {
 
   if (!products) return [];
 
-  return products
+  const sorted = products
     .map(p => ({ ...p, order_count: productCounts[p.name] || 0 }))
     .sort((a, b) => b.order_count - a.order_count)
-    .slice(0, 4); // Reduced from 8
+    .slice(0, 8);
+  return filterInStock(sorted);
 };
 
 const fetchCategories = async () => {
@@ -68,8 +77,8 @@ const fetchFeaturedProducts = async () => {
     )
     .eq('status', 'active')
     .eq('is_featured', true)
-    .limit(4);
-  return data || [];
+    .limit(8);
+  return filterInStock(data || []);
 };
 
 const fetchNotice = async () => {

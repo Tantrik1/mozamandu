@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ModernProductCard } from './ModernProductCard';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { getProductStockSummary } from '@/utils/stockCalculation';
+import { getBatchProductStock } from '@/utils/stockCalculation';
 
 interface Product {
   id: string;
@@ -43,15 +43,16 @@ const LatestProducts = memo(() => {
 
       if (error) throw error;
 
-      if (data) {
-        // Skip expensive stock calculations for homepage performance
-        const productsWithStock = data.map((product) => ({
-          ...product,
-          stock_quantity: 100, // Default stock for display
-          subcategories: product.subcategories,
-        }));
-        
-        setProducts(productsWithStock);
+      if (data && data.length > 0) {
+        const stockMap = await getBatchProductStock(data.map(p => p.id));
+        const inStockProducts = data
+          .filter(p => (stockMap[p.id] || 0) > 0)
+          .map((product) => ({
+            ...product,
+            stock_quantity: stockMap[product.id] || 0,
+            subcategories: product.subcategories,
+          }));
+        setProducts(inStockProducts);
       }
     } catch (error) {
       console.error('Error fetching latest products:', error);

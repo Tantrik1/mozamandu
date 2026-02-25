@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getBatchProductStock } from '@/utils/stockCalculation';
 
 interface Category {
   id: string;
@@ -45,7 +46,7 @@ interface Product {
 const getDisplayPrice = (p: Product) =>
   p.selling_price ?? p.subcategory?.min_selling_price ?? p.cost_price;
 
-// Fetch ALL products (default view)
+// Fetch ALL products (default view) - filters out zero-stock
 const fetchAllProducts = async () => {
   const { data } = await supabase
     .from('products')
@@ -54,7 +55,10 @@ const fetchAllProducts = async () => {
     )
     .eq('status', 'active')
     .order('created_at', { ascending: false });
-  return data || [];
+  const products = data || [];
+  if (products.length === 0) return products;
+  const stockMap = await getBatchProductStock(products.map(p => p.id));
+  return products.filter(p => (stockMap[p.id] || 0) > 0);
 };
 
 const fetchCategories = async () => {

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { supabase } from '@/integrations/supabase/client';
 import { useRobustCart } from '@/hooks/useRobustCart';
-import { getProductStockSummary } from '@/utils/stockCalculation';
+import { getProductStockSummary, getBatchVariantStock, getSizeVariantStock } from '@/utils/stockCalculation';
 import { toast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { Package, Home as HomeIcon } from 'lucide-react';
@@ -113,13 +113,18 @@ const fetchColorVariants = async (productId: string): Promise<ColorVariant[]> =>
     .from('color_variants')
     .select('id, color_name, has_sizes, image_url, colors(hex_code)')
     .eq('product_id', productId);
-  return (data || []).map((cv: any) => ({
+  const variants = (data || []).map((cv: any) => ({
     id: cv.id,
     color_name: cv.color_name,
     has_sizes: cv.has_sizes,
     image_url: cv.image_url,
     hex_code: cv.colors?.hex_code || null,
   }));
+  
+  // Filter out color variants with 0 stock
+  if (variants.length === 0) return variants;
+  const colorStockMap = await getBatchVariantStock(productId);
+  return variants.filter(v => (colorStockMap[v.id] || 0) > 0);
 };
 
 const fetchAdditionalImages = async (productId: string): Promise<string[]> => {
@@ -299,9 +304,17 @@ export default function ProductDetail() {
       .select('id, size_name')
       .eq('color_variant_id', colorVariantId);
 
-    setSizeVariants(data || []);
-    if (data && data.length > 0) {
-      setSelectedSize(data[0].id);
+    // Filter out size variants with 0 stock
+    const allSizes = data || [];
+    if (allSizes.length > 0) {
+      const sizeStockMap = await getSizeVariantStock(colorVariantId);
+      const inStockSizes = allSizes.filter(s => (sizeStockMap[s.id] || 0) > 0);
+      setSizeVariants(inStockSizes);
+      if (inStockSizes.length > 0) {
+        setSelectedSize(inStockSizes[0].id);
+      }
+    } else {
+      setSizeVariants([]);
     }
   };
 
