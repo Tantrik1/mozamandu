@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, Sparkles, Package } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getBatchProductStock } from '@/utils/stockCalculation';
 
 interface Product {
   id: string;
@@ -21,8 +22,11 @@ const fetchMixedProducts = async () => {
     .eq('status', 'active')
     .limit(8); // Reduced limit
 
-  // Shuffle the products for random order
-  return (data || []).sort(() => Math.random() - 0.5).slice(0, 4); // Show only 4
+  const products = data || [];
+  if (products.length === 0) return [];
+  const stockMap = await getBatchProductStock(products.map(p => p.id));
+  const inStock = products.filter(p => (stockMap[p.id] || 0) > 0);
+  return inStock.sort(() => Math.random() - 0.5).slice(0, 4);
 };
 
 
