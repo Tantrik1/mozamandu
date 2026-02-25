@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, Sparkles, Package } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { getBatchProductStock } from '@/utils/stockCalculation';
+import { getBatchProductStock, getActiveSubcategoryIds } from '@/utils/stockCalculation';
 
 interface Product {
   id: string;
@@ -16,11 +16,14 @@ interface Product {
 }
 
 const fetchMixedProducts = async () => {
+  const activeSubIds = await getActiveSubcategoryIds();
+  if (activeSubIds.length === 0) return [];
   const { data } = await supabase
     .from('products')
     .select('id, name, image_url, selling_price, cost_price, subcategory:subcategories(name, min_selling_price)')
     .eq('status', 'active')
-    .limit(8); // Reduced limit
+    .in('subcategory_id', activeSubIds)
+    .limit(8);
 
   const products = data || [];
   if (products.length === 0) return [];

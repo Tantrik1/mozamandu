@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, Loader2, Tag, Package, FolderOpen, ArrowLeft, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { getActiveSubcategoryIds } from '@/utils/stockCalculation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -69,7 +70,9 @@ export function MobileSearch({ isOpen, onClose }: MobileSearchProps) {
     const searchTerm = `%${searchQuery.toLowerCase()}%`;
 
     try {
-      // Search categories
+      const activeSubIds = await getActiveSubcategoryIds();
+
+      // Search categories - only active ones
       const { data: categories } = await supabase
         .from('categories')
         .select('id, name')
@@ -77,21 +80,28 @@ export function MobileSearch({ isOpen, onClose }: MobileSearchProps) {
         .ilike('name', searchTerm)
         .limit(3);
 
-      // Search subcategories
+      // Search subcategories - only those with active parent category
       const { data: subcategories } = await supabase
         .from('subcategories')
-        .select('id, name, image_url, category:categories(name)')
+        .select('id, name, image_url, category:categories!inner(name)')
         .eq('status', 'on')
+        .eq('categories.status', 'on')
         .ilike('name', searchTerm)
         .limit(5);
 
-      // Search products
-      const { data: products } = await supabase
+      // Search products - only from active subcategories
+      let productQuery = supabase
         .from('products')
         .select('id, name, image_url, selling_price, subcategory:subcategories(name)')
         .eq('status', 'active')
         .ilike('name', searchTerm)
         .limit(10);
+
+      if (activeSubIds.length > 0) {
+        productQuery = productQuery.in('subcategory_id', activeSubIds);
+      }
+
+      const { data: products } = await productQuery;
 
       const allResults: SearchResult[] = [
         ...(categories?.map(c => ({

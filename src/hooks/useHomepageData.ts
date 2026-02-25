@@ -1,6 +1,6 @@
 import { useQueries } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { getBatchProductStock } from '@/utils/stockCalculation';
+import { getBatchProductStock, getActiveSubcategoryIds } from '@/utils/stockCalculation';
 
 // Fetch functions - optimized with minimal data
 // Helper to filter out zero-stock products
@@ -11,22 +11,28 @@ const filterInStock = async (products: any[]) => {
 };
 
 const fetchLatestProducts = async () => {
+  const activeSubIds = await getActiveSubcategoryIds();
+  if (activeSubIds.length === 0) return [];
   const { data } = await supabase
     .from('products')
     .select(
       `id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price)`
     )
     .eq('status', 'active')
+    .in('subcategory_id', activeSubIds)
     .order('created_at', { ascending: false })
     .limit(8);
   return filterInStock(data || []);
 };
 
 const fetchMostSoldProducts = async () => {
+  const activeSubIds = await getActiveSubcategoryIds();
+  if (activeSubIds.length === 0) return [];
+
   const { data: orderData } = await supabase
     .from('customer_order_item_details')
     .select('product_name, quantity')
-    .limit(100); // Limit order data for faster query
+    .limit(100);
 
   const productCounts: Record<string, number> = {};
   orderData?.forEach(item => {
@@ -39,6 +45,7 @@ const fetchMostSoldProducts = async () => {
       `id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price)`
     )
     .eq('status', 'active')
+    .in('subcategory_id', activeSubIds)
     .limit(12);
 
   if (!products) return [];
@@ -70,6 +77,8 @@ const fetchFAQs = async () => {
 };
 
 const fetchFeaturedProducts = async () => {
+  const activeSubIds = await getActiveSubcategoryIds();
+  if (activeSubIds.length === 0) return [];
   const { data } = await supabase
     .from('products')
     .select(
@@ -77,6 +86,7 @@ const fetchFeaturedProducts = async () => {
     )
     .eq('status', 'active')
     .eq('is_featured', true)
+    .in('subcategory_id', activeSubIds)
     .limit(8);
   return filterInStock(data || []);
 };

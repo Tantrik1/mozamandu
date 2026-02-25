@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getBatchProductStock } from '@/utils/stockCalculation';
+import { getBatchProductStock, getActiveSubcategoryIds } from '@/utils/stockCalculation';
 
 interface Category {
   id: string;
@@ -48,12 +48,15 @@ const getDisplayPrice = (p: Product) =>
 
 // Fetch ALL products (default view) - filters out zero-stock
 const fetchAllProducts = async () => {
+  const activeSubIds = await getActiveSubcategoryIds();
+  if (activeSubIds.length === 0) return [];
   const { data } = await supabase
     .from('products')
     .select(
       'id, name, image_url, selling_price, cost_price, subcategory_id, category_id, is_featured, has_color_variants, created_at, subcategory:subcategories(name, min_selling_price)'
     )
     .eq('status', 'active')
+    .in('subcategory_id', activeSubIds)
     .order('created_at', { ascending: false });
   const products = data || [];
   if (products.length === 0) return products;

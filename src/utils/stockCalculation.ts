@@ -1,6 +1,23 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+// Returns subcategory IDs where both the subcategory AND its parent category are active
+export async function getActiveSubcategoryIds(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from('subcategories')
+      .select('id, categories!inner(status)')
+      .eq('status', 'on')
+      .eq('categories.status', 'on');
+
+    if (error) throw error;
+    return (data || []).map(s => s.id);
+  } catch (error) {
+    console.error('Error fetching active subcategory IDs:', error);
+    return [];
+  }
+}
+
 export interface ProductStockSummary {
   productId: string;
   totalStock: number;
