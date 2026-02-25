@@ -1,93 +1,128 @@
 
-# Hide Out-of-Stock Products and Variants
 
-## Overview
-Products with 0 stock should be hidden from all customer-facing listings, and individual color/size variants with 0 stock should be hidden on the product detail page.
+# Fix: Category/Subcategory Status Not Respected in Product Listings and Search
 
-## Current State
-- **ModernProductCard** (customer carousel): Already hides products with 0 stock (`if (productStock === 0) return null`) -- but fetches stock per-card which is expensive
-- **HomeProductCard** (homepage sections): No stock check at all -- shows all products regardless of stock
-- **ShopProductCard** (shop page): No stock check -- shows all products
-- **MixedProducts**: No stock check
-- **Shop page fetcher** (`fetchAllProducts`): No stock filtering
-- **Homepage fetchers** (`useHomepageData`): No stock filtering
-- **ProductDetail page**: Shows all color variants and size variants regardless of individual variant stock
-- **customer/LatestProducts**: Hardcodes `stock_quantity: 100` to skip stock checks
+## Problem
+
+When a category or subcategory is set to inactive (status = 'off'), products belonging to them **still appear** across the entire website. This affects:
+
+- Shop page product grid
+- Homepage sections (Latest, Featured, Most Sold, Mixed)
+- Global search (desktop and mobile)
+- "View all results" search on shop page
+
+Additionally, search results show subcategories whose **parent category is inactive**.
+
+## Root Cause
+
+All product-fetching queries only check `products.status = 'active'` but never verify that the parent subcategory (`status = 'on'`) or grandparent category (`status = 'on'`) is also active. Search queries for subcategories check subcategory status but not parent category status.
 
 ## Solution
 
-### 1. Filter out-of-stock products at the data-fetching level (most efficient)
+### 1. Create a shared utility to get active subcategory IDs
 
-Rather than checking stock per-card (N+1 queries), join `product_inventory` in the fetch queries and filter out products with 0 total available stock.
+Add a helper function that returns only subcategory IDs where both the subcategory AND its parent category are active. This is a single query we can reuse everywhere.
+
+**File:** `src/utils/stockCalculation.ts` (add new export)
+
+```text
+getActiveSubcategoryIds() -> string[]
+  - Fetch subcategories where status = 'on'
+  - Join categories and filter where category status = 'on'
+  - Return array of valid subcategory IDs
+  - Cache-friendly (called once per page load via React Query)
+```
+
+### 2. Filter products in all fetch functions
 
 **Files to change:**
+- `src/hooks/useHomepageData.ts` -- fetchLatestProducts, fetchMostSoldProducts, fetchFeaturedProducts
+- `src/pages/Shop.tsx` -- fetchAllProducts
+- `src/components/home/MixedProducts.tsx` -- fetchMixedProducts
+- `src/components/customer/LatestProducts.tsx` -- fetchLatestProducts
 
-**`src/hooks/useHomepageData.ts`** - All product fetch functions (latestProducts, mostSoldProducts, featuredProducts):
-- After fetching products, also fetch their stock from `product_inventory` in a single batch query
-- Filter out products where total `available_stock` across active inventory records is 0
+In each, after fetching products, filter by checking `product.subcategory_id` is in the active subcategory IDs list. Or better: add `.in('subcategory_id', activeIds)` directly to the Supabase query.
 
-**`src/pages/Shop.tsx`** - `fetchAllProducts`:
-- Same approach: batch-fetch stock for all products, filter out zero-stock ones
+### 3. Fix search to exclude inactive categories/subcategories/products
 
-**`src/components/home/MixedProducts.tsx`** - `fetchMixedProducts`:
-- Same batch stock filtering
+**Files to change:**
+- `src/components/navbar/GlobalSearch.tsx`
+- `src/components/navbar/MobileSearch.tsx`
 
-**`src/components/customer/LatestProducts.tsx`** - `fetchLatestProducts`:
-- Remove the hardcoded `stock_quantity: 100` hack
-- Apply the same stock filtering
+Changes:
+- **Subcategory search**: Also verify the parent category has `status = 'on'` (currently only checks subcategory status). Use `!inner` join: `subcategories!inner(... category:categories!inner(...))` with `.eq('category.status', 'on')`.
+- **Product search**: Filter products whose subcategory is active. Fetch active subcategory IDs first, then add `.in('subcategory_id', activeIds)` to the product query.
 
-### 2. Hide out-of-stock variants on product detail page
+### 4. Filter in CategorySubcategoryBar
 
-**`src/pages/ProductDetail.tsx`**:
-- When fetching `color_variants`, also fetch their stock from `product_inventory`
-- Filter out color variants where all their inventory records have 0 available stock
-- When fetching `size_variants` for a selected color, filter out sizes with 0 available stock
+**File:** `src/components/shop/CategorySubcategoryBar.tsx`
 
-**`src/components/product/ProductInfo.tsx`**:
-- The component receives `colorVariants` and `sizeVariants` as props, so filtering at the data level in ProductDetail is sufficient
+Already filters by `status = 'on'` for both categories and subcategories -- no change needed here.
 
-### 3. Shop page ShopProductCard
+## Technical Details
 
-**`src/components/shop/ShopProductCard.tsx`**:
-- Add stock check similar to ModernProductCard, or better: filter at the Shop page level (approach from step 1) so cards don't need individual queries
-
-## Technical Approach
-
-Create a shared utility function to batch-fetch stock for multiple product IDs:
+### New utility function
 
 ```typescript
-// In stockCalculation.ts
-async function getProductsWithStock(productIds: string[]): Promise<Record<string, number>> {
+// src/utils/stockCalculation.ts
+export const getActiveSubcategoryIds = async (): Promise<string[]> => {
   const { data } = await supabase
-    .from('product_inventory')
-    .select('product_id, available_stock')
-    .in('product_id', productIds)
-    .eq('is_active', true);
-  
-  const stockMap: Record<string, number> = {};
-  (data || []).forEach(item => {
-    stockMap[item.product_id] = (stockMap[item.product_id] || 0) + (item.available_stock || 0);
-  });
-  return stockMap;
-}
+    .from('subcategories')
+    .select('id, category:categories!inner(status)')
+    .eq('status', 'on')
+    .eq('categories.status', 'on');
+  return (data || []).map(s => s.id);
+};
 ```
 
-Then in each fetch function, after getting products:
+### Updated fetch pattern (example: fetchAllProducts)
+
 ```typescript
-const stockMap = await getProductsWithStock(products.map(p => p.id));
-return products.filter(p => (stockMap[p.id] || 0) > 0);
+const fetchAllProducts = async () => {
+  const activeSubIds = await getActiveSubcategoryIds();
+  if (activeSubIds.length === 0) return [];
+  
+  const { data } = await supabase
+    .from('products')
+    .select('...')
+    .eq('status', 'active')
+    .in('subcategory_id', activeSubIds)
+    .order('created_at', { ascending: false });
+  // ... stock filtering continues as before
+};
 ```
 
-For variants on the detail page:
-- Fetch inventory grouped by `color_variant_id` and filter out colors with 0 total stock
-- Fetch inventory grouped by `size_variant_id` for the selected color and filter out sizes with 0 stock
+### Updated search pattern (example: GlobalSearch product query)
+
+```typescript
+const activeSubIds = await getActiveSubcategoryIds();
+
+// Products - only from active subcategories
+const { data: products } = await supabase
+  .from('products')
+  .select('id, name, image_url, selling_price, subcategory:subcategories(name)')
+  .eq('status', 'active')
+  .in('subcategory_id', activeSubIds)
+  .ilike('name', searchTerm)
+  .limit(8);
+
+// Subcategories - only those with active parent category
+const { data: subcategories } = await supabase
+  .from('subcategories')
+  .select('id, name, image_url, category:categories!inner(name)')
+  .eq('status', 'on')
+  .eq('categories.status', 'on')
+  .ilike('name', searchTerm)
+  .limit(5);
+```
 
 ## Files Modified
 
-1. **`src/utils/stockCalculation.ts`** -- Add `getBatchProductStock()` utility
-2. **`src/hooks/useHomepageData.ts`** -- Filter out zero-stock products in all 3 product fetchers
-3. **`src/pages/Shop.tsx`** -- Filter out zero-stock products in `fetchAllProducts`
-4. **`src/components/home/MixedProducts.tsx`** -- Filter out zero-stock products
-5. **`src/components/customer/LatestProducts.tsx`** -- Remove stock hack, filter properly
-6. **`src/pages/ProductDetail.tsx`** -- Filter color variants and size variants with 0 stock
-7. **`src/components/shop/ShopProductCard.tsx`** -- No changes needed (filtered at page level)
+1. `src/utils/stockCalculation.ts` -- Add `getActiveSubcategoryIds()` utility
+2. `src/hooks/useHomepageData.ts` -- Filter all 3 product fetchers by active subcategories
+3. `src/pages/Shop.tsx` -- Filter `fetchAllProducts` by active subcategories
+4. `src/components/home/MixedProducts.tsx` -- Filter by active subcategories
+5. `src/components/customer/LatestProducts.tsx` -- Filter by active subcategories
+6. `src/components/navbar/GlobalSearch.tsx` -- Filter products and subcategories by active status
+7. `src/components/navbar/MobileSearch.tsx` -- Same search fixes
+
