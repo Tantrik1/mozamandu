@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Edit, Trash2, Package, Palette, Ruler } from 'lucide-react';
+import { ArrowLeft, Edit, Archive, Package, Palette, Ruler } from 'lucide-react';
 import { calculateProductStock, StockCalculationResult } from '@/utils/stockCalculation';
 import { ProductDeletionDialog } from './ProductDeletionDialog';
 
@@ -135,8 +135,8 @@ export function ProductDetailView({ productId, onEdit, onDelete, onBack }: Produ
             Edit Product
           </Button>
           <Button onClick={handleDelete} variant="destructive">
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete Product
+            <Archive className="h-4 w-4 mr-2" />
+            Archive Product
           </Button>
         </div>
       </div>
