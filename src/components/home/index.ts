@@ -5,3 +5,4 @@ export { MostSoldProducts } from './MostSoldProducts';
 export { FAQSection } from './FAQSection';
 export { FeaturedDeals } from './FeaturedDeals';
 export { MixedProducts } from './MixedProducts';
+export { FlashSales } from './FlashSales';

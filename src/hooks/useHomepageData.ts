@@ -76,6 +76,27 @@ const fetchFAQs = async () => {
   return data || [];
 };
 
+const fetchFlashSaleProducts = async () => {
+  const activeSubIds = await getActiveSubcategoryIds();
+  if (activeSubIds.length === 0) return [];
+  const { data } = await supabase
+    .from('products')
+    .select(
+      `id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price)`
+    )
+    .eq('status', 'active')
+    .in('subcategory_id', activeSubIds)
+    .not('selling_price', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  // Filter to only products where selling_price < cost_price (actual discount)
+  const discounted = (data || []).filter(
+    (p) => p.selling_price != null && p.selling_price > 0 && p.cost_price > 0 && p.selling_price < p.cost_price
+  );
+  const inStock = await filterInStock(discounted);
+  return inStock.slice(0, 8);
+};
+
 const fetchFeaturedProducts = async () => {
   const activeSubIds = await getActiveSubcategoryIds();
   if (activeSubIds.length === 0) return [];
@@ -107,6 +128,12 @@ export function useHomepageData() {
   const results = useQueries({
     queries: [
       // Priority 1: Above-the-fold content - fetch immediately
+      {
+        queryKey: ['homepage', 'flashSales'],
+        queryFn: fetchFlashSaleProducts,
+        staleTime: 2 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+      },
       {
         queryKey: ['homepage', 'latestProducts'],
         queryFn: fetchLatestProducts,
@@ -154,17 +181,19 @@ export function useHomepageData() {
   });
 
   return {
-    latestProducts: results[0].data || [],
-    categories: results[1].data || [],
-    mostSoldProducts: results[2].data || [],
-    faqs: results[3].data || [],
-    featuredProducts: results[4].data || [],
-    notice: results[5].data,
-    isLatestLoading: results[0].isLoading,
-    isCategoriesLoading: results[1].isLoading,
-    isMostSoldLoading: results[2].isLoading,
-    isFAQsLoading: results[3].isLoading,
-    isFeaturedLoading: results[4].isLoading,
-    isNoticeLoading: results[5].isLoading,
+    flashSaleProducts: results[0].data || [],
+    latestProducts: results[1].data || [],
+    categories: results[2].data || [],
+    mostSoldProducts: results[3].data || [],
+    faqs: results[4].data || [],
+    featuredProducts: results[5].data || [],
+    notice: results[6].data,
+    isFlashSaleLoading: results[0].isLoading,
+    isLatestLoading: results[1].isLoading,
+    isCategoriesLoading: results[2].isLoading,
+    isMostSoldLoading: results[3].isLoading,
+    isFAQsLoading: results[4].isLoading,
+    isFeaturedLoading: results[5].isLoading,
+    isNoticeLoading: results[6].isLoading,
   };
 }
