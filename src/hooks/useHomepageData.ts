@@ -82,18 +82,17 @@ const fetchFlashSaleProducts = async () => {
   const { data } = await supabase
     .from('products')
     .select(
-      `id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price)`
+      `id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price, max_selling_price)`
     )
     .eq('status', 'active')
     .in('subcategory_id', activeSubIds)
     .not('selling_price', 'is', null)
+    .gt('selling_price', 0)
     .order('created_at', { ascending: false })
     .limit(20);
-  // Filter to only products where selling_price < cost_price (actual discount)
-  const discounted = (data || []).filter(
-    (p) => p.selling_price != null && p.selling_price > 0 && p.cost_price > 0 && p.selling_price < p.cost_price
-  );
-  const inStock = await filterInStock(discounted);
+  // Show products that have a selling_price lower than subcategory max_selling_price (on sale)
+  // or just all products with a selling_price set
+  const inStock = await filterInStock(data || []);
   return inStock.slice(0, 8);
 };
 

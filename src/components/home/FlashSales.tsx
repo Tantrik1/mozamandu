@@ -10,7 +10,7 @@ interface Product {
   selling_price: number | null;
   cost_price: number;
   image_url: string | null;
-  subcategory: { name: string; min_selling_price?: number | null } | null;
+  subcategory: { name: string; min_selling_price?: number | null; max_selling_price?: number | null } | null;
   has_color_variants?: boolean;
 }
 
@@ -119,12 +119,14 @@ export const FlashSales = memo(function FlashSales({ products, isLoading }: Flas
         {/* Product Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
           {products.map((product, index) => {
-            const sellingPrice = product.selling_price ?? product.subcategory?.min_selling_price ?? null;
-            const discount = sellingPrice != null && product.cost_price > 0
-              ? Math.round(((product.cost_price - sellingPrice) / product.cost_price) * 100)
+            const displayPrice =
+              (product.selling_price && product.selling_price > 0)
+                ? product.selling_price
+                : (product.subcategory?.min_selling_price ?? product.cost_price ?? 0);
+            const maxPrice = product.subcategory?.max_selling_price ?? 0;
+            const discount = maxPrice > displayPrice
+              ? Math.round(((maxPrice - displayPrice) / maxPrice) * 100)
               : 0;
-
-            const displayPrice = sellingPrice ?? product.cost_price ?? 0;
 
             return (
               <div
@@ -152,7 +154,7 @@ export const FlashSales = memo(function FlashSales({ products, isLoading }: Flas
                       </p>
                       {discount > 0 && (
                         <p className="text-sm text-muted-foreground line-through">
-                          Rs. {product.cost_price.toLocaleString()}
+                          Rs. {maxPrice.toLocaleString()}
                         </p>
                       )}
                     </div>
