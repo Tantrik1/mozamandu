@@ -11,6 +11,7 @@ const MostSoldProducts = lazy(() => import('@/components/home/MostSoldProducts')
 const FAQSection = lazy(() => import('@/components/home/FAQSection').then(m => ({ default: m.FAQSection })));
 const MixedProducts = lazy(() => import('@/components/home/MixedProducts').then(m => ({ default: m.MixedProducts })));
 const FeaturedDeals = lazy(() => import('@/components/home/FeaturedDeals').then(m => ({ default: m.FeaturedDeals })));
+const FlashSales = lazy(() => import('@/components/home/FlashSales').then(m => ({ default: m.FlashSales })));
 
 // Simple section skeleton
 const SectionSkeleton = memo(() => (
@@ -27,12 +28,14 @@ const SectionSkeleton = memo(() => (
 
 export default function Home() {
   const {
+    flashSaleProducts,
     latestProducts,
     mostSoldProducts,
     categories,
     faqs,
     featuredProducts,
     notice,
+    isFlashSaleLoading,
     isLatestLoading,
     isMostSoldLoading,
     isCategoriesLoading,
@@ -99,6 +102,11 @@ export default function Home() {
       
       {/* Hero Section - Critical, loads immediately */}
       <HeroSection />
+
+      {/* Flash Sales - Between Hero and Latest */}
+      <Suspense fallback={<SectionSkeleton />}>
+        <FlashSales products={flashSaleProducts} isLoading={isFlashSaleLoading} />
+      </Suspense>
 
       {/* Latest Products - Priority content */}
       <LatestProducts products={latestProducts} isLoading={isLatestLoading} />
