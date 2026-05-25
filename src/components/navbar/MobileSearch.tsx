@@ -57,7 +57,7 @@ export function MobileSearch({ isOpen, onClose }: MobileSearchProps) {
   }, [isOpen]);
 
   // Debounced search
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const performSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) {

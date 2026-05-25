@@ -23,7 +23,7 @@ export function DashboardStats() {
 
   useEffect(() => {
     let isMounted = true;
-    let loadingTimeout: NodeJS.Timeout;
+    let loadingTimeout: ReturnType<typeof setTimeout>;
 
     console.log('🔄 DashboardStats: Starting stats fetch');
 
