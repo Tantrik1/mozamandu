@@ -59,9 +59,13 @@ export function ModernInventoryManagement() {
     console.log('Fetching inventory...');
     setLoading(true);
     try {
+      // Only show inventory rows for active products, and only active inventory rows.
+      // This prevents archived/inactive items from cluttering the dashboard.
       const { data, error } = await supabase
         .from('product_inventory')
-        .select('*')
+        .select('*, products!inner(status)')
+        .eq('is_active', true)
+        .eq('products.status', 'active')
         .order('updated_at', { ascending: false });
 
       console.log('Inventory data:', data);
