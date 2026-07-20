@@ -251,7 +251,6 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
           color_name: item.color_name || null,
           size_name: item.size_name || null,
           stock_quantity: item.stock_quantity,
-          available_stock: Math.max(0, (item.stock_quantity || 0) - ((item as any).reserved_stock || 0)),
           cost_price: item.cost_price,
           selling_price: item.selling_price,
           low_stock_threshold: item.low_stock_threshold,
