@@ -55,13 +55,12 @@ export function InventoryEditDialog({ item, isOpen, onClose, onSave }: Inventory
 
     setSaving(true);
     try {
-      // Keep available_stock in sync with stock_quantity - reserved_stock
-      const newAvailable = Math.max(0, formData.stock_quantity - (item.reserved_stock || 0));
+      // available_stock is a generated column (stock_quantity - reserved_stock)
+      // computed by the database — do NOT write it.
       const { error } = await supabase
         .from('product_inventory')
         .update({
           stock_quantity: formData.stock_quantity,
-          available_stock: newAvailable,
           low_stock_threshold: formData.low_stock_threshold,
           cost_price: formData.cost_price,
           selling_price: formData.selling_price,
