@@ -245,6 +245,8 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
       const category = productInfo?.categories?.name || '';
       const subcategory = productInfo?.subcategories?.name || '';
 
+      const savedInventoryIds: string[] = [];
+
       for (const item of inventoryItems) {
         const inventoryData = {
           sku: item.sku,
@@ -277,17 +279,47 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
             console.error('Error updating inventory item:', error);
             throw error;
           }
+
+          savedInventoryIds.push(item.id);
         } else {
           // Insert new record
-          const { error } = await supabase
+          const { data: insertedInventory, error } = await supabase
             .from('product_inventory')
-            .insert(inventoryData);
+            .insert(inventoryData)
+            .select('id')
+            .single();
 
           if (error) {
             console.error('Error inserting inventory item:', error);
             throw error;
           }
+
+          if (insertedInventory?.id) {
+            savedInventoryIds.push(insertedInventory.id);
+          }
         }
+      }
+
+      let staleInventoryQuery = supabase
+        .from('product_inventory')
+        .update({
+          stock_quantity: 0,
+          reserved_stock: 0,
+          is_active: false,
+          color_variant_id: null,
+          size_variant_id: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('product_id', productId);
+
+      if (savedInventoryIds.length > 0) {
+        staleInventoryQuery = staleInventoryQuery.not('id', 'in', `(${savedInventoryIds.join(',')})`);
+      }
+
+      const { error: staleInventoryError } = await staleInventoryQuery;
+      if (staleInventoryError) {
+        console.error('Error deactivating stale inventory items:', staleInventoryError);
+        throw staleInventoryError;
       }
 
       toast({
