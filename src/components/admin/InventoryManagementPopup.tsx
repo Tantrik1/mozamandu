@@ -17,6 +17,7 @@ interface InventoryItem {
   color_name?: string;
   size_name?: string;
   stock_quantity: number;
+  reserved_stock?: number;
   cost_price: number;
   selling_price: number;
   low_stock_threshold: number;
@@ -82,15 +83,17 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
         // Simple product - single inventory item
         const existingItem = existingInventory?.find(item => !item.color_variant_id && !item.size_variant_id);
         
+        const productIsActive = product.status !== 'inactive';
         const simpleItem: InventoryItem = {
           id: existingItem?.id,
           sku: existingItem?.sku || generateSKU(product.name),
           product_name: product.name,
           stock_quantity: existingItem?.stock_quantity || 0,
+          reserved_stock: existingItem?.reserved_stock ?? 0,
           cost_price: existingItem?.cost_price || product.cost_price,
           selling_price: existingItem?.selling_price || product.selling_price || product.cost_price,
           low_stock_threshold: existingItem?.low_stock_threshold || 10,
-          is_active: existingItem?.is_active ?? true,
+          is_active: productIsActive,
         };
         setInventoryItems([simpleItem]);
       }
@@ -109,6 +112,7 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
   const generateVariantInventory = async (product: any, existingInventory: any[] = []) => {
     try {
       const items: InventoryItem[] = [];
+      const productIsActive = product.status !== 'inactive';
 
       // Fetch color variants
       const { data: colorVariants, error: colorError } = await supabase
@@ -153,12 +157,13 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
               color_name: colorVariant.color_name,
               size_name: sizeVariant.size_name,
               stock_quantity: existingItem?.stock_quantity ?? 0,
+              reserved_stock: existingItem?.reserved_stock ?? 0,
               cost_price: existingItem?.cost_price || product.cost_price,
               selling_price: existingItem?.selling_price || product.selling_price || product.cost_price,
               low_stock_threshold: existingItem?.low_stock_threshold || 10,
               color_variant_id: colorVariant.id,
               size_variant_id: sizeVariant.id,
-              is_active: existingItem?.is_active ?? true,
+              is_active: productIsActive,
             });
           }
         } else {
@@ -181,11 +186,12 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
             product_name: product.name,
             color_name: colorVariant.color_name,
             stock_quantity: existingItem?.stock_quantity ?? 0,
+            reserved_stock: existingItem?.reserved_stock ?? 0,
             cost_price: existingItem?.cost_price || product.cost_price,
             selling_price: existingItem?.selling_price || product.selling_price || product.cost_price,
             low_stock_threshold: existingItem?.low_stock_threshold || 10,
             color_variant_id: colorVariant.id,
-            is_active: existingItem?.is_active ?? true,
+            is_active: productIsActive,
           });
         }
       }
@@ -251,10 +257,11 @@ export function InventoryManagementPopup({ productId, onClose, isOpen }: Invento
           color_name: item.color_name || null,
           size_name: item.size_name || null,
           stock_quantity: item.stock_quantity,
+          reserved_stock: item.reserved_stock ?? 0,
           cost_price: item.cost_price,
           selling_price: item.selling_price,
           low_stock_threshold: item.low_stock_threshold,
-          is_active: item.is_active !== false,
+          is_active: productInfo?.status !== 'inactive',
         };
 
         console.log('Saving inventory record:', inventoryData);
