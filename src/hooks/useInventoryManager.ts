@@ -203,7 +203,6 @@ export function useInventoryManager() {
           .from('product_inventory')
           .update({ 
             reserved_stock: newReservedStock,
-            available_stock: Math.max(0, (inventory.stock_quantity || 0) - newReservedStock),
             updated_at: new Date().toISOString()
           })
           .eq('id', item.product_inventory_id)
@@ -356,7 +355,6 @@ export function useInventoryManager() {
           .from('product_inventory')
           .update({ 
             reserved_stock: newReservedStock,
-            available_stock: Math.max(0, (inventory.stock_quantity || 0) - newReservedStock),
             updated_at: new Date().toISOString()
           })
           .eq('id', item.product_inventory_id)
@@ -472,7 +470,6 @@ export function useInventoryManager() {
           .update({ 
             stock_quantity: newStockQuantity,
             reserved_stock: newReservedStock,
-            available_stock: Math.max(0, newStockQuantity - newReservedStock),
             updated_at: new Date().toISOString()
           })
           .eq('id', item.product_inventory_id)
