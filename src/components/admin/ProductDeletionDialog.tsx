@@ -40,7 +40,6 @@ export function ProductDeletionDialog({
         .update({
           stock_quantity: 0,
           reserved_stock: 0,
-          available_stock: 0,
           is_active: false,
           updated_at: new Date().toISOString(),
         })
