@@ -57,36 +57,44 @@ interface RobustCartContextType {
 
 const RobustCartContext = createContext<RobustCartContextType | undefined>(undefined);
 
+// Helper to load cart from localStorage (used for lazy init)
+const getInitialCart = (): CartItem[] => {
+  try {
+    const savedCart = localStorage.getItem('cart');
+    if (savedCart) {
+      return JSON.parse(savedCart);
+    }
+  } catch (error) {
+    console.error('Error loading cart from storage:', error);
+  }
+  return [];
+};
+
+const getInitialAddedOrder = (items: CartItem[]): number => {
+  return items.reduce((max, item) => Math.max(max, item.addedOrder || 0), 0) + 1;
+};
+
 export function RobustCartProvider({ children }: { children: React.ReactNode }) {
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  // Lazy initialize from localStorage to prevent cart clearing on auth state changes
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => getInitialCart());
   const [loading, setLoading] = useState(false);
-  const [nextAddedOrder, setNextAddedOrder] = useState(1);
+  const [nextAddedOrder, setNextAddedOrder] = useState(() => getInitialAddedOrder(getInitialCart()));
+  const [isInitialized, setIsInitialized] = useState(false);
   const { toast } = useToast();
 
+  // Mark as initialized after first render
   useEffect(() => {
-    loadCartFromStorage();
+    setIsInitialized(true);
   }, []);
 
+  // Only save to localStorage after initialization (prevents overwriting on mount)
   useEffect(() => {
-    saveCartToStorage();
-  }, [cartItems]);
-
-  const loadCartFromStorage = () => {
-    try {
-      const savedCart = localStorage.getItem('cart');
-      if (savedCart) {
-        const parsedCart = JSON.parse(savedCart);
-        setCartItems(parsedCart);
-        
-        // Update next order counter based on existing items
-        const maxOrder = parsedCart.reduce((max: number, item: CartItem) => 
-          Math.max(max, item.addedOrder || 0), 0);
-        setNextAddedOrder(maxOrder + 1);
-      }
-    } catch (error) {
-      console.error('Error loading cart from storage:', error);
+    if (isInitialized) {
+      saveCartToStorage();
     }
-  };
+  }, [cartItems, isInitialized]);
+
+  // Stock cleanup moved to checkout page only - removed from here to improve performance
 
   const saveCartToStorage = () => {
     try {

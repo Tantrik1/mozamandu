@@ -36,7 +36,7 @@ export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!contactNumber.trim()) {
       toast({
         title: "Error",
@@ -56,14 +56,14 @@ export function ContactInfoForm({ onComplete }: ContactInfoFormProps) {
         .update({
           contact_number: contactNumber.trim(),
           whatsapp_number: finalWhatsappNumber.trim(),
-        })
+        } as any)
         .eq('id', user?.id);
 
       if (error) {
         console.error('Profile update error:', error);
         toast({
           title: "Error",
-          description: "Failed to update contact information",
+          description: `Failed to update: ${error.message || error.code || JSON.stringify(error)}`,
           variant: "destructive",
         });
         return;

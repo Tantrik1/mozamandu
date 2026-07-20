@@ -1,5 +1,4 @@
-
-import { useEffect, ReactNode, useState } from 'react';
+import { useEffect, ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
@@ -18,77 +17,31 @@ export function RouteGuard({
 }: RouteGuardProps) {
   const { user, userProfile, isLoading } = useAuth();
   const navigate = useNavigate();
-  const [guardLoading, setGuardLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
-    let loadingTimeout: NodeJS.Timeout;
+    // Only redirect after auth has finished loading
+    if (isLoading) return;
 
-    console.log('🔄 RouteGuard: Starting guard check');
+    if (requireAuth && !user) {
+      navigate(redirectTo, { replace: true });
+      return;
+    }
 
-    // Set timeout fallback
-    loadingTimeout = setTimeout(() => {
-      if (isMounted && guardLoading) {
-        console.warn('⚠️ RouteGuard: Loading timeout after 10 seconds, forcing completion');
-        setGuardLoading(false);
-      }
-    }, 10000);
-
-    const checkPermissions = () => {
-      // Wait for auth to finish loading
-      if (isLoading) {
-        console.log('🔄 RouteGuard: Waiting for auth to complete');
-        return;
-      }
-
-      if (!isMounted) return;
-
-      console.log('🔄 RouteGuard: Auth loaded, checking permissions...', { 
-        user: !!user, 
-        userProfile: !!userProfile, 
-        requireAuth, 
-        requireAdmin 
-      });
-
-      // Check auth requirements
-      if (requireAuth && !user) {
-        console.log('🔄 RouteGuard: Auth required but no user, redirecting to', redirectTo);
-        navigate(redirectTo, { replace: true });
-        return;
-      }
-
-      if (requireAdmin && (!user || !userProfile || userProfile.role !== 'admin')) {
-        console.log('🔄 RouteGuard: Admin required but user is not admin, redirecting to home');
-        navigate('/', { replace: true });
-        return;
-      }
-
-      console.log('✅ RouteGuard: All checks passed, clearing guard loading');
-      setGuardLoading(false);
-      clearTimeout(loadingTimeout);
-    };
-
-    checkPermissions();
-
-    return () => {
-      isMounted = false;
-      clearTimeout(loadingTimeout);
-    };
+    if (requireAdmin && (!user || !userProfile || userProfile.role !== 'admin')) {
+      navigate('/', { replace: true });
+    }
   }, [user, userProfile, isLoading, requireAuth, requireAdmin, navigate, redirectTo]);
 
-  // Show loading while authentication or guard is checking
-  if (isLoading || guardLoading) {
+  // Show minimal loader only while auth is initializing (max ~500ms)
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  // Don't render anything if user should be redirected
+  // Don't render if redirecting
   if (requireAuth && !user) return null;
   if (requireAdmin && (!user || !userProfile || userProfile.role !== 'admin')) return null;
 

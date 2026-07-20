@@ -1,11 +1,56 @@
-
-import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { Helmet } from 'react-helmet-async';
+import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 
 export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <CustomerHeader />
+      <Helmet>
+        <title>Privacy Policy | Mozamandu Nepal</title>
+        <meta name="description" content="Learn how Mozamandu collects, uses, and protects your personal information when shopping for socks in Nepal." />
+        <link rel="canonical" href="https://mozamandu.com/privacy-policy" />
+        <meta property="og:title" content="Privacy Policy | Mozamandu Nepal" />
+        <meta property="og:description" content="Learn how Mozamandu collects, uses, and protects your personal information." />
+        <meta property="og:url" content="https://mozamandu.com/privacy-policy" />
+        <meta property="og:type" content="website" />
+        
+        {/* BreadcrumbList Schema */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://mozamandu.com" },
+              { "@type": "ListItem", "position": 2, "name": "Privacy Policy", "item": "https://mozamandu.com/privacy-policy" }
+            ]
+          })}
+        </script>
+        
+        {/* WebPage Schema */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebPage",
+            "name": "Privacy Policy",
+            "description": "Privacy policy for Mozamandu online socks store in Nepal.",
+            "url": "https://mozamandu.com/privacy-policy",
+            "dateModified": "2025-01-01",
+            "inLanguage": "en",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "Mozamandu",
+              "url": "https://mozamandu.com"
+            },
+            "publisher": {
+              "@type": "Organization",
+              "name": "Mozamandu",
+              "url": "https://mozamandu.com"
+            }
+          })}
+        </script>
+      </Helmet>
+      
+      <ModernNavbar />
       <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">Privacy Policy</h1>

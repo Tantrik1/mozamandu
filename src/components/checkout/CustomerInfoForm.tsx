@@ -56,28 +56,63 @@ export function CustomerInfoForm({
             id="email"
             type="email"
             value={customerInfo.email}
-            onChange={(e) => setCustomerInfo(prev => ({ ...prev, email: e.target.value }))}
+            onChange={(e) => {
+              const email = e.target.value;
+              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+              setCustomerInfo(prev => ({ ...prev, email }));
+            }}
             required
+            className={customerInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email) ? 'border-red-500' : ''}
           />
+          {customerInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email) && (
+            <p className="text-red-500 text-sm mt-1">Please enter a valid email address</p>
+          )}
         </div>
 
         <div>
-          <Label htmlFor="phone">Contact Number *</Label>
+          <Label htmlFor="phone">Contact Number * (Max 10 digits)</Label>
           <Input
             id="phone"
             value={customerInfo.phone}
-            onChange={(e) => setCustomerInfo(prev => ({ ...prev, phone: e.target.value }))}
+            onChange={(e) => {
+              const phone = e.target.value.replace(/\D/g, '').slice(0, 10);
+              setCustomerInfo(prev => ({ ...prev, phone }));
+            }}
             required
+            maxLength={10}
+            className={customerInfo.phone && (customerInfo.phone.length < 10 || !/^\d{10}$/.test(customerInfo.phone)) ? 'border-red-500' : ''}
           />
+          {customerInfo.phone && (customerInfo.phone.length < 10 || !/^\d{10}$/.test(customerInfo.phone)) && (
+            <p className="text-red-500 text-sm mt-1">Please enter a valid 10-digit phone number</p>
+          )}
         </div>
 
         <div>
           <Label htmlFor="whatsapp">WhatsApp Number (Optional)</Label>
-          <Input
-            id="whatsapp"
-            value={customerInfo.whatsapp || ''}
-            onChange={(e) => setCustomerInfo(prev => ({ ...prev, whatsapp: e.target.value }))}
-          />
+          <div className="space-y-3">
+            <div className="flex items-center space-x-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="whatsappSameAsContact"
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setCustomerInfo(prev => ({
+                    ...prev,
+                    whatsapp: checked ? prev.phone : prev.whatsapp || ''
+                  }));
+                }}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <Label htmlFor="whatsappSameAsContact" className="text-sm font-medium cursor-pointer text-gray-700">
+                Same as contact number
+              </Label>
+            </div>
+            <Input
+              id="whatsapp"
+              value={customerInfo.whatsapp || ''}
+              onChange={(e) => setCustomerInfo(prev => ({ ...prev, whatsapp: e.target.value }))}
+            />
+          </div>
         </div>
 
         <div>

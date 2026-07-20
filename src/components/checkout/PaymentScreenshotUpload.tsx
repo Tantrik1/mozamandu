@@ -35,11 +35,11 @@ export function PaymentScreenshotUpload({
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
       toast({
         title: 'File too large',
-        description: 'Please upload an image smaller than 5MB.',
+        description: 'Please upload an image smaller than 10MB.',
         variant: 'destructive',
       });
       return;

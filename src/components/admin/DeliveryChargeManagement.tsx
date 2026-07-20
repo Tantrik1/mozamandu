@@ -146,15 +146,15 @@ export function DeliveryChargeManagement() {
     : 0;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold">Delivery Charge Management</h2>
-          <p className="text-gray-600 mt-1">Manage delivery charges for different locations</p>
+          <h2 className="text-2xl md:text-3xl font-bold">Delivery Charges</h2>
+          <p className="text-muted-foreground mt-1">Manage delivery charges for locations</p>
         </div>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm} className="bg-orange-600 hover:bg-orange-700">
+            <Button onClick={resetForm}>
               <Plus className="h-4 w-4 mr-2" />
               Add Location
             </Button>
@@ -173,7 +173,7 @@ export function DeliveryChargeManagement() {
                   value={formData.place_name}
                   onChange={(e) => setFormData({ ...formData, place_name: e.target.value })}
                   required
-                  placeholder="e.g., Downtown, Suburbs, etc."
+                  placeholder="e.g., Downtown, Suburbs"
                 />
               </div>
               
@@ -205,7 +205,7 @@ export function DeliveryChargeManagement() {
                   Cancel
                 </Button>
                 <Button type="submit">
-                  {editingDeliveryCharge ? 'Update' : 'Add'} Location
+                  {editingDeliveryCharge ? 'Update' : 'Add'}
                 </Button>
               </div>
             </form>
@@ -214,45 +214,45 @@ export function DeliveryChargeManagement() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <MapPin className="h-5 w-5 text-blue-600" />
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <MapPin className="h-5 w-5 text-primary shrink-0" />
               <div>
-                <p className="text-sm text-gray-600">Total Locations</p>
-                <p className="text-2xl font-bold">{totalLocations}</p>
+                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-xl font-bold">{totalLocations}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <Truck className="h-5 w-5 text-green-600" />
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Truck className="h-5 w-5 text-emerald-600 shrink-0" />
               <div>
-                <p className="text-sm text-gray-600">Active Locations</p>
-                <p className="text-2xl font-bold">{activeCharges.length}</p>
+                <p className="text-sm text-muted-foreground">Active</p>
+                <p className="text-xl font-bold text-emerald-600">{activeCharges.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <span className="text-orange-600 font-bold text-lg">Rs</span>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <span className="text-amber-600 font-bold text-lg">Rs</span>
               <div>
-                <p className="text-sm text-gray-600">Average Price</p>
-                <p className="text-2xl font-bold">{averagePrice.toFixed(2)}</p>
+                <p className="text-sm text-muted-foreground">Avg Price</p>
+                <p className="text-xl font-bold">{averagePrice.toFixed(0)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="flex items-center space-x-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+      <div className="flex flex-col sm:flex-row items-center gap-4">
+        <div className="relative flex-1 max-w-sm w-full">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="Search locations..."
             value={searchTerm}
@@ -260,69 +260,71 @@ export function DeliveryChargeManagement() {
             className="pl-10"
           />
         </div>
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-muted-foreground">
           {filteredDeliveryCharges.length} of {deliveryCharges.length} locations
         </div>
       </div>
 
       {filteredDeliveryCharges.length === 0 ? (
         <div className="text-center py-12">
-          <MapPin className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No delivery locations found</h3>
-          <p className="text-gray-500">
-            {searchTerm ? 'Try adjusting your search terms' : 'Add your first delivery location to get started'}
+          <MapPin className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+          <h3 className="text-lg font-medium mb-2">No delivery locations found</h3>
+          <p className="text-muted-foreground">
+            {searchTerm ? 'Try adjusting your search terms' : 'Add your first delivery location'}
           </p>
         </div>
       ) : (
         <Card>
-          <CardHeader>
+          <CardHeader className="px-4 md:px-6">
             <CardTitle>Delivery Locations</CardTitle>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Delivery Price</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredDeliveryCharges.map((charge) => (
-                  <TableRow key={charge.id}>
-                    <TableCell className="font-medium">{charge.place_name}</TableCell>
-                    <TableCell>Rs {charge.delivery_price.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Badge variant={charge.is_active ? 'default' : 'secondary'}>
-                        {charge.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{new Date(charge.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(charge)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(charge.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[150px]">Location</TableHead>
+                    <TableHead className="min-w-[100px]">Price</TableHead>
+                    <TableHead className="min-w-[80px]">Status</TableHead>
+                    <TableHead className="min-w-[100px]">Created</TableHead>
+                    <TableHead className="text-right min-w-[100px]">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredDeliveryCharges.map((charge) => (
+                    <TableRow key={charge.id}>
+                      <TableCell className="font-medium">{charge.place_name}</TableCell>
+                      <TableCell>Rs {charge.delivery_price.toFixed(2)}</TableCell>
+                      <TableCell>
+                        <Badge variant={charge.is_active ? 'default' : 'secondary'}>
+                          {charge.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{new Date(charge.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end space-x-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(charge)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(charge.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}

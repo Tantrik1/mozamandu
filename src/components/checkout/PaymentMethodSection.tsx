@@ -62,8 +62,19 @@ export function PaymentMethodSection({
       fetchPaymentMethods();
     } else {
       setLoading(false);
+      // Auto-select first payment method if none selected
+      if (externalPaymentMethods.length > 0 && !currentSelectedId) {
+        handleMethodChange(externalPaymentMethods[0].id);
+      }
     }
   }, [externalPaymentMethods]);
+
+  useEffect(() => {
+    // Auto-select first payment method when internal methods are loaded
+    if (internalPaymentMethods.length > 0 && !currentSelectedId) {
+      handleMethodChange(internalPaymentMethods[0].id);
+    }
+  }, [internalPaymentMethods, currentSelectedId]);
 
   const fetchPaymentMethods = async () => {
     try {
@@ -94,12 +105,13 @@ export function PaymentMethodSection({
   };
 
   const handlePaidAmountChange = (value: string) => {
+    console.log('Paid amount changed to:', value);
     if (setPaidAmount) {
       setPaidAmount(value);
     } else if (onPercentageChange && finalTotal) {
-      const amount = parseFloat(value);
+      const amount = parseFloat(value) || 0;
       const percentage = (amount / finalTotal) * 100;
-      onPercentageChange(Math.min(100, Math.max(20, percentage)));
+      onPercentageChange(Math.min(100, Math.max(0, percentage)));
     }
   };
 
@@ -110,18 +122,21 @@ export function PaymentMethodSection({
         <CardDescription>Choose your preferred payment method</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Select value={currentSelectedId} onValueChange={handleMethodChange} disabled={loading}>
-          <SelectTrigger>
-            <SelectValue placeholder={loading ? "Loading..." : "Select payment method"} />
-          </SelectTrigger>
-          <SelectContent>
-            {paymentMethods.map((method) => (
-              <SelectItem key={method.id} value={method.id}>
+        <RadioGroup 
+          value={currentSelectedId} 
+          onValueChange={handleMethodChange} 
+          disabled={loading}
+          defaultValue={paymentMethods.length > 0 ? paymentMethods[0].id : ''}
+        >
+          {paymentMethods.map((method) => (
+            <div key={method.id} className="flex items-center space-x-2">
+              <RadioGroupItem value={method.id} id={method.id} />
+              <Label htmlFor={method.id} className="cursor-pointer">
                 {method.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              </Label>
+            </div>
+          ))}
+        </RadioGroup>
 
         {selectedPaymentMethod && (
           <div className="text-center">
@@ -149,35 +164,25 @@ export function PaymentMethodSection({
             </div>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="partial" id="partial" />
-              <Label htmlFor="partial">Pay Partial Amount (Minimum 20%)</Label>
+              <Label htmlFor="partial">Pay Partial Amount (Minimum Rs. {minimumPayment?.toFixed(2) || '0.00'})</Label>
             </div>
           </RadioGroup>
 
           {((paymentType === 'partial') || (!paymentType && paymentPercentage < 100)) && (
             <div className="mt-3">
-              {paidAmount !== undefined ? (
-                <Input
-                  type="number"
-                  value={paidAmount}
-                  onChange={(e) => handlePaidAmountChange(e.target.value)}
-                  placeholder="Enter amount"
-                />
-              ) : (
-                <Input
-                  type="number"
-                  min={20}
-                  max={100}
-                  value={paymentPercentage}
-                  onChange={(e) => onPercentageChange?.(Number(e.target.value))}
-                  placeholder="Enter percentage (20-100)"
-                />
-              )}
-              <p className="text-sm text-gray-600 mt-1">
-                {paidAmount !== undefined ? 
-                  `Minimum payment: Rs. ${minimumPayment?.toFixed(2) || '0.00'}` :
-                  'Enter percentage between 20% and 100%'
-                }
-              </p>
+              <Label htmlFor="payment-amount" className="text-sm font-medium">Enter Amount (Rs.)</Label>
+              <Input
+                id="payment-amount"
+                type="text"
+                value={paidAmount}
+                onChange={(e) => handlePaidAmountChange(e.target.value)}
+                placeholder={`Enter amount (Min: Rs. ${minimumPayment?.toFixed(2) || '0.00'})`}
+                className="mt-1"
+              />
+              <div className="flex justify-between text-sm text-gray-600 mt-1">
+                <span>Minimum: Rs. {minimumPayment?.toFixed(2) || '0.00'}</span>
+                <span>Maximum: Rs. {finalTotal?.toFixed(2) || '0.00'}</span>
+              </div>
             </div>
           )}
         </div>

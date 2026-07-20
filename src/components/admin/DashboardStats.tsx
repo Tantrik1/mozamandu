@@ -23,7 +23,7 @@ export function DashboardStats() {
 
   useEffect(() => {
     let isMounted = true;
-    let loadingTimeout: NodeJS.Timeout;
+    let loadingTimeout: ReturnType<typeof setTimeout>;
 
     console.log('🔄 DashboardStats: Starting stats fetch');
 
@@ -39,8 +39,10 @@ export function DashboardStats() {
     const fetchStats = async () => {
       try {
         console.log('🔄 DashboardStats: Fetching dashboard stats...');
-        const [ordersResponse, productsResponse, customersResponse] = await Promise.all([
+        // Fetch from BOTH order tables (guest + customer orders)
+        const [guestOrdersResponse, customerOrdersResponse, productsResponse, customersResponse] = await Promise.all([
           supabase.from('orders').select('total_amount'),
+          supabase.from('customer_orders').select('total_amount'),
           supabase.from('products').select('id'),
           supabase.from('profiles').select('id').eq('role', 'customer'),
         ]);
@@ -48,10 +50,17 @@ export function DashboardStats() {
         if (!isMounted) return;
 
         // Check for errors
-        if (ordersResponse.error) {
-          console.error('❌ DashboardStats: Error fetching orders:', ordersResponse.error);
-          if (ordersResponse.error.code === 'PGRST116' || ordersResponse.error.message.includes('row-level security')) {
-            console.warn('⚠️ DashboardStats: RLS may be blocking orders access');
+        if (guestOrdersResponse.error) {
+          console.error('❌ DashboardStats: Error fetching guest orders:', guestOrdersResponse.error);
+          if (guestOrdersResponse.error.code === 'PGRST116' || guestOrdersResponse.error.message.includes('row-level security')) {
+            console.warn('⚠️ DashboardStats: RLS may be blocking guest orders access');
+          }
+        }
+
+        if (customerOrdersResponse.error) {
+          console.error('❌ DashboardStats: Error fetching customer orders:', customerOrdersResponse.error);
+          if (customerOrdersResponse.error.code === 'PGRST116' || customerOrdersResponse.error.message.includes('row-level security')) {
+            console.warn('⚠️ DashboardStats: RLS may be blocking customer orders access');
           }
         }
 
@@ -69,10 +78,16 @@ export function DashboardStats() {
           }
         }
 
-        const totalOrders = ordersResponse.data?.length || 0;
+        // Combine orders from both tables
+        const allOrders = [
+          ...(guestOrdersResponse.data || []),
+          ...(customerOrdersResponse.data || [])
+        ];
+
+        const totalOrders = allOrders.length;
         const totalProducts = productsResponse.data?.length || 0;
         const totalCustomers = customersResponse.data?.length || 0;
-        const totalRevenue = ordersResponse.data?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
+        const totalRevenue = allOrders.reduce((sum, order) => sum + Number(order.total_amount), 0);
 
         console.log('✅ DashboardStats: Stats calculated:', { totalOrders, totalProducts, totalCustomers, totalRevenue });
 

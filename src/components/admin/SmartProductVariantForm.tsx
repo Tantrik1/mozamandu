@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface ColorVariant {
   id?: string;
   color_name: string;
+  color_hex?: string;
   image_url?: string;
   has_sizes: boolean;
   size_variants: SizeVariant[];
@@ -47,6 +48,7 @@ export function SmartProductVariantForm({
       // Initialize with one empty color variant
       setColorVariants([{
         color_name: '',
+        color_hex: '#000000',
         image_url: '',
         has_sizes: hasSizeVariants,
         size_variants: hasSizeVariants ? [{ size_name: '', size_code: '' }] : [],
@@ -77,6 +79,7 @@ export function SmartProductVariantForm({
       ...colorVariants,
       {
         color_name: '',
+        color_hex: '#000000',
         image_url: '',
         has_sizes: hasSizeVariants,
         size_variants: hasSizeVariants ? [{ size_name: '', size_code: '' }] : [],
@@ -129,15 +132,42 @@ export function SmartProductVariantForm({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Validate file size (max 10MB - will be compressed automatically)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: 'Error',
+        description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 10MB`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate it's an image
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Error',
+        description: 'Please select a valid image file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setUploadingImages(prev => ({ ...prev, [colorIndex]: true }));
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `product-${productId}-${colorIndex}-${Date.now()}.${fileExt}`;
+      const { prepareImageForUpload, PRODUCT_COMPRESSION } = await import('@/utils/imageOptimizer');
+      
+      // Optimize image with aggressive compression (~250KB)
+      const { file: optimizedFile } = await prepareImageForUpload(file, PRODUCT_COMPRESSION);
+
+      const fileName = `product-${productId}-${colorIndex}-${Date.now()}.webp`;
 
       const { data, error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(fileName, file);
+        .upload(fileName, optimizedFile, {
+          contentType: 'image/webp',
+        });
 
       if (uploadError) throw uploadError;
 
@@ -151,13 +181,13 @@ export function SmartProductVariantForm({
 
       toast({
         title: 'Success',
-        description: 'Image uploaded successfully',
+        description: 'Image optimized and uploaded successfully',
       });
     } catch (error) {
       console.error('Error uploading image:', error);
       toast({
         title: 'Error',
-        description: 'Failed to upload image',
+        description: error instanceof Error ? error.message : 'Failed to upload image',
         variant: 'destructive',
       });
     } finally {
@@ -210,6 +240,24 @@ export function SmartProductVariantForm({
                     onChange={(e) => updateColorVariant(colorIndex, 'color_name', e.target.value)}
                     placeholder="Enter color name"
                   />
+
+                  <div className="mt-3">
+                    <Label>Color *</Label>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        type="color"
+                        value={colorVariant.color_hex || '#000000'}
+                        onChange={(e) => updateColorVariant(colorIndex, 'color_hex', e.target.value)}
+                        className="w-16 h-10"
+                      />
+                      <Input
+                        value={colorVariant.color_hex || ''}
+                        onChange={(e) => updateColorVariant(colorIndex, 'color_hex', e.target.value)}
+                        placeholder="#000000"
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div>

@@ -21,6 +21,7 @@ interface Order {
   created_at: string;
   user_id: string | null;
   user_role?: string;
+  isGuestOrder?: boolean;
 }
 
 interface AdminOrdersTableProps {
@@ -40,45 +41,50 @@ export function AdminOrdersTable({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
-      case 'payment_confirmed': return 'bg-blue-100 text-blue-800';
-      case 'on_delivery': return 'bg-purple-100 text-purple-800';
-      case 'delivered': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'pending_payment': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
+      case 'payment_confirmed': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+      case 'on_delivery': return 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400';
+      case 'delivered': return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400';
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 
   const getOrderType = (order: Order) => {
-    if (!order.user_id) return 'Guest';
+    if (order.isGuestOrder || !order.user_id) return 'Guest';
     if (order.user_role === 'admin') return 'Admin';
     return 'Customer';
   };
 
   const getOrderTypeBadgeColor = (orderType: string) => {
     switch (orderType) {
-      case 'Admin': return 'bg-red-100 text-red-800';
-      case 'Customer': return 'bg-blue-100 text-blue-800';
-      case 'Guest': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'Admin': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      case 'Customer': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+      case 'Guest': return 'bg-muted text-muted-foreground';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 
   const { reserveStock, releaseStock, fulfillStock } = useInventoryManager();
 
-  const handleInventoryUpdate = async (orderId: string, newStatus: string, oldStatus: string) => {
+  const handleInventoryUpdate = async (
+    orderId: string,
+    newStatus: string,
+    oldStatus: string,
+    isCustomerOrder: boolean
+  ) => {
     try {
       console.log('🔄 Checking inventory update for order:', orderId, 'from', oldStatus, 'to', newStatus);
-      
+
       // Only handle inventory for specific status changes
       if (newStatus === 'delivered' && oldStatus !== 'delivered') {
         // Fulfill stock: reduce both reserved and total stock
         console.log('📦 Fulfilling stock for delivery...');
-        await fulfillStock(orderId);
+        await fulfillStock(orderId, isCustomerOrder);
       } else if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
         // Release stock: only reduce reserved stock, keep total stock
         console.log('🔓 Releasing reserved stock for cancellation...');
-        await releaseStock(orderId);
+        await releaseStock(orderId, isCustomerOrder);
       } else {
         // No inventory changes needed for other status transitions
         console.log('ℹ️ No inventory changes required for this status transition');
@@ -97,21 +103,22 @@ export function AdminOrdersTable({
     if (!order) return;
 
     const oldStatus = order.status;
-    
+    const isCustomerOrder = !order.isGuestOrder;
+
     try {
       // Handle inventory changes first
-      await handleInventoryUpdate(orderId, newStatus, oldStatus);
-      
+      await handleInventoryUpdate(orderId, newStatus, oldStatus, isCustomerOrder);
+
       // Update order status in database
       await onUpdateStatus(orderId, newStatus);
-      
+
       // Send status update email
       console.log('Sending status update email...');
       const { error: emailError } = await supabase.functions.invoke('send-order-email', {
         body: {
           type: 'status_updated',
           orderId: orderId,
-          isCustomerOrder: true,
+          isCustomerOrder,
           oldStatus: oldStatus,
           newStatus: newStatus
         }
@@ -142,7 +149,7 @@ export function AdminOrdersTable({
           icon: CheckCircle,
           nextStatus: 'payment_confirmed',
           variant: 'default' as const,
-          color: 'bg-blue-600 hover:bg-blue-700'
+          color: ''
         });
         break;
         
@@ -151,8 +158,8 @@ export function AdminOrdersTable({
           label: 'Mark On Delivery',
           icon: Truck,
           nextStatus: 'on_delivery',
-          variant: 'default' as const,
-          color: 'bg-purple-600 hover:bg-purple-700'
+          variant: 'secondary' as const,
+          color: ''
         });
         break;
         
@@ -162,7 +169,7 @@ export function AdminOrdersTable({
           icon: Package,
           nextStatus: 'delivered',
           variant: 'default' as const,
-          color: 'bg-green-600 hover:bg-green-700'
+          color: ''
         });
         break;
         
@@ -178,11 +185,11 @@ export function AdminOrdersTable({
     // Add cancel option for non-final statuses
     if (!['delivered', 'cancelled'].includes(order.status)) {
       actions.push({
-        label: 'Cancel Order',
+        label: 'Cancel',
         icon: X,
         nextStatus: 'cancelled',
         variant: 'destructive' as const,
-        color: 'bg-red-600 hover:bg-red-700'
+        color: ''
       });
     }
     
@@ -190,48 +197,49 @@ export function AdminOrdersTable({
   };
 
   const handleViewOrder = (orderId: string) => {
-    navigate(`/customer-order-summary/${orderId}`);
+    navigate(`/order-summary/${orderId}`);
   };
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Order #</TableHead>
-          <TableHead>Customer</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Total</TableHead>
-          <TableHead>Paid</TableHead>
-          <TableHead>Current Status</TableHead>
-          <TableHead>Date</TableHead>
-          <TableHead>Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {filteredOrders.map((order) => {
-          const statusActions = getStatusActions(order);
-          
-          return (
-            <TableRow key={order.id}>
-              <TableCell className="font-medium">{order.order_number}</TableCell>
-              <TableCell>
-                <div>
-                  <p className="font-medium">{order.customer_name}</p>
-                  <p className="text-sm text-gray-600">{order.customer_email}</p>
-                </div>
-              </TableCell>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="min-w-[100px]">Order #</TableHead>
+            <TableHead className="min-w-[150px]">Customer</TableHead>
+            <TableHead className="min-w-[80px]">Type</TableHead>
+            <TableHead className="min-w-[90px]">Total</TableHead>
+            <TableHead className="min-w-[110px]">Paid</TableHead>
+            <TableHead className="min-w-[120px]">Status</TableHead>
+            <TableHead className="min-w-[90px]">Date</TableHead>
+            <TableHead className="min-w-[200px]">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredOrders.map((order) => {
+            const statusActions = getStatusActions(order);
+            
+            return (
+              <TableRow key={order.id}>
+                <TableCell className="font-medium text-sm">{order.order_number}</TableCell>
+                <TableCell>
+                  <div>
+                    <p className="font-medium truncate max-w-[140px]">{order.customer_name}</p>
+                    <p className="text-xs text-muted-foreground truncate max-w-[140px]">{order.customer_email}</p>
+                  </div>
+                </TableCell>
               <TableCell>
                 <Badge variant="outline" className={getOrderTypeBadgeColor(getOrderType(order))}>
                   {getOrderType(order)}
                 </Badge>
               </TableCell>
-              <TableCell>Rs. {Number(order.total_amount).toFixed(2)}</TableCell>
+              <TableCell className="text-sm">Rs. {Number(order.total_amount).toFixed(2)}</TableCell>
               <TableCell>
                 <div>
-                  <p className="text-green-600">Rs. {Number(order.paid_amount).toFixed(2)}</p>
+                  <p className="text-emerald-600 text-sm">Rs. {Number(order.paid_amount).toFixed(2)}</p>
                   {order.remaining_amount > 0 && (
-                    <p className="text-sm text-orange-600">
-                      Remaining: Rs. {Number(order.remaining_amount).toFixed(2)}
+                    <p className="text-xs text-amber-600">
+                      Due: Rs. {Number(order.remaining_amount).toFixed(2)}
                     </p>
                   )}
                 </div>
@@ -244,7 +252,7 @@ export function AdminOrdersTable({
                   {order.status.replace('_', ' ')}
                 </Badge>
               </TableCell>
-              <TableCell>
+              <TableCell className="text-sm">
                 {new Date(order.created_at).toLocaleDateString()}
               </TableCell>
               <TableCell>
@@ -256,7 +264,7 @@ export function AdminOrdersTable({
                       size="sm"
                       onClick={() => handleStatusUpdate(order.id, action.nextStatus)}
                       disabled={updating === order.id}
-                      className={`text-xs ${action.color}`}
+                      className="text-xs h-7 px-2"
                     >
                       <action.icon className="h-3 w-3 mr-1" />
                       {action.label}
@@ -267,8 +275,9 @@ export function AdminOrdersTable({
                     variant="outline"
                     size="sm"
                     onClick={() => handleViewOrder(order.id)}
+                    className="h-7 px-2"
                   >
-                    <Eye className="h-4 w-4 mr-1" />
+                    <Eye className="h-3 w-3 mr-1" />
                     View
                   </Button>
                 </div>
@@ -276,14 +285,15 @@ export function AdminOrdersTable({
             </TableRow>
           );
         })}
-        {filteredOrders.length === 0 && (
-          <TableRow>
-            <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-              No orders found matching your criteria.
-            </TableCell>
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
+          {filteredOrders.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                No orders found matching your criteria.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
   );
 }

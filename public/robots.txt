@@ -1,13 +1,60 @@
-
+# Mozamandu Robots.txt - SEO Optimized
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /checkout
+Disallow: /checkout/*
+Disallow: /dashboard
+Disallow: /dashboard/*
+Disallow: /order/*
+Disallow: /reset-password
+Disallow: /auth
 
-# Disallow admin pages
-Disallow: /admin/
-Disallow: /auth/
+# Crawl delay for polite crawling
+Crawl-delay: 1
 
-# Sitemap
+# Primary Sitemap (Dynamic)
+Sitemap: https://opdkvcpnfwlzihctttpo.supabase.co/functions/v1/generate-sitemap
+
+# Fallback Static Sitemap
 Sitemap: https://mozamandu.com/sitemap.xml
 
-# Crawl-delay
+# Allow important pages
+Allow: /
+Allow: /shop
+Allow: /shop/*
+Allow: /blog
+Allow: /blog/*
+Allow: /product/*
+Allow: /about
+Allow: /contact
+Allow: /faq
+Allow: /privacy-policy
+Allow: /terms-conditions
+Allow: /shipping-policy
+
+# Allow search engines to index images
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.png$
+Allow: /*.webp$
+Allow: /*.gif$
+
+# Block API endpoints from indexing
+Disallow: /api/*
+
+# Host
+Host: https://mozamandu.com
+
+# Google specific
+User-agent: Googlebot
+Allow: /blog/*
+Allow: /product/*
+Crawl-delay: 0
+
+# Bing specific  
+User-agent: Bingbot
+Allow: /blog/*
+Allow: /product/*
 Crawl-delay: 1

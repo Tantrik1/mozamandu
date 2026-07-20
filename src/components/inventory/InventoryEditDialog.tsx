@@ -55,7 +55,8 @@ export function InventoryEditDialog({ item, isOpen, onClose, onSave }: Inventory
 
     setSaving(true);
     try {
-      // Remove available_stock from the update since it's a generated column
+      // available_stock is a generated column (stock_quantity - reserved_stock)
+      // computed by the database — do NOT write it.
       const { error } = await supabase
         .from('product_inventory')
         .update({

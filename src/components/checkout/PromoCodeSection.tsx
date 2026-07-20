@@ -1,155 +1,115 @@
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { Loader2, Tag, X, Check } from 'lucide-react';
 
 interface PromoCode {
   id: string;
   code: string;
   discount_percentage: number;
+  discount_type?: string;
   minimum_order_amount: number;
+  max_discount?: number | null;
 }
 
 interface PromoCodeSectionProps {
-  onDiscountApplied: (discount: number) => void;
-  onPromoCodeUsed: (code: string) => void;
-  orderTotal: number;
-  promoCode?: string;
-  setPromoCode?: (code: string) => void;
-  appliedPromo?: PromoCode | null;
-  isPromoApplied?: boolean;
-  onApplyPromo?: () => void;
-  onRemovePromo?: () => void;
+  promoCode: string;
+  setPromoCode: (code: string) => void;
+  appliedPromo: PromoCode | null;
+  isPromoApplied: boolean;
+  isLoading?: boolean;
+  onApplyPromo: () => void;
+  onRemovePromo: () => void;
+  discountAmount?: number;
 }
 
 export function PromoCodeSection({
-  onDiscountApplied,
-  onPromoCodeUsed,
-  orderTotal,
-  promoCode: externalPromoCode,
-  setPromoCode: externalSetPromoCode,
-  appliedPromo: externalAppliedPromo,
-  isPromoApplied: externalIsPromoApplied,
-  onApplyPromo: externalOnApplyPromo,
-  onRemovePromo: externalOnRemovePromo
+  promoCode,
+  setPromoCode,
+  appliedPromo,
+  isPromoApplied,
+  isLoading = false,
+  onApplyPromo,
+  onRemovePromo,
+  discountAmount = 0
 }: PromoCodeSectionProps) {
-  const [internalPromoCode, setInternalPromoCode] = useState('');
-  const [internalAppliedPromo, setInternalAppliedPromo] = useState<PromoCode | null>(null);
-  const [isApplying, setIsApplying] = useState(false);
-  const { toast } = useToast();
-
-  // Use external state if provided, otherwise use internal state
-  const promoCode = externalPromoCode !== undefined ? externalPromoCode : internalPromoCode;
-  const setPromoCode = externalSetPromoCode || setInternalPromoCode;
-  const appliedPromo = externalAppliedPromo !== undefined ? externalAppliedPromo : internalAppliedPromo;
-  const isPromoApplied = externalIsPromoApplied !== undefined ? externalIsPromoApplied : !!internalAppliedPromo;
-
-  const applyPromoCode = async () => {
-    if (externalOnApplyPromo) {
-      externalOnApplyPromo();
-      return;
-    }
-
-    if (!promoCode.trim()) return;
-
-    setIsApplying(true);
-    try {
-      const { data, error } = await supabase
-        .from('promocodes')
-        .select('*')
-        .eq('code', promoCode.toUpperCase())
-        .eq('is_active', true)
-        .single();
-
-      if (error || !data) {
-        toast({
-          title: 'Invalid Promo Code',
-          description: 'The promo code you entered is not valid or has expired.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if (orderTotal < data.minimum_order_amount) {
-        toast({
-          title: 'Minimum Order Not Met',
-          description: `Minimum order amount for this promo code is Rs. ${data.minimum_order_amount}`,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const discount = (orderTotal * data.discount_percentage) / 100;
-      setInternalAppliedPromo(data);
-      onDiscountApplied(discount);
-      onPromoCodeUsed(data.code);
-      
-      toast({
-        title: 'Promo Code Applied!',
-        description: `You saved Rs. ${discount.toFixed(2)} with "${data.code}"`,
-      });
-    } catch (error) {
-      console.error('Error applying promo code:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to apply promo code. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsApplying(false);
-    }
-  };
-
-  const removePromoCode = () => {
-    if (externalOnRemovePromo) {
-      externalOnRemovePromo();
-      return;
-    }
-
-    setInternalAppliedPromo(null);
-    setPromoCode('');
-    onDiscountApplied(0);
-    onPromoCodeUsed('');
-    toast({
-      title: 'Promo Code Removed',
-      description: 'The promo code has been removed from your order.',
-    });
-  };
-
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Promo Code</CardTitle>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <Tag className="h-5 w-5 text-primary" />
+          <CardTitle className="text-lg">Promo Code</CardTitle>
+        </div>
         <CardDescription>Apply a promo code to get discount on your order</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex gap-2">
-          <Input
-            value={promoCode}
-            onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-            placeholder="Enter promo code"
-            disabled={isPromoApplied || isApplying}
-          />
+          <div className="relative flex-1">
+            <Input
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+              placeholder="Enter promo code"
+              disabled={isPromoApplied || isLoading}
+              className={isPromoApplied ? 'bg-green-50 border-green-300 dark:bg-green-900/20 dark:border-green-700' : ''}
+            />
+            {isPromoApplied && (
+              <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-600" />
+            )}
+          </div>
           {!isPromoApplied ? (
             <Button 
-              onClick={applyPromoCode} 
-              disabled={!promoCode.trim() || isApplying}
+              onClick={onApplyPromo} 
+              disabled={!promoCode.trim() || isLoading}
+              className="min-w-[100px]"
             >
-              {isApplying ? 'Applying...' : 'Apply'}
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                'Apply'
+              )}
             </Button>
           ) : (
-            <Button variant="outline" onClick={removePromoCode}>
+            <Button 
+              variant="outline" 
+              onClick={onRemovePromo}
+              className="min-w-[100px] text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <X className="h-4 w-4 mr-1" />
               Remove
             </Button>
           )}
         </div>
+        
         {appliedPromo && (
-          <p className="text-sm text-green-600 mt-1">
-            Promo code "{appliedPromo.code}" applied - {appliedPromo.discount_percentage}% discount
-          </p>
+          <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                  {appliedPromo.code} applied
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  {appliedPromo.discount_type === 'fixed' 
+                    ? `Rs. ${appliedPromo.discount_percentage} off`
+                    : `${appliedPromo.discount_percentage}% discount`
+                  }
+                  {appliedPromo.max_discount && appliedPromo.discount_type !== 'fixed' && (
+                    <span> (max Rs. {appliedPromo.max_discount})</span>
+                  )}
+                </p>
+              </div>
+              {discountAmount > 0 && (
+                <div className="text-right">
+                  <p className="text-lg font-bold text-green-700 dark:text-green-300">
+                    -Rs. {discountAmount.toFixed(2)}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>

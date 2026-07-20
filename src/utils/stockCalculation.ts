@@ -1,6 +1,23 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+// Returns subcategory IDs where both the subcategory AND its parent category are active
+export async function getActiveSubcategoryIds(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from('subcategories')
+      .select('id, categories!inner(status)')
+      .eq('status', 'on')
+      .eq('categories.status', 'on');
+
+    if (error) throw error;
+    return (data || []).map(s => s.id);
+  } catch (error) {
+    console.error('Error fetching active subcategory IDs:', error);
+    return [];
+  }
+}
+
 export interface ProductStockSummary {
   productId: string;
   totalStock: number;
@@ -38,17 +55,96 @@ export interface StockCalculationResult {
   }>;
 }
 
-export async function getProductStockSummary(productId: string): Promise<number> {
+const toNumber = (value: number | null | undefined) => Number(value || 0);
+
+const getAvailableStock = (item: {
+  available_stock?: number | null;
+  stock_quantity?: number | null;
+  reserved_stock?: number | null;
+}) => Math.max(0, toNumber(item.available_stock) || (toNumber(item.stock_quantity) - toNumber(item.reserved_stock)));
+
+// Batch fetch stock for multiple products - returns a map of productId -> totalAvailableStock
+export async function getBatchProductStock(productIds: string[]): Promise<Record<string, number>> {
+  if (productIds.length === 0) return {};
   try {
     const { data, error } = await supabase
       .from('product_inventory')
-      .select('available_stock')
+      .select('product_id, available_stock, stock_quantity, reserved_stock')
+      .in('product_id', productIds)
+      .eq('is_active', true);
+
+    if (error) throw error;
+
+    const stockMap: Record<string, number> = {};
+    (data || []).forEach(item => {
+      stockMap[item.product_id] = (stockMap[item.product_id] || 0) + getAvailableStock(item);
+    });
+    return stockMap;
+  } catch (error) {
+    console.error('Error fetching batch product stock:', error);
+    return {};
+  }
+}
+
+// Batch fetch stock grouped by color_variant_id
+export async function getBatchVariantStock(productId: string): Promise<Record<string, number>> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('color_variant_id, size_variant_id, available_stock, stock_quantity, reserved_stock')
       .eq('product_id', productId)
       .eq('is_active', true);
 
     if (error) throw error;
 
-    return (data || []).reduce((total, item) => total + (item.available_stock || 0), 0);
+    const colorStockMap: Record<string, number> = {};
+    (data || []).forEach(item => {
+      if (item.color_variant_id) {
+        colorStockMap[item.color_variant_id] = (colorStockMap[item.color_variant_id] || 0) + getAvailableStock(item);
+      }
+    });
+    return colorStockMap;
+  } catch (error) {
+    console.error('Error fetching batch variant stock:', error);
+    return {};
+  }
+}
+
+// Batch fetch stock grouped by size_variant_id for a specific color
+export async function getSizeVariantStock(colorVariantId: string): Promise<Record<string, number>> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('size_variant_id, available_stock, stock_quantity, reserved_stock')
+      .eq('color_variant_id', colorVariantId)
+      .eq('is_active', true);
+
+    if (error) throw error;
+
+    const sizeStockMap: Record<string, number> = {};
+    (data || []).forEach(item => {
+      if (item.size_variant_id) {
+        sizeStockMap[item.size_variant_id] = (sizeStockMap[item.size_variant_id] || 0) + getAvailableStock(item);
+      }
+    });
+    return sizeStockMap;
+  } catch (error) {
+    console.error('Error fetching size variant stock:', error);
+    return {};
+  }
+}
+
+export async function getProductStockSummary(productId: string): Promise<number> {
+  try {
+    const { data, error } = await supabase
+      .from('product_inventory')
+      .select('available_stock, stock_quantity, reserved_stock')
+      .eq('product_id', productId)
+      .eq('is_active', true);
+
+    if (error) throw error;
+
+    return (data || []).reduce((total, item) => total + getAvailableStock(item), 0);
   } catch (error) {
     console.error('Error calculating product stock:', error);
     return 0;
@@ -66,7 +162,7 @@ export async function calculateProductStock(productId: string): Promise<StockCal
     if (error) throw error;
 
     const totalStock = (data || []).reduce((sum, item) => sum + (item.stock_quantity || 0), 0);
-    const availableStock = (data || []).reduce((sum, item) => sum + (item.available_stock || 0), 0);
+    const availableStock = (data || []).reduce((sum, item) => sum + getAvailableStock(item), 0);
     const reservedStock = (data || []).reduce((sum, item) => sum + (item.reserved_stock || 0), 0);
 
     // Group by color
@@ -81,10 +177,10 @@ export async function calculateProductStock(productId: string): Promise<StockCal
 
     const colorBreakdown = Object.entries(colorGroups).map(([colorName, items]) => ({
       colorName,
-      stock: items.reduce((sum, item) => sum + (item.available_stock || 0), 0),
+      stock: items.reduce((sum, item) => sum + getAvailableStock(item), 0),
       sizeBreakdown: items.map(item => ({
         sizeName: item.size_name || 'One Size',
-        stock: item.available_stock || 0
+        stock: getAvailableStock(item)
       }))
     }));
 
@@ -116,11 +212,11 @@ export async function getDetailedProductStock(productId: string): Promise<Produc
       colorName: item.color_name,
       sizeName: item.size_name,
       stockQuantity: item.stock_quantity,
-      availableStock: item.available_stock || 0,
+      availableStock: getAvailableStock(item),
       reservedStock: item.reserved_stock || 0,
       lowStockThreshold: item.low_stock_threshold || 10,
-      isLowStock: (item.available_stock || 0) <= (item.low_stock_threshold || 10),
-      isOutOfStock: (item.available_stock || 0) === 0,
+      isLowStock: getAvailableStock(item) <= (item.low_stock_threshold || 10),
+      isOutOfStock: getAvailableStock(item) === 0,
       costPrice: item.cost_price,
       sellingPrice: item.selling_price || 0,
     }));
@@ -186,11 +282,11 @@ export async function getVariantStock(
       colorName: item.color_name,
       sizeName: item.size_name,
       stockQuantity: item.stock_quantity,
-      availableStock: item.available_stock || 0,
+      availableStock: getAvailableStock(item),
       reservedStock: item.reserved_stock || 0,
       lowStockThreshold: item.low_stock_threshold || 10,
-      isLowStock: (item.available_stock || 0) <= (item.low_stock_threshold || 10),
-      isOutOfStock: (item.available_stock || 0) === 0,
+      isLowStock: getAvailableStock(item) <= (item.low_stock_threshold || 10),
+      isOutOfStock: getAvailableStock(item) === 0,
       costPrice: item.cost_price,
       sellingPrice: item.selling_price || 0,
     };
@@ -259,10 +355,10 @@ export async function getExactVariantData(
       id: data.id,
       sku: data.sku,
       stock: data.stock_quantity,
-      availableStock: data.available_stock || 0,
+      availableStock: getAvailableStock(data),
       reservedStock: data.reserved_stock || 0,
-      isOutOfStock: (data.available_stock || 0) === 0,
-      isLowStock: (data.available_stock || 0) <= (data.low_stock_threshold || 10),
+      isOutOfStock: getAvailableStock(data) === 0,
+      isLowStock: getAvailableStock(data) <= (data.low_stock_threshold || 10),
       costPrice: data.cost_price,
       sellingPrice: data.selling_price || 0,
     };

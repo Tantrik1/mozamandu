@@ -6,13 +6,11 @@ import { PaymentMethodSection } from './PaymentMethodSection';
 import { PaymentScreenshotUpload } from './PaymentScreenshotUpload';
 import { PromoCodeSection } from './PromoCodeSection';
 import { CleanOrderSummary } from './CleanOrderSummary';
-import { CheckoutSuccess } from './CheckoutSuccess';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { usePromoCode } from '@/hooks/usePromoCode';
 import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
-import { useComboManager } from '@/hooks/useComboManager';
 import { useInventoryManager } from '@/hooks/useInventoryManager';
 import { useToast } from '@/hooks/use-toast';
 import { Package, Loader2 } from 'lucide-react';
@@ -56,23 +54,13 @@ export function UniversalCheckout() {
 
   const [discountTiers, setDiscountTiers] = useState<{ [key: string]: any[] }>({});
 
-  const { 
-    activeCombo, 
-    isComboActive, 
-    getComboPrice, 
-    shouldIgnoreMinimumQuantity 
-  } = useComboManager({ cartItems });
-
   const {
     getTotalPrice: getTieredTotalPrice,
     getItemPricing: getTieredItemPricing,
     subcategoryPricing,
-    getTotalSavings,
-    getComboInfo,
-    isComboModeActive
+    getTotalSavings
   } = useSubcategoryTieredPricing({
     cartItems,
-    activeCombo,
     discountTiers
   });
 
@@ -81,8 +69,10 @@ export function UniversalCheckout() {
     setPromoCode,
     appliedPromo,
     isPromoApplied,
+    isLoading: isPromoLoading,
     applyPromoCode,
-    removePromoCode
+    removePromoCode,
+    getDiscountAmount
   } = usePromoCode();
 
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
@@ -96,17 +86,48 @@ export function UniversalCheckout() {
   const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocation | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [paymentPercentage, setPaymentPercentage] = useState(100);
+  const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
+  const [customPaidAmount, setCustomPaidAmount] = useState<string>('');
   const [paymentScreenshotUrl, setPaymentScreenshotUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [promoDiscount, setPromoDiscount] = useState(0);
 
+  // Batch fetch all initial data in parallel for faster loading
   useEffect(() => {
-    fetchDeliveryLocations();
-    fetchPaymentMethods();
-    fetchDiscountTiers();
+    const fetchInitialData = async () => {
+      const [deliveryData, paymentData, tiersData] = await Promise.all([
+        supabase.from('delivery_charges').select('*').eq('is_active', true).order('place_name'),
+        supabase.from('payment_methods').select('*').eq('is_active', true).order('name'),
+        supabase.from('discount_tiers').select('*').order('subcategory_id, min_quantity')
+      ]);
+
+      if (deliveryData.data) setDeliveryLocations(deliveryData.data);
+      if (paymentData.data) {
+        setPaymentMethods(paymentData.data);
+        // Auto-select first payment method
+        if (paymentData.data.length > 0 && !paymentMethod) {
+          setPaymentMethod(paymentData.data[0]);
+        }
+      }
+      if (tiersData.data) {
+        const tiersBySubcategory: { [key: string]: any[] } = {};
+        tiersData.data.forEach((tier: any) => {
+          if (!tiersBySubcategory[tier.subcategory_id]) {
+            tiersBySubcategory[tier.subcategory_id] = [];
+          }
+          // Support both discount_amount and discount_percentage columns
+          tiersBySubcategory[tier.subcategory_id].push({
+            ...tier,
+            discount_amount: tier.discount_amount ?? tier.discount_percentage ?? 0
+          });
+        });
+        setDiscountTiers(tiersBySubcategory);
+      }
+    };
+
+    fetchInitialData();
   }, []);
 
   useEffect(() => {
@@ -131,98 +152,14 @@ export function UniversalCheckout() {
     }
   }, [user, userProfile]);
 
-  useEffect(() => {
-    console.log('🎯 UniversalCheckout Debug - Combo Status:');
-    console.log('Active combo:', activeCombo);
-    console.log('Is combo mode active:', isComboModeActive());
-    console.log('Cart items count:', cartItems.length);
-    
-    if (activeCombo) {
-      console.log('Combo requirements:', activeCombo.combo_subcategories);
-      
-      const subcategoryCounts: { [key: string]: number } = {};
-      cartItems.forEach(item => {
-        subcategoryCounts[item.subcategoryId] = (subcategoryCounts[item.subcategoryId] || 0) + item.quantity;
-      });
-      console.log('Current subcategory quantities:', subcategoryCounts);
-      
-      activeCombo.combo_subcategories.forEach(req => {
-        const currentQty = subcategoryCounts[req.subcategory_id] || 0;
-        console.log(`Subcategory ${req.subcategory_id}: needs ${req.min_units}, has ${currentQty}`);
-      });
-    }
-  }, [activeCombo, cartItems, isComboModeActive]);
 
-  const fetchDeliveryLocations = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('delivery_charges')
-        .select('*')
-        .order('place_name');
+  // Individual fetch functions removed - now using batched fetch above
 
-      if (error) {
-        throw error;
-      }
-
-      setDeliveryLocations(data || []);
-    } catch (error) {
-      console.error('Error fetching delivery locations:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load delivery options.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const fetchPaymentMethods = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('payment_methods')
-        .select('*')
-        .order('name');
-
-      if (error) {
-        throw error;
-      }
-
-      setPaymentMethods(data || []);
-    } catch (error) {
-      console.error('Error fetching payment methods:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load payment methods.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const fetchDiscountTiers = async () => {
-    try {
-      const { data } = await supabase
-        .from('discount_tiers')
-        .select('*')
-        .order('subcategory_id, min_quantity');
-      
-      if (data) {
-        const tiersBySubcategory: { [key: string]: any[] } = {};
-        data.forEach(tier => {
-          if (!tiersBySubcategory[tier.subcategory_id]) {
-            tiersBySubcategory[tier.subcategory_id] = [];
-          }
-          tiersBySubcategory[tier.subcategory_id].push(tier);
-        });
-        setDiscountTiers(tiersBySubcategory);
-      }
-    } catch (error) {
-      console.error('Error fetching discount tiers:', error);
-    }
-  };
 
   const calculatePromoDiscount = () => {
     if (appliedPromo) {
       const accurateSubtotal = getTieredTotalPrice();
-      const discount = (accurateSubtotal * appliedPromo.discount_percentage) / 100;
+      const discount = getDiscountAmount(accurateSubtotal);
       setPromoDiscount(discount);
       console.log('🔢 Promo calculation - Subtotal:', accurateSubtotal, 'Discount:', discount);
     } else {
@@ -230,13 +167,17 @@ export function UniversalCheckout() {
     }
   };
 
-  const handlePromoCodeApplied = (promoCode: PromoCode) => {
+  const handleApplyPromoCode = async () => {
     const totalWithDelivery = getTieredTotalPrice() + (deliveryLocation ? deliveryLocation.delivery_price : 0);
-    applyPromoCode(totalWithDelivery);
+    const success = await applyPromoCode(totalWithDelivery);
+    if (success) {
+      calculatePromoDiscount();
+    }
   };
 
-  const handlePromoCodeRemoved = () => {
+  const handleRemovePromoCode = () => {
     removePromoCode();
+    setPromoDiscount(0);
   };
 
   const handlePaymentScreenshotUpload = (url: string) => {
@@ -267,10 +208,28 @@ export function UniversalCheckout() {
         return;
       }
 
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email)) {
+        toast({
+          title: 'Validation Error',
+          description: 'Please enter a valid email address',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       if (!customerInfo.phone.trim()) {
         toast({
           title: 'Validation Error',
           description: 'Please enter your phone number',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (!/^\d{10}$/.test(customerInfo.phone)) {
+        toast({
+          title: 'Validation Error',
+          description: 'Please enter a valid 10-digit phone number',
           variant: 'destructive',
         });
         return;
@@ -390,21 +349,50 @@ export function UniversalCheckout() {
 
       const accurateSubtotal = getTieredTotalPrice();
       const accurateSavings = getTotalSavings();
-      const comboInfo = getComboInfo();
-      const isComboActive = isComboModeActive();
       
       console.log('💰 Pricing details:', {
         accurateSubtotal,
         accurateSavings,
-        comboInfo,
-        isComboActive,
         subcategoryPricing
       });
 
       const totalBeforeDelivery = accurateSubtotal - promoDiscount;
-      const finalTotal = totalBeforeDelivery + deliveryLocation.delivery_price;
-      const paidAmount = Math.round(finalTotal * (paymentPercentage / 100));
-      const remainingAmount = finalTotal - paidAmount;
+      const orderFinalTotal = totalBeforeDelivery + deliveryLocation.delivery_price;
+      const minimumAmount = Math.round(orderFinalTotal * 0.2);
+      
+      // Calculate paid amount based on payment type
+      let paidAmount: number;
+      let paymentPercentageValue: number;
+      
+      if (paymentType === 'full') {
+        paidAmount = orderFinalTotal;
+        paymentPercentageValue = 100;
+      } else {
+        // For partial payment, use the custom amount entered by user
+        paidAmount = parseFloat(customPaidAmount) || 0;
+        paymentPercentageValue = Math.round((paidAmount / orderFinalTotal) * 100);
+        
+        // Validate minimum amount for partial payments
+        if (paidAmount < minimumAmount) {
+          toast({
+            title: 'Validation Error',
+            description: `Minimum payment amount is Rs. ${minimumAmount.toFixed(2)}`,
+            variant: 'destructive',
+          });
+          return;
+        }
+        
+        if (paidAmount > orderFinalTotal) {
+          toast({
+            title: 'Validation Error',
+            description: `Payment amount cannot exceed total amount of Rs. ${orderFinalTotal.toFixed(2)}`,
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+      
+      const remainingAmount = orderFinalTotal - paidAmount;
 
       const pricingBreakdown = {
         subcategoryPricing: Object.fromEntries(
@@ -413,19 +401,20 @@ export function UniversalCheckout() {
             {
               subcategoryId: data.subcategoryId,
               totalQuantity: data.totalQuantity,
-              moqReached: data.moqReached,
-              moqRequired: data.moqRequired,
-              comboActive: data.comboActive,
-              comboPrice: data.comboPrice || 0,
+              basePrice: data.basePrice,
+              tierBreakdown: data.tierBreakdown,
               totalSavings: data.totalSavings,
+              totalCost: data.totalCost,
               description: data.description,
               itemBreakdown: data.itemBreakdown.map(item => ({
                 itemId: item.itemId,
-                unitPrice: item.unitPrice,
+                basePrice: item.basePrice,
+                unitsAtBase: item.unitsAtBase,
+                basePriceTotal: item.basePriceTotal,
+                discountedUnits: item.discountedUnits,
                 totalPrice: item.totalPrice,
-                appliedTier: item.appliedTier,
-                tierInfo: item.tierInfo || '',
-                savings: item.savings
+                savings: item.savings,
+                averageUnitPrice: item.averageUnitPrice
               }))
             }
           ])
@@ -434,24 +423,26 @@ export function UniversalCheckout() {
         accurateSavings,
         promoDiscount,
         deliveryCharge: deliveryLocation.delivery_price,
-        finalTotal,
-        comboInfo: isComboActive && comboInfo ? {
-          combo: {
-            id: comboInfo.combo.id,
-            name: comboInfo.combo.name,
-            description: comboInfo.combo.description
-          },
-          totalComboSavings: comboInfo.totalComboSavings || 0
-        } : null,
-        pricingMode: isComboActive ? 'combo' : (accurateSavings > 0 ? 'moq_discount' : 'normal')
+        finalTotal: orderFinalTotal,
+        pricingMode: accurateSavings > 0 ? 'progressive_discount' : 'normal'
       };
 
       console.log('📋 Enhanced pricing breakdown:', pricingBreakdown);
 
       console.log('📝 Creating order with validated inventory data...');
       
-      const orderData = {
-        user_id: user?.id || null,
+      // Determine which tables to use based on authentication status
+      const isCustomerOrder = !!user;
+      
+      console.log(`📋 Using ${isCustomerOrder ? 'customer_orders' : 'orders'} table (isCustomerOrder: ${isCustomerOrder})`);
+      
+      // Generate order number
+      const { data: orderNumberData } = await supabase.rpc('generate_order_number');
+      const orderNumber = orderNumberData || `ORD-${Date.now()}`;
+      
+      
+      const baseOrderData = {
+        order_number: orderNumber,
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
         contact_number: customerInfo.phone,
@@ -462,101 +453,182 @@ export function UniversalCheckout() {
         subtotal: accurateSubtotal,
         promocode_used: appliedPromo?.code || null,
         promocode_discount: promoDiscount,
-        total_amount: finalTotal,
+        total_amount: orderFinalTotal,
         paid_amount: paidAmount,
         remaining_amount: remainingAmount,
-        payment_percentage: paymentPercentage,
         payment_method_id: paymentMethod.id,
         payment_screenshot_url: paymentScreenshotUrl,
-        combo_applied: isComboActive,
-        pricing_breakdown: pricingBreakdown,
+        pricing_breakdown: JSON.parse(JSON.stringify(pricingBreakdown)),
         status: 'pending_payment' as const
       };
 
-      console.log('📋 Order data being sent:', orderData);
+      console.log('📋 Order data being sent:', baseOrderData);
       
-      const { data: createdOrder, error: orderError } = await supabase
-        .from('customer_orders')
-        .insert(orderData)
-        .select()
-        .single();
+      let createdOrderId: string;
+      let createdOrderNumber: string;
 
-      if (orderError) {
-        console.error('❌ Order creation error:', orderError);
-        throw new Error(`Failed to create order: ${orderError.message}`);
+      if (isCustomerOrder && user) {
+        // Insert into customer_orders table
+        const { data: createdOrder, error: orderError } = await supabase
+          .from('customer_orders')
+          .insert([{
+            ...baseOrderData,
+            user_id: user.id,
+          }])
+          .select()
+          .single();
+
+        if (orderError) {
+          console.error('❌ Order creation error:', orderError);
+          throw new Error(`Failed to create order: ${orderError.message}`);
+        }
+        createdOrderId = createdOrder.id;
+        createdOrderNumber = createdOrder.order_number;
+      } else {
+        // Insert into orders table (guest orders)
+        const { data: createdOrder, error: orderError } = await supabase
+          .from('orders')
+          .insert([baseOrderData])
+          .select()
+          .single();
+
+        if (orderError) {
+          console.error('❌ Order creation error:', orderError);
+          throw new Error(`Failed to create order: ${orderError.message}`);
+        }
+        createdOrderId = createdOrder.id;
+        createdOrderNumber = createdOrder.order_number;
       }
 
-      console.log('✅ Order created successfully:', createdOrder.id);
+      console.log('✅ Order created successfully:', createdOrderId);
 
-      const orderItemsToInsert = cartItemsWithInventory.map(item => ({
-        order_id: createdOrder.id,
-        product_id: item.productId,
-        quantity: item.quantity
-      }));
-
-      const { error: orderItemsError } = await supabase
-        .from('customer_order_items')
-        .insert(orderItemsToInsert);
-
-      if (orderItemsError) {
-        console.error('❌ Order items error:', orderItemsError);
-        throw new Error(`Failed to create order items: ${orderItemsError.message}`);
-      }
-
+      // STEP 1: Insert order_item_details FIRST (source of truth for order summaries, analytics, inventory)
       const orderItemDetailsToInsert = cartItemsWithInventory.map(item => {
         const pricingResult = getTieredItemPricing(item.id);
         const pricingInfo = pricingResult || {
-          unitPrice: item.basePrice,
+          basePrice: item.basePrice,
+          unitsAtBase: item.quantity,
+          basePriceTotal: item.basePrice * item.quantity,
+          discountedUnits: [],
           totalPrice: item.basePrice * item.quantity,
-          appliedTier: 'normal',
           savings: 0,
-          tierInfo: undefined,
-          subcategoryInfo: null
+          averageUnitPrice: item.basePrice,
         };
 
         return {
-          order_id: createdOrder.id,
+          order_id: createdOrderId,
           product_inventory_id: item.inventoryId,
           product_name: item.productName,
           color_name: item.colorName || null,
           size_name: item.sizeName || null,
           sku: item.sku,
           quantity: item.quantity,
-          unit_price: pricingInfo.unitPrice,
+          unit_price: pricingInfo.averageUnitPrice,
           total_price: pricingInfo.totalPrice,
-          pricing_mode: pricingInfo.appliedTier || 'normal',
+          pricing_mode: pricingInfo.savings > 0 ? 'progressive_discount' : 'normal',
           pricing_details: {
-            appliedTier: pricingInfo.appliedTier || 'normal',
-            tierInfo: pricingInfo.tierInfo || null,
+            progressivePricing: true,
+            unitsAtBase: pricingInfo.unitsAtBase,
+            basePriceTotal: pricingInfo.basePriceTotal,
+            discountedUnits: pricingInfo.discountedUnits,
             savings: pricingInfo.savings || 0,
             basePrice: item.basePrice,
             subcategoryId: item.subcategoryId,
-            comboApplied: isComboActive,
             discountApplied: (pricingInfo.savings || 0) > 0,
             inventoryId: item.inventoryId,
-            moqPricingApplied: pricingInfo.appliedTier === 'discount',
-            accurateUnitPrice: pricingInfo.unitPrice,
+            averageUnitPrice: pricingInfo.averageUnitPrice,
             accurateTotalPrice: pricingInfo.totalPrice,
             availableStock: item.availableStock
           }
         };
       });
 
-      console.log('📝 Enhanced order item details with validated inventory IDs:', orderItemDetailsToInsert.length);
+      console.log('📝 Inserting order item details (source of truth):', orderItemDetailsToInsert.length);
 
-      const { error: orderItemDetailsError } = await supabase
-        .from('customer_order_item_details')
-        .insert(orderItemDetailsToInsert);
-
-      if (orderItemDetailsError) {
-        console.error('❌ Order item details error:', orderItemDetailsError);
-        throw new Error(`Failed to create order item details: ${orderItemDetailsError.message}`);
+      // Insert order_item_details - this is CRITICAL and must succeed
+      if (isCustomerOrder) {
+        const { error: orderItemDetailsError } = await supabase
+          .from('customer_order_item_details')
+          .insert(orderItemDetailsToInsert);
+        if (orderItemDetailsError) {
+          console.error('❌ Order item details error:', orderItemDetailsError);
+          // Rollback: delete the order since items failed
+          await supabase.from('customer_orders').delete().eq('id', createdOrderId);
+          throw new Error(`Failed to create order item details: ${orderItemDetailsError.message}`);
+        }
+      } else {
+        const { error: orderItemDetailsError } = await supabase
+          .from('order_item_details')
+          .insert(orderItemDetailsToInsert);
+        if (orderItemDetailsError) {
+          console.error('❌ Order item details error:', orderItemDetailsError);
+          // Rollback: delete the order since items failed
+          await supabase.from('orders').delete().eq('id', createdOrderId);
+          throw new Error(`Failed to create order item details: ${orderItemDetailsError.message}`);
+        }
       }
 
-      console.log('🔒 Reserving stock immediately for order:', createdOrder.id);
+      console.log('✅ Order item details inserted successfully');
+
+      // STEP 2: Insert legacy order_items as best-effort (non-blocking)
+      // This handles schema differences gracefully
+      const orderItemsToInsert = cartItemsWithInventory.map(item => {
+        const pricingResult = getTieredItemPricing(item.id);
+        const unitPrice = Number(pricingResult?.averageUnitPrice ?? item.basePrice);
+        const totalPrice = Number(pricingResult?.totalPrice ?? (item.basePrice * item.quantity));
+
+        return {
+          order_id: createdOrderId,
+          product_id: item.productId,
+          quantity: item.quantity,
+          unit_price: unitPrice,
+          total_price: totalPrice,
+        };
+      });
+
+      // Attempt to insert legacy order_items - don't fail the order if this doesn't work
+      const legacyTable = isCustomerOrder ? 'customer_order_items' : 'order_items';
       try {
-        await reserveStock(createdOrder.id);
-        console.log('✅ Stock reserved successfully for order:', createdOrder.id);
+        const { error: orderItemsError } = await supabase
+          .from(legacyTable)
+          .insert(orderItemsToInsert);
+        
+        if (orderItemsError) {
+          console.warn(`⚠️ Legacy ${legacyTable} insert failed (non-critical):`, orderItemsError.message);
+          
+          // If schema mismatch, try minimal payload with defaults for required fields
+          if (orderItemsError.message.includes('schema cache') || orderItemsError.message.includes('column')) {
+            console.log('🔄 Retrying with minimal payload...');
+            const minimalItems = cartItemsWithInventory.map(item => ({
+              order_id: createdOrderId,
+              product_id: item.productId,
+              quantity: item.quantity,
+              unit_price: 0,
+              total_price: 0,
+            }));
+            
+            const { error: retryError } = await supabase
+              .from(legacyTable)
+              .insert(minimalItems);
+            
+            if (retryError) {
+              console.warn(`⚠️ Minimal ${legacyTable} insert also failed (non-critical):`, retryError.message);
+            } else {
+              console.log(`✅ Minimal ${legacyTable} insert succeeded`);
+            }
+          }
+        } else {
+          console.log(`✅ Legacy ${legacyTable} inserted successfully`);
+        }
+      } catch (legacyError) {
+        // Completely non-blocking - log and continue
+        console.warn(`⚠️ Legacy ${legacyTable} insert exception (non-critical):`, legacyError);
+      }
+
+      console.log('🔒 Reserving stock immediately for order:', createdOrderId);
+      try {
+        await reserveStock(createdOrderId, isCustomerOrder);
+        console.log('✅ Stock reserved successfully for order:', createdOrderId);
         toast({
           title: 'Order Placed Successfully!',
           description: 'Stock has been reserved for your order!',
@@ -578,8 +650,8 @@ export function UniversalCheckout() {
         const { error: emailError } = await supabase.functions.invoke('send-order-email', {
           body: {
             type: 'order_created',
-            orderId: createdOrder.id,
-            isCustomerOrder: true
+            orderId: createdOrderId,
+            isCustomerOrder: isCustomerOrder
           }
         });
 
@@ -601,7 +673,7 @@ export function UniversalCheckout() {
       clearCart();
       
       // Redirect to thank you page instead of showing inline success
-      window.location.href = `/thank-you/${createdOrder.id}`;
+      window.location.href = `/thank-you/${createdOrderId}`;
 
     } catch (error) {
       console.error('💥 Enhanced order submission failed:', error);
@@ -620,25 +692,18 @@ export function UniversalCheckout() {
   const totalBeforeDelivery = subtotal - promoDiscount;
   const finalTotal = totalBeforeDelivery + (deliveryLocation ? deliveryLocation.delivery_price : 0);
 
-  console.log('🎯 Final checkout calculations:', {
-    subtotal,
-    totalSavings: getTotalSavings(),
-    promoDiscount,
-    finalTotal
-  });
-
   // Remove the showSuccess condition since we're redirecting to thank you page
   
   return (
     <div className="container mx-auto py-8 pb-32">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
-        <p className="text-gray-600 mt-1">Complete your order below</p>
+        <h1 className="text-3xl font-bold text-foreground">Checkout</h1>
+        <p className="text-muted-foreground mt-1">Complete your order below</p>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
         <div className="space-y-6">
-          <Card className="shadow-sm border-gray-200">
+          <Card className="shadow-sm border-border">
             <CardContent className="p-6">
               <CustomerInfoForm
                 customerInfo={customerInfo}
@@ -650,7 +715,18 @@ export function UniversalCheckout() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-gray-200">
+          <PromoCodeSection
+            promoCode={promoCode}
+            setPromoCode={setPromoCode}
+            appliedPromo={appliedPromo}
+            isPromoApplied={isPromoApplied}
+            isLoading={isPromoLoading}
+            onApplyPromo={handleApplyPromoCode}
+            onRemovePromo={handleRemovePromoCode}
+            discountAmount={promoDiscount}
+          />
+
+          <Card className="shadow-sm border-border">
             <CardContent className="p-6">
               <PaymentMethodSection
                 paymentMethods={paymentMethods}
@@ -659,15 +735,19 @@ export function UniversalCheckout() {
                   const method = paymentMethods.find(m => m.id === value);
                   setPaymentMethod(method || null);
                 }}
-                paymentType={paymentPercentage === 100 ? 'full' : 'partial'}
+                paymentType={paymentType}
                 onPaymentTypeChange={(type) => {
-                  setPaymentPercentage(type === 'full' ? 100 : 20);
+                  setPaymentType(type as 'full' | 'partial');
+                  if (type === 'full') {
+                    setCustomPaidAmount('');
+                  } else {
+                    // Set default to minimum amount when switching to partial
+                    setCustomPaidAmount(Math.round(finalTotal * 0.2).toString());
+                  }
                 }}
-                paidAmount={Math.round(finalTotal * (paymentPercentage / 100)).toString()}
+                paidAmount={paymentType === 'full' ? finalTotal.toString() : customPaidAmount}
                 setPaidAmount={(value) => {
-                  const amount = parseFloat(value);
-                  const percentage = (amount / finalTotal) * 100;
-                  setPaymentPercentage(Math.min(100, Math.max(20, percentage)));
+                  setCustomPaidAmount(value);
                 }}
                 paymentScreenshot={null}
                 setPaymentScreenshot={() => {}}
@@ -680,7 +760,7 @@ export function UniversalCheckout() {
           </Card>
 
           {/* Payment Screenshot Upload */}
-          <Card className="shadow-sm border-gray-200">
+          <Card className="shadow-sm border-border">
             <CardContent className="p-6">
               <PaymentScreenshotUpload
                 onUploadComplete={handlePaymentScreenshotUpload}
@@ -689,18 +769,6 @@ export function UniversalCheckout() {
               />
             </CardContent>
           </Card>
-
-          <PromoCodeSection
-            onDiscountApplied={setPromoDiscount}
-            onPromoCodeUsed={(code) => {}}
-            orderTotal={getTieredTotalPrice() + (deliveryLocation ? deliveryLocation.delivery_price : 0)}
-            promoCode={promoCode}
-            setPromoCode={setPromoCode}
-            appliedPromo={appliedPromo}
-            isPromoApplied={isPromoApplied}
-            onApplyPromo={() => handlePromoCodeApplied(appliedPromo!)}
-            onRemovePromo={handlePromoCodeRemoved}
-          />
         </div>
 
         <div className="space-y-6">
@@ -714,18 +782,16 @@ export function UniversalCheckout() {
             finalTotal={finalTotal}
             isSubmitting={isSubmitting}
             onSubmitOrder={handleSubmitOrder}
-            comboInfo={getComboInfo()}
             getTieredItemPricing={getTieredItemPricing}
-            isComboModeActive={isComboModeActive()}
           />
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 lg:hidden z-50 shadow-2xl">
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-4 lg:hidden z-50 shadow-2xl">
         <div className="container mx-auto">
           {(getTotalSavings() + promoDiscount) > 0 && (
             <div className="text-center mb-3">
-              <div className="text-green-600 font-semibold text-sm">
+              <div className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm">
                 🎉 You're saving Rs. {(getTotalSavings() + promoDiscount).toFixed(2)}!
               </div>
             </div>
@@ -734,7 +800,7 @@ export function UniversalCheckout() {
           <Button
             onClick={handleSubmitOrder}
             disabled={isSubmitting || cartItems.length === 0 || !paymentScreenshotUrl}
-            className="w-full h-14 text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
+            className="w-full h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
             size="lg"
           >
             {isSubmitting ? (

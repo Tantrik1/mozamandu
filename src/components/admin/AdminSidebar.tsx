@@ -1,7 +1,8 @@
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { Home, Package, Users, Gift, Tag, CreditCard, Truck, Bell, Type, Settings, ShoppingCart, UserCheck, LogOut, HelpCircle, Warehouse } from "lucide-react";
+import { Home, Package, Users, Tag, CreditCard, Truck, Bell, Type, Settings, ShoppingCart, UserCheck, LogOut, HelpCircle, Warehouse, MessageSquare, BarChart3, Key, FileText } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+
 const menuItems = [{
   title: "Dashboard",
   url: "/admin",
@@ -31,10 +32,6 @@ const menuItems = [{
   url: "/admin/customers",
   icon: UserCheck
 }, {
-  title: "Combos",
-  url: "/admin/combos",
-  icon: Gift
-}, {
   title: "Promo Codes",
   url: "/admin/promocodes",
   icon: Tag
@@ -55,18 +52,31 @@ const menuItems = [{
   url: "/admin/top-bar-text",
   icon: Type
 }, {
-  title: "Navbar",
-  url: "/admin/navbar",
-  icon: Type
-}, {
   title: "FAQs",
   url: "/admin/faqs",
   icon: HelpCircle
+}, {
+  title: "Reviews",
+  url: "/admin/reviews",
+  icon: MessageSquare
+}, {
+  title: "Blogs",
+  url: "/admin/blogs",
+  icon: FileText
+}, {
+  title: "Analytics",
+  url: "/admin/analytics",
+  icon: BarChart3
+}, {
+  title: "Analytics Settings",
+  url: "/admin/analytics-settings",
+  icon: Key
 }, {
   title: "Settings",
   url: "/admin/settings",
   icon: Settings
 }];
+
 export function AdminSidebar() {
   const location = useLocation();
   const {

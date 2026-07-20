@@ -1,238 +1,635 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { AdminHeader } from './AdminHeader';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { TrendingUp, TrendingDown, AlertTriangle, DollarSign, ShoppingCart, Users, Package } from 'lucide-react';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { RefreshCw, Clock, Activity, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns';
+import {
+  CoreBusinessStats,
+  TimeBasedSalesStats,
+  OrderPerformanceStats,
+  ProductPerformanceStats,
+  InventoryStats,
+  CustomerStatsPanel,
+  RevenueChart,
+  DashboardDateFilter,
+  OrderSourceBreakdown,
+  createDateFilterValue,
+  type DateFilterValue,
+  type OrderSourceFilter
+} from './dashboard';
 
-interface RevenueData {
+interface RevenueDataPoint {
   period: string;
   revenue: number;
   orders: number;
-}
-
-interface OrderStatusData {
-  name: string;
-  value: number;
-  color: string;
 }
 
 interface TopProduct {
   name: string;
   quantity: number;
   revenue: number;
+  profit: number;
 }
 
 interface TopCustomer {
   name: string;
   email: string;
-  total: number;
-  orders: number;
+  totalSpent: number;
+  ordersCount: number;
 }
 
-interface CustomerGrowth {
-  month: string;
-  customers: number;
-}
-
-interface LowStockItem {
-  product_name: string;
-  color_name: string | null;
-  size_name: string | null;
-  available_stock: number;
-  low_stock_threshold: number | null;
-  sku: string;
+// Cache for orders data to avoid duplicate fetches
+interface OrdersCache {
+  data: any[] | null;
+  timestamp: number;
 }
 
 export function EnhancedAdminDashboard() {
-  const [revenuePeriod, setRevenuePeriod] = useState('week');
-  const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
-  const [orderStatusData, setOrderStatusData] = useState<OrderStatusData[]>([]);
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
-  const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
-  const [customerGrowth, setCustomerGrowth] = useState<CustomerGrowth[]>([]);
-  const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [totalOrders, setTotalOrders] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [dateFilter, setDateFilter] = useState<DateFilterValue>(createDateFilterValue('allTime'));
+  const [sourceFilter, setSourceFilter] = useState<OrderSourceFilter>('all');
+  const [revenueChartData, setRevenueChartData] = useState<RevenueDataPoint[]>([]);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [lastRefreshed, setLastRefreshed] = useState(new Date());
+  const ordersCache = useRef<OrdersCache>({ data: null, timestamp: 0 });
+  
+  // Order Source Stats
+  const [orderSourceStats, setOrderSourceStats] = useState({
+    totalOrders: 0,
+    totalRevenue: 0,
+    registeredOrders: 0,
+    registeredRevenue: 0,
+    guestOrders: 0,
+    guestRevenue: 0,
+    registeredAOV: 0,
+    guestAOV: 0
+  });
+  
+  // Core Business Stats
+  const [coreStats, setCoreStats] = useState({
+    totalRevenue: 0,
+    totalOrders: 0,
+    netProfit: 0,
+    grossMargin: 0,
+    averageOrderValue: 0,
+    conversionRate: 0,
+    refundRate: 0,
+    returnRate: 0
+  });
 
-  const chartConfig = {
-    revenue: { label: "Revenue", color: "hsl(var(--primary))" },
-    orders: { label: "Orders", color: "hsl(var(--secondary))" }
-  };
+  // Time-Based Sales Stats
+  const [timeStats, setTimeStats] = useState({
+    todayRevenue: 0,
+    yesterdayRevenue: 0,
+    last7DaysRevenue: 0,
+    last30DaysRevenue: 0,
+    mtdRevenue: 0,
+    ytdRevenue: 0,
+    revenueGrowth: 0,
+    ordersGrowth: 0
+  });
 
-  const statusColors: Record<string, string> = {
-    pending_payment: '#f59e0b',
-    payment_confirmed: '#3b82f6', 
-    on_delivery: '#8b5cf6',
-    delivered: '#10b981',
-    cancelled: '#ef4444'
-  };
+  // Order Performance Stats
+  const [orderStats, setOrderStats] = useState({
+    paidOrders: 0,
+    pendingOrders: 0,
+    shippedOrders: 0,
+    deliveredOrders: 0,
+    cancelledOrders: 0,
+    returnedOrders: 0,
+    codOrders: 0,
+    prepaidOrders: 0,
+    failedPayments: 0
+  });
 
+  // Product Performance Stats
+  const [productStats, setProductStats] = useState({
+    topSellingProducts: [] as TopProduct[],
+    leastSellingProducts: [] as { name: string; quantity: number }[],
+    outOfStockCount: 0,
+    lowStockCount: 0,
+    deadStockCount: 0
+  });
+
+  // Inventory Stats
+  const [inventoryStats, setInventoryStats] = useState({
+    totalSKUs: 0,
+    availableStockUnits: 0,
+    stockValueAtCost: 0,
+    stockTurnoverRatio: 0,
+    avgDaysInventoryHeld: 0,
+    inventoryFillRate: 0,
+    oversellingIncidents: 0
+  });
+
+  // Customer Stats
+  const [customerStats, setCustomerStats] = useState({
+    totalCustomers: 0,
+    newCustomers: 0,
+    returningCustomers: 0,
+    repeatPurchaseRate: 0,
+    customerLifetimeValue: 0,
+    avgOrdersPerCustomer: 0,
+    churnRate: 0,
+    highValueCustomersCount: 0,
+    topCustomers: [] as TopCustomer[]
+  });
+
+  // Live clock
   useEffect(() => {
-    fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
-  }, [revenuePeriod]);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-  const fetchDashboardData = async () => {
+  // Fetch orders with caching (5 minute cache) - includes both customer and guest orders
+  const fetchOrdersWithCache = async () => {
+    const now = Date.now();
+    const cacheAge = now - ordersCache.current.timestamp;
+    
+    if (ordersCache.current.data && cacheAge < 300000) {
+      return ordersCache.current.data;
+    }
+
+    // Fetch from BOTH order tables in parallel
+    const [customerOrdersRes, guestOrdersRes] = await Promise.all([
+      supabase
+        .from('customer_orders')
+        .select('id, created_at, total_amount, subtotal, status, customer_email, customer_name, delivery_charge, paid_amount')
+        .order('created_at', { ascending: false })
+        .limit(1000),
+      supabase
+        .from('orders')
+        .select('id, created_at, total_amount, subtotal, status, customer_email, customer_name, delivery_charge, paid_amount')
+        .order('created_at', { ascending: false })
+        .limit(1000)
+    ]);
+
+    // Combine with source tag for proper item fetching later
+    const customerOrders = (customerOrdersRes.data || []).map(o => ({ ...o, source: 'customer' as const }));
+    const guestOrders = (guestOrdersRes.data || []).map(o => ({ ...o, source: 'guest' as const }));
+    
+    const allOrders = [...customerOrders, ...guestOrders]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    ordersCache.current = { data: allOrders, timestamp: now };
+    return allOrders;
+  };
+
+  // Filter orders by date range and source
+  const filterOrdersByDateRange = (orders: any[]) => {
+    return orders.filter(o => {
+      const orderDate = new Date(o.created_at);
+      return orderDate >= dateFilter.startDate && orderDate <= dateFilter.endDate;
+    });
+  };
+
+  const filterOrdersBySource = (orders: any[]) => {
+    if (sourceFilter === 'all') return orders;
+    if (sourceFilter === 'registered') return orders.filter(o => o.source === 'customer');
+    if (sourceFilter === 'guest') return orders.filter(o => o.source === 'guest');
+    return orders;
+  };
+
+  const calculateOrderSourceStats = (filteredOrders: any[]) => {
+    const nonCancelled = filteredOrders.filter(o => o.status !== 'cancelled');
+    const registeredOrders = nonCancelled.filter(o => o.source === 'customer');
+    const guestOrders = nonCancelled.filter(o => o.source === 'guest');
+    
+    const registeredRevenue = registeredOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const guestRevenue = guestOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    
+    setOrderSourceStats({
+      totalOrders: nonCancelled.length,
+      totalRevenue: registeredRevenue + guestRevenue,
+      registeredOrders: registeredOrders.length,
+      registeredRevenue,
+      guestOrders: guestOrders.length,
+      guestRevenue,
+      registeredAOV: registeredOrders.length > 0 ? registeredRevenue / registeredOrders.length : 0,
+      guestAOV: guestOrders.length > 0 ? guestRevenue / guestOrders.length : 0
+    });
+  };
+
+  const fetchAllData = useCallback(async () => {
+    setIsLoading(true);
     try {
+      // Fetch orders once and share across stats
+      const allOrders = await fetchOrdersWithCache();
+      const dateFilteredOrders = filterOrdersByDateRange(allOrders);
+      
+      // Calculate order source stats before applying source filter
+      calculateOrderSourceStats(dateFilteredOrders);
+      
+      // Apply source filter for other stats
+      const filteredOrders = filterOrdersBySource(dateFilteredOrders);
+      
+      // Run all stat calculations in parallel with filtered orders
       await Promise.all([
-        fetchRevenueData(),
-        fetchOrderStatusData(),
-        fetchTopProducts(),
-        fetchTopCustomers(),
-        fetchCustomerGrowth(),
-        fetchLowStockItems()
+        calculateCoreBusinessStats(filteredOrders),
+        calculateTimeBasedStats(filteredOrders, filterOrdersBySource(allOrders)),
+        calculateOrderStats(filteredOrders),
+        fetchProductStats(filteredOrders),
+        fetchInventoryStats(),
+        calculateCustomerStats(filteredOrders, filterOrdersBySource(allOrders)),
+        fetchRevenueChartData(filteredOrders)
       ]);
+      
+      setLastRefreshed(new Date());
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [dateFilter, sourceFilter]);
 
-  const fetchRevenueData = async () => {
-    const { data, error } = await supabase
-      .from('customer_orders')
-      .select('created_at, total_amount, status')
-      .not('status', 'eq', 'cancelled')
-      .order('created_at', { ascending: true });
+  useEffect(() => {
+    fetchAllData();
+    // Refresh every 5 minutes
+    const interval = setInterval(fetchAllData, 300000);
+    return () => clearInterval(interval);
+  }, [fetchAllData]);
 
-    if (!error && data) {
-      const groupedData = groupDataByPeriod(data, revenuePeriod);
-      setRevenueData(groupedData);
-      setTotalRevenue(data.reduce((sum, order) => sum + Number(order.total_amount), 0));
-      setTotalOrders(data.length);
-    }
-  };
-
-  const fetchOrderStatusData = async () => {
-    const { data, error } = await supabase
-      .from('customer_orders')
-      .select('status')
-      .not('status', 'eq', 'cancelled');
-
-    if (!error && data) {
-      const statusCounts = data.reduce((acc: Record<string, number>, order) => {
-        acc[order.status] = (acc[order.status] || 0) + 1;
-        return acc;
-      }, {});
-
-      const formattedData = Object.entries(statusCounts).map(([status, count]) => ({
-        name: status.replace('_', ' ').toUpperCase(),
-        value: count as number,
-        color: statusColors[status]
-      }));
-      setOrderStatusData(formattedData);
-    }
-  };
-
-  const fetchTopProducts = async () => {
-    const { data, error } = await supabase
-      .from('customer_order_item_details')
-      .select('product_name, quantity, total_price')
-      .order('quantity', { ascending: false });
-
-    if (!error && data) {
-      const productSales = data.reduce((acc, item) => {
-        if (!acc[item.product_name]) {
-          acc[item.product_name] = { quantity: 0, revenue: 0 };
-        }
-        acc[item.product_name].quantity += item.quantity;
-        acc[item.product_name].revenue += Number(item.total_price);
-        return acc;
-      }, {});
-
-      const sortedProducts = Object.entries(productSales)
-        .map(([name, data]) => ({ name, ...(data as { quantity: number; revenue: number }) }))
-        .sort((a, b) => b.quantity - a.quantity)
-        .slice(0, 5);
-      
-      setTopProducts(sortedProducts);
-    }
-  };
-
-  const fetchTopCustomers = async () => {
-    const { data, error } = await supabase
-      .from('customer_orders')
-      .select('customer_name, customer_email, total_amount')
-      .not('status', 'eq', 'cancelled');
-
-    if (!error && data) {
-      const customerSales = data.reduce((acc, order) => {
-        const key = order.customer_email;
-        if (!acc[key]) {
-          acc[key] = { name: order.customer_name, email: order.customer_email, total: 0, orders: 0 };
-        }
-        acc[key].total += Number(order.total_amount);
-        acc[key].orders += 1;
-        return acc;
-      }, {});
-
-      const sortedCustomers = (Object.values(customerSales) as TopCustomer[])
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 5);
-      
-      setTopCustomers(sortedCustomers);
-    }
-  };
-
-  const fetchCustomerGrowth = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('created_at')
-      .eq('role', 'customer')
-      .order('created_at', { ascending: true });
-
-    if (!error && data) {
-      const monthlyGrowth = data.reduce((acc: Record<string, number>, profile) => {
-        const month = new Date(profile.created_at).toISOString().slice(0, 7);
-        acc[month] = (acc[month] || 0) + 1;
-        return acc;
-      }, {});
-
-      const formattedData = Object.entries(monthlyGrowth).map(([month, count]) => ({
-        month: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        customers: count as number
-      }));
-      
-      setCustomerGrowth(formattedData);
-    }
-  };
-
-  const fetchLowStockItems = async () => {
-    const { data, error } = await supabase
+  const calculateCoreBusinessStats = async (orders: any[]) => {
+    const nonCancelledOrders = orders.filter(o => o.status !== 'cancelled');
+    const totalRevenue = nonCancelledOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const totalSubtotal = nonCancelledOrders.reduce((sum, o) => sum + Number(o.subtotal || 0), 0);
+    const totalOrders = nonCancelledOrders.length;
+    const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
+    
+    // Fetch actual cost data from inventory
+    const { data: inventoryData } = await supabase
       .from('product_inventory')
-      .select('product_name, color_name, size_name, available_stock, low_stock_threshold, sku')
-      .lte('available_stock', 10)
-      .eq('is_active', true)
-      .order('available_stock', { ascending: true })
-      .limit(10);
+      .select('cost_price, selling_price')
+      .limit(500);
+    
+    // Calculate actual gross margin from inventory data
+    const avgCostRatio = inventoryData && inventoryData.length > 0
+      ? inventoryData.reduce((sum, item) => {
+          const cost = Number(item.cost_price || 0);
+          const sell = Number(item.selling_price || item.cost_price || 1);
+          return sum + (cost / sell);
+        }, 0) / inventoryData.length
+      : 0.7;
+    
+    const estimatedCostOfGoods = totalSubtotal * avgCostRatio;
+    const netProfit = totalSubtotal - estimatedCostOfGoods;
+    const grossMargin = totalSubtotal > 0 ? ((totalSubtotal - estimatedCostOfGoods) / totalSubtotal) * 100 : 0;
+    const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    
+    // Calculate actual rates from order data
+    const refundRate = orders.length > 0 ? (cancelledOrders / orders.length) * 100 : 0;
+    const returnRate = 0; // No return status in system yet
+    const conversionRate = 0; // Requires website traffic data (GA removed)
 
-    if (!error && data) {
-      setLowStockItems(data);
+    setCoreStats({
+      totalRevenue,
+      totalOrders,
+      netProfit,
+      grossMargin,
+      averageOrderValue,
+      conversionRate,
+      refundRate,
+      returnRate
+    });
+  };
+
+  const calculateTimeBasedStats = async (filteredOrders: any[], allOrders: any[]) => {
+    const validOrders = filteredOrders.filter(o => o.status !== 'cancelled');
+    const allValidOrders = allOrders.filter(o => o.status !== 'cancelled');
+    
+    // Get current period stats
+    const periodRevenue = validOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const periodOrders = validOrders.length;
+    
+    // Calculate comparison with previous period of same length
+    const periodDays = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const prevPeriodEnd = new Date(dateFilter.startDate);
+    prevPeriodEnd.setDate(prevPeriodEnd.getDate() - 1);
+    const prevPeriodStart = new Date(prevPeriodEnd);
+    prevPeriodStart.setDate(prevPeriodStart.getDate() - periodDays);
+    
+    const prevPeriodOrders = allValidOrders.filter(o => {
+      const date = new Date(o.created_at);
+      return date >= prevPeriodStart && date <= prevPeriodEnd;
+    });
+    const prevPeriodRevenue = prevPeriodOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    
+    const revenueGrowth = prevPeriodRevenue > 0 
+      ? ((periodRevenue - prevPeriodRevenue) / prevPeriodRevenue) * 100 
+      : periodRevenue > 0 ? 100 : 0;
+
+    const ordersGrowth = prevPeriodOrders.length > 0 
+      ? ((periodOrders - prevPeriodOrders.length) / prevPeriodOrders.length) * 100 
+      : periodOrders > 0 ? 100 : 0;
+
+    // Calculate actual time-based stats from ALL orders (not filtered by date picker)
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+
+    const todayRevenue = allValidOrders
+      .filter(o => new Date(o.created_at) >= today)
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+    const yesterdayRevenue = allValidOrders
+      .filter(o => {
+        const date = new Date(o.created_at);
+        return date >= yesterday && date < today;
+      })
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+    const last7DaysRevenue = allValidOrders
+      .filter(o => new Date(o.created_at) >= sevenDaysAgo)
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+    const last30DaysRevenue = allValidOrders
+      .filter(o => new Date(o.created_at) >= thirtyDaysAgo)
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+    const mtdRevenue = allValidOrders
+      .filter(o => new Date(o.created_at) >= monthStart)
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+    const ytdRevenue = allValidOrders
+      .filter(o => new Date(o.created_at) >= yearStart)
+      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+    setTimeStats({
+      todayRevenue,
+      yesterdayRevenue,
+      last7DaysRevenue,
+      last30DaysRevenue,
+      mtdRevenue,
+      ytdRevenue,
+      revenueGrowth,
+      ordersGrowth
+    });
+  };
+
+  const calculateOrderStats = async (orders: any[]) => {
+    const paidOrders = orders.filter(o => o.status === 'payment_confirmed').length;
+    const pendingOrders = orders.filter(o => o.status === 'pending_payment').length;
+    const shippedOrders = orders.filter(o => o.status === 'on_delivery').length;
+    const deliveredOrders = orders.filter(o => o.status === 'delivered').length;
+    const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
+    
+    // COD = orders with paid_amount < total_amount (partial/no payment upfront)
+    // Prepaid = orders with paid_amount >= total_amount
+    const nonCancelledOrders = orders.filter(o => o.status !== 'cancelled');
+    const prepaidOrders = nonCancelledOrders.filter(o => Number(o.paid_amount || 0) >= Number(o.total_amount || 0) && Number(o.total_amount || 0) > 0).length;
+    const codOrders = nonCancelledOrders.length - prepaidOrders;
+
+    setOrderStats({
+      paidOrders,
+      pendingOrders,
+      shippedOrders,
+      deliveredOrders,
+      cancelledOrders,
+      returnedOrders: 0,
+      codOrders,
+      prepaidOrders,
+      failedPayments: 0
+    });
+  };
+
+  const fetchProductStats = async (filteredOrders: any[]) => {
+    // Separate order IDs by source for fetching from correct tables
+    const customerOrderIds = filteredOrders.filter(o => o.source === 'customer').map(o => o.id);
+    const guestOrderIds = filteredOrders.filter(o => o.source === 'guest').map(o => o.id);
+    
+    // Parallel fetch for product stats from BOTH order item tables
+    const [customerItemsRes, guestItemsRes, inventoryResponse] = await Promise.all([
+      supabase
+        .from('customer_order_item_details')
+        .select('product_name, quantity, total_price, order_id')
+        .in('order_id', customerOrderIds.length > 0 ? customerOrderIds : ['none'])
+        .limit(1000),
+      supabase
+        .from('order_item_details')
+        .select('product_name, quantity, total_price, order_id')
+        .in('order_id', guestOrderIds.length > 0 ? guestOrderIds : ['none'])
+        .limit(1000),
+      supabase
+        .from('product_inventory')
+        .select('product_name, available_stock, low_stock_threshold, updated_at')
+        .eq('is_active', true)
+        .limit(500)
+    ]);
+    
+    // Combine order items from both sources
+    const orderItemsResponse = {
+      data: [...(customerItemsRes.data || []), ...(guestItemsRes.data || [])]
+    };
+
+    const orderItems = orderItemsResponse.data || [];
+    const inventory = inventoryResponse.data || [];
+
+    const productSales = orderItems.reduce((acc, item) => {
+      if (!acc[item.product_name]) {
+        acc[item.product_name] = { quantity: 0, revenue: 0, profit: 0 };
+      }
+      acc[item.product_name].quantity += item.quantity;
+      acc[item.product_name].revenue += Number(item.total_price || 0);
+      acc[item.product_name].profit += Number(item.total_price || 0) * 0.3;
+      return acc;
+    }, {} as Record<string, { quantity: number; revenue: number; profit: number }>);
+
+    const sortedProducts = Object.entries(productSales)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.quantity - a.quantity);
+
+    const topSellingProducts = sortedProducts.slice(0, 10);
+    const leastSellingProducts = sortedProducts.slice(-5).reverse()
+      .map(p => ({ name: p.name, quantity: p.quantity }));
+
+    let outOfStockCount = 0;
+    let lowStockCount = 0;
+    let deadStockCount = 0;
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    inventory.forEach(item => {
+      if (item.available_stock === 0) outOfStockCount++;
+      else if (item.available_stock <= (item.low_stock_threshold || 10)) lowStockCount++;
+      if (item.updated_at && new Date(item.updated_at) < thirtyDaysAgo) deadStockCount++;
+    });
+
+    setProductStats({
+      topSellingProducts,
+      leastSellingProducts,
+      outOfStockCount,
+      lowStockCount,
+      deadStockCount
+    });
+  };
+
+  const fetchInventoryStats = async () => {
+    const { data: inventory } = await supabase
+      .from('product_inventory')
+      .select('stock_quantity, available_stock, reserved_stock, cost_price')
+      .eq('is_active', true)
+      .limit(500);
+
+    if (inventory) {
+      const totalSKUs = inventory.length;
+      const availableStockUnits = inventory.reduce((sum, i) => sum + (i.available_stock || 0), 0);
+      const stockValueAtCost = inventory.reduce((sum, i) => sum + (i.stock_quantity * Number(i.cost_price || 0)), 0);
+      const totalStock = inventory.reduce((sum, i) => sum + i.stock_quantity, 0);
+      const totalReserved = inventory.reduce((sum, i) => sum + i.reserved_stock, 0);
+
+      // Turnover = total units sold (reserved as proxy) relative to average stock
+      const stockTurnoverRatio = totalStock > 0 ? totalReserved / (totalStock * 0.5) : 0;
+      const inventoryFillRate = totalStock > 0 ? (availableStockUnits / totalStock) * 100 : 0;
+      const avgDaysInventoryHeld = stockTurnoverRatio > 0 ? Math.round(365 / stockTurnoverRatio) : 0;
+
+      setInventoryStats({
+        totalSKUs,
+        availableStockUnits,
+        stockValueAtCost,
+        stockTurnoverRatio,
+        avgDaysInventoryHeld,
+        inventoryFillRate,
+        oversellingIncidents: 0
+      });
     }
   };
 
-  const groupDataByPeriod = (data: any[], period: string): RevenueData[] => {
-    const grouped = data.reduce((acc: Record<string, RevenueData>, order: any) => {
+  const calculateCustomerStats = async (filteredOrders: any[], allOrders: any[]) => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Fetch only count for registered customers
+    const { count: registeredCustomers } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'customer');
+
+    const { data: recentProfiles } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'customer')
+      .gte('created_at', dateFilter.startDate.toISOString())
+      .lte('created_at', dateFilter.endDate.toISOString())
+      .limit(100);
+
+    const validOrders = filteredOrders.filter(o => o.status !== 'cancelled');
+    const allValidOrders = allOrders.filter(o => o.status !== 'cancelled');
+    const newCustomers = recentProfiles?.length || 0;
+    
+    // Count unique guest customers by email (from guest orders)
+    const guestOrders = allValidOrders.filter(o => o.source === 'guest');
+    const uniqueGuestEmails = new Set(guestOrders.map(o => o.customer_email?.toLowerCase()).filter(Boolean));
+    const guestCustomersCount = uniqueGuestEmails.size;
+    
+    // Total customers = registered + unique guests
+    const totalCustomers = (registeredCustomers || 0) + guestCustomersCount;
+
+    type CustomerData = { count: number; total: number; name: string };
+    const customerOrderCounts = validOrders.reduce((acc, o) => {
+      const key = o.customer_email;
+      if (!acc[key]) acc[key] = { count: 0, total: 0, name: o.customer_name };
+      acc[key].count++;
+      acc[key].total += Number(o.total_amount || 0);
+      return acc;
+    }, {} as Record<string, CustomerData>);
+
+    const customerEntries = Object.entries(customerOrderCounts) as [string, CustomerData][];
+    const returningCustomers = customerEntries.filter(([_, data]) => data.count > 1).length;
+    const repeatPurchaseRate = customerEntries.length > 0 
+      ? (returningCustomers / customerEntries.length) * 100 
+      : 0;
+
+    const totalOrdersCount = validOrders.length;
+    const avgOrdersPerCustomer = customerEntries.length > 0 
+      ? totalOrdersCount / customerEntries.length 
+      : 0;
+
+    const totalRevenue = validOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const customerLifetimeValue = customerEntries.length > 0 
+      ? totalRevenue / customerEntries.length 
+      : 0;
+
+    const highValueCustomersCount = customerEntries.filter(([_, data]) => data.total > 10000).length;
+
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+    const activeCustomers = new Set(
+      allValidOrders
+        .filter(o => new Date(o.created_at || '') >= sixtyDaysAgo)
+        .map(o => o.customer_email)
+    ).size;
+    
+    const churnRate = (totalCustomers || 0) > 0 
+      ? (((totalCustomers || 0) - activeCustomers) / (totalCustomers || 1)) * 100 
+      : 0;
+
+    const topCustomers = customerEntries
+      .map(([email, data]) => ({
+        name: data.name,
+        email,
+        totalSpent: data.total,
+        ordersCount: data.count
+      }))
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, 10);
+
+    setCustomerStats({
+      totalCustomers: totalCustomers || 0,
+      newCustomers,
+      returningCustomers,
+      repeatPurchaseRate,
+      customerLifetimeValue,
+      avgOrdersPerCustomer,
+      churnRate: Math.min(churnRate, 100),
+      highValueCustomersCount,
+      topCustomers
+    });
+  };
+
+  const fetchRevenueChartData = async (orders: any[]) => {
+    // Use the date filter for chart data - orders are already filtered
+    const validOrders = orders.filter(o => o.status !== 'cancelled');
+    
+    // Determine grouping based on date range span
+    const daysDiff = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
+    let groupBy: 'hour' | 'day' | 'week' | 'month' = 'day';
+    
+    if (daysDiff <= 1) {
+      groupBy = 'hour';
+    } else if (daysDiff <= 14) {
+      groupBy = 'day';
+    } else if (daysDiff <= 90) {
+      groupBy = 'week';
+    } else {
+      groupBy = 'month';
+    }
+
+    const grouped = validOrders.reduce((acc, order) => {
       let key: string;
       const date = new Date(order.created_at);
       
-      switch (period) {
+      switch (groupBy) {
+        case 'hour':
+          key = `${date.getHours().toString().padStart(2, '0')}:00`;
+          break;
         case 'day':
-          key = date.toISOString().split('T')[0];
+          key = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
           break;
         case 'week':
-          const weekStart = new Date(date.setDate(date.getDate() - date.getDay()));
-          key = weekStart.toISOString().split('T')[0];
+          const weekStart = new Date(date);
+          weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+          key = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
           break;
         case 'month':
-          key = date.toISOString().slice(0, 7);
-          break;
-        case 'year':
-          key = date.getFullYear().toString();
+          key = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
           break;
         default:
           key = date.toISOString().split('T')[0];
@@ -241,223 +638,163 @@ export function EnhancedAdminDashboard() {
       if (!acc[key]) {
         acc[key] = { period: key, revenue: 0, orders: 0 };
       }
-      acc[key].revenue += Number(order.total_amount);
+      acc[key].revenue += Number(order.total_amount || 0);
       acc[key].orders += 1;
       return acc;
-    }, {});
+    }, {} as Record<string, RevenueDataPoint>);
 
-    return (Object.values(grouped) as RevenueData[]).sort((a, b) => new Date(a.period).getTime() - new Date(b.period).getTime());
+    const sortedData: RevenueDataPoint[] = Object.values(grouped);
+    // Sort chart data chronologically
+    sortedData.sort((a, b) => {
+      if (groupBy === 'hour') {
+        return parseInt(a.period) - parseInt(b.period);
+      }
+      // For day/week/month, parse the date strings for proper ordering
+      return new Date(a.period + ', 2025').getTime() - new Date(b.period + ', 2025').getTime();
+    });
+
+    setRevenueChartData(sortedData);
   };
 
   return (
     <div className="min-h-screen bg-background">
       <div className="p-4 md:p-6 space-y-6">
-        {/* Welcome Section */}
-        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-background p-6 rounded-xl border">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Dashboard Overview</h1>
-          <p className="text-muted-foreground mt-2">
-            Real-time business insights and analytics
-          </p>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${totalRevenue.toLocaleString()}</div>
-            </CardContent>
-          </Card>
+        {/* Enhanced Header with Global Date Filter */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 rounded-2xl border border-primary/10"
+        >
+          {/* Animated Background Elements */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute -top-1/2 -right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute -bottom-1/2 -left-1/4 w-72 h-72 bg-primary/3 rounded-full blur-3xl" />
+          </div>
           
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalOrders.toLocaleString()}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{topCustomers.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Low Stock Alerts</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">{lowStockItems.length}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Revenue Trend */}
-          <Card className="col-span-1 lg:col-span-2">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Revenue Trend</CardTitle>
-                  <CardDescription>Revenue and orders over time</CardDescription>
-                </div>
-                <Select value={revenuePeriod} onValueChange={setRevenuePeriod}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Daily</SelectItem>
-                    <SelectItem value="week">Weekly</SelectItem>
-                    <SelectItem value="month">Monthly</SelectItem>
-                    <SelectItem value="year">Yearly</SelectItem>
-                  </SelectContent>
-                </Select>
+          <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="hidden sm:flex p-3 rounded-2xl bg-primary/10 border border-primary/20">
+                <Sparkles className="h-7 w-7 text-primary" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer config={chartConfig} className="h-80">
-                <LineChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="period" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line type="monotone" dataKey="revenue" stroke="var(--color-revenue)" strokeWidth={2} />
-                  <Line type="monotone" dataKey="orders" stroke="var(--color-orders)" strokeWidth={2} />
-                </LineChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-
-          {/* Order Status Distribution */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Order Status Distribution</CardTitle>
-              <CardDescription>Current order status breakdown</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer config={chartConfig} className="h-64">
-                <PieChart>
-                  <Pie
-                    data={orderStatusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {orderStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-
-          {/* Customer Growth */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Customer Growth</CardTitle>
-              <CardDescription>New customers by month</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer config={chartConfig} className="h-64">
-                <BarChart data={customerGrowth}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="customers" fill="hsl(var(--primary))" />
-                </BarChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Data Tables */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Top Products */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Top 5 Sold Products</CardTitle>
-              <CardDescription>Best performing products by quantity</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {topProducts.map((product, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{product.name}</p>
-                      <p className="text-sm text-muted-foreground">{product.quantity} sold</p>
-                    </div>
-                    <Badge variant="secondary">${product.revenue.toFixed(2)}</Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Top Customers */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Top 5 Customers</CardTitle>
-              <CardDescription>Highest spending customers</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {topCustomers.map((customer, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{customer.name}</p>
-                      <p className="text-sm text-muted-foreground">{customer.orders} orders</p>
-                    </div>
-                    <Badge variant="secondary">${customer.total.toFixed(2)}</Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Low Stock Alerts */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Low Stock Alerts
-            </CardTitle>
-            <CardDescription>Products running low on inventory</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {lowStockItems.map((item, index) => (
-                <div key={index} className="p-4 border rounded-lg space-y-2">
-                  <h4 className="font-medium">{item.product_name}</h4>
-                  {item.color_name && <p className="text-sm text-muted-foreground">Color: {item.color_name}</p>}
-                  {item.size_name && <p className="text-sm text-muted-foreground">Size: {item.size_name}</p>}
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Stock: {item.available_stock}</span>
-                    <Badge variant="destructive">{item.sku}</Badge>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                  Dashboard Overview
+                  <AnimatePresence>
+                    {isLoading && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0 }}
+                      >
+                        <Activity className="h-5 w-5 text-primary animate-pulse" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </h1>
+                <div className="flex items-center gap-3 mt-1">
+                  <p className="text-muted-foreground">
+                    Real-time business insights
+                  </p>
+                  <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-full bg-muted/50 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    {format(currentTime, 'h:mm:ss a')}
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <DashboardDateFilter value={dateFilter} onChange={setDateFilter} />
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  ordersCache.current = { data: null, timestamp: 0 };
+                  fetchAllData();
+                }}
+                disabled={isLoading}
+                className="gap-2 bg-background/50 backdrop-blur-sm hover:bg-background/80"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Last Updated Indicator */}
+          <div className="relative mt-4 pt-3 border-t border-primary/10">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Last updated: {format(lastRefreshed, 'MMM d, h:mm a')}
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Order Source Breakdown with Toggle Filter */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <OrderSourceBreakdown 
+            stats={orderSourceStats}
+            sourceFilter={sourceFilter}
+            onSourceFilterChange={setSourceFilter}
+          />
+        </motion.div>
+
+        {/* Core Business Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          <CoreBusinessStats {...coreStats} />
+        </motion.div>
+
+        {/* Revenue Chart - now uses global date filter */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <RevenueChart 
+            data={revenueChartData}
+            period={dateFilter.preset}
+            onPeriodChange={() => {}}
+          />
+        </motion.div>
+
+        {/* Time-Based & Order Performance */}
+        <motion.div 
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <TimeBasedSalesStats {...timeStats} />
+          <OrderPerformanceStats {...orderStats} />
+        </motion.div>
+
+        {/* Product Performance & Inventory */}
+        <motion.div 
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <ProductPerformanceStats {...productStats} />
+          <InventoryStats {...inventoryStats} />
+        </motion.div>
+
+        {/* Customer Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <CustomerStatsPanel {...customerStats} />
+        </motion.div>
       </div>
     </div>
   );

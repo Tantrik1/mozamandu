@@ -213,6 +213,10 @@ export function PaymentScreenshotViewer({
                 style={{
                   transform: `scale(${zoom}) rotate(${rotation}deg)`,
                   transformOrigin: 'center',
+                  maxWidth: 'calc(100vw - 100px)',
+                  maxHeight: 'calc(100vh - 300px)',
+                  width: 'auto',
+                  height: 'auto',
                 }}
               />
             </div>

@@ -1,14 +1,26 @@
-
-import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Package, Phone, Mail, MapPin, Calendar, CreditCard, Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { ModernNavbar } from '@/components/navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PaymentScreenshotViewer } from '@/components/admin/PaymentScreenshotViewer';
+import { useAuth } from '@/hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
+
+interface PricingBreakdown {
+  pricingMode?: string;
+  tieredSubtotal?: number;
+  tieredSavings?: number;
+  accurateSavings?: number;
+  accurateSubtotal?: number;
+  comboInfo?: {
+    combo: { name: string; description: string };
+    totalComboSavings: number;
+  };
+}
 
 interface CustomerOrderDetails {
   id: string;
@@ -29,7 +41,7 @@ interface CustomerOrderDetails {
   promocode_used?: string;
   combo_applied?: boolean;
   created_at: string;
-  pricing_breakdown?: any;
+  pricing_breakdown?: PricingBreakdown;
   payment_method?: {
     name: string;
   };
@@ -55,67 +67,56 @@ interface OrderItem {
   };
 }
 
+// Optimized fetch function - parallel queries
+const fetchCustomerOrderData = async (orderId: string) => {
+  // Fetch order and items in parallel
+  const [orderResult, itemsResult] = await Promise.all([
+    supabase
+      .from('customer_orders')
+      .select(`
+        *, payment_method:payment_methods(name),
+        delivery_location:delivery_charges(place_name)
+      `)
+      .eq('id', orderId)
+      .single(),
+    supabase
+      .from('customer_order_item_details')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('created_at')
+  ]);
+
+  if (orderResult.error) throw new Error('Order not found');
+
+  const items = (itemsResult.data || []).map(item => ({
+    ...item,
+    pricing_details: item.pricing_details as any || { savings: 0 }
+  }));
+
+  return { order: orderResult.data, items };
+};
+
 export default function CustomerOrderSummary() {
   const { orderId } = useParams();
-  const [orderDetails, setOrderDetails] = useState<CustomerOrderDetails | null>(null);
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { userProfile } = useAuth();
 
-  useEffect(() => {
-    if (orderId) {
-      fetchOrderDetails();
-    }
-  }, [orderId]);
+  const isAdminView = userProfile?.role === 'admin';
 
-  const fetchOrderDetails = async () => {
-    try {
-      console.log('🔍 Fetching customer order details for:', orderId);
+  // Use React Query for fast cached fetching
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['customer-order-summary', orderId],
+    queryFn: () => fetchCustomerOrderData(orderId!),
+    enabled: !!orderId,
+    staleTime: 2 * 60 * 1000,
+    retry: 1,
+  });
 
-      // Fetch order details with related data
-      const { data: orderData, error: orderError } = await supabase
-        .from('customer_orders')
-        .select(`
-          *,
-          payment_method:payment_methods(name),
-          delivery_location:delivery_charges(place_name)
-        `)
-        .eq('id', orderId)
-        .single();
-
-      if (orderError) {
-        console.error('❌ Error fetching customer order:', orderError);
-        setError('Order not found');
-        setIsLoading(false);
-        return;
-      }
-
-      // Fetch order items
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('customer_order_item_details')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('created_at');
-
-      if (itemsError) {
-        console.error('❌ Error fetching order items:', itemsError);
-      }
-
-      console.log('✅ Customer order data fetched:', orderData);
-      console.log('✅ Order items fetched:', itemsData);
-
-      setOrderDetails(orderData);
-      setOrderItems((itemsData || []).map(item => ({
-        ...item,
-        pricing_details: item.pricing_details as any || { savings: 0 }
-      })));
-    } catch (error) {
-      console.error('💥 Error fetching customer order details:', error);
-      setError('Failed to load order details');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const orderDetails: CustomerOrderDetails | null = data?.order ? {
+    ...data.order,
+    pricing_breakdown: data.order.pricing_breakdown as PricingBreakdown | undefined,
+    combo_applied: (data.order as any).combo_applied
+  } : null;
+  const orderItems = data?.items || [];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -135,8 +136,9 @@ export default function CustomerOrderSummary() {
   const getPricingModeDisplay = (mode: string) => {
     switch (mode) {
       case 'combo': return { text: 'Combo Price', color: 'bg-purple-100 text-purple-800' };
-      case 'discount': return { text: 'MOQ Discount', color: 'bg-green-100 text-green-800' };
-      case 'moq_discount': return { text: 'MOQ Discount', color: 'bg-green-100 text-green-800' };
+      case 'discount': return { text: 'Volume Discount', color: 'bg-green-100 text-green-800' };
+      case 'moq_discount': return { text: 'Volume Discount', color: 'bg-green-100 text-green-800' };
+      case 'progressive_discount': return { text: 'Progressive Discount', color: 'bg-green-100 text-green-800' };
       default: return { text: 'Normal Price', color: 'bg-gray-100 text-gray-800' };
     }
   };
@@ -144,11 +146,11 @@ export default function CustomerOrderSummary() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <CustomerHeader />
+        <ModernNavbar />
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading order details...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading order...</p>
           </div>
         </div>
         <Footer />
@@ -159,15 +161,15 @@ export default function CustomerOrderSummary() {
   if (error || !orderDetails) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <CustomerHeader />
+        <ModernNavbar />
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Order Not Found</h1>
-            <p className="text-gray-600 mb-6">{error || 'The requested order could not be found.'}</p>
+            <p className="text-gray-600 mb-6">{error instanceof Error ? error.message : 'The requested order could not be found.'}</p>
             <Button asChild>
-              <Link to="/dashboard">
+              <Link to={isAdminView ? "/admin" : "/dashboard"}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
+                {isAdminView ? "Back to Admin" : "Back to Dashboard"}
               </Link>
             </Button>
           </div>
@@ -179,14 +181,14 @@ export default function CustomerOrderSummary() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <CustomerHeader />
+      <ModernNavbar />
       
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-6">
           <Button asChild variant="outline" className="mb-4">
-            <Link to="/dashboard">
+            <Link to={isAdminView ? "/admin" : "/dashboard"}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              {isAdminView ? "Back to Admin" : "Back to Dashboard"}
             </Link>
           </Button>
           
@@ -224,47 +226,65 @@ export default function CustomerOrderSummary() {
                 <div className="space-y-4">
                   {orderItems.map((item) => {
                     const pricingMode = getPricingModeDisplay(item.pricing_mode);
+                    const pricingDetails = item.pricing_details || {};
+                    const hasProgressivePricing = pricingDetails.progressivePricing || pricingDetails.discountedUnits;
+                    const basePrice = pricingDetails.basePrice || item.unit_price;
+                    
                     return (
-                      <div key={item.id} className="flex justify-between items-start py-4 border-b last:border-b-0">
-                        <div className="flex-1">
-                          <h4 className="font-medium">{item.product_name}</h4>
-                          {item.color_name && (
-                            <p className="text-sm text-gray-600">Color: {item.color_name}</p>
-                          )}
-                          {item.size_name && (
-                            <p className="text-sm text-gray-600">Size: {item.size_name}</p>
-                          )}
-                          {item.sku && (
-                            <p className="text-sm text-gray-500">SKU: {item.sku}</p>
-                          )}
+                      <div key={item.id} className="py-4 border-b last:border-b-0">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <h4 className="font-medium">{item.product_name}</h4>
+                            {item.color_name && (
+                              <p className="text-sm text-gray-600">Color: {item.color_name}</p>
+                            )}
+                            {item.size_name && (
+                              <p className="text-sm text-gray-600">Size: {item.size_name}</p>
+                            )}
+                            {item.sku && (
+                              <p className="text-sm text-gray-500">SKU: {item.sku}</p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">Rs. {item.total_price.toFixed(2)}</p>
+                            {pricingDetails.savings > 0 && basePrice !== item.unit_price && (
+                              <p className="text-xs text-gray-500 line-through">
+                                Rs. {(basePrice * item.quantity).toFixed(2)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Progressive pricing breakdown */}
+                        {hasProgressivePricing && pricingDetails.discountedUnits?.length > 0 ? (
+                          <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
+                            {pricingDetails.unitsAtBase > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">{pricingDetails.unitsAtBase} × Rs. {basePrice.toFixed(2)} (base)</span>
+                                <span>Rs. {pricingDetails.basePriceTotal?.toFixed(2) || (pricingDetails.unitsAtBase * basePrice).toFixed(2)}</span>
+                              </div>
+                            )}
+                            {pricingDetails.discountedUnits.map((tier: any, idx: number) => (
+                              <div key={idx} className="flex justify-between text-green-700">
+                                <span>{tier.units} × Rs. {tier.unitPrice.toFixed(2)} ({tier.tierName})</span>
+                                <span>Rs. {tier.total.toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
                           <p className="text-sm text-gray-600">
                             Qty: {item.quantity} × Rs. {item.unit_price.toFixed(2)}
                           </p>
-                          
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="secondary" className={pricingMode.color}>
-                              {pricingMode.text}
-                            </Badge>
-                            {item.pricing_details?.savings && item.pricing_details.savings > 0 && (
-                              <span className="text-sm text-green-600">
-                                Saved Rs. {item.pricing_details.savings.toFixed(2)}
-                              </span>
-                            )}
-                          </div>
-                          
-                          {item.pricing_details?.tierInfo && (
-                            <p className="text-xs text-blue-600 mt-1">
-                              {item.pricing_details.tierInfo}
-                            </p>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold">Rs. {item.total_price.toFixed(2)}</p>
-                          <p className="text-sm text-gray-600">Rs. {item.unit_price.toFixed(2)} each</p>
-                          {item.pricing_details?.basePrice && item.pricing_details.basePrice !== item.unit_price && (
-                            <p className="text-xs text-gray-500 line-through">
-                              Rs. {item.pricing_details.basePrice.toFixed(2)} base
-                            </p>
+                        )}
+                        
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="secondary" className={pricingMode.color}>
+                            {pricingMode.text}
+                          </Badge>
+                          {pricingDetails.savings > 0 && (
+                            <span className="text-sm text-green-600">
+                              Saved Rs. {pricingDetails.savings.toFixed(2)}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -294,17 +314,17 @@ export default function CustomerOrderSummary() {
                         </div>
                       )}
                       
-                      {orderDetails.pricing_breakdown.pricingMode === 'moq_discount' && orderDetails.pricing_breakdown.tieredSavings > 0 && (
+                      {(orderDetails.pricing_breakdown.pricingMode === 'moq_discount' || orderDetails.pricing_breakdown.pricingMode === 'progressive_discount') && (orderDetails.pricing_breakdown.tieredSavings || orderDetails.pricing_breakdown.accurateSavings) > 0 && (
                         <div className="bg-green-50 border border-green-200 rounded p-3 mb-3">
                           <div className="flex items-center gap-2 mb-1">
                             <Package className="h-4 w-4 text-green-600" />
-                            <span className="font-medium text-green-800">MOQ Discount Applied</span>
+                            <span className="font-medium text-green-800">Progressive Volume Discount Applied</span>
                           </div>
                           <p className="text-sm text-green-700">
-                            You reached the minimum order quantity and received tiered pricing discounts.
+                            You received ladder-style pricing - each tier of items gets progressively better discounts.
                           </p>
                           <p className="text-xs text-green-600 mt-1">
-                            Total MOQ savings: Rs. {orderDetails.pricing_breakdown.tieredSavings.toFixed(2)}
+                            Total volume savings: Rs. {(orderDetails.pricing_breakdown.tieredSavings || orderDetails.pricing_breakdown.accurateSavings || 0).toFixed(2)}
                           </p>
                         </div>
                       )}

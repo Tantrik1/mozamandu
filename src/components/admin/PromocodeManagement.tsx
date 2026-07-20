@@ -12,15 +12,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Search, Percent, Calendar, DollarSign, Tag } from 'lucide-react';
 
+// Interface matching your external Supabase schema
 interface Promocode {
   id: string;
   code: string;
-  description: string;
+  description: string | null;
   discount_percentage: number;
-  minimum_order_amount: number;
+  minimum_order_amount: number | null;
   is_active: boolean;
-  valid_from: string;
-  valid_until: string;
+  valid_from: string | null;
+  valid_until: string | null;
   used_count: number;
   created_at: string;
 }
@@ -30,6 +31,8 @@ export function PromocodeManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPromocode, setEditingPromocode] = useState<Promocode | null>(null);
+  const [promoUsageData, setPromoUsageData] = useState<{ [key: string]: number }>({});
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     code: '',
     description: '',
@@ -40,58 +43,123 @@ export function PromocodeManagement() {
     valid_until: '',
   });
 
-  // Stats
+  // Calculate accurate stats using frontend data
   const activePromocodes = promocodes.filter(p => p.is_active).length;
-  const totalUsage = promocodes.reduce((sum, p) => sum + (p.used_count || 0), 0);
+  const totalUsage = Object.values(promoUsageData).reduce((sum, count) => sum + count, 0);
   const averageDiscount = promocodes.length > 0 
     ? promocodes.reduce((sum, p) => sum + p.discount_percentage, 0) / promocodes.length 
     : 0;
 
   useEffect(() => {
-    fetchPromocodes();
+    fetchPromocodesAndUsage();
   }, []);
 
-  const fetchPromocodes = async () => {
-    const { data, error } = await supabase
-      .from('promocodes')
-      .select('*')
-      .order('created_at', { ascending: false });
+  const fetchPromocodesAndUsage = async () => {
+    setLoading(true);
+    console.log('🔍 Fetching promocodes and calculating usage...');
+    
+    try {
+      // Fetch promocodes - select only columns that exist in your external table
+      const { data: promoData, error: promoError } = await supabase
+        .from('promocodes')
+        .select('id, code, description, discount_percentage, minimum_order_amount, is_active, valid_from, valid_until, used_count, created_at')
+        .order('created_at', { ascending: false });
 
-    if (error) {
+      if (promoError) {
+        console.error('❌ Promocode fetch error:', promoError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch promocodes: " + promoError.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const promocodesList = (promoData || []) as Promocode[];
+      console.log(`📋 Fetched ${promocodesList.length} promocodes`);
+
+      // Fetch ALL orders from both tables to calculate promo usage
+      console.log('📊 Fetching all orders for promo usage calculation...');
+      const [customerOrdersResult, ordersResult] = await Promise.all([
+        supabase
+          .from('customer_orders')
+          .select('promocode_used')
+          .not('promocode_used', 'is', null)
+          .neq('promocode_used', ''),
+        supabase
+          .from('orders')
+          .select('promocode_used')
+          .not('promocode_used', 'is', null)
+          .neq('promocode_used', '')
+      ]);
+
+      let allPromosUsed: string[] = [];
+      
+      if (!customerOrdersResult.error && customerOrdersResult.data) {
+        allPromosUsed = [...allPromosUsed, ...customerOrdersResult.data.map(order => order.promocode_used).filter(Boolean)];
+      }
+      
+      if (!ordersResult.error && ordersResult.data) {
+        allPromosUsed = [...allPromosUsed, ...ordersResult.data.map(order => order.promocode_used).filter(Boolean)];
+      }
+
+      console.log(`💰 Found ${allPromosUsed.length} total promo code usages`);
+
+      // Calculate usage count for each promo code
+      const usageMap: { [key: string]: number } = {};
+      promocodesList.forEach(promo => {
+        const usageCount = allPromosUsed.filter(usedCode => 
+          usedCode && usedCode.toUpperCase() === promo.code.toUpperCase()
+        ).length;
+        usageMap[promo.code] = usageCount;
+        
+        console.log(`📈 Promo "${promo.code}": ${usageCount} uses`);
+      });
+
+      console.log('✅ Promo usage calculation complete:', usageMap);
+      
+      setPromocodes(promocodesList);
+      setPromoUsageData(usageMap);
+      
+    } catch (error) {
+      console.error('❌ Error in fetchPromocodesAndUsage:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch promocodes",
+        description: "Failed to fetch data: " + (error as Error).message,
         variant: "destructive",
       });
-    } else {
-      setPromocodes(data || []);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Only include fields that exist in your external Supabase table
     const promocodeData = {
       code: formData.code.toUpperCase(),
-      description: formData.description,
+      description: formData.description || null,
       discount_percentage: formData.discount_percentage,
-      minimum_order_amount: formData.minimum_order_amount,
+      minimum_order_amount: formData.minimum_order_amount || 0,
       is_active: formData.is_active,
-      valid_from: formData.valid_from,
-      valid_until: formData.valid_until,
+      valid_from: formData.valid_from || null,
+      valid_until: formData.valid_until || null,
     };
 
     let error;
     
     if (editingPromocode) {
+      // Cast to any to bypass TypeScript - external Supabase doesn't have discount_type/max_discount
       ({ error } = await supabase
         .from('promocodes')
-        .update(promocodeData)
+        .update(promocodeData as any)
         .eq('id', editingPromocode.id));
     } else {
+      // Cast to any to bypass TypeScript - external Supabase doesn't have discount_type/max_discount
       ({ error } = await supabase
         .from('promocodes')
-        .insert([promocodeData]));
+        .insert([promocodeData as any]));
     }
 
     if (error) {
@@ -110,7 +178,7 @@ export function PromocodeManagement() {
     
     resetForm();
     setIsCreateModalOpen(false);
-    fetchPromocodes();
+    fetchPromocodesAndUsage();
   };
 
   const handleEdit = (promocode: Promocode) => {
@@ -146,7 +214,7 @@ export function PromocodeManagement() {
         title: "Success",
         description: "Promocode deleted successfully",
       });
-      fetchPromocodes();
+      fetchPromocodesAndUsage();
     }
   };
 
@@ -168,21 +236,32 @@ export function PromocodeManagement() {
     (promocode.description && promocode.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const isExpired = (validUntil: string) => {
+  const isExpired = (validUntil: string | null) => {
     return validUntil && new Date(validUntil) < new Date();
   };
 
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-32">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-4"></div>
+          <span>Loading promocodes and calculating usage...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">Promocode Management</h2>
-          <p className="text-gray-600 mt-1">Manage discount codes and promotional offers</p>
+          <h2 className="text-2xl md:text-3xl font-bold">Promocode Management</h2>
+          <p className="text-muted-foreground mt-1">Manage discount codes (Usage calculated from all orders)</p>
         </div>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg">
+            <Button onClick={resetForm}>
               <Plus className="h-4 w-4 mr-2" />
               Add Promocode
             </Button>
@@ -212,7 +291,7 @@ export function PromocodeManagement() {
                   <Input
                     id="discount_percentage"
                     type="number"
-                    min="0"
+                    min="0.01"
                     max="100"
                     step="0.01"
                     value={formData.discount_percentage}
@@ -235,7 +314,7 @@ export function PromocodeManagement() {
               </div>
               
               <div>
-                <Label htmlFor="minimum_order_amount">Minimum Order Amount</Label>
+                <Label htmlFor="minimum_order_amount">Minimum Order Amount (Rs.)</Label>
                 <Input
                   id="minimum_order_amount"
                   type="number"
@@ -282,7 +361,7 @@ export function PromocodeManagement() {
                 <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                <Button type="submit">
                   {editingPromocode ? 'Update' : 'Create'} Promocode
                 </Button>
               </div>
@@ -292,58 +371,58 @@ export function PromocodeManagement() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Promocodes</p>
-                <p className="text-2xl font-bold text-gray-900">{promocodes.length}</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Promocodes</p>
+                <p className="text-2xl font-bold">{promocodes.length}</p>
               </div>
-              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Tag className="h-6 w-6 text-blue-600" />
+              <div className="h-10 w-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <Tag className="h-5 w-5 text-primary" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active Promocodes</p>
-                <p className="text-2xl font-bold text-green-600">{activePromocodes}</p>
+                <p className="text-sm font-medium text-muted-foreground">Active</p>
+                <p className="text-2xl font-bold text-emerald-600">{activePromocodes}</p>
               </div>
-              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Percent className="h-6 w-6 text-green-600" />
+              <div className="h-10 w-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
+                <Percent className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Usage</p>
-                <p className="text-2xl font-bold text-purple-600">{totalUsage}</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Usage</p>
+                <p className="text-2xl font-bold text-violet-600">{totalUsage}</p>
               </div>
-              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-purple-600" />
+              <div className="h-10 w-10 bg-violet-100 dark:bg-violet-900/30 rounded-lg flex items-center justify-center">
+                <DollarSign className="h-5 w-5 text-violet-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Avg. Discount</p>
-                <p className="text-2xl font-bold text-orange-600">{averageDiscount.toFixed(1)}%</p>
+                <p className="text-sm font-medium text-muted-foreground">Avg. Discount</p>
+                <p className="text-2xl font-bold text-amber-600">{averageDiscount.toFixed(1)}%</p>
               </div>
-              <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                <Percent className="h-6 w-6 text-orange-600" />
+              <div className="h-10 w-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+                <Percent className="h-5 w-5 text-amber-600" />
               </div>
             </div>
           </CardContent>
@@ -352,8 +431,8 @@ export function PromocodeManagement() {
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <div className="relative flex-1 max-w-md w-full">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="Search promocodes..."
             value={searchTerm}
@@ -361,7 +440,7 @@ export function PromocodeManagement() {
             className="pl-10"
           />
         </div>
-        <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-lg">
+        <div className="text-sm text-muted-foreground bg-muted px-3 py-2 rounded-lg">
           {filteredPromocodes.length} of {promocodes.length} promocodes
         </div>
       </div>
@@ -416,11 +495,13 @@ export function PromocodeManagement() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">{promocode.discount_percentage}% OFF</div>
-                  {promocode.minimum_order_amount > 0 && (
-                    <div className="text-sm text-gray-600">
-                      Min. order: ${promocode.minimum_order_amount}
+                <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">
+                    {promocode.discount_percentage}% OFF
+                  </div>
+                  {promocode.minimum_order_amount && promocode.minimum_order_amount > 0 && (
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Min. order: Rs. {promocode.minimum_order_amount}
                     </div>
                   )}
                 </div>
@@ -444,7 +525,7 @@ export function PromocodeManagement() {
                   )}
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
-                    <span>Used: {promocode.used_count || 0} times</span>
+                    <span>Used: {promoUsageData[promocode.code] || 0} times</span>
                   </div>
                 </div>
 

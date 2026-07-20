@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -14,6 +14,10 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { SmartProductVariantForm } from './SmartProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
+import { ProductAdditionalImages, type AdditionalImage, type ProductAdditionalImagesRef } from './ProductAdditionalImages';
+import { ProductSEOSection } from './ProductSEOSection';
+import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
+import { CareInstructionsInput } from './CareInstructionsInput';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -26,6 +30,14 @@ const productSchema = z.object({
   has_color_variants: z.boolean().default(false),
   has_size_variants: z.boolean().default(false),
   status: z.enum(['active', 'inactive']).default('active'),
+  material_composition: z.string().optional(),
+  care_instructions: z.union([z.string(), z.array(z.string())]).optional(),
+  // SEO fields
+  meta_title: z.string().max(60).optional(),
+  meta_description: z.string().max(160).optional(),
+  meta_keywords: z.string().optional(),
+  og_title: z.string().max(60).optional(),
+  og_description: z.string().max(160).optional(),
 });
 
 interface Category {
@@ -42,6 +54,7 @@ interface Subcategory {
 interface ColorVariant {
   id?: string;
   color_name: string;
+  color_hex?: string;
   image_url?: string;
   has_sizes: boolean;
   size_variants: SizeVariant[];
@@ -69,6 +82,8 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showInventoryPopup, setShowInventoryPopup] = useState(false);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
+  const [additionalImages, setAdditionalImages] = useState<AdditionalImage[]>([]);
+  const additionalImagesRef = useRef<ProductAdditionalImagesRef>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -84,6 +99,14 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       has_color_variants: false,
       has_size_variants: false,
       status: 'active',
+      material_composition: 'Premium quality fabric blend designed for comfort and durability.',
+      care_instructions: ['Machine wash cold with similar colors', 'Do not bleach', 'Tumble dry low', 'Iron on low heat if needed'],
+      // SEO defaults
+      meta_title: '',
+      meta_description: '',
+      meta_keywords: '',
+      og_title: '',
+      og_description: '',
     },
   });
 
@@ -147,6 +170,27 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file size (max 10MB - will be compressed automatically)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: 'Error',
+        description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 10MB`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate it's an image
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Error',
+        description: 'Please select a valid image file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setUploadingImage(true);
     
     try {
@@ -160,7 +204,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       
       toast({
         title: 'Success',
-        description: 'Image ready for upload',
+        description: 'Image ready for upload (will be optimized to WebP)',
       });
     } catch (error) {
       console.error('Error preparing image:', error);
@@ -183,12 +227,16 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     if (!imageFile) return null;
 
     try {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `product-${Date.now()}.${fileExt}`;
+      // Optimize image with aggressive compression (~250KB)
+      const { file: optimizedFile } = await prepareImageForUpload(imageFile, PRODUCT_COMPRESSION);
+
+      const fileName = `product-${Date.now()}.webp`;
 
       const { data, error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(fileName, imageFile);
+        .upload(fileName, optimizedFile, {
+          contentType: 'image/webp',
+        });
 
       if (uploadError) throw uploadError;
 
@@ -201,10 +249,17 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       console.error('Error uploading image:', error);
       toast({
         title: 'Error',
-        description: 'Failed to upload image',
+        description: error instanceof Error ? error.message : 'Failed to upload image',
         variant: 'destructive',
       });
       return null;
+    }
+  };
+
+  const uploadAdditionalImages = async (productId: string): Promise<void> => {
+    // Use the ref to upload images through the component
+    if (additionalImagesRef.current?.hasNewImages()) {
+      await additionalImagesRef.current.uploadImages(productId);
     }
   };
 
@@ -218,6 +273,18 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
         imageUrl = await uploadImageAndGetUrl();
       }
 
+      // Convert care_instructions to array for Supabase text[] column
+      const careInstructionsArray = data.care_instructions
+        ? (Array.isArray(data.care_instructions)
+            ? data.care_instructions.filter(Boolean)
+            : data.care_instructions.split('\n').filter(Boolean))
+        : ['Machine wash cold with similar colors', 'Do not bleach', 'Tumble dry low', 'Iron on low heat if needed'];
+
+      // Convert meta_keywords string to array for Supabase text[] column
+      const metaKeywordsArray = data.meta_keywords
+        ? data.meta_keywords.split(',').map(k => k.trim()).filter(Boolean)
+        : null;
+
       const productData = {
         name: data.name,
         description: data.description || null,
@@ -230,13 +297,22 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
         color_has_size_variants: data.has_size_variants,
         status: data.status,
         image_url: imageUrl,
+        material_composition: data.material_composition || 'Premium quality fabric blend designed for comfort and durability.',
+        care_instructions: careInstructionsArray,
+        // SEO fields
+        meta_title: data.meta_title || null,
+        meta_description: data.meta_description || null,
+        meta_keywords: metaKeywordsArray,
+        og_title: data.og_title || null,
+        og_description: data.og_description || null,
       };
 
       console.log('Product data to insert:', productData);
 
+      // Cast to bypass TypeScript - actual Supabase schema has care_instructions as text[]
       const { data: newProduct, error } = await supabase
         .from('products')
-        .insert(productData)
+        .insert(productData as any)
         .select()
         .single();
 
@@ -248,6 +324,11 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       // Create color variants and size variants first
       if (data.has_color_variants && colorVariants.length > 0) {
         await saveColorVariants(newProduct.id, data.has_size_variants);
+      }
+
+      // Upload additional images
+      if (additionalImages.some(img => img.isNew)) {
+        await uploadAdditionalImages(newProduct.id);
       }
 
       // Show inventory management popup
@@ -277,12 +358,42 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       const validVariants = colorVariants.filter(cv => cv.color_name.trim());
       if (validVariants.length === 0) return;
 
+      const normalized = validVariants.map(cv => ({
+        ...cv,
+        color_name: cv.color_name.trim(),
+        color_hex: cv.color_hex?.trim() || null,
+      }));
+
+      const uniqueColorNames = Array.from(new Set(normalized.map(v => v.color_name)));
+      const colorIdByName = new Map<string, string>();
+
+      for (const name of uniqueColorNames) {
+        const hex = normalized.find(v => v.color_name === name)?.color_hex || null;
+        const { data: upsertedColor, error: upsertColorError } = await supabase
+          .from('colors')
+          .upsert(
+            {
+              name,
+              hex_code: hex,
+            },
+            { onConflict: 'name' }
+          )
+          .select('id, name')
+          .single();
+
+        if (upsertColorError) throw upsertColorError;
+        if (upsertedColor?.id) {
+          colorIdByName.set(name, upsertedColor.id);
+        }
+      }
+
       const { data: insertedColors, error: colorError } = await supabase
         .from('color_variants')
         .insert(
-          validVariants.map(cv => ({
+          normalized.map(cv => ({
             product_id: productId,
             color_name: cv.color_name,
+            color_id: colorIdByName.get(cv.color_name) || null,
             image_url: cv.image_url || null,
             has_sizes: hasSizeVariants,
           }))
@@ -369,6 +480,24 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                     placeholder="Enter product description"
                     rows={3}
                   />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="material_composition">Material Composition</Label>
+                    <Textarea
+                      id="material_composition"
+                      {...form.register('material_composition')}
+                      placeholder="e.g., Premium quality fabric blend designed for comfort and durability."
+                      rows={2}
+                    />
+                  </div>
+                  <div>
+                    <CareInstructionsInput
+                      value={form.watch('care_instructions') || []}
+                      onChange={(value) => form.setValue('care_instructions', value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -551,10 +680,37 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                     </div>
                   )}
                 </div>
+
+                {/* Additional Images Section */}
+                <div className="mt-6 pt-4 border-t border-border">
+                  <ProductAdditionalImages
+                    ref={additionalImagesRef}
+                    onImagesChange={setAdditionalImages}
+                    maxImages={3}
+                  />
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* SEO Settings Section */}
+        <ProductSEOSection
+          metaTitle={form.watch('meta_title') || ''}
+          metaDescription={form.watch('meta_description') || ''}
+          metaKeywords={form.watch('meta_keywords') || ''}
+          ogTitle={form.watch('og_title') || ''}
+          ogDescription={form.watch('og_description') || ''}
+          productName={form.watch('name') || ''}
+          productDescription={form.watch('description') || ''}
+          sellingPrice={form.watch('selling_price') || 0}
+          categoryName={categories.find(c => c.id === form.watch('category_id'))?.name}
+          onMetaTitleChange={(v) => form.setValue('meta_title', v)}
+          onMetaDescriptionChange={(v) => form.setValue('meta_description', v)}
+          onMetaKeywordsChange={(v) => form.setValue('meta_keywords', v)}
+          onOgTitleChange={(v) => form.setValue('og_title', v)}
+          onOgDescriptionChange={(v) => form.setValue('og_description', v)}
+        />
 
         {(watchedHasColorVariants || watchedHasSizeVariants) && (
           <SmartProductVariantForm

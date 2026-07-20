@@ -46,18 +46,52 @@ export function TopBar() {
   if (!topBarText || !isVisible) return null;
 
   return (
-    <div className="bg-red-600 text-white text-center py-2 px-4 relative z-50 sticky top-0">
-      <div className="flex items-center justify-center">
-        <p className="text-sm font-medium flex-1 text-center pr-8">
-          {topBarText.text}
+    <div className="bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white py-2.5 relative z-50 overflow-hidden">
+      {/* Subtle shimmer overlay - using transform for composited animation */}
+      <div 
+        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+        style={{
+          animation: 'shimmer 3s ease-in-out infinite',
+          willChange: 'transform',
+        }}
+      />
+      
+      <div className="relative flex items-center justify-center px-12">
+        <p 
+          className="text-sm font-medium text-center"
+          style={{
+            animation: 'bounceX 8s ease-in-out infinite',
+            willChange: 'transform',
+          }}
+        >
+          ✨ {topBarText.text} ✨
         </p>
         <button
           onClick={handleClose}
-          className="absolute right-4 hover:bg-red-700 rounded p-1 transition-colors"
+          className="absolute right-3 bg-white/10 hover:bg-white/20 rounded-full p-1.5 transition-all duration-200 hover:scale-110"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
+      
+      <style>{`
+        @keyframes bounceX {
+          0%, 100% {
+            transform: translateX(-30%);
+          }
+          50% {
+            transform: translateX(30%);
+          }
+        }
+        @keyframes shimmer {
+          0%, 100% {
+            transform: translateX(-100%);
+          }
+          50% {
+            transform: translateX(100%);
+          }
+        }
+      `}</style>
     </div>
   );
 }

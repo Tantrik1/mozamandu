@@ -1,16 +1,15 @@
-
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, Plus, Minus, X, AlertTriangle, Gift, Tag } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, AlertTriangle } from 'lucide-react';
 import { useRobustCart } from '@/hooks/useRobustCart';
 import { useSubcategoryTieredPricing } from '@/hooks/useSubcategoryTieredPricing';
-import { useComboManager } from '@/hooks/useComboManager';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { PricingBreakdown } from '@/components/cart/PricingBreakdown';
 
 interface SubcategoryRequirement {
   subcategoryId: string;
@@ -20,7 +19,7 @@ interface SubcategoryRequirement {
   fulfilled: boolean;
 }
 
-export function CartSidebar() {
+export function CartSidebar({ disableModifications = false }: { disableModifications?: boolean } = {}) {
   const { 
     cartItems, 
     updateQuantity, 
@@ -33,23 +32,12 @@ export function CartSidebar() {
   const [subcategoryRequirements, setSubcategoryRequirements] = useState<SubcategoryRequirement[]>([]);
   const [discountTiers, setDiscountTiers] = useState<{ [key: string]: any[] }>({});
 
-  // Enhanced combo management integration
-  const { 
-    activeCombo, 
-    isComboActive, 
-    getComboPrice, 
-    shouldIgnoreMinimumQuantity 
-  } = useComboManager({ cartItems });
-
-  // Use tiered pricing hook with combo support
+  // Use tiered pricing hook
   const {
     getTotalPrice: getTieredTotalPrice,
-    getItemPricing: getTieredItemPricing,
-    isComboModeActive,
-    getComboInfo
+    getItemPricing: getTieredItemPricing
   } = useSubcategoryTieredPricing({
     cartItems,
-    activeCombo,
     discountTiers
   });
 
@@ -61,32 +49,7 @@ export function CartSidebar() {
     if (cartItems.length > 0) {
       checkSubcategoryRequirements();
     }
-  }, [cartItems, activeCombo]);
-
-  // Debug combo activation
-  useEffect(() => {
-    console.log('🎯 CartSidebar Debug - Combo Status:');
-    console.log('Active combo:', activeCombo);
-    console.log('Is combo mode active:', isComboModeActive());
-    console.log('Cart items count:', cartItems.length);
-    
-    if (activeCombo) {
-      console.log('Combo requirements:', activeCombo.combo_subcategories);
-      
-      // Check subcategory quantities
-      const subcategoryCounts: { [key: string]: number } = {};
-      cartItems.forEach(item => {
-        subcategoryCounts[item.subcategoryId] = (subcategoryCounts[item.subcategoryId] || 0) + item.quantity;
-      });
-      console.log('Current subcategory quantities:', subcategoryCounts);
-      
-      // Check if combo requirements are met
-      activeCombo.combo_subcategories.forEach(req => {
-        const currentQty = subcategoryCounts[req.subcategory_id] || 0;
-        console.log(`Subcategory ${req.subcategory_id}: needs ${req.min_units}, has ${currentQty}`);
-      });
-    }
-  }, [activeCombo, cartItems, isComboModeActive]);
+  }, [cartItems]);
 
   const fetchDiscountTiers = async () => {
     try {
@@ -97,11 +60,15 @@ export function CartSidebar() {
       
       if (data) {
         const tiersBySubcategory: { [key: string]: any[] } = {};
-        data.forEach(tier => {
+        data.forEach((tier: any) => {
           if (!tiersBySubcategory[tier.subcategory_id]) {
             tiersBySubcategory[tier.subcategory_id] = [];
           }
-          tiersBySubcategory[tier.subcategory_id].push(tier);
+          // Support both discount_amount and discount_percentage columns
+          tiersBySubcategory[tier.subcategory_id].push({
+            ...tier,
+            discount_amount: tier.discount_amount ?? tier.discount_percentage ?? 0
+          });
         });
         setDiscountTiers(tiersBySubcategory);
       }
@@ -118,7 +85,7 @@ export function CartSidebar() {
       subcategoryTotals[item.subcategoryId] = (subcategoryTotals[item.subcategoryId] || 0) + item.quantity;
     }
 
-    // Get subcategory requirements (but ignore if combo is active)
+    // Get subcategory requirements
     const subcategoryIds = Object.keys(subcategoryTotals);
     if (subcategoryIds.length > 0) {
       const { data: subcategories } = await supabase
@@ -132,7 +99,7 @@ export function CartSidebar() {
           subcategoryName: sub.name,
           minimumQuantity: sub.minimum_quantity,
           currentQuantity: subcategoryTotals[sub.id] || 0,
-          fulfilled: shouldIgnoreMinimumQuantity(sub.id) || (subcategoryTotals[sub.id] || 0) >= sub.minimum_quantity
+          fulfilled: (subcategoryTotals[sub.id] || 0) >= sub.minimum_quantity
         }));
 
         setSubcategoryRequirements(requirements);
@@ -150,6 +117,12 @@ export function CartSidebar() {
         description: "Please add more items to meet minimum quantity requirements",
         variant: "destructive",
       });
+      return;
+    }
+
+    if (disableModifications) {
+      // Clear cart and navigate to home
+      navigate('/');
       return;
     }
 
@@ -194,47 +167,16 @@ export function CartSidebar() {
             {/* Scrollable Content Area */}
             <ScrollArea className="flex-1 pr-2">
               <div className="space-y-4">
-                {/* Enhanced Active Combo Banner */}
-                {isComboModeActive() && (
-                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4 shadow-sm">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Gift className="h-5 w-5 text-purple-600" />
-                      <span className="font-bold text-purple-800 text-lg">🎉 COMBO ACTIVE!</span>
-                    </div>
-                    <p className="text-purple-800 font-medium">{activeCombo?.name}</p>
-                    <p className="text-sm text-purple-700 mt-1">{activeCombo?.description}</p>
-                    <div className="mt-2 text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded">
-                      ⚡ Special combo pricing overrides all MOQ discounts
-                    </div>
-                    {getComboInfo() && (
-                      <div className="mt-2 text-xs text-green-600 font-semibold">
-                        💰 You're saving Rs.{getComboInfo()?.totalComboSavings.toFixed(2)} with this combo!
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Debug info for combo (remove in production) */}
-                {process.env.NODE_ENV === 'development' && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs">
-                    <div>Debug Info:</div>
-                    <div>Combo Mode: {isComboModeActive() ? 'YES' : 'NO'}</div>
-                    <div>Active Combo: {activeCombo?.name || 'None'}</div>
-                    <div>Cart Items: {cartItems.length}</div>
-                  </div>
-                )}
-
                 {/* Cart Items */}
                 <div className="space-y-3">
                   {cartItems.map((item) => {
                     const pricingResult = getTieredItemPricing(item.id);
                     const pricing = pricingResult || {
-                      unitPrice: item.basePrice,
+                      unitsAtBase: item.quantity,
+                      basePriceTotal: item.basePrice * item.quantity,
+                      discountedUnits: [],
                       totalPrice: item.basePrice * item.quantity,
-                      appliedTier: 'normal' as const,
                       savings: 0,
-                      tierInfo: undefined,
-                      subcategoryInfo: null
                     };
                     const itemTotal = pricing.totalPrice;
 
@@ -263,47 +205,21 @@ export function CartSidebar() {
                             )}
                           </div>
 
-                          {/* Enhanced Pricing Information */}
-                          <div className="mt-2 space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold text-red-600">
-                                Rs.{itemTotal.toFixed(2)}
-                              </span>
-                              {pricing.appliedTier === 'combo' && (
-                                <Badge variant="secondary" className="text-xs px-2 py-0 bg-purple-100 text-purple-800 border border-purple-200">
-                                  <Gift className="w-2 h-2 mr-1" />
-                                  COMBO
-                                </Badge>
-                              )}
-                              {pricing.appliedTier === 'discount' && (
-                                <Badge variant="secondary" className="text-xs px-2 py-0 bg-blue-100 text-blue-800 border border-blue-200">
-                                  <Tag className="w-2 h-2 mr-1" />
-                                  MOQ Discount
-                                </Badge>
-                              )}
-                              {pricing.appliedTier === 'normal' && (
-                                <Badge variant="outline" className="text-xs px-2 py-0 bg-gray-50 text-gray-700">
-                                  Normal
-                                </Badge>
-                              )}
-                              {pricing.savings > 0 && (
-                                <span className="text-xs text-green-600">
-                                  Save Rs.{pricing.savings.toFixed(2)}
-                                </span>
-                              )}
-                            </div>
-                            
-                            <p className="text-xs text-gray-600">
-                              Rs.{pricing.unitPrice.toFixed(2)} avg per item
-                            </p>
-                            
-                            {/* Show tier info */}
-                            {pricingResult?.tierInfo && (
-                              <div className="text-xs text-gray-500 mt-1 bg-blue-50 p-2 rounded">
-                                <div className="font-medium">Pricing details:</div>
-                                <div className="ml-2">{pricingResult.tierInfo}</div>
-                              </div>
-                            )}
+                          {/* Pricing Breakdown */}
+                          <div className="mt-2">
+                            <PricingBreakdown
+                              basePrice={item.basePrice}
+                              quantity={item.quantity}
+                              unitsAtBase={pricing.unitsAtBase}
+                              basePriceTotal={pricing.basePriceTotal}
+                              discountedUnits={pricing.discountedUnits}
+                              totalPrice={pricing.totalPrice}
+                              savings={pricing.savings}
+                              nextTierHint={pricingResult?.subcategoryInfo?.nextTierInfo?.unitsNeeded > 0 
+                                ? `Add ${pricingResult.subcategoryInfo.nextTierInfo.unitsNeeded} more for Rs.${pricingResult.subcategoryInfo.nextTierInfo.priceAtNextTier}/item`
+                                : undefined}
+                              compact
+                            />
                           </div>
 
                           {/* Quantity Controls */}
@@ -313,7 +229,7 @@ export function CartSidebar() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                disabled={item.quantity <= 1}
+                                disabled={item.quantity <= 1 || disableModifications}
                                 className="h-7 w-7 p-0"
                               >
                                 <Minus className="h-3 w-3" />
@@ -323,6 +239,7 @@ export function CartSidebar() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                disabled={disableModifications}
                                 className="h-7 w-7 p-0"
                               >
                                 <Plus className="h-3 w-3" />
@@ -333,7 +250,8 @@ export function CartSidebar() {
                               variant="ghost"
                               size="sm"
                               onClick={() => removeFromCart(item.id)}
-                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                              disabled={disableModifications}
+                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 disabled:opacity-50"
                             >
                               <X className="h-3 w-3" />
                             </Button>
@@ -348,16 +266,13 @@ export function CartSidebar() {
                 {subcategoryRequirements.length > 0 && (
                   <div className="border-t pt-4">
                     <h4 className="text-sm font-medium text-gray-900 mb-3">
-                      {isComboModeActive() ? 'Requirements (Combo Override Active)' : 'Minimum Requirements'}
+                      Minimum Requirements
                     </h4>
                     <div className="space-y-2">
                       {subcategoryRequirements.map((req) => (
                         <div key={req.subcategoryId} className="flex items-center justify-between text-xs">
                           <span className={req.fulfilled ? 'text-green-600' : 'text-red-600'}>
                             {req.subcategoryName}
-                            {shouldIgnoreMinimumQuantity(req.subcategoryId) && (
-                              <span className="text-purple-600 ml-1">(Combo Override)</span>
-                            )}
                           </span>
                           <div className="flex items-center gap-1">
                             <span className={req.fulfilled ? 'text-green-600' : 'text-red-600'}>
@@ -379,29 +294,22 @@ export function CartSidebar() {
 
             {/* Fixed Bottom Section */}
             <div className="flex-shrink-0 border-t pt-4 mt-4 space-y-4">
-              {/* Enhanced Total Section */}
+              {/* Total Section */}
               <div>
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
                   <span>Rs.{totalPrice.toFixed(2)}</span>
                 </div>
-                {isComboModeActive() && (
-                  <div className="bg-purple-50 border border-purple-200 rounded p-2 mt-2">
-                    <p className="text-sm text-purple-800 font-medium flex items-center gap-1">
-                      <Gift className="w-4 h-4" />
-                      🎉 COMBO PRICING ACTIVE! You're getting the best deal!
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Checkout Button */}
               <Button 
                 className="w-full bg-red-600 hover:bg-red-700" 
-                disabled={!canCheckout}
+                disabled={!canCheckout || disableModifications}
                 onClick={handleCheckout}
               >
-                {canCheckout ? 'Proceed to Checkout' : 'Minimum Requirements Not Met'}
+                {disableModifications ? 'Return to Home to Modify Cart' : 
+                 canCheckout ? 'Proceed to Checkout' : 'Minimum Requirements Not Met'}
               </Button>
             </div>
           </>

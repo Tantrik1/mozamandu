@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, ArrowRight, Package, Clock } from 'lucide-react';
-import { CustomerHeader } from '@/components/customer/CustomerHeader';
+import { ModernNavbar } from '@/components/navbar';
+import { Footer } from '@/components/layout/Footer';
 
 export default function ThankYou() {
   const { orderId } = useParams();
@@ -18,7 +19,7 @@ export default function ThankYou() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <CustomerHeader />
+      <ModernNavbar />
       
       <div className="container mx-auto py-8 px-4">
         <div className="max-w-2xl mx-auto">
@@ -116,6 +117,8 @@ export default function ThankYou() {
           </Card>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 }

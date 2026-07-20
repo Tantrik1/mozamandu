@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ModernProductCard } from './ModernProductCard';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { getProductStockSummary } from '@/utils/stockCalculation';
+import { getBatchProductStock, getActiveSubcategoryIds } from '@/utils/stockCalculation';
 
 interface Product {
   id: string;
@@ -20,7 +20,7 @@ interface Product {
   stock_quantity: number;
   subcategories: {
     name: string;
-    selling_price: number;
+    min_selling_price: number;
   } | null;
 }
 
@@ -31,33 +31,31 @@ const LatestProducts = memo(() => {
 
   const fetchLatestProducts = useMemo(() => async () => {
     try {
+      const activeSubIds = await getActiveSubcategoryIds();
+      if (activeSubIds.length === 0) { setLoading(false); return; }
       const { data, error } = await supabase
         .from('products')
         .select(`
           *,
-          subcategories(name, selling_price)
+          subcategories(name, min_selling_price)
         `)
         .eq('status', 'active')
+        .in('subcategory_id', activeSubIds)
         .order('created_at', { ascending: false })
-        .limit(8); // Reduced from 12 to 8
+        .limit(6);
 
       if (error) throw error;
 
-      if (data) {
-        // Batch stock calculation
-        const stockPromises = data.map(product => 
-          getProductStockSummary(product.id).catch(() => 0)
-        );
-        
-        const stockResults = await Promise.all(stockPromises);
-        
-        const productsWithStock = data.map((product, index) => ({
-          ...product,
-          stock_quantity: stockResults[index],
-          subcategories: product.subcategories,
-        }));
-        
-        setProducts(productsWithStock);
+      if (data && data.length > 0) {
+        const stockMap = await getBatchProductStock(data.map(p => p.id));
+        const inStockProducts = data
+          .filter(p => (stockMap[p.id] || 0) > 0)
+          .map((product) => ({
+            ...product,
+            stock_quantity: stockMap[product.id] || 0,
+            subcategories: product.subcategories,
+          }));
+        setProducts(inStockProducts);
       }
     } catch (error) {
       console.error('Error fetching latest products:', error);
@@ -124,7 +122,7 @@ const LatestProducts = memo(() => {
               >
                 <ModernProductCard
                   product={product}
-                  subcategorySellingPrice={product.subcategories?.selling_price || 0}
+                  subcategorySellingPrice={product.subcategories?.min_selling_price || 0}
                 />
               </CarouselItem>
             ))}

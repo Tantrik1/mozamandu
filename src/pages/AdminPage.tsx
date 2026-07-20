@@ -13,16 +13,19 @@ import { EnhancedOrderManagement } from '@/components/admin/EnhancedOrderManagem
 import { CustomerManagement } from '@/components/admin/CustomerManagement';
 import { CategoryManagement } from '@/components/admin/CategoryManagement';
 import { SubcategoryManagement } from '@/components/admin/SubcategoryManagement';
-import { ComboManagement } from '@/components/admin/ComboManagement';
 import { DeliveryChargeManagement } from '@/components/admin/DeliveryChargeManagement';
 import { PaymentMethodManagement } from '@/components/admin/PaymentMethodManagement';
 import { FAQManagement } from '@/components/admin/FAQManagement';
 import { NoticeManagement } from '@/components/admin/NoticeManagement';
 import { TopBarTextManagement } from '@/components/admin/TopBarTextManagement';
-import { NavbarManagement } from '@/components/admin/NavbarManagement';
+import { ReviewManagement } from '@/components/admin/ReviewManagement';
 import { PromocodeManagement } from '@/components/admin/PromocodeManagement';
 import { AdminSettings } from '@/components/admin/AdminSettings';
 import { ModernInventoryManagement } from '@/components/inventory/ModernInventoryManagement';
+import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
+import { AnalyticsSettings } from '@/components/admin/AnalyticsSettings';
+import { BlogManagement } from '@/components/admin/BlogManagement';
+import { BlogPostForm } from '@/components/admin/BlogPostForm';
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -103,14 +106,18 @@ export default function AdminPage() {
               <Route path="customers" element={<CustomerManagement />} />
               <Route path="categories" element={<CategoryManagement />} />
               <Route path="subcategories" element={<SubcategoryManagement />} />
-              <Route path="combos" element={<ComboManagement />} />
               <Route path="delivery-charges" element={<DeliveryChargeManagement />} />
               <Route path="payments" element={<PaymentMethodManagement />} />
               <Route path="promocodes" element={<PromocodeManagement />} />
               <Route path="faqs" element={<FAQManagement />} />
               <Route path="notices" element={<NoticeManagement />} />
               <Route path="top-bar-text" element={<TopBarTextManagement />} />
-              <Route path="navbar" element={<NavbarManagement />} />
+              <Route path="reviews" element={<ReviewManagement />} />
+              <Route path="blogs" element={<BlogManagement />} />
+              <Route path="blogs/new" element={<BlogPostForm />} />
+              <Route path="blogs/edit/:blogId" element={<BlogPostForm />} />
+              <Route path="analytics" element={<AnalyticsDashboard />} />
+              <Route path="analytics-settings" element={<AnalyticsSettings />} />
               <Route path="settings" element={<AdminSettings />} />
               <Route path="*" element={<Navigate to="/admin" replace />} />
             </Routes>

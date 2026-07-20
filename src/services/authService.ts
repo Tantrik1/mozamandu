@@ -2,6 +2,55 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
+// Helper function to translate technical errors into user-friendly messages
+const translateErrorMessage = (error: any): string => {
+  const message = error.message || error.toString();
+  
+  // Password validation errors
+  if (message.includes('Password should contain at least one character of each')) {
+    return 'Password must contain at least 8 characters including uppercase, lowercase, numbers, and special characters (!@#$%^&*).';
+  }
+  
+  if (message.includes('Password is too weak')) {
+    return 'Please create a stronger password with at least 8 characters including uppercase, lowercase, numbers, and special characters.';
+  }
+  
+  if (message.includes('Password must be at least')) {
+    return 'Password must be at least 8 characters long.';
+  }
+  
+  // Email validation errors
+  if (message.includes('Invalid email')) {
+    return 'Please enter a valid email address.';
+  }
+  
+  // Network/connection errors
+  if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
+    return 'Connection error. Please check your internet connection and try again.';
+  }
+  
+  // Rate limiting
+  if (message.includes('rate limit')) {
+    return 'Too many attempts. Please wait a few minutes before trying again.';
+  }
+  
+  // Default fallback for other errors
+  if (message.includes('User already registered')) {
+    return 'An account with this email already exists. Please try signing in instead.';
+  }
+  
+  if (message.includes('Email not confirmed')) {
+    return 'Please verify your email before signing in. Check your inbox for the verification link.';
+  }
+  
+  if (message.includes('Invalid login credentials')) {
+    return 'Invalid email or password. Please check your credentials and try again.';
+  }
+  
+  // Return original message if no translation found
+  return message;
+};
+
 export const authService = {
   async signIn(email: string, password: string) {
     try {
@@ -14,17 +63,7 @@ export const authService = {
       
       if (error) {
         console.error('❌ AuthService: Sign in error:', error);
-        
-        // Handle specific error cases
-        if (error.message.includes('Email not confirmed') || error.message.includes('email_not_confirmed')) {
-          return { error: { message: 'Please verify your email before signing in. Check your inbox for the verification link.' } };
-        }
-        
-        if (error.message.includes('Invalid login credentials')) {
-          return { error: { message: 'Invalid email or password. Please check your credentials and try again.' } };
-        }
-        
-        return { error };
+        return { error: { message: translateErrorMessage(error) } };
       }
       
       // Check if email is confirmed
@@ -64,13 +103,7 @@ export const authService = {
 
       if (error) {
         console.error('❌ AuthService: Sign up error:', error);
-        
-        // Handle specific error cases
-        if (error.message.includes('User already registered')) {
-          return { error: { message: 'An account with this email already exists. Please try signing in instead.' } };
-        }
-        
-        return { error };
+        return { error: { message: translateErrorMessage(error) } };
       }
 
       if (data.user && !data.user.identities?.length) {
@@ -111,6 +144,34 @@ export const authService = {
       window.location.href = '/';
     } catch (error) {
       console.error('❌ AuthService: Sign out exception:', error);
+    }
+  },
+
+  async signInWithGoogle() {
+    try {
+      console.log('🔄 AuthService: Starting Google sign in');
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth?confirmed=true`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+      
+      if (error) {
+        console.error('❌ AuthService: Google sign in error:', error);
+        return { error: { message: error.message } };
+      }
+      
+      console.log('✅ AuthService: Google sign in initiated');
+      return { error: null };
+    } catch (error) {
+      console.error('❌ AuthService: Google sign in exception:', error);
+      return { error: { message: 'Failed to sign in with Google. Please try again.' } };
     }
   },
 

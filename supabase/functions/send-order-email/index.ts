@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@4.0.0";
-import { renderAsync } from 'npm:@react-email/components@0.0.22'
+import { renderAsync } from 'npm:@react-email/render@0.0.17'
 import React from 'npm:react@18.3.1'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { OrderCreatedEmail } from './_templates/order-created.tsx'
@@ -30,8 +30,11 @@ interface OrderEmailRequest {
   newStatus?: string
 }
 
+// Hardcoded external Supabase URL for consistent connection
+const EXTERNAL_SUPABASE_URL = 'https://huwhbxjlyucamitwwhyg.supabase.co';
+
 const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
+  EXTERNAL_SUPABASE_URL,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 )
 
@@ -48,24 +51,47 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Function environment check - RESEND_API_KEY exists:', !!Deno.env.get("RESEND_API_KEY"));
 
     // Fetch order details from appropriate table
-    const tableName = isCustomerOrder ? 'customer_orders' : 'orders';
-    const { data: order, error: orderError } = await supabase
-      .from(tableName)
+    // Note: we accept isCustomerOrder hint, but also fall back to the other table
+    const requestedTable = isCustomerOrder ? 'customer_orders' : 'orders';
+    const fallbackTable = isCustomerOrder ? 'orders' : 'customer_orders';
+
+    let actualIsCustomerOrder = isCustomerOrder;
+
+    let { data: order, error: orderError } = await supabase
+      .from(requestedTable)
       .select('*')
       .eq('id', orderId)
-      .single();
+      .maybeSingle();
+
+    if (!order) {
+      console.warn('Order not found in requested table, trying fallback:', {
+        requestedTable,
+        fallbackTable,
+        orderError,
+      });
+
+      const fallback = await supabase
+        .from(fallbackTable)
+        .select('*')
+        .eq('id', orderId)
+        .maybeSingle();
+
+      order = fallback.data;
+      orderError = fallback.error;
+      if (order) actualIsCustomerOrder = !isCustomerOrder;
+    }
 
     if (orderError || !order) {
       console.error('Error fetching order:', orderError);
       throw new Error('Order not found');
     }
 
-    console.log('Order fetched successfully:', order.order_number);
+    console.log('Order fetched successfully:', order.order_number, 'actualIsCustomerOrder:', actualIsCustomerOrder);
 
-    // Determine the order summary URL
-    const baseUrl = Deno.env.get('SUPABASE_URL')?.replace('/supabase', '') || 'https://your-domain.com';
-    const summaryPath = isCustomerOrder ? 'customer-order-summary' : 'order-summary';
-    const orderSummaryUrl = `${baseUrl}/${summaryPath}/${orderId}`;
+    // Determine the order summary URL - use production domain
+    // Always use 'order-summary' path as it's public and accessible without auth
+    const baseUrl = 'https://mozamandu.com';
+    const orderSummaryUrl = `${baseUrl}/order-summary/${orderId}`;
 
     let emailHtml = '';
     let subject = '';
@@ -80,7 +106,7 @@ const handler = async (req: Request): Promise<Response> => {
           paidAmount: parseFloat(order.paid_amount),
           remainingAmount: parseFloat(order.remaining_amount),
           orderSummaryUrl,
-          isCustomerOrder,
+          isCustomerOrder: actualIsCustomerOrder,
         })
       );
     } else if (type === 'status_updated' && oldStatus && newStatus) {
@@ -102,7 +128,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Send email
     console.log('Attempting to send email to:', order.customer_email);
     console.log('Email subject:', subject);
-    
+
     const emailResponse = await resend.emails.send({
       from: "Mozamandu <orders@mozamandu.com>",
       to: [order.customer_email],

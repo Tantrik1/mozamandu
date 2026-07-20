@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, X, Upload } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Upload, Package } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -24,11 +24,13 @@ interface DiscountTier {
   discount_amount: number;
 }
 
+
 interface Subcategory {
   id: string;
   name: string;
   description: string;
-  selling_price: number;
+  min_selling_price: number;
+  max_selling_price: number;
   minimum_quantity: number;
   status: 'on' | 'off';
   category_id: string;
@@ -49,7 +51,8 @@ export function SubcategoryManagement() {
     name: '',
     description: '',
     category_id: '',
-    selling_price: '',
+    min_selling_price: '',
+    max_selling_price: '',
     minimum_quantity: '',
     status: true,
   });
@@ -75,7 +78,7 @@ export function SubcategoryManagement() {
         variant: "destructive",
       });
     } else {
-      setSubcategories(data || []);
+      setSubcategories((data || []) as Subcategory[]);
     }
   };
 
@@ -96,7 +99,7 @@ export function SubcategoryManagement() {
     }
   };
 
-  const fetchDiscountTiers = async (subcategoryId: string) => {
+  const fetchDiscountTiers = async (subcategoryId: string): Promise<DiscountTier[]> => {
     const { data, error } = await supabase
       .from('discount_tiers')
       .select('*')
@@ -111,12 +114,40 @@ export function SubcategoryManagement() {
       });
       return [];
     }
-    return data || [];
+    // Support both discount_amount (external DB) and discount_percentage (Lovable Cloud) columns
+    return (data || []).map((tier: any) => ({
+      id: tier.id,
+      min_quantity: tier.min_quantity,
+      max_quantity: tier.max_quantity,
+      // Prefer discount_amount, fallback to discount_percentage for backward compatibility
+      discount_amount: tier.discount_amount ?? tier.discount_percentage ?? 0
+    }));
   };
 
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Validate file size (max 10MB - will be compressed automatically)
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        toast({
+          title: "Error",
+          description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 10MB`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate it's an image
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Error",
+          description: "Please select a valid image file",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setSelectedImage(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -128,13 +159,19 @@ export function SubcategoryManagement() {
 
   const uploadImage = async (file: File): Promise<string | null> => {
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
+      const { prepareImageForUpload, THUMBNAIL_COMPRESSION } = await import('@/utils/imageOptimizer');
+      
+      // Use aggressive thumbnail compression (~150KB)
+      const { file: optimizedFile } = await prepareImageForUpload(file, THUMBNAIL_COMPRESSION);
+
+      const fileName = `${Math.random()}.webp`;
       const filePath = `${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('subcategory-images')
-        .upload(filePath, file);
+        .upload(filePath, optimizedFile, {
+          contentType: 'image/webp',
+        });
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
@@ -148,6 +185,11 @@ export function SubcategoryManagement() {
       return data.publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to upload image",
+        variant: "destructive",
+      });
       return null;
     }
   };
@@ -195,7 +237,8 @@ export function SubcategoryManagement() {
       name: formData.name,
       description: formData.description,
       category_id: formData.category_id,
-      selling_price: parseFloat(formData.selling_price),
+      min_selling_price: parseFloat(formData.min_selling_price),
+      max_selling_price: parseFloat(formData.max_selling_price) || parseFloat(formData.min_selling_price),
       minimum_quantity: parseInt(formData.minimum_quantity),
       status: formData.status ? 'on' : 'off' as 'on' | 'off',
       image_url: imageUrl,
@@ -230,33 +273,46 @@ export function SubcategoryManagement() {
     }
 
     // Handle discount tiers
-    if (subcategoryId && discountTiers.length > 0) {
-      // Delete existing tiers if editing
+    if (subcategoryId) {
+      // Always delete existing tiers when editing (also allows clearing all tiers)
       if (editingSubcategory) {
-        await supabase
+        const { error: deleteError } = await supabase
           .from('discount_tiers')
           .delete()
           .eq('subcategory_id', subcategoryId);
+
+        if (deleteError) {
+          toast({
+            title: "Error",
+            description: `Failed to update discount tiers: ${deleteError.message}`,
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
-      // Insert new tiers
-      const tiersToInsert = discountTiers.map(tier => ({
-        subcategory_id: subcategoryId,
-        min_quantity: tier.min_quantity,
-        max_quantity: tier.max_quantity,
-        discount_amount: tier.discount_amount
-      }));
+      if (discountTiers.length > 0) {
+        // Insert new tiers - use discount_amount for price-based discounts
+        const tiersToInsert = discountTiers.map((tier) => ({
+          subcategory_id: subcategoryId,
+          min_quantity: tier.min_quantity,
+          max_quantity: tier.max_quantity,
+          discount_amount: Number(tier.discount_amount) || 0,
+        }));
 
-      const { error: tiersError } = await supabase
-        .from('discount_tiers')
-        .insert(tiersToInsert);
 
-      if (tiersError) {
-        toast({
-          title: "Warning",
-          description: "Subcategory saved but discount tiers failed to save",
-          variant: "destructive",
-        });
+        const { error: tiersError } = await supabase
+          .from('discount_tiers')
+          .insert(tiersToInsert as any);
+
+        if (tiersError) {
+          toast({
+            title: "Error",
+            description: `Discount tiers failed to save: ${tiersError.message}`,
+            variant: "destructive",
+          });
+          return;
+        }
       }
     }
 
@@ -276,7 +332,8 @@ export function SubcategoryManagement() {
       name: subcategory.name,
       description: subcategory.description,
       category_id: subcategory.category_id,
-      selling_price: subcategory.selling_price.toString(),
+      min_selling_price: subcategory.min_selling_price.toString(),
+      max_selling_price: subcategory.max_selling_price?.toString() || subcategory.min_selling_price.toString(),
       minimum_quantity: subcategory.minimum_quantity.toString(),
       status: subcategory.status === 'on',
     });
@@ -321,7 +378,8 @@ export function SubcategoryManagement() {
       name: '',
       description: '',
       category_id: '',
-      selling_price: '',
+      min_selling_price: '',
+      max_selling_price: '',
       minimum_quantity: '',
       status: true,
     });
@@ -332,9 +390,12 @@ export function SubcategoryManagement() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Subcategory Management</h2>
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold">Subcategory Management</h2>
+          <p className="text-muted-foreground mt-1">Manage product subcategories</p>
+        </div>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
@@ -349,7 +410,7 @@ export function SubcategoryManagement() {
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">Subcategory Name</Label>
                   <Input
@@ -406,26 +467,46 @@ export function SubcategoryManagement() {
                 </div>
                 {imagePreview && (
                   <div className="mt-2">
-                    <img 
-                      src={imagePreview} 
-                      alt="Preview" 
-                      className="w-32 h-32 object-cover rounded-lg border"
-                    />
+                    <div className="relative w-32 aspect-square rounded-lg border overflow-hidden bg-muted">
+                      <img 
+                        src={imagePreview} 
+                        alt="Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="selling_price">Selling Price ($)</Label>
+                  <Label htmlFor="min_selling_price">Min Selling Price (Rs.)</Label>
                   <Input
-                    id="selling_price"
+                    id="min_selling_price"
                     type="number"
                     step="0.01"
-                    value={formData.selling_price}
-                    onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                    value={formData.min_selling_price}
+                    onChange={(e) => setFormData({ ...formData, min_selling_price: e.target.value })}
+                    placeholder="e.g., 100"
                     required
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Default price for products without selling price
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="max_selling_price">Max Selling Price (Rs.)</Label>
+                  <Input
+                    id="max_selling_price"
+                    type="number"
+                    step="0.01"
+                    value={formData.max_selling_price}
+                    onChange={(e) => setFormData({ ...formData, max_selling_price: e.target.value })}
+                    placeholder="e.g., 500"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Maximum price in this subcategory (optional)
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="minimum_quantity">Minimum Order Quantity (MOQ)</Label>
@@ -438,8 +519,8 @@ export function SubcategoryManagement() {
                     placeholder="e.g., 3"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Minimum items from this subcategory required for checkout
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Minimum items required for checkout
                   </p>
                 </div>
               </div>
@@ -474,9 +555,9 @@ export function SubcategoryManagement() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                          <Label>Quantity to reach to apply Discount</Label>
+                          <Label>Min Qty for Discount</Label>
                           <Input
                             type="number"
                             min="1"
@@ -492,24 +573,24 @@ export function SubcategoryManagement() {
                             min="1"
                             value={tier.max_quantity || ''}
                             onChange={(e) => updateDiscountTier(index, 'max_quantity', e.target.value ? parseInt(e.target.value) : null)}
-                            placeholder="Leave empty for no limit"
+                            placeholder="No limit"
                           />
                         </div>
                         <div>
-                          <Label>Discount Amount ($)</Label>
+                          <Label>Discount Amount (Rs.)</Label>
                           <Input
                             type="number"
                             step="0.01"
                             min="0"
                             value={tier.discount_amount}
                             onChange={(e) => updateDiscountTier(index, 'discount_amount', parseFloat(e.target.value) || 0)}
-                            placeholder="e.g., 2"
+                            placeholder="e.g., 50"
                           />
                         </div>
                       </div>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         Quantities {tier.min_quantity} {tier.max_quantity ? `to ${tier.max_quantity}` : 'and above'}: 
-                        ${tier.discount_amount} discount per item for ALL items in this quantity range
+                        Rs. {tier.discount_amount} discount per item
                       </p>
                     </CardContent>
                   </Card>
@@ -539,7 +620,7 @@ export function SubcategoryManagement() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {subcategories.map((subcategory) => (
           <SubcategoryCard 
             key={subcategory.id} 
@@ -579,78 +660,75 @@ function SubcategoryCard({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            {subcategory.image_url && (
-              <img 
-                src={subcategory.image_url} 
-                alt={subcategory.name}
-                className="w-full h-32 object-cover rounded-lg mb-3"
-              />
-            )}
-            <CardTitle className="text-lg">{subcategory.name}</CardTitle>
-            <p className="text-sm text-gray-500">{subcategory.categories?.name}</p>
+    <Card className="group overflow-hidden hover:shadow-lg transition-shadow">
+      {/* 1:1 Image */}
+      <div className="relative aspect-square bg-muted overflow-hidden">
+        {subcategory.image_url ? (
+          <img 
+            src={subcategory.image_url} 
+            alt={subcategory.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            loading="lazy"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
+            <Package className="w-12 h-12 text-muted-foreground" />
           </div>
-          <div className="flex space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onEdit(subcategory)}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onDelete(subcategory.id)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+        )}
+        {/* Status Badge */}
+        <span className={`absolute top-2 left-2 px-2 py-1 rounded text-xs font-medium ${
+          subcategory.status === 'on' 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {subcategory.status === 'on' ? 'Active' : 'Inactive'}
+        </span>
+        {/* Action Buttons */}
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => onEdit(subcategory)}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-8 w-8 text-red-600 hover:text-red-700"
+            onClick={() => onDelete(subcategory.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      <CardContent className="p-3">
+        <h3 className="font-semibold truncate">{subcategory.name}</h3>
+        <p className="text-xs text-muted-foreground">{subcategory.categories?.name}</p>
+        <div className="mt-2 space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Price Range:</span>
+            <span className="font-medium">
+              Rs.{subcategory.min_selling_price}
+              {subcategory.max_selling_price && subcategory.max_selling_price !== subcategory.min_selling_price 
+                ? ` - Rs.${subcategory.max_selling_price}` 
+                : ''}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">MOQ:</span>
+            <span className="font-medium text-blue-600">{subcategory.minimum_quantity}</span>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-gray-600 mb-3">{subcategory.description}</p>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-sm">Selling Price:</span>
-            <span className="font-semibold">${subcategory.selling_price}</span>
-          </div>
-          
-          <div className="flex justify-between">
-            <span className="text-sm">Minimum Order Qty:</span>
-            <span className="font-semibold text-blue-600">{subcategory.minimum_quantity}</span>
-          </div>
-          
-          {discountTiers.length > 0 && (
-            <div className="space-y-1">
-              <span className="text-sm font-medium">Discount Tiers:</span>
-              {discountTiers.map((tier, index) => (
-                <div key={index} className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                  <span className="font-medium">
-                    {tier.min_quantity}{tier.max_quantity ? `-${tier.max_quantity}` : '+'} qty:
-                  </span>
-                  <span className="text-green-600 ml-2">${tier.discount_amount} off each</span>
-                </div>
-              ))}
+        {discountTiers.length > 0 && (
+          <div className="mt-2 pt-2 border-t">
+            <span className="text-xs font-medium">Discounts:</span>
+            <div className="text-xs text-green-600">
+              {discountTiers.length} tier{discountTiers.length > 1 ? 's' : ''}
             </div>
-          )}
-          
-          <div className="flex justify-between items-center">
-            <span className={`px-2 py-1 rounded text-sm ${
-              subcategory.status === 'on' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-red-100 text-red-800'
-            }`}>
-              {subcategory.status === 'on' ? 'Active' : 'Inactive'}
-            </span>
-            <span className="text-sm text-gray-500">
-              {new Date(subcategory.created_at).toLocaleDateString()}
-            </span>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

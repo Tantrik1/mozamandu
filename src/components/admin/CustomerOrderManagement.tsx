@@ -42,7 +42,7 @@ export function CustomerOrderManagement() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setOrders(data || []);
+      setOrders((data || []) as CustomerOrder[]);
     } catch (error) {
       console.error('Error fetching orders:', error);
       toast({

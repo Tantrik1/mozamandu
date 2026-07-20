@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -14,6 +14,11 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
 import { EnhancedProductVariantForm } from './EnhancedProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
+import { ProductAdditionalImages, type AdditionalImage, type ProductAdditionalImagesRef } from './ProductAdditionalImages';
+import { ProductSEOSection } from './ProductSEOSection';
+import { ProductFAQsManager } from './ProductFAQsManager';
+import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
+import { CareInstructionsInput } from './CareInstructionsInput';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -26,6 +31,14 @@ const productSchema = z.object({
   has_color_variants: z.boolean().default(false),
   has_size_variants: z.boolean().default(false),
   status: z.enum(['active', 'inactive']).default('active'),
+  material_composition: z.string().optional(),
+  care_instructions: z.union([z.string(), z.array(z.string())]).optional(),
+  // SEO fields
+  meta_title: z.string().max(60).optional(),
+  meta_description: z.string().max(160).optional(),
+  meta_keywords: z.string().optional(),
+  og_title: z.string().max(60).optional(),
+  og_description: z.string().max(160).optional(),
 });
 
 interface Category {
@@ -55,6 +68,8 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showInventoryPopup, setShowInventoryPopup] = useState(false);
+  const [additionalImages, setAdditionalImages] = useState<AdditionalImage[]>([]);
+  const additionalImagesRef = useRef<ProductAdditionalImagesRef>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -70,6 +85,13 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       has_color_variants: false,
       has_size_variants: false,
       status: 'active',
+      material_composition: '',
+      care_instructions: '',
+      meta_title: '',
+      meta_description: '',
+      meta_keywords: '',
+      og_title: '',
+      og_description: '',
     },
   });
 
@@ -181,7 +203,14 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         is_featured: product.is_featured,
         has_color_variants: product.has_color_variants,
         has_size_variants: product.color_has_size_variants || false,
-        status: product.status,
+        status: (product.status === 'active' || product.status === 'inactive') ? product.status : 'active',
+        material_composition: product.material_composition || '',
+        care_instructions: product.care_instructions || '',
+        meta_title: (product as any).meta_title || '',
+        meta_description: (product as any).meta_description || '',
+        meta_keywords: (product as any).meta_keywords?.join(', ') || '',
+        og_title: (product as any).og_title || '',
+        og_description: (product as any).og_description || '',
       });
 
       setImagePreview(product.image_url);
@@ -199,6 +228,27 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file size (max 10MB - will be compressed automatically)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: 'Error',
+        description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 10MB`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate it's an image
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Error',
+        description: 'Please select a valid image file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setUploadingImage(true);
     
     try {
@@ -212,7 +262,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       
       toast({
         title: 'Success',
-        description: 'Image ready for upload',
+        description: 'Image ready for upload (will be optimized to WebP)',
       });
     } catch (error) {
       console.error('Error preparing image:', error);
@@ -235,12 +285,18 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     if (!imageFile) return null;
 
     try {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `product-${Date.now()}.${fileExt}`;
+      const { prepareImageForUpload, PRODUCT_COMPRESSION } = await import('@/utils/imageOptimizer');
+      
+      // Optimize image with aggressive compression (~250KB)
+      const { file: optimizedFile } = await prepareImageForUpload(imageFile, PRODUCT_COMPRESSION);
+
+      const fileName = `product-${Date.now()}.webp`;
 
       const { data, error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(fileName, imageFile);
+        .upload(fileName, optimizedFile, {
+          contentType: 'image/webp',
+        });
 
       if (uploadError) throw uploadError;
 
@@ -253,10 +309,25 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       console.error('Error uploading image:', error);
       toast({
         title: 'Error',
-        description: 'Failed to upload image',
+        description: error instanceof Error ? error.message : 'Failed to upload image',
         variant: 'destructive',
       });
       return null;
+    }
+  };
+
+  const uploadAdditionalImages = async (): Promise<void> => {
+    // Use the ref to upload images through the component
+    console.log('📸 uploadAdditionalImages called, checking ref...');
+    console.log('📸 additionalImagesRef.current:', additionalImagesRef.current);
+    console.log('📸 hasNewImages:', additionalImagesRef.current?.hasNewImages());
+    
+    if (additionalImagesRef.current?.hasNewImages()) {
+      console.log('📸 Uploading additional images for product:', productId);
+      const result = await additionalImagesRef.current.uploadImages(productId);
+      console.log('📸 Upload result:', result);
+    } else {
+      console.log('📸 No new images to upload or ref not available');
     }
   };
 
@@ -271,6 +342,18 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         }
       }
 
+      // Convert care_instructions to array for Supabase text[] column
+      const careInstructionsArray = data.care_instructions
+        ? (Array.isArray(data.care_instructions)
+            ? data.care_instructions.filter(Boolean)
+            : data.care_instructions.split('\n').filter(Boolean))
+        : null;
+
+      // Convert meta_keywords string to array for Supabase text[] column
+      const metaKeywordsArray = data.meta_keywords
+        ? data.meta_keywords.split(',').map(k => k.trim()).filter(Boolean)
+        : null;
+
       const productData = {
         name: data.name,
         description: data.description || null,
@@ -284,14 +367,28 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         status: data.status,
         image_url: imageUrl,
         updated_at: new Date().toISOString(),
+        material_composition: data.material_composition || null,
+        care_instructions: careInstructionsArray,
+        // SEO fields
+        meta_title: data.meta_title || null,
+        meta_description: data.meta_description || null,
+        meta_keywords: metaKeywordsArray,
+        og_title: data.og_title || null,
+        og_description: data.og_description || null,
       };
 
+      // Cast to bypass TypeScript - actual Supabase schema has care_instructions as text[]
       const { error } = await supabase
         .from('products')
-        .update(productData)
+        .update(productData as any)
         .eq('id', productId);
 
       if (error) throw error;
+
+      // Upload additional images
+      if (additionalImages.some(img => img.isNew)) {
+        await uploadAdditionalImages();
+      }
 
       toast({
         title: 'Success',
@@ -319,7 +416,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   const handleInventoryClose = () => {
     setShowInventoryPopup(false);
-    onSave();
+    onSave(); // Close the edit form after inventory management is done
   };
 
   if (loadingData) {
@@ -373,6 +470,24 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                     placeholder="Enter product description"
                     rows={3}
                   />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="material_composition">Material Composition</Label>
+                    <Textarea
+                      id="material_composition"
+                      {...form.register('material_composition')}
+                      placeholder="e.g., Premium quality fabric blend designed for comfort and durability."
+                      rows={2}
+                    />
+                  </div>
+                  <div>
+                    <CareInstructionsInput
+                      value={form.watch('care_instructions') || []}
+                      onChange={(value) => form.setValue('care_instructions', value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -570,22 +685,81 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                     </div>
                   )}
                 </div>
+
+                {/* Additional Images Section */}
+                <div className="mt-6 pt-4 border-t border-border">
+                  <ProductAdditionalImages
+                    ref={additionalImagesRef}
+                    productId={productId}
+                    onImagesChange={setAdditionalImages}
+                    maxImages={3}
+                  />
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* SEO Settings Section */}
+        <ProductSEOSection
+          metaTitle={form.watch('meta_title') || ''}
+          metaDescription={form.watch('meta_description') || ''}
+          metaKeywords={form.watch('meta_keywords') || ''}
+          ogTitle={form.watch('og_title') || ''}
+          ogDescription={form.watch('og_description') || ''}
+          productName={form.watch('name')}
+          productDescription={form.watch('description') || ''}
+          sellingPrice={form.watch('selling_price') || form.watch('cost_price')}
+          categoryName={categories.find(c => c.id === form.watch('category_id'))?.name}
+          onMetaTitleChange={(value) => form.setValue('meta_title', value)}
+          onMetaDescriptionChange={(value) => form.setValue('meta_description', value)}
+          onMetaKeywordsChange={(value) => form.setValue('meta_keywords', value)}
+          onOgTitleChange={(value) => form.setValue('og_title', value)}
+          onOgDescriptionChange={(value) => form.setValue('og_description', value)}
+        />
+
+        {/* Product FAQs Section */}
+        <ProductFAQsManager productId={productId} />
 
         {(watchedHasColorVariants || watchedHasSizeVariants) && (
           <EnhancedProductVariantForm
             productId={productId}
             hasColorVariants={watchedHasColorVariants}
             hasSizeVariants={watchedHasSizeVariants}
+            getProductData={() => ({
+              name: form.getValues('name'),
+              description: form.getValues('description'),
+              cost_price: form.getValues('cost_price'),
+              selling_price: form.getValues('selling_price'),
+              category_id: form.getValues('category_id'),
+              subcategory_id: form.getValues('subcategory_id'),
+              is_featured: form.getValues('is_featured'),
+              has_color_variants: form.getValues('has_color_variants'),
+              has_size_variants: form.getValues('has_size_variants'),
+              status: form.getValues('status'),
+              material_composition: form.getValues('material_composition'),
+              care_instructions: form.getValues('care_instructions'),
+              meta_title: form.getValues('meta_title'),
+              meta_description: form.getValues('meta_description'),
+              meta_keywords: form.getValues('meta_keywords'),
+              og_title: form.getValues('og_title'),
+              og_description: form.getValues('og_description'),
+            })}
+            imageFile={imageFile}
+            imagePreview={imagePreview}
+            onBeforeSave={async () => {
+              // Upload additional images before variant form save completes
+              console.log('📸 onBeforeSave called - uploading additional images');
+              if (additionalImagesRef.current?.hasNewImages()) {
+                console.log('📸 Has new images, uploading...');
+                await additionalImagesRef.current.uploadImages(productId);
+              }
+            }}
             onSave={() => {
-              // Fetch fresh data and open inventory popup
-              fetchProduct();
+              // After successful save, open inventory popup
               setShowInventoryPopup(true);
             }}
-            onCancel={() => {}}
+            onCancel={onCancel}
           />
         )}
 

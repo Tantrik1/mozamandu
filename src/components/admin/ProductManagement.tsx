@@ -9,8 +9,9 @@ import { CreateProductForm } from './CreateProductForm';
 import { EditProductForm } from './EditProductForm';
 import { ProductDetailView } from './ProductDetailView';
 import { ProductDeletionDialog } from './ProductDeletionDialog';
-import { Pencil, Trash2, Plus, Search, Package, Eye, Filter } from 'lucide-react';
+import { Pencil, Trash2, Plus, Search, Package, Eye, Filter, Archive, RotateCcw } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getProductStockSummary } from '@/utils/stockCalculation';
 
 interface Product {
@@ -43,6 +44,7 @@ export function ProductManagement() {
   const [viewingProductId, setViewingProductId] = useState<string | null>(null);
   const [productStocks, setProductStocks] = useState<Record<string, number>>({});
   const [deletingProduct, setDeletingProduct] = useState<{ id: string; name: string } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -99,7 +101,7 @@ export function ProductManagement() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setProducts(data || []);
+      setProducts((data || []) as Product[]);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast({
@@ -183,7 +185,34 @@ export function ProductManagement() {
     setViewingProductId(null);
   };
 
+  const handleReactivate = async (productId: string) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ status: 'active', updated_at: new Date().toISOString() })
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Product Reactivated',
+        description: 'Product is now visible on the store.',
+      });
+      fetchProducts();
+    } catch (error) {
+      console.error('Error reactivating product:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reactivate product',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const filteredProducts = products.filter(product => {
+    // Status filter
+    const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
+
     // Search filter
     const matchesSearch = 
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -196,8 +225,11 @@ export function ProductManagement() {
     // Subcategory filter
     const matchesSubcategory = !subcategoryFilter || subcategoryFilter === 'all' || product.subcategory_id === subcategoryFilter;
     
-    return matchesSearch && matchesCategory && matchesSubcategory;
+    return matchesStatus && matchesSearch && matchesCategory && matchesSubcategory;
   });
+
+  const activeCount = products.filter(p => p.status === 'active').length;
+  const inactiveCount = products.filter(p => p.status === 'inactive').length;
 
   if (loading) {
     return <div className="flex justify-center p-8">Loading products...</div>;
@@ -234,18 +266,29 @@ export function ProductManagement() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Product Management</h2>
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold">Product Management</h2>
+          <p className="text-muted-foreground mt-1">Manage your product catalog</p>
+        </div>
         <Button onClick={() => setIsCreateFormOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Product
         </Button>
       </div>
 
-      <div className="flex items-center space-x-4 flex-wrap gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+      <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'active' | 'inactive' | 'all')}>
+        <TabsList>
+          <TabsTrigger value="active">Active ({activeCount})</TabsTrigger>
+          <TabsTrigger value="inactive">Inactive ({inactiveCount})</TabsTrigger>
+          <TabsTrigger value="all">All ({products.length})</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div className="flex flex-col lg:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="Search products..."
             value={searchTerm}
@@ -254,10 +297,10 @@ export function ProductManagement() {
           />
         </div>
         
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-gray-500" />
+        <div className="flex flex-wrap items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-40">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
@@ -275,7 +318,7 @@ export function ProductManagement() {
             onValueChange={setSubcategoryFilter}
             disabled={!categoryFilter}
           >
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-44">
               <SelectValue placeholder="All Subcategories" />
             </SelectTrigger>
             <SelectContent>
@@ -290,7 +333,7 @@ export function ProductManagement() {
             </SelectContent>
           </Select>
           
-          {(categoryFilter && categoryFilter !== 'all') || (subcategoryFilter && subcategoryFilter !== 'all') && (
+          {((categoryFilter && categoryFilter !== 'all') || (subcategoryFilter && subcategoryFilter !== 'all')) && (
             <Button 
               variant="outline" 
               size="sm" 
@@ -299,112 +342,111 @@ export function ProductManagement() {
                 setSubcategoryFilter('all');
               }}
             >
-              Clear Filters
+              Clear
             </Button>
           )}
         </div>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filteredProducts.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <div className="col-span-full text-center py-8 text-muted-foreground">
+            <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
             <p>No products found</p>
           </div>
         ) : (
           filteredProducts.map((product) => (
-            <Card key={product.id}>
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex space-x-4">
-                    {product.image_url && (
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="w-16 h-16 object-cover rounded-lg border"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    )}
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <h3 className="text-lg font-semibold">{product.name}</h3>
-                        <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>
-                          {product.status}
-                        </Badge>
-                        {product.is_featured && (
-                          <Badge variant="outline">Featured</Badge>
-                        )}
-                      </div>
-                      
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <p>
-                          <span className="font-medium">Category:</span> {product.categories?.name}
-                          {' > '}
-                          <span className="font-medium">Subcategory:</span> {product.subcategories?.name}
-                        </p>
-                        <p>
-                          <span className="font-medium">Cost Price:</span> Rs {product.cost_price}
-                          {product.selling_price && (
-                            <>
-                              {' | '}
-                              <span className="font-medium">Selling Price:</span> Rs {product.selling_price}
-                            </>
-                          )}
-                        </p>
-                        <p>
-                          <span className="font-medium">Stock:</span> 
-                          <Badge variant="outline" className="ml-2">
-                            {productStocks[product.id] !== undefined ? productStocks[product.id] : 'Loading...'}
-                          </Badge>
-                          {(product.has_color_variants || product.color_has_size_variants) && (
-                            <span className="text-xs text-gray-500 ml-2">
-                              (Calculated from variants)
-                            </span>
-                          )}
-                        </p>
-                        {(product.has_color_variants || product.color_has_size_variants) && (
-                          <div className="flex items-center space-x-1">
-                            {product.has_color_variants && (
-                              <Badge variant="outline" className="text-xs">Color Variants</Badge>
-                            )}
-                            {product.color_has_size_variants && (
-                              <Badge variant="outline" className="text-xs">Size Variants</Badge>
-                            )}
-                          </div>
-                        )}
-                        {product.description && (
-                          <p className="text-gray-500 mt-2 line-clamp-2">{product.description}</p>
-                        )}
-                      </div>
-                    </div>
+            <Card key={product.id} className="group overflow-hidden hover:shadow-lg transition-shadow">
+              <div className="relative aspect-square bg-muted">
+                {product.image_url ? (
+                  <img
+                    src={product.image_url}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = '/placeholder.svg';
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Package className="h-16 w-16 text-muted-foreground/30" />
                   </div>
-                  
-                  <div className="flex space-x-2">
+                )}
+                
+                {/* Hover overlay with actions */}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleView(product.id)}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleEdit(product.id)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  {product.status === 'active' ? (
                     <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleView(product.id)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(product.id)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
+                      variant="destructive"
                       size="sm"
                       onClick={() => handleDelete(product.id, product.name)}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Archive className="h-4 w-4" />
                     </Button>
-                  </div>
+                  ) : (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleReactivate(product.id)}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
+
+                {/* Status badge */}
+                <div className="absolute top-2 left-2 flex gap-1">
+                  <Badge variant={product.status === 'active' ? 'default' : 'secondary'} className="text-xs">
+                    {product.status}
+                  </Badge>
+                  {product.is_featured && (
+                    <Badge variant="outline" className="text-xs bg-background/80">Featured</Badge>
+                  )}
+                </div>
+
+                {/* Stock badge */}
+                <div className="absolute top-2 right-2">
+                  <Badge variant="outline" className="text-xs bg-background/80">
+                    Stock: {productStocks[product.id] !== undefined ? productStocks[product.id] : '...'}
+                  </Badge>
+                </div>
+              </div>
+              
+              <CardContent className="p-4 space-y-2">
+                <h3 className="font-semibold text-sm line-clamp-1">{product.name}</h3>
+                <p className="text-xs text-muted-foreground line-clamp-1">
+                  {product.categories?.name} › {product.subcategories?.name}
+                </p>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Cost: Rs {product.cost_price}</span>
+                  {product.selling_price && (
+                    <span className="font-medium">Rs {product.selling_price}</span>
+                  )}
+                </div>
+                {(product.has_color_variants || product.color_has_size_variants) && (
+                  <div className="flex gap-1 flex-wrap">
+                    {product.has_color_variants && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">Colors</Badge>
+                    )}
+                    {product.color_has_size_variants && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">Sizes</Badge>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))

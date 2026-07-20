@@ -59,9 +59,30 @@ export function NoticeManagement() {
     }
   };
 
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Validate file size (max 10MB - will be compressed automatically)
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        toast({
+          title: "Error",
+          description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 10MB`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate it's an image
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Error",
+          description: "Please select a valid image file",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setSelectedImage(file);
       const reader = new FileReader();
       reader.onload = () => {
@@ -72,12 +93,19 @@ export function NoticeManagement() {
   };
 
   const uploadImage = async (file: File): Promise<string> => {
-    const fileName = `${Date.now()}-${file.name}`;
+    const { prepareImageForUpload, HIGH_COMPRESSION } = await import('@/utils/imageOptimizer');
+    
+    // Optimize image with aggressive compression for notices (target ~200KB)
+    const { file: optimizedFile } = await prepareImageForUpload(file, HIGH_COMPRESSION);
+
+    const fileName = `${Date.now()}-notice.webp`;
     const filePath = `notices/${fileName}`;
 
     const { error } = await supabase.storage
       .from('notice-images')
-      .upload(filePath, file);
+      .upload(filePath, optimizedFile, {
+        contentType: 'image/webp',
+      });
 
     if (error) throw error;
 
@@ -122,7 +150,7 @@ export function NoticeManagement() {
       } else {
         const { error } = await supabase
           .from('notices')
-          .insert([noticeData]);
+          .insert([noticeData] as any);
 
         if (error) throw error;
 
@@ -196,9 +224,12 @@ export function NoticeManagement() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Notice Management</h1>
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Notice Management</h1>
+          <p className="text-muted-foreground mt-1">Manage homepage notice popups</p>
+        </div>
         <Button onClick={() => setShowForm(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Notice
@@ -297,20 +328,20 @@ export function NoticeManagement() {
             <CardContent className="p-4">
               <div className="flex justify-between items-start">
                 <div className="flex-1 space-y-2">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-lg font-semibold">{notice.title}</h3>
                     <span
                       className={`px-2 py-1 text-xs rounded ${
                         notice.is_active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
                       }`}
                     >
                       {notice.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </div>
                   {notice.description && (
-                    <p className="text-gray-600">{notice.description}</p>
+                    <p className="text-muted-foreground">{notice.description}</p>
                   )}
                   {notice.image_url && (
                     <img
@@ -319,7 +350,7 @@ export function NoticeManagement() {
                       className="w-24 h-24 object-cover rounded"
                     />
                   )}
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     Created: {new Date(notice.created_at).toLocaleDateString()}
                   </p>
                 </div>
@@ -346,7 +377,7 @@ export function NoticeManagement() {
         {notices.length === 0 && (
           <Card>
             <CardContent className="p-8 text-center">
-              <p className="text-gray-500">No notices found. Create your first notice!</p>
+              <p className="text-muted-foreground">No notices found. Create your first notice!</p>
             </CardContent>
           </Card>
         )}
