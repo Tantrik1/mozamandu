@@ -33,7 +33,7 @@ export function HeroSection() {
       {/* Hero Background Image - Dynamic from site_settings with instant fallback */}
       <img
         alt="Mozamandu Premium Socks Collection"
-        fetchPriority="high"
+        {...({ fetchpriority: 'high' } as any)}
         decoding="sync"
         width={1920}
         height={1080}
