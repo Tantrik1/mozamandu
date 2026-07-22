@@ -20,29 +20,10 @@ const s3Client = new S3Client({
   },
 });
 
-const BUCKET = 'mozamandu';
-const CDN_BASE = 'https://images.mozamandu.com';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rgfwekuceitxmturaiqn.supabase.co';
+const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || 'sb_secret_PrmNB-DDS-6BlGu2GwsYOA_8QGbPJAh';
 
-const supabaseProd = createClient(
-  'https://huwhbxjlyucamitwwhyg.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1d2hieGpseXVjYW1pdHd3aHlnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MDY1ODg1NywiZXhwIjoyMDY2MjM0ODU3fQ.Hr_KRFCup-UpGr2x6FHJI6xGaR5_NNfTaCLb874NNzk'
-);
-
-const supabaseDev = createClient(
-  'https://rgfwekuceitxmturaiqn.supabase.co',
-  'sb_secret_PrmNB-DDS-6BlGu2GwsYOA_8QGbPJAh'
-);
-
-function getSupabase(req) {
-  const host = req?.headers?.host || '';
-  const referer = req?.headers?.referer || '';
-  if (host.includes('demo') || referer.includes('demo') || process.env.NODE_ENV === 'development') {
-    return supabaseDev;
-  }
-  return supabaseProd;
-}
-
-const supabase = supabaseDev; // Default client for dev server
+const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY);
 
 // In-memory cache (5 seconds TTL for sub-20ms responses)
 const responseCache = new Map();
