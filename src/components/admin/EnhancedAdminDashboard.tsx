@@ -730,26 +730,26 @@ export function EnhancedAdminDashboard() {
           </div>
         </motion.div>
 
-        {/* Order Source Breakdown with Toggle Filter */}
+        {/* Core Business Stats */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
+        >
+          <CoreBusinessStats {...coreStats} />
+        </motion.div>
+
+        {/* Order Source Breakdown with Toggle Filter */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
         >
           <OrderSourceBreakdown 
             stats={orderSourceStats}
             sourceFilter={sourceFilter}
             onSourceFilterChange={setSourceFilter}
           />
-        </motion.div>
-
-        {/* Core Business Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-        >
-          <CoreBusinessStats {...coreStats} />
         </motion.div>
 
         {/* Revenue Chart - now uses global date filter */}

@@ -18,6 +18,7 @@ import browserImageCompression from 'browser-image-compression';
 import { RichTextEditor } from './RichTextEditor';
 import { BlogFAQsManager } from './BlogFAQsManager';
 import { BlogProductsManager } from './BlogProductsManager';
+import { MediaPicker } from './MediaPicker';
 
 interface BlogCategory {
   id: string;
@@ -58,6 +59,8 @@ export function BlogPostForm() {
   const [uploading, setUploading] = useState(false);
   const [keywordsInput, setKeywordsInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerField, setPickerField] = useState<'featured_image_url' | 'og_image_url'>('featured_image_url');
 
   // Fetch categories
   const { data: categories = [] } = useQuery({
@@ -146,19 +149,8 @@ export function BlogPostForm() {
         fileType: 'image/webp' as const,
       };
       const compressedFile = await browserImageCompression(file, options);
-      
-      const fileName = `${Date.now()}-${file.name.replace(/\.[^/.]+$/, '')}.webp`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('blog-images')
-        .upload(fileName, compressedFile, { contentType: 'image/webp' });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('blog-images')
-        .getPublicUrl(fileName);
-
+      const { uploadToR2 } = await import('@/utils/r2Upload');
+      const publicUrl = await uploadToR2(compressedFile, 'blog-images');
       setFormData(prev => ({ ...prev, [field]: publicUrl }));
       
       if (field === 'featured_image_url' && !formData.og_image_url) {
@@ -366,12 +358,18 @@ export function BlogPostForm() {
                     />
                   )}
                   <div className="flex-1">
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleImageUpload(e, 'featured_image_url')}
-                      disabled={uploading}
-                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setPickerField('featured_image_url');
+                        setPickerOpen(true);
+                      }}
+                    >
+                      <Image className="h-4 w-4 mr-2 text-primary" />
+                      {formData.featured_image_url ? 'Change Featured Image' : 'Select / Upload Featured Image'}
+                    </Button>
                     <p className="text-xs text-muted-foreground mt-1">
                       Recommended: 1200x630px for optimal social sharing
                     </p>
@@ -471,13 +469,18 @@ export function BlogPostForm() {
                         className="h-16 w-24 object-cover rounded border"
                       />
                     )}
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleImageUpload(e, 'og_image_url')}
-                      disabled={uploading}
-                      className="flex-1"
-                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setPickerField('og_image_url');
+                        setPickerOpen(true);
+                      }}
+                    >
+                      <Image className="h-4 w-4 mr-2 text-primary" />
+                      {formData.og_image_url ? 'Change OG Image' : 'Select / Upload OG Image'}
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -576,6 +579,19 @@ export function BlogPostForm() {
           </Tabs>
         </CardContent>
       </Card>
+      {/* Media Picker Modal */}
+      <MediaPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        folder="blog-images"
+        onSelect={(url) => {
+          setFormData(prev => ({
+            ...prev,
+            [pickerField]: url,
+            ...(pickerField === 'featured_image_url' && !prev.og_image_url ? { og_image_url: url } : {})
+          }));
+        }}
+      />
     </div>
   );
 }
