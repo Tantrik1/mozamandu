@@ -6,9 +6,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Trash2, Plus, Upload, X } from 'lucide-react';
+import { Trash2, Plus, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { MediaPicker } from './MediaPicker';
 
 interface Notice {
   id: string;
@@ -31,6 +32,7 @@ export function NoticeManagement() {
     description: '',
     is_active: true,
   });
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -94,26 +96,12 @@ export function NoticeManagement() {
 
   const uploadImage = async (file: File): Promise<string> => {
     const { prepareImageForUpload, HIGH_COMPRESSION } = await import('@/utils/imageOptimizer');
+    const { uploadToR2 } = await import('@/utils/r2Upload');
     
     // Optimize image with aggressive compression for notices (target ~200KB)
     const { file: optimizedFile } = await prepareImageForUpload(file, HIGH_COMPRESSION);
-
-    const fileName = `${Date.now()}-notice.webp`;
-    const filePath = `notices/${fileName}`;
-
-    const { error } = await supabase.storage
-      .from('notice-images')
-      .upload(filePath, optimizedFile, {
-        contentType: 'image/webp',
-      });
-
-    if (error) throw error;
-
-    const { data } = supabase.storage
-      .from('notice-images')
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
+    const publicUrl = await uploadToR2(optimizedFile, 'notice-images');
+    return publicUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -268,12 +256,15 @@ export function NoticeManagement() {
               <div>
                 <Label htmlFor="image">Image</Label>
                 <div className="space-y-2">
-                  <Input
-                    id="image"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsMediaPickerOpen(true)}
+                  >
+                    <ImageIcon className="h-4 w-4 mr-2 text-primary" />
+                    {imagePreview ? 'Change Image' : 'Select / Upload Image'}
+                  </Button>
                   {imagePreview && (
                     <div className="relative inline-block">
                       <img
@@ -382,6 +373,16 @@ export function NoticeManagement() {
           </Card>
         )}
       </div>
+      {/* Media Picker Modal */}
+      <MediaPicker
+        open={isMediaPickerOpen}
+        onClose={() => setIsMediaPickerOpen(false)}
+        folder="notice-images"
+        onSelect={(url) => {
+          setImagePreview(url);
+          setSelectedImage(null);
+        }}
+      />
     </div>
   );
 }

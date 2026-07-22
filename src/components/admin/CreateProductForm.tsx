@@ -17,6 +17,7 @@ import { InventoryManagementPopup } from './InventoryManagementPopup';
 import { ProductAdditionalImages, type AdditionalImage, type ProductAdditionalImagesRef } from './ProductAdditionalImages';
 import { ProductSEOSection } from './ProductSEOSection';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
+import { uploadToR2 } from '@/utils/r2Upload';
 import { CareInstructionsInput } from './CareInstructionsInput';
 
 const productSchema = z.object({
@@ -229,22 +230,8 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     try {
       // Optimize image with aggressive compression (~250KB)
       const { file: optimizedFile } = await prepareImageForUpload(imageFile, PRODUCT_COMPRESSION);
-
-      const fileName = `product-${Date.now()}.webp`;
-
-      const { data, error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, optimizedFile, {
-          contentType: 'image/webp',
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(fileName);
-
-      return urlData.publicUrl;
+      const publicUrl = await uploadToR2(optimizedFile, 'products');
+      return publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
       toast({

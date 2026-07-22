@@ -200,19 +200,8 @@ export function BlogManagement() {
         fileType: 'image/webp' as const,
       };
       const compressedFile = await browserImageCompression(file, options);
-      
-      const fileName = `category-${Date.now()}.webp`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('blog-images')
-        .upload(fileName, compressedFile, { contentType: 'image/webp' });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('blog-images')
-        .getPublicUrl(fileName);
-
+      const { uploadToR2 } = await import('@/utils/r2Upload');
+      const publicUrl = await uploadToR2(compressedFile, 'blog-images');
       setCategoryFormData(prev => ({ ...prev, image_url: publicUrl }));
       toast({ title: 'Image uploaded successfully' });
     } catch (error) {

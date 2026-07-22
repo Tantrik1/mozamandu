@@ -269,21 +269,9 @@ export function EnhancedProductVariantForm({
     try {
       // Optimize image to WebP before uploading
       const { file: optimizedFile } = await prepareImageForUpload(file, PRODUCT_COMPRESSION);
-      const fileName = `product-${productId}-color-${colorIndex}-${Date.now()}.webp`;
-
-      const { data, error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, optimizedFile, {
-          contentType: 'image/webp',
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(fileName);
-
-      updateColorVariant(colorIndex, 'image_url', urlData.publicUrl);
+      const { uploadToR2 } = await import('@/utils/r2Upload');
+      const imageUrl = await uploadToR2(optimizedFile, 'color_variants');
+      updateColorVariant(colorIndex, 'image_url', imageUrl);
 
       toast({
         title: 'Success',
@@ -311,21 +299,9 @@ export function EnhancedProductVariantForm({
 
     try {
       const { file: optimizedFile } = await prepareImageForUpload(imageFile, PRODUCT_COMPRESSION);
-      const fileName = `product-${Date.now()}.webp`;
-
-      const { data, error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, optimizedFile, {
-          contentType: 'image/webp',
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(fileName);
-
-      return urlData.publicUrl;
+      const { uploadToR2 } = await import('@/utils/r2Upload');
+      const publicUrl = await uploadToR2(optimizedFile, 'products');
+      return publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
       toast({

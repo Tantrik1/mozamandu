@@ -286,25 +286,12 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
     try {
       const { prepareImageForUpload, PRODUCT_COMPRESSION } = await import('@/utils/imageOptimizer');
+      const { uploadToR2 } = await import('@/utils/r2Upload');
       
       // Optimize image with aggressive compression (~250KB)
       const { file: optimizedFile } = await prepareImageForUpload(imageFile, PRODUCT_COMPRESSION);
-
-      const fileName = `product-${Date.now()}.webp`;
-
-      const { data, error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, optimizedFile, {
-          contentType: 'image/webp',
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(fileName);
-
-      return urlData.publicUrl;
+      const publicUrl = await uploadToR2(optimizedFile, 'products');
+      return publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
       toast({

@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Search, CreditCard, QrCode, Upload, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, CreditCard, QrCode, Upload, X, Image as ImageIcon } from 'lucide-react';
+import { MediaPicker } from './MediaPicker';
 
 interface PaymentMethod {
   id: string;
@@ -29,6 +30,7 @@ export function PaymentMethodManagement() {
     qr_code_url: '',
     is_active: true,
   });
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [qrCodeFile, setQrCodeFile] = useState<File | null>(null);
   const [qrCodePreview, setQrCodePreview] = useState<string>('');
   const [uploading, setUploading] = useState(false);
@@ -99,25 +101,9 @@ export function PaymentMethodManagement() {
       
       // Optimize QR code image with thumbnail compression (~150KB)
       const { file: optimizedFile } = await prepareImageForUpload(qrCodeFile, THUMBNAIL_COMPRESSION);
-
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.webp`;
-      const filePath = `payment-qr-codes/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('uploads')
-        .upload(filePath, optimizedFile, {
-          contentType: 'image/webp',
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      const { data } = supabase.storage
-        .from('uploads')
-        .getPublicUrl(filePath);
-
-      return data.publicUrl;
+      const { uploadToR2 } = await import('@/utils/r2Upload');
+      const publicUrl = await uploadToR2(optimizedFile, 'payment_methods');
+      return publicUrl;
     } catch (error) {
       console.error('Upload error:', error);
       toast({
@@ -329,21 +315,15 @@ export function PaymentMethodManagement() {
                 <Label htmlFor="qr_code">QR Code Image *</Label>
                 <div className="mt-2 space-y-4">
                   <div className="flex items-center justify-center w-full">
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <Upload className="w-8 h-8 mb-2 text-gray-500" />
-                        <p className="mb-2 text-sm text-gray-500">
-                          <span className="font-semibold">Click to upload</span> QR code
-                        </p>
-                        <p className="text-xs text-gray-500">PNG, JPG, JPEG (Max 5MB)</p>
-                      </div>
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        onChange={handleFileSelect}
-                      />
-                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full h-24 border-2 border-dashed flex flex-col items-center justify-center gap-2"
+                      onClick={() => setIsMediaPickerOpen(true)}
+                    >
+                      <ImageIcon className="w-8 h-8 text-primary" />
+                      <span className="text-sm font-medium">Select / Upload QR Code Image</span>
+                    </Button>
                   </div>
 
                   {qrCodePreview && (
@@ -521,6 +501,16 @@ export function PaymentMethodManagement() {
           ))}
         </div>
       )}
+      {/* Media Picker Modal */}
+      <MediaPicker
+        open={isMediaPickerOpen}
+        onClose={() => setIsMediaPickerOpen(false)}
+        folder="payment_methods"
+        onSelect={(url) => {
+          setQrCodePreview(url);
+          setFormData({ ...formData, qr_code_url: url });
+        }}
+      />
     </div>
   );
 }

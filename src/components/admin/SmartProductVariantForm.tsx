@@ -160,23 +160,8 @@ export function SmartProductVariantForm({
       
       // Optimize image with aggressive compression (~250KB)
       const { file: optimizedFile } = await prepareImageForUpload(file, PRODUCT_COMPRESSION);
-
-      const fileName = `product-${productId}-${colorIndex}-${Date.now()}.webp`;
-
-      const { data, error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, optimizedFile, {
-          contentType: 'image/webp',
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(fileName);
-
-      const imageUrl = urlData.publicUrl;
-
+      const { uploadToR2 } = await import('@/utils/r2Upload');
+      const imageUrl = await uploadToR2(optimizedFile, 'color_variants');
       updateColorVariant(colorIndex, 'image_url', imageUrl);
 
       toast({

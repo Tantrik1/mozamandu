@@ -4,8 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Loader2, X } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { uploadToR2 } from '@/utils/r2Upload';
 
 interface PaymentScreenshotUploadProps {
   onUploadComplete: (url: string) => void;
@@ -47,20 +47,7 @@ export function PaymentScreenshotUpload({
 
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `payment-${Date.now()}.${fileExt}`;
-      const filePath = `payment-screenshots/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('uploads')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('uploads')
-        .getPublicUrl(filePath);
-
+      const publicUrl = await uploadToR2(file, 'payment-screenshots');
       onUploadComplete(publicUrl);
       toast({
         title: 'Screenshot uploaded',

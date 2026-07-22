@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Search, FolderOpen, Upload, ImageIcon } from 'lucide-react';
+import { MediaPicker } from './MediaPicker';
 
 interface Category {
   id: string;
@@ -33,6 +34,7 @@ export const CategoryManagement = memo(function CategoryManagement() {
     description: '',
     status: true,
   });
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -90,28 +92,12 @@ export const CategoryManagement = memo(function CategoryManagement() {
   const uploadImage = async (file: File): Promise<string | null> => {
     try {
       const { prepareImageForUpload, THUMBNAIL_COMPRESSION } = await import('@/utils/imageOptimizer');
+      const { uploadToR2 } = await import('@/utils/r2Upload');
       
       // Use aggressive thumbnail compression for category images (~150KB)
       const { file: optimizedFile } = await prepareImageForUpload(file, THUMBNAIL_COMPRESSION);
-
-      const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.webp`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('category-images')
-        .upload(fileName, optimizedFile, {
-          contentType: 'image/webp',
-        });
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        return null;
-      }
-
-      const { data } = supabase.storage
-        .from('category-images')
-        .getPublicUrl(fileName);
-
-      return data.publicUrl;
+      const publicUrl = await uploadToR2(optimizedFile, 'categories');
+      return publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
       return null;
@@ -272,21 +258,14 @@ export const CategoryManagement = memo(function CategoryManagement() {
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <Input
-                      id="category-image"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageSelect}
-                      className="hidden"
-                    />
                     <Button 
                       type="button" 
                       variant="outline" 
                       size="sm"
-                      onClick={() => document.getElementById('category-image')?.click()}
+                      onClick={() => setIsMediaPickerOpen(true)}
                     >
-                      <Upload className="h-4 w-4 mr-2" />
-                      {imagePreview ? 'Change' : 'Upload'}
+                      <ImageIcon className="h-4 w-4 mr-2 text-primary" />
+                      {imagePreview ? 'Change Image' : 'Select / Upload Image'}
                     </Button>
                     {imagePreview && (
                       <Button 
@@ -429,6 +408,16 @@ export const CategoryManagement = memo(function CategoryManagement() {
           ))}
         </div>
       )}
+      {/* Media Picker Modal */}
+      <MediaPicker
+        open={isMediaPickerOpen}
+        onClose={() => setIsMediaPickerOpen(false)}
+        folder="categories"
+        onSelect={(url) => {
+          setImagePreview(url);
+          setSelectedImage(null); // URL already uploaded via MediaPicker
+        }}
+      />
     </div>
   );
 });

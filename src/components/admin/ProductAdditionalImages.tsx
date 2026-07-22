@@ -68,44 +68,15 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
           try {
             // Optimize image with compression
             const { file: optimizedFile } = await prepareImageForUpload(img.file, PRODUCT_COMPRESSION);
+            const { uploadToR2 } = await import('@/utils/r2Upload');
 
-            // Use subfolder structure: additional/{productId}/{timestamp}.webp
-            const fileName = `additional/${targetProductId}/${Date.now()}-${i}.webp`;
-
-            console.log('📤 Uploading additional image to bucket:', BUCKET_NAME, 'file:', fileName);
-
-            // Upload to storage using standard supabase client
-            const { data: uploadData, error: uploadError } = await supabase.storage
-              .from(BUCKET_NAME)
-              .upload(fileName, optimizedFile, {
-                contentType: 'image/webp',
-                upsert: true,
-              });
-
-            if (uploadError) {
-              console.error('❌ Storage upload error:', uploadError);
-              toast({
-                title: 'Upload Failed',
-                description: `Storage error: ${uploadError.message}`,
-                variant: 'destructive',
-              });
-              throw uploadError;
-            }
-
-            console.log('✅ Storage upload success:', uploadData);
-
-            // Get public URL
-            const { data: urlData } = supabase.storage
-              .from(BUCKET_NAME)
-              .getPublicUrl(fileName);
-
-            console.log('🔗 Public URL:', urlData.publicUrl);
+            const publicUrl = await uploadToR2(optimizedFile, `product_additional_images/${targetProductId}`);
 
             // Save to product_additional_images table (cast to any for external table)
             const insertData = {
               product_id: targetProductId,
-              image_url: urlData.publicUrl,
-              storage_path: fileName,
+              image_url: publicUrl,
+              storage_path: publicUrl,
               display_order: i,
             };
 
@@ -134,7 +105,7 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
                 isNew: false, 
                 uploading: false, 
                 id: dbData?.id || crypto.randomUUID(),
-                storagePath: fileName 
+                storagePath: publicUrl 
               } : p
             ));
 
@@ -260,17 +231,8 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
       
       if (imageToRemove.id) {
         try {
-          // Delete from storage if we have the storage path
-          if (imageToRemove.storagePath) {
-            const { error: storageError } = await supabase.storage
-              .from(BUCKET_NAME)
-              .remove([imageToRemove.storagePath]);
-            
-            if (storageError) {
-              console.warn('Storage delete warning:', storageError);
-              // Continue even if storage delete fails
-            }
-          }
+          // Images are stored in Cloudflare R2 - no client-side delete needed
+          // The URL reference is removed from the database below
 
           // Delete from database (cast to any for external table)
           const { error } = await (supabase as any)
