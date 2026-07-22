@@ -73,7 +73,7 @@ export function CoreBusinessStats({
     },
     {
       label: 'Conversion Rate',
-      value: conversionRate > 0 ? `${conversionRate.toFixed(1)}%` : 'N/A',
+      value: `${conversionRate.toFixed(1)}%`,
       icon: TrendingUp,
       color: 'text-cyan-600',
       bgColor: 'bg-gradient-to-br from-cyan-50 to-cyan-100/50 dark:from-cyan-950/40 dark:to-cyan-900/20',
@@ -91,7 +91,7 @@ export function CoreBusinessStats({
     },
     {
       label: 'Return Rate',
-      value: returnRate > 0 ? `${returnRate.toFixed(1)}%` : 'N/A',
+      value: `${returnRate.toFixed(1)}%`,
       icon: RotateCcw,
       color: 'text-rose-600',
       bgColor: 'bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/40 dark:to-rose-900/20',
