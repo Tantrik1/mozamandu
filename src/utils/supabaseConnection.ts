@@ -1,12 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 
-// External Supabase project details
-const EXPECTED_SUPABASE_URL = 'https://huwhbxjlyucamitwwhyg.supabase.co';
-const EXPECTED_PROJECT_ID = 'huwhbxjlyucamitwwhyg';
+const EXPECTED_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://opdkvcpnfwlzihctttpo.supabase.co';
+const EXPECTED_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'opdkvcpnfwlzihctttpo';
 
 /**
  * Verifies connection to the external Supabase project
- * Call this on app startup to confirm the correct database is connected
  */
 export async function verifySupabaseConnection(): Promise<{
   connected: boolean;
@@ -15,7 +13,6 @@ export async function verifySupabaseConnection(): Promise<{
   error?: string;
 }> {
   try {
-    // Extract project ID from the Supabase client URL
     // @ts-ignore - accessing internal supabase URL
     const supabaseUrl = supabase.supabaseUrl || '';
     const projectIdMatch = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/);
@@ -26,21 +23,6 @@ export async function verifySupabaseConnection(): Promise<{
     
     const connected = !error;
     const isCorrectProject = actualProjectId === EXPECTED_PROJECT_ID;
-    
-    // Log connection status
-    console.log('🔗 Supabase Connection Check:', {
-      connected,
-      projectId: actualProjectId,
-      expectedProjectId: EXPECTED_PROJECT_ID,
-      isCorrectProject,
-      url: supabaseUrl,
-    });
-    
-    if (!isCorrectProject) {
-      console.warn('⚠️ WARNING: Connected to unexpected Supabase project!');
-      console.warn(`  Expected: ${EXPECTED_PROJECT_ID}`);
-      console.warn(`  Actual: ${actualProjectId}`);
-    }
     
     if (error) {
       console.error('❌ Supabase connection error:', error.message);
@@ -65,16 +47,10 @@ export async function verifySupabaseConnection(): Promise<{
   }
 }
 
-/**
- * Gets the expected Supabase project URL
- */
 export function getExpectedSupabaseUrl(): string {
   return EXPECTED_SUPABASE_URL;
 }
 
-/**
- * Gets the expected Supabase project ID
- */
 export function getExpectedProjectId(): string {
   return EXPECTED_PROJECT_ID;
 }

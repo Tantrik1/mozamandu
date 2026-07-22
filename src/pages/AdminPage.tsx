@@ -26,6 +26,7 @@ import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
 import { AnalyticsSettings } from '@/components/admin/AnalyticsSettings';
 import { BlogManagement } from '@/components/admin/BlogManagement';
 import { BlogPostForm } from '@/components/admin/BlogPostForm';
+import { MediaPage } from '@/pages/admin/MediaPage';
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -116,6 +117,7 @@ export default function AdminPage() {
               <Route path="blogs" element={<BlogManagement />} />
               <Route path="blogs/new" element={<BlogPostForm />} />
               <Route path="blogs/edit/:blogId" element={<BlogPostForm />} />
+              <Route path="media" element={<MediaPage />} />
               <Route path="analytics" element={<AnalyticsDashboard />} />
               <Route path="analytics-settings" element={<AnalyticsSettings />} />
               <Route path="settings" element={<AdminSettings />} />
