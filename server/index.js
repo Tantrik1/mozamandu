@@ -23,10 +23,26 @@ const s3Client = new S3Client({
 const BUCKET = 'mozamandu';
 const CDN_BASE = 'https://images.mozamandu.com';
 
-const supabase = createClient(
+const supabaseProd = createClient(
   'https://huwhbxjlyucamitwwhyg.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1d2hieGpseXVjYW1pdHd3aHlnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MDY1ODg1NywiZXhwIjoyMDY2MjM0ODU3fQ.Hr_KRFCup-UpGr2x6FHJI6xGaR5_NNfTaCLb874NNzk'
 );
+
+const supabaseDev = createClient(
+  'https://rgfwekuceitxmturaiqn.supabase.co',
+  'sb_secret_PrmNB-DDS-6BlGu2GwsYOA_8QGbPJAh'
+);
+
+function getSupabase(req) {
+  const host = req?.headers?.host || '';
+  const referer = req?.headers?.referer || '';
+  if (host.includes('demo') || referer.includes('demo') || process.env.NODE_ENV === 'development') {
+    return supabaseDev;
+  }
+  return supabaseProd;
+}
+
+const supabase = supabaseDev; // Default client for dev server
 
 // In-memory cache (5 seconds TTL for sub-20ms responses)
 const responseCache = new Map();
@@ -69,7 +85,7 @@ async function getAllUsageCounts() {
           if (id) map[id] = (map[id] || 0) + 1;
         });
       }
-    } catch (e) {}
+    } catch (e) { }
   }));
 
   return map;
@@ -363,7 +379,7 @@ app.get(['/api/health', '/health'], (req, res) => {
 });
 
 // ── Event Loop Keep-Alive (Prevents process exit) ────────────
-setInterval(() => {}, 60000);
+setInterval(() => { }, 60000);
 
 // ── Start Server ─────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
