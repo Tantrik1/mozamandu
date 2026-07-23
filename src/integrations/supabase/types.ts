@@ -1532,6 +1532,7 @@ export type Database = {
         }
         Returns: string
       }
+      is_admin: { Args: { _user_id?: string }; Returns: boolean }
       safe_update_stock: {
         Args: {
           p_color_variant_id?: string
