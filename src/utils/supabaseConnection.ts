@@ -1,7 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
+import { EXTERNAL_SUPABASE_PROJECT_ID, EXTERNAL_SUPABASE_URL } from "@/integrations/supabase/externalClient";
 
-const EXPECTED_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://opdkvcpnfwlzihctttpo.supabase.co';
-const EXPECTED_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'opdkvcpnfwlzihctttpo';
+const EXPECTED_SUPABASE_URL = EXTERNAL_SUPABASE_URL;
+const EXPECTED_PROJECT_ID = EXTERNAL_SUPABASE_PROJECT_ID;
 
 /**
  * Verifies connection to the external Supabase project

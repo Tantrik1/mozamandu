@@ -1,14 +1,9 @@
 
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
-  const supabaseUrl = env.VITE_SUPABASE_URL || 'https://huwhbxjlyucamitwwhyg.supabase.co';
-  const supabasePublishableKey = env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1d2hieGpseXVjYW1pdHd3aHlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2NTg4NTcsImV4cCI6MjA2NjIzNDg1N30.cB3YipySfkizYpvwUPd9xlBlq_haPznmEpPgcbAwovQ';
-  const supabaseProjectId = env.VITE_SUPABASE_PROJECT_ID || 'huwhbxjlyucamitwwhyg';
-
   return {
     server: {
       host: "::",
@@ -17,13 +12,9 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
     ].filter(Boolean),
-    define: {
-      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
-      'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify(supabasePublishableKey),
-      'import.meta.env.VITE_SUPABASE_PROJECT_ID': JSON.stringify(supabaseProjectId),
-    },
     resolve: {
       alias: {
+        "@/integrations/supabase/client": path.resolve(__dirname, "./src/integrations/supabase/externalClient.ts"),
         "@": path.resolve(__dirname, "./src"),
       },
     },

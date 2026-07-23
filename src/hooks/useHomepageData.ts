@@ -16,11 +16,10 @@ const fetchLatestProducts = async () => {
   const { data } = await supabase
     .from('products')
     .select(
-      `id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price)`
+      `id, name, selling_price, cost_price, image_url, has_color_variants`
     )
     .eq('status', 'active')
     .in('subcategory_id', activeSubIds)
-    .order('created_at', { ascending: false })
     .limit(8);
   return filterInStock(data || []);
 };
@@ -42,7 +41,7 @@ const fetchMostSoldProducts = async () => {
   const { data: products } = await supabase
     .from('products')
     .select(
-      `id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price)`
+      `id, name, selling_price, cost_price, image_url, has_color_variants`
     )
     .eq('status', 'active')
     .in('subcategory_id', activeSubIds)
@@ -82,13 +81,12 @@ const fetchFlashSaleProducts = async () => {
   const { data } = await supabase
     .from('products')
     .select(
-      `id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price, max_selling_price)`
+      `id, name, selling_price, cost_price, image_url, has_color_variants`
     )
     .eq('status', 'active')
     .in('subcategory_id', activeSubIds)
     .not('selling_price', 'is', null)
     .gt('selling_price', 0)
-    .order('created_at', { ascending: false })
     .limit(20);
   // Show products that have a selling_price lower than subcategory max_selling_price (on sale)
   // or just all products with a selling_price set
@@ -102,7 +100,7 @@ const fetchFeaturedProducts = async () => {
   const { data } = await supabase
     .from('products')
     .select(
-      `id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price)`
+      `id, name, selling_price, cost_price, image_url, has_color_variants`
     )
     .eq('status', 'active')
     .eq('is_featured', true)
