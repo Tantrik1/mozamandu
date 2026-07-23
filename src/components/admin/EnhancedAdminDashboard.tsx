@@ -277,18 +277,10 @@ export function EnhancedAdminDashboard() {
     const grossMargin = totalSubtotal > 0 ? ((totalSubtotal - estimatedCostOfGoods) / totalSubtotal) * 100 : 0;
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     
-    // Calculate actual rates from order & session data
+    // Calculate actual rates from order data
     const refundRate = orders.length > 0 ? (cancelledOrders / orders.length) * 100 : 0;
-    const returnedOrders = orders.filter(o => o.status === 'returned').length;
-    const returnRate = orders.length > 0 ? (returnedOrders / orders.length) * 100 : 0;
-
-    // Fetch unique session count for live Conversion Rate calculation
-    const { count: sessionCount } = await supabase
-      .from('site_sessions' as any)
-      .select('*', { count: 'exact', head: true });
-
-    const totalSessions = sessionCount || 0;
-    const conversionRate = totalSessions > 0 ? (totalOrders / totalSessions) * 100 : (totalOrders > 0 ? 100 : 0);
+    const returnRate = 0; // No return status in system yet
+    const conversionRate = 0; // Requires website traffic data (GA removed)
 
     setCoreStats({
       totalRevenue,
