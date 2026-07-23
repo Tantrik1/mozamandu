@@ -16,7 +16,7 @@ const fetchLatestProducts = async () => {
   const { data } = await supabase
     .from('products')
     .select(
-      `id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price)`
+      `id, name, selling_price, cost_price, image_url, has_color_variants`
     )
     .eq('status', 'active')
     .in('subcategory_id', activeSubIds)
@@ -41,7 +41,7 @@ const fetchMostSoldProducts = async () => {
   const { data: products } = await supabase
     .from('products')
     .select(
-      `id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price)`
+      `id, name, selling_price, cost_price, image_url, has_color_variants`
     )
     .eq('status', 'active')
     .in('subcategory_id', activeSubIds)
@@ -81,7 +81,7 @@ const fetchFlashSaleProducts = async () => {
   const { data } = await supabase
     .from('products')
     .select(
-      `id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price, max_selling_price)`
+      `id, name, selling_price, cost_price, image_url, has_color_variants`
     )
     .eq('status', 'active')
     .in('subcategory_id', activeSubIds)
@@ -100,7 +100,7 @@ const fetchFeaturedProducts = async () => {
   const { data } = await supabase
     .from('products')
     .select(
-      `id, name, selling_price, cost_price, image_url, has_color_variants, subcategory:subcategories(name, min_selling_price)`
+      `id, name, selling_price, cost_price, image_url, has_color_variants`
     )
     .eq('status', 'active')
     .eq('is_featured', true)
