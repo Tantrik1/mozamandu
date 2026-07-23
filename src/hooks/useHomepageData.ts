@@ -20,7 +20,6 @@ const fetchLatestProducts = async () => {
     )
     .eq('status', 'active')
     .in('subcategory_id', activeSubIds)
-    .order('created_at', { ascending: false })
     .limit(8);
   return filterInStock(data || []);
 };
@@ -88,7 +87,6 @@ const fetchFlashSaleProducts = async () => {
     .in('subcategory_id', activeSubIds)
     .not('selling_price', 'is', null)
     .gt('selling_price', 0)
-    .order('created_at', { ascending: false })
     .limit(20);
   // Show products that have a selling_price lower than subcategory max_selling_price (on sale)
   // or just all products with a selling_price set
