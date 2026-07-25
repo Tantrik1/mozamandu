@@ -24,7 +24,7 @@ export const FAQSection = memo(function FAQSection({
 
   if (isLoading) {
     return (
-      <section className="py-12 md:py-16 lg:py-20 bg-gradient-to-b from-background to-muted/30">
+      <section className="py-10 md:py-16 bg-slate-50/70 dark:bg-slate-950/70 border-y border-border/40">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[...Array(4)].map((_, i) => (
@@ -39,43 +39,44 @@ export const FAQSection = memo(function FAQSection({
   if (faqs.length === 0) return null;
 
   return (
-    <section className="py-12 md:py-16 lg:py-20 bg-gradient-to-b from-background to-muted/30">
+    <section className="py-10 md:py-16 lg:py-20 bg-slate-50/70 dark:bg-slate-950/70 border-y border-border/40 relative">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="text-center mb-8 md:mb-10 animate-fade-in">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-            <HelpCircle className="w-8 h-8 text-primary" />
+        {/* Consistent Centered Header */}
+        <div className="text-center mb-8 md:mb-12 space-y-2">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold tracking-wide bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 shadow-2xs">
+            <HelpCircle className="w-3.5 h-3.5" />
+            Help & Guidance
           </div>
-          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-3">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
             Frequently Asked Questions
           </h2>
-          <p className="text-muted-foreground max-w-lg mx-auto">
-            Find answers to all your queries about our products and services.
+          <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-lg mx-auto">
+            Find answers to all your queries regarding ordering, delivery, fabric care, and returns
           </p>
         </div>
 
         {/* FAQ Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10 md:mb-12 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 md:mb-12">
           {faqs.slice(0, 4).map((faq, index) => (
             <div
               key={faq.id}
-              className="bg-card rounded-2xl border border-border/50 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+              className="bg-card rounded-2xl border border-border/60 overflow-hidden shadow-2xs hover:shadow-md transition-all duration-300"
             >
               <button
                 onClick={() => setOpenIndex(openIndex === index ? null : index)}
-                className="w-full flex items-start gap-4 p-5 text-left hover:bg-muted/30 transition-colors"
+                className="w-full flex items-start gap-3.5 p-4 sm:p-5 text-left hover:bg-muted/30 transition-colors"
               >
-                <span className="text-2xl flex-shrink-0 mt-0.5">
+                <span className="text-xl sm:text-2xl flex-shrink-0 mt-0.5">
                   {faqEmojis[index % faqEmojis.length]}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <span className="font-semibold text-foreground text-sm md:text-base leading-tight block pr-6">
+                  <span className="font-bold text-foreground text-sm sm:text-base leading-snug block pr-2">
                     {faq.question}
                   </span>
                 </div>
                 <ChevronDown
-                  className={`w-5 h-5 text-muted-foreground flex-shrink-0 transition-transform duration-300 ${
-                    openIndex === index ? 'rotate-180' : ''
+                  className={`w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground flex-shrink-0 transition-transform duration-300 mt-1 ${
+                    openIndex === index ? 'rotate-180 text-primary' : ''
                   }`}
                 />
               </button>
@@ -85,7 +86,7 @@ export const FAQSection = memo(function FAQSection({
                 }`}
               >
                 <div className="overflow-hidden">
-                  <div className="px-5 pb-5 pl-14 text-muted-foreground leading-relaxed text-sm md:text-base">
+                  <div className="px-4 sm:px-5 pb-5 pl-11 sm:pl-13 text-muted-foreground leading-relaxed text-xs sm:text-sm border-t border-border/40 pt-3">
                     {faq.answer}
                   </div>
                 </div>
@@ -95,20 +96,17 @@ export const FAQSection = memo(function FAQSection({
         </div>
 
         {/* Contact CTA Banner */}
-        <div
-          className="mt-10 md:mt-12 bg-foreground/90 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in"
-          style={{ animationDelay: '0.2s' }}
-        >
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center justify-center w-12 h-12 rounded-full bg-primary/20">
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-900 dark:to-slate-950 text-white rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg border border-slate-700/50">
+          <div className="flex items-center gap-4 text-center md:text-left">
+            <div className="hidden md:flex items-center justify-center w-12 h-12 rounded-full bg-primary/20 shrink-0">
               <MessageCircle className="w-6 h-6 text-primary" />
             </div>
-            <div className="text-center md:text-left">
-              <h4 className="text-lg md:text-xl font-semibold text-background mb-1">Still need help?</h4>
-              <p className="text-background/70 text-sm">Contact our support team anytime!</p>
+            <div>
+              <h3 className="text-base sm:text-lg md:text-xl font-bold mb-0.5">Have additional questions?</h3>
+              <p className="text-slate-300 text-xs sm:text-sm">Our customer happiness team is available to assist you anytime.</p>
             </div>
           </div>
-          <Button asChild className="rounded-full px-6 md:px-8 bg-primary hover:bg-primary/90">
+          <Button asChild size="lg" className="rounded-full px-8 bg-primary hover:bg-primary/90 font-bold shrink-0 shadow-md">
             <Link to="/contact">Get in Touch</Link>
           </Button>
         </div>

@@ -32,7 +32,6 @@ const fetchMixedProducts = async () => {
   return inStock.sort(() => Math.random() - 0.5).slice(0, 4);
 };
 
-
 export const MixedProducts = memo(function MixedProducts() {
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['mixed-products'],
@@ -42,9 +41,9 @@ export const MixedProducts = memo(function MixedProducts() {
 
   if (isLoading) {
     return (
-      <section className="py-10 md:py-12 lg:py-16 bg-muted/30">
+      <section className="py-10 md:py-16 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="aspect-square bg-muted rounded-2xl animate-pulse" />
             ))}
@@ -57,24 +56,24 @@ export const MixedProducts = memo(function MixedProducts() {
   if (products.length === 0) return null;
 
   return (
-    <section className="py-10 md:py-12 lg:py-16 bg-muted/30">
+    <section className="py-10 md:py-16 lg:py-20 bg-background relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="text-center mb-6 md:mb-8">
-          <div className="inline-flex items-center gap-2 text-primary text-sm font-medium mb-3 bg-primary/10 px-4 py-1.5 rounded-full">
-            <Sparkles className="w-4 h-4" />
-            Discover More
+        {/* Consistent Centered Header */}
+        <div className="text-center mb-8 md:mb-12 space-y-2">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold tracking-wide bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5" />
+            Explore Collection
           </div>
-          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2">
-            Explore Our Collection
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
+            Handpicked Selections
           </h2>
-          <p className="text-muted-foreground max-w-xl mx-auto">
-            Handpicked products from all categories for your comfort and style
+          <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
+            Discover versatile styles and premium sock packs chosen for your ultimate comfort
           </p>
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-8">
           {products.map((product) => {
             const displayPrice =
               product.selling_price ?? product.subcategory?.min_selling_price ?? product.cost_price;
@@ -85,12 +84,12 @@ export const MixedProducts = memo(function MixedProducts() {
                 to={`/product/${product.id}`}
                 className="group"
               >
-                <div className="relative aspect-square rounded-2xl overflow-hidden bg-card border border-border/50 shadow-sm hover:shadow-xl transition-all duration-500">
+                <div className="relative aspect-square rounded-2xl overflow-hidden bg-card border border-border/60 shadow-xs hover:shadow-xl transition-all duration-500">
                   {product.image_url ? (
                     <img
                       src={product.image_url}
                       alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                       loading="lazy"
                       decoding="async"
                       width={300}
@@ -103,32 +102,32 @@ export const MixedProducts = memo(function MixedProducts() {
                   )}
 
                   {/* Hover Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
                   {/* Category Badge */}
                   {product.subcategory?.name && (
                     <div className="absolute top-3 left-3">
-                      <span className="bg-background/80 backdrop-blur-sm text-xs font-medium px-2 py-1 rounded-full text-foreground">
+                      <span className="bg-background/85 backdrop-blur-md text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full text-foreground border border-border/40 shadow-2xs">
                         {product.subcategory.name}
                       </span>
                     </div>
                   )}
 
                   {/* Product Info on Hover */}
-                  <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                    <h3 className="text-white font-semibold text-sm line-clamp-1 mb-1">
+                  <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300 hidden lg:block">
+                    <h3 className="text-white font-bold text-sm line-clamp-1 mb-0.5">
                       {product.name}
                     </h3>
-                    <p className="text-white/80 text-sm font-medium">
+                    <p className="text-white/90 text-xs font-extrabold">
                       Rs. {displayPrice.toLocaleString()}
                     </p>
                   </div>
                 </div>
 
                 {/* Product Info Below Image (Mobile) */}
-                <div className="mt-3 lg:hidden">
-                  <h3 className="font-medium text-foreground text-sm line-clamp-1">{product.name}</h3>
-                  <p className="text-primary font-semibold text-sm">
+                <div className="mt-2.5 lg:hidden space-y-0.5">
+                  <h3 className="font-semibold text-foreground text-xs sm:text-sm line-clamp-1">{product.name}</h3>
+                  <p className="text-primary font-bold text-xs sm:text-sm">
                     Rs. {displayPrice.toLocaleString()}
                   </p>
                 </div>
@@ -137,12 +136,11 @@ export const MixedProducts = memo(function MixedProducts() {
           })}
         </div>
 
-
         {/* Shop More CTA */}
         <div className="text-center">
-          <Button asChild size="lg" className="rounded-full gap-2 px-10 shadow-lg hover:shadow-xl transition-all">
+          <Button asChild size="lg" className="rounded-full gap-2 px-8 font-bold shadow-md hover:shadow-lg transition-all">
             <Link to="/shop">
-              Shop More
+              Shop Full Collection
               <ArrowRight className="w-4 h-4" />
             </Link>
           </Button>
