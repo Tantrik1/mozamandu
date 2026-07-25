@@ -55,7 +55,7 @@ export const HomeProductCard = memo(function HomeProductCard({
 
       <div className="p-4">
         {product.subcategory?.name && (
-          <p className="text-xs font-semibold text-muted-foreground/80 mb-1 tracking-tight">
+          <p className="text-xs font-bold text-destructive mb-1 tracking-tight">
             {product.subcategory.name}
           </p>
         )}
@@ -63,7 +63,7 @@ export const HomeProductCard = memo(function HomeProductCard({
           {product.name}
         </h3>
         {priceSlot ?? (
-          <p className="text-lg font-bold text-foreground">Rs. {displayPrice.toLocaleString()}</p>
+          <p className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">Rs. {displayPrice.toLocaleString()}</p>
         )}
       </div>
     </Link>

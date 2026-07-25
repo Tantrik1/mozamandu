@@ -124,7 +124,7 @@ export const MixedProducts = memo(function MixedProducts() {
                 {/* Product Info Below Image (Mobile) */}
                 <div className="mt-2.5 lg:hidden space-y-0.5">
                   <h3 className="font-semibold text-foreground text-xs sm:text-sm line-clamp-1">{product.name}</h3>
-                  <p className="text-primary font-bold text-xs sm:text-sm">
+                  <p className="text-emerald-600 dark:text-emerald-400 font-bold text-xs sm:text-sm">
                     Rs. {displayPrice.toLocaleString()}
                   </p>
                 </div>

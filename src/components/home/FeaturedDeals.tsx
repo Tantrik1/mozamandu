@@ -82,7 +82,7 @@ export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }
                   }
                   priceSlot={
                     <div className="flex items-center gap-2">
-                      <p className="text-sm sm:text-base font-extrabold text-primary">
+                      <p className="text-sm sm:text-base font-extrabold text-emerald-600 dark:text-emerald-400">
                         Rs. {displayPrice.toLocaleString()}
                       </p>
                       {discount > 0 && (
