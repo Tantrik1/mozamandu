@@ -218,7 +218,10 @@ export default function Blog() {
                             <div className="relative h-64 overflow-hidden">
                               <img
                                 src={blog.featured_image_url}
-                                alt={blog.title}
+                                alt={blog.title || "Mozamandu Blog Cover"}
+                                title={blog.title || "Mozamandu Blog"}
+                                loading="lazy"
+                                decoding="async"
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               />
                               <Badge className="absolute top-4 left-4 bg-primary">Featured</Badge>
@@ -267,7 +270,10 @@ export default function Blog() {
                           <div className="relative h-48 overflow-hidden">
                             <img
                               src={blog.featured_image_url}
-                              alt={blog.title}
+                              alt={blog.title || "Mozamandu Blog Article"}
+                              title={blog.title || "Mozamandu Blog Article"}
+                              loading="lazy"
+                              decoding="async"
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
                           </div>

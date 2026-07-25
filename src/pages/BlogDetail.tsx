@@ -366,7 +366,10 @@ export default function BlogDetail() {
             <div className="mb-8 rounded-xl overflow-hidden">
               <img
                 src={blog.featured_image_url}
-                alt={blog.title}
+                alt={blog.title || "Mozamandu Blog Main Image"}
+                title={blog.title || "Mozamandu Blog"}
+                loading="eager"
+                decoding="async"
                 className="w-full h-auto max-h-[500px] object-cover"
               />
             </div>
@@ -393,7 +396,10 @@ export default function BlogDetail() {
                         {product.image_url ? (
                           <img
                             src={product.image_url}
-                            alt={product.name}
+                            alt={product.name || "Mozamandu Product"}
+                            title={product.name || "Mozamandu Product"}
+                            loading="lazy"
+                            decoding="async"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                           />
                         ) : (
