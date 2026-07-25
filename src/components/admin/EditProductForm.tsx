@@ -9,32 +9,51 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Upload, Eye, X, Image as ImageIcon } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Upload, 
+  Eye, 
+  X, 
+  ImageIcon, 
+  Package, 
+  DollarSign, 
+  Tag, 
+  Layers, 
+  Sparkles, 
+  Percent, 
+  CheckCircle2, 
+  AlertCircle,
+  FileText,
+  Palette,
+  Ruler,
+  HelpCircle
+} from 'lucide-react';
 import { EnhancedProductVariantForm } from './EnhancedProductVariantForm';
+import { ProductFAQsManager } from './ProductFAQsManager';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 import { ProductAdditionalImages, type AdditionalImage, type ProductAdditionalImagesRef } from './ProductAdditionalImages';
 import { ProductSEOSection } from './ProductSEOSection';
-import { ProductFAQsManager } from './ProductFAQsManager';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
+import { uploadToR2 } from '@/utils/r2Upload';
 import { CareInstructionsInput } from './CareInstructionsInput';
 import { MediaPicker } from './MediaPicker';
 
 const productSchema = z.object({
-  name: z.string().min(1, 'Product name is required'),
+  name: z.string().min(1, 'Product name is required').max(120, 'Name must be under 120 characters'),
   description: z.string().optional(),
   cost_price: z.number().min(0, 'Cost price must be positive'),
   selling_price: z.number().min(0, 'Selling price must be positive').optional(),
-  category_id: z.string().min(1, 'Category is required'),
-  subcategory_id: z.string().min(1, 'Subcategory is required'),
+  category_id: z.string().min(1, 'Please select a category'),
+  subcategory_id: z.string().min(1, 'Please select a subcategory'),
   is_featured: z.boolean().default(false),
   has_color_variants: z.boolean().default(false),
   has_size_variants: z.boolean().default(false),
   status: z.enum(['active', 'inactive']).default('active'),
   material_composition: z.string().optional(),
   care_instructions: z.union([z.string(), z.array(z.string())]).optional(),
-  // SEO fields
   meta_title: z.string().max(60).optional(),
   meta_description: z.string().max(160).optional(),
   meta_keywords: z.string().optional(),
@@ -63,13 +82,13 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [filteredSubcategories, setFilteredSubcategories] = useState<Subcategory[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingData, setLoadingData] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [showInventoryPopup, setShowInventoryPopup] = useState(false);
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [additionalImages, setAdditionalImages] = useState<AdditionalImage[]>([]);
   const additionalImagesRef = useRef<ProductAdditionalImagesRef>(null);
   const { toast } = useToast();
@@ -88,7 +107,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       has_size_variants: false,
       status: 'active',
       material_composition: '',
-      care_instructions: '',
+      care_instructions: [],
       meta_title: '',
       meta_description: '',
       meta_keywords: '',
@@ -100,31 +119,24 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const watchedCategoryId = form.watch('category_id');
   const watchedHasColorVariants = form.watch('has_color_variants');
   const watchedHasSizeVariants = form.watch('has_size_variants');
+  const watchedCostPrice = form.watch('cost_price') || 0;
+  const watchedSellingPrice = form.watch('selling_price') || 0;
+
+  const profitAmount = watchedSellingPrice > 0 ? watchedSellingPrice - watchedCostPrice : 0;
+  const profitMarginPercent = watchedCostPrice > 0 && watchedSellingPrice > 0 
+    ? Math.round(((watchedSellingPrice - watchedCostPrice) / watchedCostPrice) * 100)
+    : 0;
 
   useEffect(() => {
-    const initializeData = async () => {
-      setLoadingData(true);
-      try {
-        await Promise.all([
-          fetchCategories(),
-          fetchSubcategories(),
-          fetchProduct()
-        ]);
-      } catch (error) {
-        console.error('Error initializing data:', error);
-      } finally {
-        setLoadingData(false);
-      }
-    };
-
-    initializeData();
+    fetchCategories();
+    fetchSubcategories();
+    fetchProductDetails();
   }, [productId]);
 
   useEffect(() => {
-    if (watchedCategoryId && subcategories.length > 0) {
+    if (watchedCategoryId) {
       const filtered = subcategories.filter(sub => sub.category_id === watchedCategoryId);
       setFilteredSubcategories(filtered);
-      console.log('Filtered subcategories for category', watchedCategoryId, ':', filtered);
     } else {
       setFilteredSubcategories([]);
     }
@@ -143,49 +155,31 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         .select('id, name')
         .eq('status', 'on')
         .order('name');
-
       if (error) throw error;
-      console.log('Fetched categories:', data);
       setCategories(data || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch categories',
-        variant: 'destructive',
-      });
     }
   };
 
   const fetchSubcategories = async () => {
     try {
-      // Enhanced query with better error handling
       const { data, error } = await supabase
         .from('subcategories')
         .select('id, name, category_id')
         .eq('status', 'on')
         .order('name');
-
-      if (error) {
-        console.error('Supabase error fetching subcategories:', error);
-        throw error;
-      }
-      
-      console.log('Raw subcategories data:', data);
+      if (error) throw error;
       setSubcategories(data || []);
     } catch (error) {
       console.error('Error fetching subcategories:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch subcategories',
-        variant: 'destructive',
-      });
     }
   };
 
-  const fetchProduct = async () => {
+  const fetchProductDetails = async () => {
     try {
-      const { data: product, error } = await supabase
+      setLoading(true);
+      const { data, error } = await supabase
         .from('products')
         .select('*')
         .eq('id', productId)
@@ -193,36 +187,52 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
       if (error) throw error;
 
-      console.log('Fetched product:', product);
+      let careInstructions: string[] = [];
+      if (data.care_instructions) {
+        if (typeof data.care_instructions === 'string') {
+          try {
+            careInstructions = JSON.parse(data.care_instructions);
+          } catch {
+            careInstructions = [data.care_instructions];
+          }
+        } else if (Array.isArray(data.care_instructions)) {
+          careInstructions = data.care_instructions;
+        }
+      }
 
+      const prod = data as any;
       form.reset({
-        name: product.name,
-        description: product.description || '',
-        cost_price: product.cost_price,
-        selling_price: product.selling_price || 0,
-        category_id: product.category_id,
-        subcategory_id: product.subcategory_id,
-        is_featured: product.is_featured,
-        has_color_variants: product.has_color_variants,
-        has_size_variants: product.color_has_size_variants || false,
-        status: (product.status === 'active' || product.status === 'inactive') ? product.status : 'active',
-        material_composition: product.material_composition || '',
-        care_instructions: product.care_instructions || '',
-        meta_title: (product as any).meta_title || '',
-        meta_description: (product as any).meta_description || '',
-        meta_keywords: (product as any).meta_keywords?.join(', ') || '',
-        og_title: (product as any).og_title || '',
-        og_description: (product as any).og_description || '',
+        name: prod.name || '',
+        description: prod.description || '',
+        cost_price: prod.cost_price || 0,
+        selling_price: prod.selling_price || 0,
+        category_id: prod.category_id || '',
+        subcategory_id: prod.subcategory_id || '',
+        is_featured: prod.is_featured || false,
+        has_color_variants: prod.has_color_variants || false,
+        has_size_variants: prod.has_size_variants || false,
+        status: (prod.status as 'active' | 'inactive') || 'active',
+        material_composition: prod.material_composition || '',
+        care_instructions: careInstructions,
+        meta_title: prod.meta_title || '',
+        meta_description: prod.meta_description || '',
+        meta_keywords: prod.meta_keywords || '',
+        og_title: prod.og_title || '',
+        og_description: prod.og_description || '',
       });
 
-      setImagePreview(product.image_url);
+      if (data.image_url) {
+        setImagePreview(data.image_url);
+      }
     } catch (error) {
-      console.error('Error fetching product:', error);
+      console.error('Error fetching product details:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load product',
+        description: 'Failed to load product details',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -230,21 +240,18 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file size (max 10MB - will be compressed automatically)
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
+    if (file.size > 10 * 1024 * 1024) {
       toast({
-        title: 'Error',
-        description: `File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 10MB`,
+        title: 'File Too Large',
+        description: 'File size exceeds 10MB limit',
         variant: 'destructive',
       });
       return;
     }
 
-    // Validate it's an image
     if (!file.type.startsWith('image/')) {
       toast({
-        title: 'Error',
+        title: 'Invalid File',
         description: 'Please select a valid image file',
         variant: 'destructive',
       });
@@ -252,22 +259,15 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     }
 
     setUploadingImage(true);
-    
     try {
       setImagePreview(URL.createObjectURL(file));
       setImageFile(file);
-      
       toast({
-        title: 'Success',
-        description: 'Image ready for upload (will be optimized to WebP)',
+        title: 'Image Selected',
+        description: 'Image ready for high-efficiency WebP R2 upload',
       });
     } catch (error) {
       console.error('Error preparing image:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to prepare image',
-        variant: 'destructive',
-      });
     } finally {
       setUploadingImage(false);
     }
@@ -280,503 +280,640 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   const uploadImageAndGetUrl = async (): Promise<string | null> => {
     if (!imageFile) return null;
-
     try {
-      const { prepareImageForUpload, PRODUCT_COMPRESSION } = await import('@/utils/imageOptimizer');
-      const { uploadToR2 } = await import('@/utils/r2Upload');
-      
-      // Optimize image with aggressive compression (~250KB)
       const { file: optimizedFile } = await prepareImageForUpload(imageFile, PRODUCT_COMPRESSION);
       const publicUrl = await uploadToR2(optimizedFile, 'products');
       return publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to upload image',
+        title: 'Upload Error',
+        description: error instanceof Error ? error.message : 'Failed to upload image to Cloudflare R2',
         variant: 'destructive',
       });
       return null;
     }
   };
 
-  const uploadAdditionalImages = async (): Promise<void> => {
-    // Use the ref to upload images through the component
-    console.log('📸 uploadAdditionalImages called, checking ref...');
-    console.log('📸 additionalImagesRef.current:', additionalImagesRef.current);
-    console.log('📸 hasNewImages:', additionalImagesRef.current?.hasNewImages());
-    
-    if (additionalImagesRef.current?.hasNewImages()) {
-      console.log('📸 Uploading additional images for product:', productId);
-      const result = await additionalImagesRef.current.uploadImages(productId);
-      console.log('📸 Upload result:', result);
-    } else {
-      console.log('📸 No new images to upload or ref not available');
-    }
-  };
-
   const onSubmit = async (data: z.infer<typeof productSchema>) => {
-    setLoading(true);
+    setSaving(true);
     try {
-      let imageUrl = imagePreview;
+      let finalImageUrl = imagePreview;
       if (imageFile) {
-        const newImageUrl = await uploadImageAndGetUrl();
-        if (newImageUrl) {
-          imageUrl = newImageUrl;
+        const uploadedUrl = await uploadImageAndGetUrl();
+        if (uploadedUrl) {
+          finalImageUrl = uploadedUrl;
         }
       }
 
-      const { ensureUploadedUrl } = await import('@/utils/r2Upload');
-      imageUrl = await ensureUploadedUrl(imageUrl, 'products');
-
-      // Convert care_instructions to array for Supabase text[] column
-      const careInstructionsArray = data.care_instructions
-        ? (Array.isArray(data.care_instructions)
-            ? data.care_instructions.filter(Boolean)
-            : data.care_instructions.split('\n').filter(Boolean))
-        : null;
-
-      // Convert meta_keywords string to array for Supabase text[] column
-      const metaKeywordsArray = data.meta_keywords
-        ? data.meta_keywords.split(',').map(k => k.trim()).filter(Boolean)
-        : null;
-
-      const productData = {
-        name: data.name,
-        description: data.description || null,
-        cost_price: data.cost_price,
-        selling_price: data.selling_price || null,
-        category_id: data.category_id,
-        subcategory_id: data.subcategory_id,
-        is_featured: data.is_featured,
-        has_color_variants: data.has_color_variants,
-        color_has_size_variants: data.has_size_variants,
-        status: data.status,
-        image_url: imageUrl,
-        updated_at: new Date().toISOString(),
-        material_composition: data.material_composition || null,
-        care_instructions: careInstructionsArray,
-        // SEO fields
-        meta_title: data.meta_title || null,
-        meta_description: data.meta_description || null,
-        meta_keywords: metaKeywordsArray,
-        og_title: data.og_title || null,
-        og_description: data.og_description || null,
-      };
-
-      // Cast to bypass TypeScript - actual Supabase schema has care_instructions as text[]
-      const { error } = await supabase
+      const { error: productError } = await supabase
         .from('products')
-        .update(productData as any)
+        .update({
+          name: data.name,
+          description: data.description || null,
+          cost_price: data.cost_price,
+          selling_price: data.selling_price || null,
+          category_id: data.category_id,
+          subcategory_id: data.subcategory_id,
+          is_featured: data.is_featured,
+          has_color_variants: data.has_color_variants,
+          has_size_variants: data.has_size_variants,
+          status: data.status,
+          image_url: finalImageUrl || null,
+          material_composition: data.material_composition || null,
+          care_instructions: Array.isArray(data.care_instructions) 
+            ? JSON.stringify(data.care_instructions) 
+            : data.care_instructions || null,
+          meta_title: data.meta_title || null,
+          meta_description: data.meta_description || null,
+          meta_keywords: data.meta_keywords || null,
+          og_title: data.og_title || null,
+          og_description: data.og_description || null,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', productId);
 
-      if (error) throw error;
+      if (productError) throw productError;
 
-      // Upload additional images
-      if (additionalImages.some(img => img.isNew)) {
-        await uploadAdditionalImages();
+      if (additionalImagesRef.current?.hasNewImages()) {
+        await additionalImagesRef.current.uploadImages(productId);
       }
 
       toast({
-        title: 'Success',
-        description: 'Product updated successfully',
+        title: 'Product Updated',
+        description: `${data.name} changes saved successfully`,
       });
 
-      // Only show inventory popup if product doesn't have variants
-      if (!data.has_color_variants && !data.has_size_variants) {
+      if (data.has_color_variants || data.has_size_variants) {
         setShowInventoryPopup(true);
       } else {
-        // If it has variants, user will manage inventory through variant form
         onSave();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating product:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to update product',
+        title: 'Submission Error',
+        description: error.message || 'Failed to update product',
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleInventoryClose = () => {
-    setShowInventoryPopup(false);
-    onSave(); // Close the edit form after inventory management is done
-  };
-
-  if (loadingData) {
+  if (loading) {
     return (
-      <div className="flex justify-center items-center p-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p>Loading product data...</p>
-        </div>
+      <div className="p-12 text-center space-y-4">
+        <div className="h-8 w-8 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-sm font-medium text-muted-foreground">Loading product details...</p>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onCancel}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <h2 className="text-2xl font-bold">Edit Product</h2>
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50 pb-16">
+      {/* Sticky Top Header Banner */}
+      <div className="sticky top-0 z-30 bg-background/85 backdrop-blur-md border-b border-border/60 shadow-sm px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center space-x-3">
+            <Button variant="ghost" size="sm" onClick={onCancel} className="hover:bg-accent rounded-lg">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <div className="h-5 w-px bg-border" />
+            <div className="flex items-center space-x-2">
+              <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                <Package className="h-5 w-5" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                  Edit Product
+                  <Badge variant={form.watch('status') === 'active' ? "default" : "secondary"} className="text-[10px] uppercase font-bold">
+                    {form.watch('status')}
+                  </Badge>
+                </h1>
+                <p className="text-xs text-muted-foreground truncate max-w-xs">{form.watch('name')}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Metrics & Actions */}
+          <div className="flex items-center space-x-3">
+            {watchedSellingPrice > 0 && watchedCostPrice > 0 && (
+              <Badge variant={profitMarginPercent >= 0 ? "secondary" : "destructive"} className="hidden sm:flex items-center gap-1.5 px-3 py-1 text-xs">
+                <Percent className="h-3.5 w-3.5" />
+                Profit: <span className="font-bold">+{profitMarginPercent}%</span> (Rs. {profitAmount})
+              </Badge>
+            )}
+            <Button variant="outline" size="sm" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={form.handleSubmit(onSubmit)} 
+              disabled={saving}
+              className="bg-primary hover:bg-primary/90 shadow-sm font-medium px-5"
+            >
+              {saving ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Update Product
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Product Name *</Label>
-                  <Input
-                    id="name"
-                    {...form.register('name')}
-                    placeholder="Enter product name"
-                  />
-                  {form.formState.errors.name && (
-                    <p className="text-red-500 text-sm mt-1">{form.formState.errors.name.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    {...form.register('description')}
-                    placeholder="Enter product description"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="material_composition">Material Composition</Label>
-                    <Textarea
-                      id="material_composition"
-                      {...form.register('material_composition')}
-                      placeholder="e.g., Premium quality fabric blend designed for comfort and durability."
-                      rows={2}
-                    />
-                  </div>
-                  <div>
-                    <CareInstructionsInput
-                      value={form.watch('care_instructions') || []}
-                      onChange={(value) => form.setValue('care_instructions', value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="cost_price">Cost Price (Rs) *</Label>
-                    <Input
-                      id="cost_price"
-                      type="number"
-                      step="0.01"
-                      {...form.register('cost_price', { valueAsNumber: true })}
-                      placeholder="0.00"
-                    />
-                    {form.formState.errors.cost_price && (
-                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.cost_price.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="selling_price">Selling Price (Rs)</Label>
-                    <Input
-                      id="selling_price"
-                      type="number"
-                      step="0.01"
-                      {...form.register('selling_price', { valueAsNumber: true })}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="category">Category *</Label>
-                    <Select
-                      value={form.watch('category_id')}
-                      onValueChange={(value) => {
-                        console.log('Category selected:', value);
-                        form.setValue('category_id', value);
-                        form.setValue('subcategory_id', '');
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {form.formState.errors.category_id && (
-                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.category_id.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="subcategory">Subcategory *</Label>
-                    <Select
-                      value={form.watch('subcategory_id')}
-                      onValueChange={(value) => {
-                        console.log('Subcategory selected:', value);
-                        form.setValue('subcategory_id', value);
-                      }}
-                      disabled={!watchedCategoryId || filteredSubcategories.length === 0}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={
-                          !watchedCategoryId 
-                            ? "Select category first" 
-                            : filteredSubcategories.length === 0 
-                              ? "No subcategories available"
-                              : "Select subcategory"
-                        } />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filteredSubcategories.map((subcategory) => (
-                          <SelectItem key={subcategory.id} value={subcategory.id}>
-                            {subcategory.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {form.formState.errors.subcategory_id && (
-                      <p className="text-red-500 text-sm mt-1">{form.formState.errors.subcategory_id.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
+      {/* Main Container */}
+      <div className="max-w-7xl mx-auto px-6 pt-8">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* Left 2 Columns: Essential Info & Pricing */}
+            <div className="lg:col-span-2 space-y-8">
+              
+              {/* Product Basic Information Card */}
+              <Card className="shadow-sm border-border/80 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-primary/5 via-primary/2 to-transparent border-b border-border/60 py-4">
                   <div className="flex items-center space-x-2">
-                    <Switch
-                      id="is_featured"
-                      checked={form.watch('is_featured')}
-                      onCheckedChange={(checked) => form.setValue('is_featured', checked)}
-                    />
-                    <Label htmlFor="is_featured">Featured</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="has_color_variants"
-                      checked={form.watch('has_color_variants')}
-                      onCheckedChange={(checked) => {
-                        form.setValue('has_color_variants', checked);
-                        if (!checked) {
-                          form.setValue('has_size_variants', false);
-                        }
-                      }}
-                    />
-                    <Label htmlFor="has_color_variants">Colors</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="has_size_variants"
-                      checked={form.watch('has_size_variants')}
-                      onCheckedChange={(checked) => {
-                        form.setValue('has_size_variants', checked);
-                      }}
-                      disabled={!watchedHasColorVariants}
-                    />
-                    <Label 
-                      htmlFor="has_size_variants" 
-                      className={!watchedHasColorVariants ? 'text-gray-400' : ''}
-                    >
-                      Sizes {!watchedHasColorVariants && '(Enable Colors first)'}
-                    </Label>
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={form.watch('status')}
-                    onValueChange={(value: 'active' | 'inactive') => form.setValue('status', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <Label>Product Image</Label>
-                <div className="mt-2 space-y-4">
-                  <div>
-                    <input
-                      id="image-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      disabled={uploadingImage}
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <label
-                        htmlFor="image-upload"
-                        className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        {uploadingImage ? 'Preparing...' : 'Upload File'}
-                      </label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsMediaPickerOpen(true)}
-                        className="gap-2"
-                      >
-                        <ImageIcon className="h-4 w-4 text-primary" />
-                        Choose from Media Library
-                      </Button>
+                    <FileText className="h-5 w-5 text-primary" />
+                    <div>
+                      <CardTitle className="text-base font-semibold">General Information</CardTitle>
+                      <CardDescription className="text-xs">Product title, description, and fabric specs</CardDescription>
                     </div>
                   </div>
+                </CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  
+                  {/* Name */}
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-sm font-semibold flex items-center gap-1">
+                      Product Title <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="name"
+                      {...form.register('name')}
+                      placeholder="e.g. Adidas Ankle Box Socks (4pc Pack)"
+                      className="text-base font-medium h-11 focus-visible:ring-primary"
+                    />
+                    {form.formState.errors.name && (
+                      <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {form.formState.errors.name.message}
+                      </p>
+                    )}
+                  </div>
 
-                  {imagePreview && (
-                    <div className="relative">
-                      <img
-                        src={imagePreview}
-                        alt="Product preview"
-                        className="w-full max-w-sm h-48 object-cover rounded-lg border"
+                  {/* Description */}
+                  <div className="space-y-2">
+                    <Label htmlFor="description" className="text-sm font-semibold">
+                      Product Description
+                    </Label>
+                    <Textarea
+                      id="description"
+                      {...form.register('description')}
+                      placeholder="Write a clear, engaging description highlighting fabric quality, comfort, and durability..."
+                      rows={4}
+                      className="resize-y min-h-[100px]"
+                    />
+                  </div>
+
+                  {/* Material & Care Instructions Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="material_composition" className="text-sm font-semibold">
+                        Material Composition
+                      </Label>
+                      <Textarea
+                        id="material_composition"
+                        {...form.register('material_composition')}
+                        placeholder="e.g. 85% Combed Cotton, 12% Nylon, 3% Elastane"
+                        rows={3}
+                        className="text-xs"
                       />
-                      <div className="absolute top-2 right-2 space-x-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => window.open(imagePreview, '_blank')}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="destructive"
-                          onClick={removeImage}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Care Instructions</Label>
+                      <CareInstructionsInput
+                        value={form.watch('care_instructions') || []}
+                        onChange={(value) => form.setValue('care_instructions', value)}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Pricing & Categories Card */}
+              <Card className="shadow-sm border-border/80 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-emerald-500/5 via-transparent to-transparent border-b border-border/60 py-4">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    <div>
+                      <CardTitle className="text-base font-semibold">Pricing & Category Classification</CardTitle>
+                      <CardDescription className="text-xs">Financial rates and store taxonomy</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  
+                  {/* Price Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="cost_price" className="text-sm font-semibold flex items-center gap-1">
+                        Cost Price (Rs.) <span className="text-destructive">*</span>
+                      </Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-medium">Rs.</span>
+                        <Input
+                          id="cost_price"
+                          type="number"
+                          step="0.01"
+                          {...form.register('cost_price', { valueAsNumber: true })}
+                          placeholder="0.00"
+                          className="pl-11 h-11 font-medium"
+                        />
+                      </div>
+                      {form.formState.errors.cost_price && (
+                        <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          {form.formState.errors.cost_price.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="selling_price" className="text-sm font-semibold">
+                        Selling Price (Rs.)
+                      </Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-medium">Rs.</span>
+                        <Input
+                          id="selling_price"
+                          type="number"
+                          step="0.01"
+                          {...form.register('selling_price', { valueAsNumber: true })}
+                          placeholder="0.00"
+                          className="pl-11 h-11 font-medium text-emerald-600 dark:text-emerald-400"
+                        />
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
 
-                {/* Additional Images Section */}
-                <div className="mt-6 pt-4 border-t border-border">
-                  <ProductAdditionalImages
-                    ref={additionalImagesRef}
-                    productId={productId}
-                    onImagesChange={setAdditionalImages}
-                    maxImages={3}
-                  />
-                </div>
-              </div>
+                  {/* Taxonomy Category Selection */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="category" className="text-sm font-semibold flex items-center gap-1">
+                        Category <span className="text-destructive">*</span>
+                      </Label>
+                      <Select
+                        value={form.watch('category_id')}
+                        onValueChange={(value) => form.setValue('category_id', value)}
+                      >
+                        <SelectTrigger className="h-11">
+                          <SelectValue placeholder="Select Category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {form.formState.errors.category_id && (
+                        <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          {form.formState.errors.category_id.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="subcategory" className="text-sm font-semibold flex items-center gap-1">
+                        Subcategory <span className="text-destructive">*</span>
+                      </Label>
+                      <Select
+                        value={form.watch('subcategory_id')}
+                        onValueChange={(value) => form.setValue('subcategory_id', value)}
+                        disabled={!watchedCategoryId}
+                      >
+                        <SelectTrigger className="h-11">
+                          <SelectValue placeholder={watchedCategoryId ? "Select Subcategory" : "Select Category First"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredSubcategories.map((sub) => (
+                            <SelectItem key={sub.id} value={sub.id}>
+                              {sub.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {form.formState.errors.subcategory_id && (
+                        <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          {form.formState.errors.subcategory_id.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
             </div>
-          </CardContent>
-        </Card>
 
-        {(watchedHasColorVariants || watchedHasSizeVariants) && (
-          <EnhancedProductVariantForm
-            productId={productId}
-            hasColorVariants={watchedHasColorVariants}
-            hasSizeVariants={watchedHasSizeVariants}
-            getProductData={() => ({
-              name: form.getValues('name'),
-              description: form.getValues('description'),
-              cost_price: form.getValues('cost_price'),
-              selling_price: form.getValues('selling_price'),
-              category_id: form.getValues('category_id'),
-              subcategory_id: form.getValues('subcategory_id'),
-              is_featured: form.getValues('is_featured'),
-              has_color_variants: form.getValues('has_color_variants'),
-              has_size_variants: form.getValues('has_size_variants'),
-              status: form.getValues('status'),
-              material_composition: form.getValues('material_composition'),
-              care_instructions: form.getValues('care_instructions'),
-              meta_title: form.getValues('meta_title'),
-              meta_description: form.getValues('meta_description'),
-              meta_keywords: form.getValues('meta_keywords'),
-              og_title: form.getValues('og_title'),
-              og_description: form.getValues('og_description'),
-            })}
-            imageFile={imageFile}
-            imagePreview={imagePreview}
-            onBeforeSave={async () => {
-              // Upload additional images before variant form save completes
-              console.log('📸 onBeforeSave called - uploading additional images');
-              if (additionalImagesRef.current?.hasNewImages()) {
-                console.log('📸 Has new images, uploading...');
-                await additionalImagesRef.current.uploadImages(productId);
-              }
-            }}
-            onSave={() => {
-              // After successful save, open inventory popup
-              setShowInventoryPopup(true);
-            }}
-            onCancel={onCancel}
+            {/* Right Column: Media, Status & Feature Toggles */}
+            <div className="space-y-8">
+              
+              {/* Media Card */}
+              <Card className="shadow-sm border-border/80 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-blue-500/5 via-transparent to-transparent border-b border-border/60 py-4">
+                  <div className="flex items-center space-x-2">
+                    <ImageIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    <div>
+                      <CardTitle className="text-base font-semibold font-semibold">Primary Cover Image</CardTitle>
+                      <CardDescription className="text-xs">Cloudflare R2 WebP asset</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6 space-y-5">
+                  <div className="space-y-4">
+                    <Button
+                      type="button"
+                      onClick={() => setIsMediaPickerOpen(true)}
+                      className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-xs flex items-center justify-center gap-2"
+                    >
+                      <ImageIcon className="h-4 w-4" />
+                      Select / Upload Image (Media Library)
+                    </Button>
+
+                    {/* Image Preview Box */}
+                    {imagePreview ? (
+                      <div className="relative group rounded-2xl overflow-hidden border border-border bg-muted/30 aspect-square flex items-center justify-center">
+                        <img
+                          src={imagePreview}
+                          alt="Product Cover Preview"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center space-x-2">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="secondary"
+                            className="rounded-full h-9 w-9 bg-white/90 text-black hover:bg-white"
+                            onClick={() => window.open(imagePreview, '_blank')}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="destructive"
+                            className="rounded-full h-9 w-9"
+                            onClick={removeImage}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Badge className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md text-white text-[10px] border-none font-medium">
+                          Primary Cover
+                        </Badge>
+                      </div>
+                    ) : (
+                      <div 
+                        onClick={() => setIsMediaPickerOpen(true)}
+                        className="border-2 border-dashed border-border hover:border-primary/50 rounded-2xl p-8 text-center cursor-pointer transition-colors bg-muted/20 hover:bg-muted/40 flex flex-col items-center justify-center space-y-3"
+                      >
+                        <div className="p-3 rounded-full bg-primary/10 text-primary">
+                          <ImageIcon className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Click to open Media Library & Upload</p>
+                          <p className="text-xs text-muted-foreground mt-1">Pick existing image or upload new file to R2</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Additional Images Section */}
+                  <div className="pt-4 border-t border-border">
+                    <ProductAdditionalImages
+                      ref={additionalImagesRef}
+                      productId={productId}
+                      onImagesChange={setAdditionalImages}
+                      maxImages={3}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Status & Options Toggles Card */}
+              <Card className="shadow-sm border-border/80 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-purple-500/5 via-transparent to-transparent border-b border-border/60 py-4">
+                  <div className="flex items-center space-x-2">
+                    <Tag className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    <div>
+                      <CardTitle className="text-base font-semibold">Visibility & Options</CardTitle>
+                      <CardDescription className="text-xs">Publish status and variant options</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6 space-y-5">
+                  
+                  {/* Status Selection */}
+                  <div className="space-y-2">
+                    <Label htmlFor="status" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Catalog Status
+                    </Label>
+                    <Select
+                      value={form.watch('status')}
+                      onValueChange={(value: 'active' | 'inactive') => form.setValue('status', value)}
+                    >
+                      <SelectTrigger className="h-10 font-medium">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">
+                          <span className="flex items-center gap-2 font-medium text-emerald-600">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500" /> Active (Visible on Store)
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="inactive">
+                          <span className="flex items-center gap-2 font-medium text-gray-500">
+                            <span className="h-2 w-2 rounded-full bg-gray-400" /> Inactive (Hidden / Draft)
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="h-px bg-border my-2" />
+
+                  {/* Toggles */}
+                  <div className="space-y-4">
+                    
+                    {/* Featured Toggle */}
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="is_featured" className="text-sm font-semibold flex items-center gap-1.5 cursor-pointer">
+                          <Sparkles className="h-4 w-4 text-amber-500" />
+                          Featured Product
+                        </Label>
+                        <p className="text-xs text-muted-foreground">Display in hero & featured collections</p>
+                      </div>
+                      <Switch
+                        id="is_featured"
+                        checked={form.watch('is_featured')}
+                        onCheckedChange={(checked) => form.setValue('is_featured', checked)}
+                      />
+                    </div>
+
+                    {/* Color Variants Toggle */}
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="has_color_variants" className="text-sm font-semibold flex items-center gap-1.5 cursor-pointer">
+                          <Palette className="h-4 w-4 text-blue-500" />
+                          Has Color Variants
+                        </Label>
+                        <p className="text-xs text-muted-foreground">Enable custom color swatches & images</p>
+                      </div>
+                      <Switch
+                        id="has_color_variants"
+                        checked={form.watch('has_color_variants')}
+                        onCheckedChange={(checked) => {
+                          form.setValue('has_color_variants', checked);
+                          if (!checked) {
+                            form.setValue('has_size_variants', false);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {/* Size Variants Toggle */}
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50">
+                      <div className="space-y-0.5">
+                        <Label 
+                          htmlFor="has_size_variants" 
+                          className={`text-sm font-semibold flex items-center gap-1.5 cursor-pointer ${!watchedHasColorVariants ? 'opacity-50' : ''}`}
+                        >
+                          <Ruler className="h-4 w-4 text-emerald-500" />
+                          Has Size Variants
+                        </Label>
+                        <p className="text-xs text-muted-foreground">Enable size options per color</p>
+                      </div>
+                      <Switch
+                        id="has_size_variants"
+                        checked={form.watch('has_size_variants')}
+                        onCheckedChange={(checked) => form.setValue('has_size_variants', checked)}
+                        disabled={!watchedHasColorVariants}
+                      />
+                    </div>
+                  </div>
+
+                </CardContent>
+              </Card>
+
+            </div>
+
+          </div>
+
+          {/* Variants Section (Positioned FIRST before SEO & FAQs) */}
+          {(watchedHasColorVariants || watchedHasSizeVariants) && (
+            <Card className="shadow-sm border-border/80 overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-blue-600/10 via-indigo-500/5 to-transparent border-b border-border/60 py-4">
+                <div className="flex items-center space-x-2">
+                  <Layers className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                  <div>
+                    <CardTitle className="text-base font-semibold">Product Variants & Swatches</CardTitle>
+                    <CardDescription className="text-xs">Color swatches, size grids, and variant images</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <EnhancedProductVariantForm
+                  productId={productId}
+                  hasColorVariants={watchedHasColorVariants}
+                  hasSizeVariants={watchedHasSizeVariants}
+                  getProductData={() => ({
+                    name: form.getValues('name'),
+                    description: form.getValues('description'),
+                    cost_price: form.getValues('cost_price'),
+                    selling_price: form.getValues('selling_price'),
+                    category_id: form.getValues('category_id'),
+                    subcategory_id: form.getValues('subcategory_id'),
+                    is_featured: form.getValues('is_featured'),
+                    has_color_variants: form.getValues('has_color_variants'),
+                    has_size_variants: form.getValues('has_size_variants'),
+                    status: form.getValues('status'),
+                    material_composition: form.getValues('material_composition'),
+                    care_instructions: form.getValues('care_instructions'),
+                    meta_title: form.getValues('meta_title'),
+                    meta_description: form.getValues('meta_description'),
+                    meta_keywords: form.getValues('meta_keywords'),
+                    og_title: form.getValues('og_title'),
+                    og_description: form.getValues('og_description'),
+                  })}
+                  imageFile={imageFile}
+                  imagePreview={imagePreview}
+                  onBeforeSave={async () => {
+                    if (additionalImagesRef.current?.hasNewImages()) {
+                      await additionalImagesRef.current.uploadImages(productId);
+                    }
+                  }}
+                  onSave={() => {
+                    setShowInventoryPopup(true);
+                  }}
+                  onCancel={onCancel}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* SEO Settings Section (Positioned BELOW Variants) */}
+          <ProductSEOSection
+            metaTitle={form.watch('meta_title') || ''}
+            metaDescription={form.watch('meta_description') || ''}
+            metaKeywords={form.watch('meta_keywords') || ''}
+            ogTitle={form.watch('og_title') || ''}
+            ogDescription={form.watch('og_description') || ''}
+            productName={form.watch('name')}
+            productDescription={form.watch('description') || ''}
+            sellingPrice={form.watch('selling_price') || form.watch('cost_price')}
+            categoryName={categories.find(c => c.id === form.watch('category_id'))?.name}
+            onMetaTitleChange={(value) => form.setValue('meta_title', value)}
+            onMetaDescriptionChange={(value) => form.setValue('meta_description', value)}
+            onMetaKeywordsChange={(value) => form.setValue('meta_keywords', value)}
+            onOgTitleChange={(value) => form.setValue('og_title', value)}
+            onOgDescriptionChange={(value) => form.setValue('og_description', value)}
           />
-        )}
 
-        {/* SEO Settings Section */}
-        <ProductSEOSection
-          metaTitle={form.watch('meta_title') || ''}
-          metaDescription={form.watch('meta_description') || ''}
-          metaKeywords={form.watch('meta_keywords') || ''}
-          ogTitle={form.watch('og_title') || ''}
-          ogDescription={form.watch('og_description') || ''}
-          productName={form.watch('name')}
-          productDescription={form.watch('description') || ''}
-          sellingPrice={form.watch('selling_price') || form.watch('cost_price')}
-          categoryName={categories.find(c => c.id === form.watch('category_id'))?.name}
-          onMetaTitleChange={(value) => form.setValue('meta_title', value)}
-          onMetaDescriptionChange={(value) => form.setValue('meta_description', value)}
-          onMetaKeywordsChange={(value) => form.setValue('meta_keywords', value)}
-          onOgTitleChange={(value) => form.setValue('og_title', value)}
-          onOgDescriptionChange={(value) => form.setValue('og_description', value)}
-        />
+          {/* Product FAQs Manager Section (Positioned BELOW Variants & SEO) */}
+          <ProductFAQsManager productId={productId} />
 
-        {/* Product FAQs Section */}
-        <ProductFAQsManager productId={productId} />
-
-        {!(watchedHasColorVariants || watchedHasSizeVariants) && (
-          <div className="flex justify-end space-x-4">
-            <Button type="button" variant="outline" onClick={onCancel}>
+          {/* Bottom Actions Footer */}
+          <div className="flex items-center justify-end space-x-4 pt-6 border-t border-border">
+            <Button type="button" variant="outline" size="lg" onClick={onCancel} className="px-6">
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Updating...' : 'Update Product'}
+            <Button type="submit" size="lg" disabled={saving} className="bg-primary hover:bg-primary/90 px-8 font-semibold shadow-md">
+              {saving ? 'Updating Product...' : 'Update Product Now'}
             </Button>
           </div>
-        )}
-      </form>
+        </form>
+      </div>
 
       {showInventoryPopup && (
         <InventoryManagementPopup
           productId={productId}
-          onClose={handleInventoryClose}
+          onClose={() => {
+            setShowInventoryPopup(false);
+            onSave();
+          }}
           isOpen={showInventoryPopup}
         />
       )}
