@@ -1,5 +1,4 @@
 import { memo } from 'react';
-import { Zap } from 'lucide-react';
 import { HomeProductCard } from './HomeProductCard';
 
 interface Product {
@@ -37,14 +36,11 @@ export const FlashSales = memo(function FlashSales({ products, isLoading }: Flas
   return (
     <section className="py-10 md:py-16 lg:py-20 bg-background relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        {/* Center Aligned Section Header */}
-        <div className="text-center mb-8 md:mb-12 space-y-2.5">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-extrabold tracking-wide bg-destructive/10 text-destructive border border-destructive/20 shadow-2xs">
-            <Zap className="w-3.5 h-3.5 fill-current animate-bounce" />
-            Flash Sale — Limited Time
-          </div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-            Flash Deals of the Day
+        {/* Center Aligned Section Header without Eyebrow */}
+        <div className="text-center mb-8 md:mb-12 space-y-2">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
+            <span className="text-foreground">Flash Deals </span>
+            <span className="text-destructive">of the Day</span>
           </h2>
           <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
             Grab premium socks at extraordinary discounted prices before stock runs out
@@ -65,7 +61,6 @@ export const FlashSales = memo(function FlashSales({ products, isLoading }: Flas
                 badge={
                   <div className="absolute top-3 left-3">
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-destructive text-destructive-foreground text-[10px] sm:text-xs font-extrabold rounded-full shadow-xs">
-                      <Zap className="w-3 h-3 fill-current" />
                       Flash Deal
                     </span>
                   </div>

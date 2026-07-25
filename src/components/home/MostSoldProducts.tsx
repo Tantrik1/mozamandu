@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, TrendingUp, Flame } from 'lucide-react';
+import { ArrowRight, Flame } from 'lucide-react';
 import { HomeProductCard } from './HomeProductCard';
 
 interface Product {
@@ -39,14 +39,11 @@ export const MostSoldProducts = memo(function MostSoldProducts({ products, isLoa
   return (
     <section className="py-10 md:py-16 lg:py-20 bg-background relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Center Aligned Section Header */}
-        <div className="text-center mb-8 md:mb-12 space-y-2.5">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-extrabold tracking-wide bg-destructive/10 text-destructive border border-destructive/20 shadow-2xs">
-            <TrendingUp className="w-3.5 h-3.5" />
-            Best Sellers
-          </div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-            Most Sold Products
+        {/* Center Aligned Section Header without Eyebrow */}
+        <div className="text-center mb-8 md:mb-12 space-y-2">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
+            <span className="text-foreground">Most Sold </span>
+            <span className="text-destructive">Products</span>
           </h2>
           <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
             Customer favorites loved and ordered repeatedly across Nepal

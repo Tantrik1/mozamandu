@@ -1,7 +1,7 @@
 import { memo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { HelpCircle, ChevronDown, MessageCircle } from 'lucide-react';
+import { ChevronDown, MessageCircle } from 'lucide-react';
 
 interface FAQ {
   id: string;
@@ -41,14 +41,11 @@ export const FAQSection = memo(function FAQSection({
   return (
     <section className="py-10 md:py-16 lg:py-20 bg-background relative">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Center Aligned Section Header */}
-        <div className="text-center mb-8 md:mb-12 space-y-2.5">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-extrabold tracking-wide bg-destructive/10 text-destructive border border-destructive/20 shadow-2xs">
-            <HelpCircle className="w-3.5 h-3.5" />
-            Help & Guidance
-          </div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-            Frequently Asked Questions
+        {/* Center Aligned Section Header without Eyebrow */}
+        <div className="text-center mb-8 md:mb-12 space-y-2">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
+            <span className="text-foreground">Frequently Asked </span>
+            <span className="text-destructive">Questions</span>
           </h2>
           <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-lg mx-auto">
             Find answers to all your queries regarding ordering, delivery, fabric care, and returns

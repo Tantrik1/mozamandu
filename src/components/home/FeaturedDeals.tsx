@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Percent, Tag } from 'lucide-react';
+import { ArrowRight, Percent } from 'lucide-react';
 import { HomeProductCard } from './HomeProductCard';
 
 interface Product {
@@ -39,14 +39,11 @@ export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }
   return (
     <section className="py-10 md:py-16 lg:py-20 bg-background relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Center Aligned Section Header */}
-        <div className="text-center mb-8 md:mb-12 space-y-2.5">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-extrabold tracking-wide bg-destructive/10 text-destructive border border-destructive/20 shadow-2xs">
-            <Tag className="w-3.5 h-3.5" />
-            Special Offers
-          </div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-            Featured Deals
+        {/* Center Aligned Section Header without Eyebrow */}
+        <div className="text-center mb-8 md:mb-12 space-y-2">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
+            <span className="text-foreground">Featured </span>
+            <span className="text-destructive">Deals</span>
           </h2>
           <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
             Don't miss out on exclusive pricing and promotional sock bundles

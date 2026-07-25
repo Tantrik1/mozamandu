@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Grid3X3 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -35,14 +35,11 @@ export const ShopByCategory = memo(function ShopByCategory({ categories, isLoadi
   return (
     <section className="py-10 md:py-16 lg:py-20 bg-background relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Center Aligned Section Header */}
-        <div className="text-center mb-8 md:mb-12 space-y-2.5">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-extrabold tracking-wide bg-destructive/10 text-destructive border border-destructive/20 shadow-2xs">
-            <Grid3X3 className="w-3.5 h-3.5" />
-            Taxonomy Collections
-          </div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-            Shop by Category
+        {/* Center Aligned Section Header without Eyebrow */}
+        <div className="text-center mb-8 md:mb-12 space-y-2">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
+            <span className="text-foreground">Shop by </span>
+            <span className="text-destructive">Category</span>
           </h2>
           <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
             Browse our curated categories to find the exact sock style for every occasion
