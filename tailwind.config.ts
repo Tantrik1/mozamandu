@@ -65,8 +65,8 @@ export default {
 			},
 			fontFamily: {
 				sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
-				heading: ["Space Grotesk", "Inter", "sans-serif"],
-				display: ["Space Grotesk", "Inter", "sans-serif"],
+				heading: ["Josefin Sans", "Inter", "sans-serif"],
+				display: ["Josefin Sans", "Inter", "sans-serif"],
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

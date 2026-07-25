@@ -54,9 +54,11 @@ export const HomeProductCard = memo(function HomeProductCard({
       </div>
 
       <div className="p-4">
-        <p className="text-xs text-muted-foreground mb-1">
-          {product.subcategory?.name || 'Uncategorized'}
-        </p>
+        {product.subcategory?.name && (
+          <p className="text-xs font-semibold text-muted-foreground/80 mb-1 tracking-tight">
+            {product.subcategory.name}
+          </p>
+        )}
         <h3 className="font-semibold text-foreground line-clamp-1 mb-2 group-hover:text-primary transition-colors">
           {product.name}
         </h3>

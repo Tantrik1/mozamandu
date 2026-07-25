@@ -58,13 +58,13 @@ export const MixedProducts = memo(function MixedProducts() {
   return (
     <section className="py-10 md:py-16 lg:py-20 bg-background relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Center Aligned Section Header without Eyebrow */}
+        {/* Center Aligned Section Header */}
         <div className="text-center mb-8 md:mb-12 space-y-2">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight">
             <span className="text-foreground">Handpicked </span>
             <span className="text-destructive">Selections</span>
           </h2>
-          <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
+          <p className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-xl mx-auto">
             Discover versatile styles and premium sock packs chosen for your ultimate comfort
           </p>
         </div>
@@ -135,7 +135,7 @@ export const MixedProducts = memo(function MixedProducts() {
 
         {/* Shop More CTA */}
         <div className="text-center">
-          <Button asChild size="lg" className="rounded-full gap-2 px-8 font-bold shadow-md hover:shadow-lg transition-all">
+          <Button asChild size="lg" className="rounded-full gap-2 px-10 font-bold shadow-md hover:shadow-lg transition-all">
             <Link to="/shop">
               Shop Full Collection
               <ArrowRight className="w-4 h-4" />

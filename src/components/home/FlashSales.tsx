@@ -36,13 +36,13 @@ export const FlashSales = memo(function FlashSales({ products, isLoading }: Flas
   return (
     <section className="py-10 md:py-16 lg:py-20 bg-background relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        {/* Center Aligned Section Header without Eyebrow */}
+        {/* Center Aligned Section Header */}
         <div className="text-center mb-8 md:mb-12 space-y-2">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight">
             <span className="text-foreground">Flash Deals </span>
             <span className="text-destructive">of the Day</span>
           </h2>
-          <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
+          <p className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-xl mx-auto">
             Grab premium socks at extraordinary discounted prices before stock runs out
           </p>
         </div>
