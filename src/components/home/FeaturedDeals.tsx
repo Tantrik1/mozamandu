@@ -22,7 +22,7 @@ interface FeaturedDealsProps {
 export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }: FeaturedDealsProps) {
   if (isLoading) {
     return (
-      <section className="py-10 md:py-16 bg-slate-50/70 dark:bg-slate-950/70 border-t border-border/40">
+      <section className="py-10 md:py-16 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
             {[...Array(4)].map((_, i) => (
@@ -37,29 +37,20 @@ export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }
   if (products.length === 0) return null;
 
   return (
-    <section className="py-10 md:py-16 lg:py-20 bg-slate-50/70 dark:bg-slate-950/70 border-t border-border/40 relative">
+    <section className="py-10 md:py-16 lg:py-20 bg-background relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Consistent Section Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8 md:mb-10">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold tracking-wide bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 shadow-2xs">
-              <Tag className="w-3.5 h-3.5" />
-              Special Offers
-            </div>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-              Featured Deals
-            </h2>
-            <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-xl">
-              Don't miss out on exclusive pricing and promotional sock bundles
-            </p>
+        {/* Center Aligned Section Header */}
+        <div className="text-center mb-8 md:mb-12 space-y-2.5">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-extrabold tracking-wide bg-destructive/10 text-destructive border border-destructive/20 shadow-2xs">
+            <Tag className="w-3.5 h-3.5" />
+            Special Offers
           </div>
-
-          <Button asChild className="rounded-full group self-start sm:self-auto text-xs sm:text-sm font-bold shadow-md px-6">
-            <Link to="/shop" className="flex items-center gap-2">
-              Shop All Deals
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Link>
-          </Button>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
+            Featured Deals
+          </h2>
+          <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
+            Don't miss out on exclusive pricing and promotional sock bundles
+          </p>
         </div>
 
         {/* Product Cards Grid */}
@@ -81,11 +72,11 @@ export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }
               >
                 <HomeProductCard
                   product={product}
-                  className="border-rose-500/20 hover:border-rose-500/40"
+                  className="border-destructive/20 hover:border-destructive/40"
                   badge={
                     discount > 0 ? (
                       <div className="absolute top-3 left-3">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-600 text-white text-[10px] sm:text-xs font-extrabold rounded-full shadow-2xs">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-destructive text-white text-[10px] sm:text-xs font-extrabold rounded-full shadow-2xs">
                           <Percent className="w-3 h-3" />
                           {discount}% OFF
                         </span>
@@ -108,6 +99,16 @@ export const FeaturedDeals = memo(function FeaturedDeals({ products, isLoading }
               </div>
             );
           })}
+        </div>
+
+        {/* Center View All Deals Button */}
+        <div className="mt-8 text-center">
+          <Button asChild size="lg" className="rounded-full gap-2 px-8 font-bold shadow-md hover:shadow-lg transition-all">
+            <Link to="/shop">
+              Shop All Deals
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </Button>
         </div>
       </div>
     </section>

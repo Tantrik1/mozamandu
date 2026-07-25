@@ -18,7 +18,7 @@ interface ShopByCategoryProps {
 export const ShopByCategory = memo(function ShopByCategory({ categories, isLoading }: ShopByCategoryProps) {
   if (isLoading) {
     return (
-      <section className="py-10 md:py-16 bg-slate-50/70 dark:bg-slate-950/70 border-y border-border/40">
+      <section className="py-10 md:py-16 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
             {[...Array(6)].map((_, i) => (
@@ -33,11 +33,11 @@ export const ShopByCategory = memo(function ShopByCategory({ categories, isLoadi
   if (categories.length === 0) return null;
 
   return (
-    <section className="py-10 md:py-16 lg:py-20 bg-slate-50/70 dark:bg-slate-950/70 border-y border-border/40 relative">
+    <section className="py-10 md:py-16 lg:py-20 bg-background relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Consistent Centered Section Header */}
-        <div className="text-center mb-8 md:mb-12 space-y-2">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold tracking-wide bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+        {/* Center Aligned Section Header */}
+        <div className="text-center mb-8 md:mb-12 space-y-2.5">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-extrabold tracking-wide bg-destructive/10 text-destructive border border-destructive/20 shadow-2xs">
             <Grid3X3 className="w-3.5 h-3.5" />
             Taxonomy Collections
           </div>

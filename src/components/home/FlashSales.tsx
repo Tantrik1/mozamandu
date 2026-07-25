@@ -48,7 +48,7 @@ const CountdownTimer = memo(function CountdownTimer() {
   }, []);
 
   return (
-    <div className="flex items-center gap-1.5 bg-background/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-destructive/20 shadow-xs">
+    <div className="inline-flex items-center gap-1.5 bg-background border border-destructive/20 px-3 py-1.5 rounded-xl shadow-2xs">
       <Clock className="w-3.5 h-3.5 text-destructive animate-pulse" />
       <span className="text-xs font-semibold text-muted-foreground mr-1 hidden xs:inline">Ends in:</span>
       {[
@@ -71,7 +71,7 @@ const CountdownTimer = memo(function CountdownTimer() {
 export const FlashSales = memo(function FlashSales({ products, isLoading }: FlashSalesProps) {
   if (isLoading) {
     return (
-      <section className="py-10 md:py-16 bg-slate-50/70 dark:bg-slate-950/70 border-y border-border/40">
+      <section className="py-10 md:py-16 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
             {[...Array(4)].map((_, i) => (
@@ -86,34 +86,26 @@ export const FlashSales = memo(function FlashSales({ products, isLoading }: Flas
   if (products.length === 0) return null;
 
   return (
-    <section className="py-10 md:py-16 lg:py-20 bg-slate-50/70 dark:bg-slate-950/70 border-y border-border/40 relative overflow-hidden">
-      {/* Soft Ambient Light Glow */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-32 -right-32 w-96 h-96 bg-destructive/5 rounded-full blur-3xl opacity-70" />
-        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl opacity-70" />
-      </div>
-
+    <section className="py-10 md:py-16 lg:py-20 bg-background relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        {/* Consistent Section Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8 md:mb-10">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold tracking-wide bg-destructive/10 text-destructive border border-destructive/20 shadow-2xs">
-              <Zap className="w-3.5 h-3.5 fill-current animate-bounce" />
-              Flash Sale — Limited Time
-            </div>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-              Flash Deals of the Day
-            </h2>
-            <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-xl">
-              Grab premium socks at extraordinary discounted prices before stock runs out
-            </p>
+        {/* Center Aligned Section Header */}
+        <div className="text-center mb-8 md:mb-12 space-y-2.5">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-extrabold tracking-wide bg-destructive/10 text-destructive border border-destructive/20 shadow-2xs">
+            <Zap className="w-3.5 h-3.5 fill-current animate-bounce" />
+            Flash Sale — Limited Time
           </div>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
+            Flash Deals of the Day
+          </h2>
+          <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
+            Grab premium socks at extraordinary discounted prices before stock runs out
+          </p>
 
-          <div className="flex items-center gap-3 self-start sm:self-auto">
+          <div className="pt-2 flex items-center justify-center gap-3">
             <CountdownTimer />
-            <Button asChild variant="ghost" className="group text-xs sm:text-sm font-semibold hover:bg-background/80">
-              <Link to="/shop" className="flex items-center gap-1.5">
-                View All
+            <Button asChild variant="ghost" className="group text-xs sm:text-sm font-semibold">
+              <Link to="/shop" className="flex items-center gap-1.5 text-destructive hover:text-destructive">
+                View All Deals
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
             </Button>

@@ -24,7 +24,7 @@ export const FAQSection = memo(function FAQSection({
 
   if (isLoading) {
     return (
-      <section className="py-10 md:py-16 bg-slate-50/70 dark:bg-slate-950/70 border-y border-border/40">
+      <section className="py-10 md:py-16 bg-background">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[...Array(4)].map((_, i) => (
@@ -39,11 +39,11 @@ export const FAQSection = memo(function FAQSection({
   if (faqs.length === 0) return null;
 
   return (
-    <section className="py-10 md:py-16 lg:py-20 bg-slate-50/70 dark:bg-slate-950/70 border-y border-border/40 relative">
+    <section className="py-10 md:py-16 lg:py-20 bg-background relative">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Consistent Centered Header */}
-        <div className="text-center mb-8 md:mb-12 space-y-2">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold tracking-wide bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 shadow-2xs">
+        {/* Center Aligned Section Header */}
+        <div className="text-center mb-8 md:mb-12 space-y-2.5">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-extrabold tracking-wide bg-destructive/10 text-destructive border border-destructive/20 shadow-2xs">
             <HelpCircle className="w-3.5 h-3.5" />
             Help & Guidance
           </div>
@@ -96,14 +96,14 @@ export const FAQSection = memo(function FAQSection({
         </div>
 
         {/* Contact CTA Banner */}
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-900 dark:to-slate-950 text-white rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg border border-slate-700/50">
+        <div className="bg-foreground text-background rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg border border-border/40">
           <div className="flex items-center gap-4 text-center md:text-left">
             <div className="hidden md:flex items-center justify-center w-12 h-12 rounded-full bg-primary/20 shrink-0">
               <MessageCircle className="w-6 h-6 text-primary" />
             </div>
             <div>
               <h3 className="text-base sm:text-lg md:text-xl font-bold mb-0.5">Have additional questions?</h3>
-              <p className="text-slate-300 text-xs sm:text-sm">Our customer happiness team is available to assist you anytime.</p>
+              <p className="text-background/80 text-xs sm:text-sm">Our customer happiness team is available to assist you anytime.</p>
             </div>
           </div>
           <Button asChild size="lg" className="rounded-full px-8 bg-primary hover:bg-primary/90 font-bold shrink-0 shadow-md">

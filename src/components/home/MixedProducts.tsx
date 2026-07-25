@@ -58,9 +58,9 @@ export const MixedProducts = memo(function MixedProducts() {
   return (
     <section className="py-10 md:py-16 lg:py-20 bg-background relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Consistent Centered Header */}
-        <div className="text-center mb-8 md:mb-12 space-y-2">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold tracking-wide bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shadow-2xs">
+        {/* Center Aligned Section Header */}
+        <div className="text-center mb-8 md:mb-12 space-y-2.5">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-extrabold tracking-wide bg-destructive/10 text-destructive border border-destructive/20 shadow-2xs">
             <Sparkles className="w-3.5 h-3.5" />
             Explore Collection
           </div>
