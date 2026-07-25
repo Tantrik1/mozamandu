@@ -691,6 +691,15 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
           </CardContent>
         </Card>
 
+        {(watchedHasColorVariants || watchedHasSizeVariants) && (
+          <SmartProductVariantForm
+            hasColorVariants={watchedHasColorVariants}
+            hasSizeVariants={watchedHasSizeVariants}
+            onVariantsChange={setColorVariants}
+            hideStockFields={true}
+          />
+        )}
+
         {/* SEO Settings Section */}
         <ProductSEOSection
           metaTitle={form.watch('meta_title') || ''}
@@ -708,15 +717,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
           onOgTitleChange={(v) => form.setValue('og_title', v)}
           onOgDescriptionChange={(v) => form.setValue('og_description', v)}
         />
-
-        {(watchedHasColorVariants || watchedHasSizeVariants) && (
-          <SmartProductVariantForm
-            hasColorVariants={watchedHasColorVariants}
-            hasSizeVariants={watchedHasSizeVariants}
-            onVariantsChange={setColorVariants}
-            hideStockFields={true}
-          />
-        )}
 
         <div className="flex justify-end space-x-4">
           <Button type="button" variant="outline" onClick={onCancel}>

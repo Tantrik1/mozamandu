@@ -698,27 +698,6 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
           </CardContent>
         </Card>
 
-        {/* SEO Settings Section */}
-        <ProductSEOSection
-          metaTitle={form.watch('meta_title') || ''}
-          metaDescription={form.watch('meta_description') || ''}
-          metaKeywords={form.watch('meta_keywords') || ''}
-          ogTitle={form.watch('og_title') || ''}
-          ogDescription={form.watch('og_description') || ''}
-          productName={form.watch('name')}
-          productDescription={form.watch('description') || ''}
-          sellingPrice={form.watch('selling_price') || form.watch('cost_price')}
-          categoryName={categories.find(c => c.id === form.watch('category_id'))?.name}
-          onMetaTitleChange={(value) => form.setValue('meta_title', value)}
-          onMetaDescriptionChange={(value) => form.setValue('meta_description', value)}
-          onMetaKeywordsChange={(value) => form.setValue('meta_keywords', value)}
-          onOgTitleChange={(value) => form.setValue('og_title', value)}
-          onOgDescriptionChange={(value) => form.setValue('og_description', value)}
-        />
-
-        {/* Product FAQs Section */}
-        <ProductFAQsManager productId={productId} />
-
         {(watchedHasColorVariants || watchedHasSizeVariants) && (
           <EnhancedProductVariantForm
             productId={productId}
@@ -760,6 +739,27 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             onCancel={onCancel}
           />
         )}
+
+        {/* SEO Settings Section */}
+        <ProductSEOSection
+          metaTitle={form.watch('meta_title') || ''}
+          metaDescription={form.watch('meta_description') || ''}
+          metaKeywords={form.watch('meta_keywords') || ''}
+          ogTitle={form.watch('og_title') || ''}
+          ogDescription={form.watch('og_description') || ''}
+          productName={form.watch('name')}
+          productDescription={form.watch('description') || ''}
+          sellingPrice={form.watch('selling_price') || form.watch('cost_price')}
+          categoryName={categories.find(c => c.id === form.watch('category_id'))?.name}
+          onMetaTitleChange={(value) => form.setValue('meta_title', value)}
+          onMetaDescriptionChange={(value) => form.setValue('meta_description', value)}
+          onMetaKeywordsChange={(value) => form.setValue('meta_keywords', value)}
+          onOgTitleChange={(value) => form.setValue('og_title', value)}
+          onOgDescriptionChange={(value) => form.setValue('og_description', value)}
+        />
+
+        {/* Product FAQs Section */}
+        <ProductFAQsManager productId={productId} />
 
         {!(watchedHasColorVariants || watchedHasSizeVariants) && (
           <div className="flex justify-end space-x-4">
