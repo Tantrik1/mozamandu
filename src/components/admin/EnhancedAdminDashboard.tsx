@@ -13,10 +13,8 @@ import {
   CustomerStatsPanel,
   RevenueChart,
   DashboardDateFilter,
-  OrderSourceBreakdown,
   createDateFilterValue,
-  type DateFilterValue,
-  type OrderSourceFilter
+  type DateFilterValue
 } from './dashboard';
 
 interface RevenueDataPoint {
@@ -48,23 +46,10 @@ interface OrdersCache {
 export function EnhancedAdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState<DateFilterValue>(createDateFilterValue('allTime'));
-  const [sourceFilter, setSourceFilter] = useState<OrderSourceFilter>('all');
   const [revenueChartData, setRevenueChartData] = useState<RevenueDataPoint[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const ordersCache = useRef<OrdersCache>({ data: null, timestamp: 0 });
-  
-  // Order Source Stats
-  const [orderSourceStats, setOrderSourceStats] = useState({
-    totalOrders: 0,
-    totalRevenue: 0,
-    registeredOrders: 0,
-    registeredRevenue: 0,
-    guestOrders: 0,
-    guestRevenue: 0,
-    registeredAOV: 0,
-    guestAOV: 0
-  });
   
   // Core Business Stats
   const [coreStats, setCoreStats] = useState({
@@ -176,38 +161,11 @@ export function EnhancedAdminDashboard() {
     return allOrders;
   };
 
-  // Filter orders by date range and source
+  // Filter orders by date range
   const filterOrdersByDateRange = (orders: any[]) => {
     return orders.filter(o => {
       const orderDate = new Date(o.created_at);
       return orderDate >= dateFilter.startDate && orderDate <= dateFilter.endDate;
-    });
-  };
-
-  const filterOrdersBySource = (orders: any[]) => {
-    if (sourceFilter === 'all') return orders;
-    if (sourceFilter === 'registered') return orders.filter(o => o.source === 'customer');
-    if (sourceFilter === 'guest') return orders.filter(o => o.source === 'guest');
-    return orders;
-  };
-
-  const calculateOrderSourceStats = (filteredOrders: any[]) => {
-    const nonCancelled = filteredOrders.filter(o => o.status !== 'cancelled');
-    const registeredOrders = nonCancelled.filter(o => o.source === 'customer');
-    const guestOrders = nonCancelled.filter(o => o.source === 'guest');
-    
-    const registeredRevenue = registeredOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-    const guestRevenue = guestOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-    
-    setOrderSourceStats({
-      totalOrders: nonCancelled.length,
-      totalRevenue: registeredRevenue + guestRevenue,
-      registeredOrders: registeredOrders.length,
-      registeredRevenue,
-      guestOrders: guestOrders.length,
-      guestRevenue,
-      registeredAOV: registeredOrders.length > 0 ? registeredRevenue / registeredOrders.length : 0,
-      guestAOV: guestOrders.length > 0 ? guestRevenue / guestOrders.length : 0
     });
   };
 
@@ -218,21 +176,15 @@ export function EnhancedAdminDashboard() {
       const allOrders = await fetchOrdersWithCache();
       const dateFilteredOrders = filterOrdersByDateRange(allOrders);
       
-      // Calculate order source stats before applying source filter
-      calculateOrderSourceStats(dateFilteredOrders);
-      
-      // Apply source filter for other stats
-      const filteredOrders = filterOrdersBySource(dateFilteredOrders);
-      
       // Run all stat calculations in parallel with filtered orders
       await Promise.all([
-        calculateCoreBusinessStats(filteredOrders),
-        calculateTimeBasedStats(filteredOrders, filterOrdersBySource(allOrders)),
-        calculateOrderStats(filteredOrders),
-        fetchProductStats(filteredOrders),
+        calculateCoreBusinessStats(dateFilteredOrders),
+        calculateTimeBasedStats(dateFilteredOrders, allOrders),
+        calculateOrderStats(dateFilteredOrders),
+        fetchProductStats(dateFilteredOrders),
         fetchInventoryStats(),
-        calculateCustomerStats(filteredOrders, filterOrdersBySource(allOrders)),
-        fetchRevenueChartData(filteredOrders)
+        calculateCustomerStats(dateFilteredOrders, allOrders),
+        fetchRevenueChartData(dateFilteredOrders)
       ]);
       
       setLastRefreshed(new Date());
@@ -241,7 +193,7 @@ export function EnhancedAdminDashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [dateFilter, sourceFilter]);
+  }, [dateFilter]);
 
   useEffect(() => {
     fetchAllData();
@@ -737,19 +689,6 @@ export function EnhancedAdminDashboard() {
           transition={{ delay: 0.1 }}
         >
           <CoreBusinessStats {...coreStats} />
-        </motion.div>
-
-        {/* Order Source Breakdown with Toggle Filter */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-        >
-          <OrderSourceBreakdown 
-            stats={orderSourceStats}
-            sourceFilter={sourceFilter}
-            onSourceFilterChange={setSourceFilter}
-          />
         </motion.div>
 
         {/* Revenue Chart - now uses global date filter */}
