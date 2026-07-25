@@ -187,15 +187,11 @@ export function CoreBusinessStats({
         >
           {stats.map((stat, index) => {
             const Icon = stat.icon;
-            const isActive = index === activeIndex;
 
             return (
-              <motion.div
+              <div
                 key={stat.id}
                 className="snap-start min-w-[110px] sm:min-w-0"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.04 }}
               >
                 <Card
                   onClick={() => {
@@ -203,13 +199,11 @@ export function CoreBusinessStats({
                     scrollToCard(index);
                   }}
                   className={`
-                    relative overflow-hidden cursor-pointer transition-all duration-300 border
-                    ${stat.borderColor} ${stat.glowColor} hover:shadow-xs hover:-translate-y-0.5
-                    ${isActive ? 'ring-2 ring-primary/40 shadow-xs scale-[1.01]' : 'opacity-95'}
+                    relative overflow-hidden border ${stat.borderColor} rounded-xl shadow-2xs cursor-pointer
                   `}
                 >
-                  {/* Subtle Background Accent */}
-                  <div className={`absolute inset-0 ${stat.bgColor} opacity-40`} />
+                  {/* Background Color Tint */}
+                  <div className={`absolute inset-0 ${stat.bgColor} opacity-30`} />
 
                   <CardContent className="relative p-2.5 space-y-1">
                     <div className="flex items-center justify-between gap-1">
@@ -226,7 +220,7 @@ export function CoreBusinessStats({
                     </p>
                   </CardContent>
                 </Card>
-              </motion.div>
+              </div>
             );
           })}
         </div>
