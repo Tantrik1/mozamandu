@@ -447,18 +447,9 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                     <Textarea
                       id="material_composition"
                       {...form.register('material_composition')}
-                      placeholder="e.g. 85% Combed Cotton, 12% Nylon, 3% Elastane"
+                      placeholder="e.g. Premium quality fabric blend designed for comfort and durability."
                       rows={2}
                       className="text-xs"
-                    />
-                  </div>
-
-                  {/* Care Instructions Row */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold">Care Instructions</Label>
-                    <CareInstructionsInput
-                      value={form.watch('care_instructions') || []}
-                      onChange={(value) => form.setValue('care_instructions', value)}
                     />
                   </div>
                 </CardContent>
@@ -577,6 +568,25 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                       )}
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Care Instructions Card (Separate Box Below Pricing) */}
+              <Card className="shadow-sm border-border/80 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-amber-500/5 via-transparent to-transparent border-b border-border/60 py-4">
+                  <div className="flex items-center space-x-2">
+                    <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    <div>
+                      <CardTitle className="text-base font-semibold">Care Instructions</CardTitle>
+                      <CardDescription className="text-xs">Washing, drying & fabric care guidelines</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <CareInstructionsInput
+                    value={form.watch('care_instructions') || []}
+                    onChange={(value) => form.setValue('care_instructions', value)}
+                  />
                 </CardContent>
               </Card>
 
