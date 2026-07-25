@@ -14,7 +14,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getBatchProductStock, getActiveSubcategoryIds } from '@/utils/stockCalculation';
 
@@ -474,13 +475,6 @@ const Shop = memo(function Shop() {
           </form>
         </div>
 
-        {/* Desktop title */}
-        <div className="hidden lg:block mb-4">
-          <h1 className="text-2xl font-bold">
-            {searchQuery ? `Results for "${searchQuery}"` : 'Shop'}
-          </h1>
-        </div>
-
         {/* Filter Summary Strip */}
         <FilterSummaryStrip
           filters={appliedFilters}
@@ -526,6 +520,59 @@ const Shop = memo(function Shop() {
 
           {/* Product Grid */}
           <main className="flex-1 min-w-0">
+            {/* Top Bar for Desktop: Search & Sort in Right Column Header */}
+            <div className="hidden lg:flex items-center justify-between gap-4 mb-6 p-4 rounded-2xl bg-card border border-border/60 shadow-2xs">
+              <div>
+                <h1 className="text-xl font-black text-foreground tracking-tight">
+                  {searchQuery ? `Results for "${searchQuery}"` : 'Shop Collection'}
+                </h1>
+                <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                  Showing {filteredProducts.length} items
+                </p>
+              </div>
+
+              {/* Search Bar & Sort Dropdown at Right Column Top */}
+              <div className="flex items-center gap-3">
+                <form onSubmit={handleSearch} className="relative w-64 sm:w-72">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search products..."
+                    value={localSearch}
+                    onChange={(e) => {
+                      setLocalSearch(e.target.value);
+                      handleDesktopSearch(e.target.value);
+                    }}
+                    className="pl-9 pr-8 h-10 rounded-xl bg-background border-border/80 text-sm font-medium focus-visible:ring-primary"
+                  />
+                  {localSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocalSearch('');
+                        handleDesktopSearch('');
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </form>
+
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                  <SelectTrigger className="h-10 w-44 text-xs font-bold rounded-xl bg-background border-border/80">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="bestseller" className="text-xs font-semibold">Best Sellers</SelectItem>
+                    <SelectItem value="newest" className="text-xs font-semibold">Newest First</SelectItem>
+                    <SelectItem value="price_low" className="text-xs font-semibold">Price: Low to High</SelectItem>
+                    <SelectItem value="price_high" className="text-xs font-semibold">Price: High to Low</SelectItem>
+                    <SelectItem value="name" className="text-xs font-semibold">Name: A to Z</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
               {productsLoading ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4 transition-opacity duration-300">
                   {[...Array(8)].map((_, i) => (

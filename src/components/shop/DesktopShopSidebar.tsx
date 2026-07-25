@@ -171,49 +171,6 @@ export const DesktopShopSidebar = memo(function DesktopShopSidebar({
           )}
         </div>
 
-        {/* 1. Real-time Search */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Search</label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search products..."
-              value={localInput}
-              onChange={(e) => setLocalInput(e.target.value)}
-              className="pl-9 pr-8 h-10 text-sm rounded-xl border-border/80 focus-visible:ring-primary"
-            />
-            {localInput && (
-              <button
-                onClick={() => {
-                  setLocalInput('');
-                  onSearchChange('');
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* 2. Sort By */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Sort By</label>
-          <Select value={sortBy} onValueChange={(v) => onSortChange(v as SortOption)}>
-            <SelectTrigger className="h-10 text-sm rounded-xl border-border/80 bg-card font-medium">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl">
-              {SORT_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="text-sm font-medium">
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         {/* 3. PRICE RANGE (PLACED ABOVE CATEGORIES & COLORS AS REQUESTED) */}
         <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/5 via-emerald-500/10 to-teal-500/5 border border-emerald-500/20 shadow-2xs space-y-3">
           <div className="flex items-center justify-between">
