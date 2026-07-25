@@ -488,10 +488,6 @@ const Shop = memo(function Shop() {
         <div className="lg:flex lg:gap-8">
           {/* Desktop Sidebar */}
           <DesktopShopSidebar
-            searchValue={localSearch}
-            onSearchChange={handleDesktopSearch}
-            sortBy={sortBy}
-            onSortChange={setSortBy}
             categories={categories}
             selectedCategoryId={selectedCategoryId}
             selectedSubcategoryId={selectedSubcategoryId}
@@ -520,21 +516,21 @@ const Shop = memo(function Shop() {
 
           {/* Product Grid */}
           <main className="flex-1 min-w-0">
-            {/* Top Bar for Desktop: Search & Sort in Right Column Header */}
-            <div className="hidden lg:flex items-center justify-between gap-4 mb-6 p-4 rounded-2xl bg-card border border-border/60 shadow-2xs">
+            {/* Sticky Advanced Top Bar for Desktop: Search & Sort in Right Column Header */}
+            <div className="hidden lg:flex items-center justify-between gap-4 mb-6 p-4 rounded-2xl bg-background/95 backdrop-blur-md border border-border/60 shadow-xs sticky top-[76px] z-30 transition-all duration-300">
               <div>
                 <h1 className="text-xl font-black text-foreground tracking-tight">
                   {searchQuery ? `Results for "${searchQuery}"` : 'Shop Collection'}
                 </h1>
                 <p className="text-xs text-muted-foreground font-medium mt-0.5">
-                  Showing {filteredProducts.length} items
+                  Showing <span className="font-extrabold text-foreground">{filteredProducts.length}</span> items
                 </p>
               </div>
 
-              {/* Search Bar & Sort Dropdown at Right Column Top */}
+              {/* Advanced Search Bar & Sort Dropdown at Right Column Top */}
               <div className="flex items-center gap-3">
-                <form onSubmit={handleSearch} className="relative w-64 sm:w-72">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <form onSubmit={handleSearch} className="relative w-72 sm:w-80">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     type="text"
                     placeholder="Search products..."
@@ -543,7 +539,7 @@ const Shop = memo(function Shop() {
                       setLocalSearch(e.target.value);
                       handleDesktopSearch(e.target.value);
                     }}
-                    className="pl-9 pr-8 h-10 rounded-xl bg-background border-border/80 text-sm font-medium focus-visible:ring-primary"
+                    className="pl-9 pr-9 h-10 rounded-xl bg-card border-border/80 text-sm font-medium focus-visible:ring-primary shadow-2xs"
                   />
                   {localSearch && (
                     <button
@@ -552,7 +548,7 @@ const Shop = memo(function Shop() {
                         setLocalSearch('');
                         handleDesktopSearch('');
                       }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-muted transition-colors"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -560,7 +556,7 @@ const Shop = memo(function Shop() {
                 </form>
 
                 <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-                  <SelectTrigger className="h-10 w-44 text-xs font-bold rounded-xl bg-background border-border/80">
+                  <SelectTrigger className="h-10 w-44 text-xs font-bold rounded-xl bg-card border-border/80 shadow-2xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
