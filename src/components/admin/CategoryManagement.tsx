@@ -241,95 +241,115 @@ export const CategoryManagement = memo(function CategoryManagement() {
               Add Category
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {editingCategory ? 'Edit Category' : 'Create Category'}
+          <DialogContent className="max-w-md p-0 overflow-hidden rounded-2xl shadow-xl">
+            <DialogHeader className="p-6 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-border/60">
+              <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                <FolderOpen className="h-5 w-5 text-primary" />
+                {editingCategory ? 'Edit Category' : 'Create New Category'}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Image Upload */}
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!formData.name.trim()) {
+                toast({ title: 'Validation Error', description: 'Category name is required', variant: 'destructive' });
+                return;
+              }
+              handleSubmit(e);
+            }} className="p-6 space-y-5">
+              
+              {/* Single Interactive Dropzone Card */}
               <div className="space-y-2">
-                <Label>Category Image (1:1 Ratio)</Label>
-                <div className="flex flex-col items-center gap-4">
-                  <div className="relative w-full aspect-square max-w-[200px] mx-auto border-2 border-dashed rounded-xl overflow-hidden bg-muted/30">
-                    {imagePreview ? (
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Category Image (1:1 Ratio)
+                </Label>
+                <div 
+                  onClick={() => setIsMediaPickerOpen(true)}
+                  className="relative group w-full aspect-square max-w-[180px] mx-auto border-2 border-dashed border-border hover:border-primary/50 rounded-2xl overflow-hidden bg-muted/20 hover:bg-muted/40 cursor-pointer transition-colors flex items-center justify-center"
+                >
+                  {imagePreview ? (
+                    <>
                       <img 
                         src={imagePreview} 
                         alt="Preview" 
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
-                    ) : (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
-                        <ImageIcon className="w-12 h-12 mb-2" />
-                        <span className="text-sm">No image</span>
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <Button 
+                          type="button" 
+                          size="icon" 
+                          variant="destructive"
+                          className="h-8 w-8 rounded-full"
+                          onClick={(evt) => {
+                            evt.stopPropagation();
+                            setSelectedImage(null);
+                            setImagePreview(null);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setIsMediaPickerOpen(true)}
-                    >
-                      <ImageIcon className="h-4 w-4 mr-2 text-primary" />
-                      {imagePreview ? 'Change Image' : 'Select / Upload Image'}
-                    </Button>
-                    {imagePreview && (
-                      <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedImage(null);
-                          setImagePreview(null);
-                        }}
-                      >
-                        Remove
-                      </Button>
-                    )}
-                  </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center p-4 text-center space-y-2">
+                      <div className="p-3 rounded-full bg-primary/10 text-primary">
+                        <ImageIcon className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">Click to select image</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Pick or upload to R2</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="name">Category Name</Label>
+              {/* Category Name Input */}
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-sm font-semibold flex items-center gap-1">
+                  Category Name <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                  placeholder="Enter category name"
+                  placeholder="e.g. Ankle Socks"
+                  className="h-11 font-medium"
                 />
               </div>
               
-              <div>
-                <Label htmlFor="description">Description</Label>
+              {/* Category Description Input */}
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-sm font-semibold">
+                  Description
+                </Label>
                 <Textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Enter category description"
+                  placeholder="Briefly describe products in this category..."
                   rows={3}
                 />
               </div>
               
-              <div className="flex items-center space-x-2">
+              {/* Active Toggle */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50">
+                <Label htmlFor="status" className="text-sm font-semibold cursor-pointer">
+                  Category Active Status
+                </Label>
                 <Switch
                   id="status"
                   checked={formData.status}
                   onCheckedChange={(checked) => setFormData({ ...formData, status: checked })}
                 />
-                <Label htmlFor="status">Active</Label>
               </div>
               
-              <div className="flex justify-end space-x-2">
+              <div className="flex justify-end space-x-3 pt-3 border-t border-border">
                 <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isUploading}>
-                  {isUploading ? 'Saving...' : (editingCategory ? 'Update' : 'Create')} Category
+                <Button type="submit" disabled={isUploading} className="bg-primary hover:bg-primary/90 font-semibold px-5">
+                  {isUploading ? 'Saving...' : (editingCategory ? 'Update Category' : 'Create Category')}
                 </Button>
               </div>
             </form>

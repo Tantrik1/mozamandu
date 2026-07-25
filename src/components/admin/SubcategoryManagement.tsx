@@ -396,216 +396,285 @@ export function SubcategoryManagement() {
               Add Subcategory
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingSubcategory ? 'Edit Subcategory' : 'Create Subcategory'}
+          <DialogContent className="max-w-3xl p-0 overflow-hidden rounded-2xl shadow-2xl">
+            <DialogHeader className="p-6 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-border/60">
+              <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                <FolderOpen className="h-5 w-5 text-primary" />
+                {editingSubcategory ? 'Edit Subcategory' : 'Create New Subcategory'}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name">Subcategory Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="category">Category</Label>
-                  <Select 
-                    value={formData.category_id} 
-                    onValueChange={(value) => setFormData({ ...formData, category_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
-              </div>
-              
-              {/* Image Upload Section */}
-              <div className="space-y-2">
-                <Label htmlFor="image">Subcategory Image</Label>
-                <div className="flex items-center space-x-4">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!formData.name.trim()) {
+                toast({ title: 'Validation Error', description: 'Subcategory name is required', variant: 'destructive' });
+                return;
+              }
+              if (!formData.category_id) {
+                toast({ title: 'Validation Error', description: 'Please select a parent category', variant: 'destructive' });
+                return;
+              }
+              if (!formData.min_selling_price || parseFloat(formData.min_selling_price) < 0) {
+                toast({ title: 'Validation Error', description: 'Min selling price must be a valid non-negative number', variant: 'destructive' });
+                return;
+              }
+              if (formData.max_selling_price && parseFloat(formData.max_selling_price) < parseFloat(formData.min_selling_price)) {
+                toast({ title: 'Validation Error', description: 'Max selling price cannot be less than min selling price', variant: 'destructive' });
+                return;
+              }
+              handleSubmit(e);
+            }} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Image Column */}
+                <div className="space-y-2 md:col-span-1">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Subcategory Cover Image
+                  </Label>
+                  <div 
                     onClick={() => setIsMediaPickerOpen(true)}
+                    className="relative group w-full aspect-square border-2 border-dashed border-border hover:border-primary/50 rounded-2xl overflow-hidden bg-muted/20 hover:bg-muted/40 cursor-pointer transition-colors flex items-center justify-center"
                   >
-                    <ImageIcon className="h-4 w-4 mr-2 text-primary" />
-                    {imagePreview ? 'Change Image' : 'Select / Upload Image'}
-                  </Button>
+                    {imagePreview ? (
+                      <>
+                        <img 
+                          src={imagePreview} 
+                          alt="Preview" 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <Button 
+                            type="button" 
+                            size="icon" 
+                            variant="destructive"
+                            className="h-8 w-8 rounded-full"
+                            onClick={(evt) => {
+                              evt.stopPropagation();
+                              setSelectedImage(null);
+                              setImagePreview(null);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center p-4 text-center space-y-2">
+                        <div className="p-3 rounded-full bg-primary/10 text-primary">
+                          <ImageIcon className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">Click to select image</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Pick or upload to R2</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                {imagePreview && (
-                  <div className="mt-2">
-                    <div className="relative w-32 aspect-square rounded-lg border overflow-hidden bg-muted">
-                      <img 
-                        src={imagePreview} 
-                        alt="Preview" 
-                        className="w-full h-full object-cover"
+
+                {/* Details Column */}
+                <div className="space-y-4 md:col-span-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name" className="text-sm font-semibold flex items-center gap-1">
+                        Subcategory Name <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="e.g. Ankle Box Socks"
+                        className="h-11 font-medium"
                       />
                     </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="category" className="text-sm font-semibold flex items-center gap-1">
+                        Parent Category <span className="text-destructive">*</span>
+                      </Label>
+                      <Select 
+                        value={formData.category_id} 
+                        onValueChange={(value) => setFormData({ ...formData, category_id: value })}
+                      >
+                        <SelectTrigger className="h-11 font-medium">
+                          <SelectValue placeholder="Select parent category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description" className="text-sm font-semibold">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Enter subcategory description..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="min_selling_price">Min Selling Price (Rs.)</Label>
-                  <Input
-                    id="min_selling_price"
-                    type="number"
-                    step="0.01"
-                    value={formData.min_selling_price}
-                    onChange={(e) => setFormData({ ...formData, min_selling_price: e.target.value })}
-                    placeholder="e.g., 100"
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Default price for products without selling price
-                  </p>
+              {/* Pricing & MOQ Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-border">
+                <div className="space-y-2">
+                  <Label htmlFor="min_selling_price" className="text-sm font-semibold flex items-center gap-1">
+                    Min Selling Price (Rs.) <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-medium">Rs.</span>
+                    <Input
+                      id="min_selling_price"
+                      type="number"
+                      step="0.01"
+                      value={formData.min_selling_price}
+                      onChange={(e) => setFormData({ ...formData, min_selling_price: e.target.value })}
+                      placeholder="100.00"
+                      className="pl-11 h-11 font-medium"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="max_selling_price">Max Selling Price (Rs.)</Label>
-                  <Input
-                    id="max_selling_price"
-                    type="number"
-                    step="0.01"
-                    value={formData.max_selling_price}
-                    onChange={(e) => setFormData({ ...formData, max_selling_price: e.target.value })}
-                    placeholder="e.g., 500"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Maximum price in this subcategory (optional)
-                  </p>
+
+                <div className="space-y-2">
+                  <Label htmlFor="max_selling_price" className="text-sm font-semibold">
+                    Max Selling Price (Rs.)
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-medium">Rs.</span>
+                    <Input
+                      id="max_selling_price"
+                      type="number"
+                      step="0.01"
+                      value={formData.max_selling_price}
+                      onChange={(e) => setFormData({ ...formData, max_selling_price: e.target.value })}
+                      placeholder="500.00"
+                      className="pl-11 h-11 font-medium"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="minimum_quantity">Minimum Order Quantity (MOQ)</Label>
+
+                <div className="space-y-2">
+                  <Label htmlFor="minimum_quantity" className="text-sm font-semibold flex items-center gap-1">
+                    Min Order Qty (MOQ) <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="minimum_quantity"
                     type="number"
                     min="1"
                     value={formData.minimum_quantity}
                     onChange={(e) => setFormData({ ...formData, minimum_quantity: e.target.value })}
-                    placeholder="e.g., 3"
-                    required
+                    placeholder="3"
+                    className="h-11 font-medium"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Minimum items required for checkout
-                  </p>
                 </div>
               </div>
 
-              {/* Discount Tiers Section */}
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <Label className="text-lg font-semibold">Discount Tiers (Separate from MOQ)</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addDiscountTier}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Discount Tier
-                  </Button>
+              {/* Active Toggle */}
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-muted/30 border border-border/50">
+                <div>
+                  <Label htmlFor="status" className="text-sm font-semibold cursor-pointer">
+                    Subcategory Status
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Visible on storefront catalog</p>
                 </div>
-                <p className="text-sm text-gray-600">
-                  Discount tiers are separate from the minimum order quantity above. Customers must meet the MOQ to checkout, 
-                  but can get discounts based on these tiers. The discount applies to ALL items when the tier quantity is reached.
-                </p>
-                
-                {discountTiers.map((tier, index) => (
-                  <Card key={index}>
-                    <CardHeader>
-                      <div className="flex justify-between items-center">
-                        <CardTitle className="text-sm">Discount Tier {index + 1}</CardTitle>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeDiscountTier(index)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div>
-                          <Label>Min Qty for Discount</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={tier.min_quantity}
-                            onChange={(e) => updateDiscountTier(index, 'min_quantity', parseInt(e.target.value) || 1)}
-                            placeholder="e.g., 5"
-                          />
-                        </div>
-                        <div>
-                          <Label>Max Quantity</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={tier.max_quantity || ''}
-                            onChange={(e) => updateDiscountTier(index, 'max_quantity', e.target.value ? parseInt(e.target.value) : null)}
-                            placeholder="No limit"
-                          />
-                        </div>
-                        <div>
-                          <Label>Discount Amount (Rs.)</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={tier.discount_amount}
-                            onChange={(e) => updateDiscountTier(index, 'discount_amount', parseFloat(e.target.value) || 0)}
-                            placeholder="e.g., 50"
-                          />
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Quantities {tier.min_quantity} {tier.max_quantity ? `to ${tier.max_quantity}` : 'and above'}: 
-                        Rs. {tier.discount_amount} discount per item
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
-                
-                {discountTiers.length === 0 && (
-                  <p className="text-sm text-gray-500 text-center py-4">
-                    No discount tiers added. Click "Add Discount Tier" to create quantity-based discounts.
-                  </p>
-                )}
-              </div>
-              
-              <div className="flex items-center space-x-2">
                 <Switch
                   id="status"
                   checked={formData.status}
                   onCheckedChange={(checked) => setFormData({ ...formData, status: checked })}
                 />
-                <Label htmlFor="status">Active</Label>
               </div>
-              
-              <Button type="submit" className="w-full">
-                {editingSubcategory ? 'Update' : 'Create'} Subcategory
-              </Button>
+
+              {/* Discount Tiers Section */}
+              <div className="space-y-4 pt-2 border-t border-border">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <Label className="text-base font-semibold">Bulk Discount Tiers</Label>
+                    <p className="text-xs text-muted-foreground">Tiered price discounts applied when customers order higher quantities</p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={addDiscountTier} className="h-9">
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Add Tier
+                  </Button>
+                </div>
+                
+                {discountTiers.length === 0 ? (
+                  <div className="text-center py-6 border rounded-xl border-dashed bg-muted/20 text-muted-foreground text-xs">
+                    No discount tiers added. Click "Add Tier" to create quantity discounts.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {discountTiers.map((tier, index) => (
+                      <Card key={index} className="border-border/70 shadow-xs">
+                        <CardHeader className="py-3 px-4 bg-muted/20 flex flex-row justify-between items-center">
+                          <CardTitle className="text-xs font-semibold">Tier {index + 1}</CardTitle>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => removeDiscountTier(index)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </CardHeader>
+                        <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs font-medium">Min Qty</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={tier.min_quantity}
+                              onChange={(e) => updateDiscountTier(index, 'min_quantity', parseInt(e.target.value) || 1)}
+                              placeholder="5"
+                              className="h-9 text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs font-medium">Max Qty (Optional)</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={tier.max_quantity || ''}
+                              onChange={(e) => updateDiscountTier(index, 'max_quantity', e.target.value ? parseInt(e.target.value) : null)}
+                              placeholder="Unlimited"
+                              className="h-9 text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs font-medium">Discount Amount (Rs.)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={tier.discount_amount}
+                              onChange={(e) => updateDiscountTier(index, 'discount_amount', parseFloat(e.target.value) || 0)}
+                              placeholder="50.00"
+                              className="h-9 text-xs font-medium text-emerald-600 dark:text-emerald-400"
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-border">
+                <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-primary hover:bg-primary/90 font-semibold px-6">
+                  {editingSubcategory ? 'Update Subcategory' : 'Create Subcategory'}
+                </Button>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
