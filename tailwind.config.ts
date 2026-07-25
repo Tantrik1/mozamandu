@@ -63,6 +63,11 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				}
 			},
+			fontFamily: {
+				sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+				heading: ["Space Grotesk", "Inter", "sans-serif"],
+				display: ["Space Grotesk", "Inter", "sans-serif"],
+			},
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
