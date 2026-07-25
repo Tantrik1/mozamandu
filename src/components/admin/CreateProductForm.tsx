@@ -14,7 +14,6 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, 
-  Upload, 
   Eye, 
   X, 
   ImageIcon, 
@@ -34,6 +33,7 @@ import { SmartProductVariantForm } from './SmartProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 import { ProductAdditionalImages, type AdditionalImage, type ProductAdditionalImagesRef } from './ProductAdditionalImages';
 import { ProductSEOSection } from './ProductSEOSection';
+import { ProductFAQsManager } from './ProductFAQsManager';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
 import { uploadToR2 } from '@/utils/r2Upload';
 import { CareInstructionsInput } from './CareInstructionsInput';
@@ -98,7 +98,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
   const [showInventoryPopup, setShowInventoryPopup] = useState(false);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
@@ -135,7 +134,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const watchedCostPrice = form.watch('cost_price') || 0;
   const watchedSellingPrice = form.watch('selling_price') || 0;
 
-  // Real-time Profit Calculation
   const profitAmount = watchedSellingPrice > 0 ? watchedSellingPrice - watchedCostPrice : 0;
   const profitMarginPercent = watchedCostPrice > 0 && watchedSellingPrice > 0 
     ? Math.round(((watchedSellingPrice - watchedCostPrice) / watchedCostPrice) * 100)
@@ -187,43 +185,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       setSubcategories(data || []);
     } catch (error) {
       console.error('Error fetching subcategories:', error);
-    }
-  };
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 10 * 1024 * 1024) {
-      toast({
-        title: 'File Too Large',
-        description: `File size exceeds 10MB limit`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!file.type.startsWith('image/')) {
-      toast({
-        title: 'Invalid File',
-        description: 'Please select a valid image file',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setUploadingImage(true);
-    try {
-      setImagePreview(URL.createObjectURL(file));
-      setImageFile(file);
-      toast({
-        title: 'Image Selected',
-        description: 'Image ready for high-efficiency WebP R2 upload',
-      });
-    } catch (error) {
-      console.error('Error preparing image:', error);
-    } finally {
-      setUploadingImage(false);
     }
   };
 
@@ -392,7 +353,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
             </div>
           </div>
 
-          {/* Quick Metrics & Actions */}
           <div className="flex items-center space-x-3">
             {watchedSellingPrice > 0 && watchedCostPrice > 0 && (
               <Badge variant={profitMarginPercent >= 0 ? "secondary" : "destructive"} className="hidden sm:flex items-center gap-1.5 px-3 py-1 text-xs">
@@ -440,7 +400,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                     <FileText className="h-5 w-5 text-primary" />
                     <div>
                       <CardTitle className="text-base font-semibold">General Details</CardTitle>
-                      <CardDescription className="text-xs">Title, description, and material details</CardDescription>
+                      <CardDescription className="text-xs">Title, description, and fabric details</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
@@ -479,27 +439,27 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                     />
                   </div>
 
-                  {/* Material & Care Instructions Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="material_composition" className="text-sm font-semibold">
-                        Material Composition
-                      </Label>
-                      <Textarea
-                        id="material_composition"
-                        {...form.register('material_composition')}
-                        placeholder="e.g. 85% Combed Cotton, 12% Nylon, 3% Elastane"
-                        rows={3}
-                        className="text-xs"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold">Care Instructions</Label>
-                      <CareInstructionsInput
-                        value={form.watch('care_instructions') || []}
-                        onChange={(value) => form.setValue('care_instructions', value)}
-                      />
-                    </div>
+                  {/* Material Composition Row */}
+                  <div className="space-y-2 pt-2">
+                    <Label htmlFor="material_composition" className="text-sm font-semibold">
+                      Material Composition
+                    </Label>
+                    <Textarea
+                      id="material_composition"
+                      {...form.register('material_composition')}
+                      placeholder="e.g. 85% Combed Cotton, 12% Nylon, 3% Elastane"
+                      rows={2}
+                      className="text-xs"
+                    />
+                  </div>
+
+                  {/* Care Instructions Row */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Care Instructions</Label>
+                    <CareInstructionsInput
+                      value={form.watch('care_instructions') || []}
+                      onChange={(value) => form.setValue('care_instructions', value)}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -622,32 +582,126 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
 
             </div>
 
-            {/* Right Column: Media, Status & Feature Toggles */}
+            {/* Right Column: Visibility FIRST, Media SECOND */}
             <div className="space-y-8">
               
-              {/* Media Card */}
+              {/* Status & Options Toggles Card (Positioned FIRST) */}
+              <Card className="shadow-sm border-border/80 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-purple-500/5 via-transparent to-transparent border-b border-border/60 py-4">
+                  <div className="flex items-center space-x-2">
+                    <Tag className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    <div>
+                      <CardTitle className="text-base font-semibold">Visibility & Options</CardTitle>
+                      <CardDescription className="text-xs">Publish status and variant toggles</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6 space-y-5">
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="status" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Catalog Status
+                    </Label>
+                    <Select
+                      value={form.watch('status')}
+                      onValueChange={(value: 'active' | 'inactive') => form.setValue('status', value)}
+                    >
+                      <SelectTrigger className="h-10 font-medium">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">
+                          <span className="flex items-center gap-2 font-medium text-emerald-600">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500" /> Active (Visible on Store)
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="inactive">
+                          <span className="flex items-center gap-2 font-medium text-gray-500">
+                            <span className="h-2 w-2 rounded-full bg-gray-400" /> Inactive (Hidden / Draft)
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="h-px bg-border my-2" />
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="is_featured" className="text-sm font-semibold flex items-center gap-1.5 cursor-pointer">
+                          <Sparkles className="h-4 w-4 text-amber-500" />
+                          Featured Product
+                        </Label>
+                        <p className="text-xs text-muted-foreground">Display in hero & featured collections</p>
+                      </div>
+                      <Switch
+                        id="is_featured"
+                        checked={form.watch('is_featured')}
+                        onCheckedChange={(checked) => form.setValue('is_featured', checked)}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="has_color_variants" className="text-sm font-semibold flex items-center gap-1.5 cursor-pointer">
+                          <Palette className="h-4 w-4 text-blue-500" />
+                          Has Color Variants
+                        </Label>
+                        <p className="text-xs text-muted-foreground">Enable custom color swatches & images</p>
+                      </div>
+                      <Switch
+                        id="has_color_variants"
+                        checked={form.watch('has_color_variants')}
+                        onCheckedChange={(checked) => {
+                          form.setValue('has_color_variants', checked);
+                          if (!checked) {
+                            setColorVariants([]);
+                            form.setValue('has_size_variants', false);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50">
+                      <div className="space-y-0.5">
+                        <Label 
+                          htmlFor="has_size_variants" 
+                          className={`text-sm font-semibold flex items-center gap-1.5 cursor-pointer ${!watchedHasColorVariants ? 'opacity-50' : ''}`}
+                        >
+                          <Ruler className="h-4 w-4 text-emerald-500" />
+                          Has Size Variants
+                        </Label>
+                        <p className="text-xs text-muted-foreground">Enable size options per color</p>
+                      </div>
+                      <Switch
+                        id="has_size_variants"
+                        checked={form.watch('has_size_variants')}
+                        onCheckedChange={(checked) => form.setValue('has_size_variants', checked)}
+                        disabled={!watchedHasColorVariants}
+                      />
+                    </div>
+                  </div>
+
+                </CardContent>
+              </Card>
+
+              {/* Media Card (Positioned SECOND) */}
               <Card className="shadow-sm border-border/80 overflow-hidden">
                 <CardHeader className="bg-gradient-to-r from-blue-500/5 via-transparent to-transparent border-b border-border/60 py-4">
                   <div className="flex items-center space-x-2">
                     <ImageIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     <div>
-                      <CardTitle className="text-base font-semibold">Main Media Asset</CardTitle>
-                      <CardDescription className="text-xs">High-efficiency WebP image</CardDescription>
+                      <CardTitle className="text-base font-semibold">Product Images</CardTitle>
+                      <CardDescription className="text-xs">Primary cover & gallery assets</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-6 space-y-5">
-                  <div className="space-y-4">
-                    <Button
-                      type="button"
-                      onClick={() => setIsMediaPickerOpen(true)}
-                      className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-xs flex items-center justify-center gap-2"
-                    >
-                      <ImageIcon className="h-4 w-4" />
-                      Select / Upload Image (Media Library)
-                    </Button>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Primary Cover Image</Label>
 
-                    {/* Image Preview Box */}
+                    {/* Interactive Dropzone Card directly opens Media Library */}
                     {imagePreview ? (
                       <div className="relative group rounded-2xl overflow-hidden border border-border bg-muted/30 aspect-square flex items-center justify-center">
                         <img
@@ -682,9 +736,9 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                     ) : (
                       <div 
                         onClick={() => setIsMediaPickerOpen(true)}
-                        className="border-2 border-dashed border-border hover:border-primary/50 rounded-2xl p-8 text-center cursor-pointer transition-colors bg-muted/20 hover:bg-muted/40 flex flex-col items-center justify-center space-y-3"
+                        className="border-2 border-dashed border-border hover:border-primary/50 rounded-2xl p-8 text-center cursor-pointer transition-colors bg-muted/20 hover:bg-muted/40 flex flex-col items-center justify-center space-y-3 group"
                       >
-                        <div className="p-3 rounded-full bg-primary/10 text-primary">
+                        <div className="p-3 rounded-full bg-primary/10 text-primary group-hover:scale-110 transition-transform">
                           <ImageIcon className="h-6 w-6" />
                         </div>
                         <div>
@@ -706,118 +760,11 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                 </CardContent>
               </Card>
 
-              {/* Status & Options Toggles Card */}
-              <Card className="shadow-sm border-border/80 overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-purple-500/5 via-transparent to-transparent border-b border-border/60 py-4">
-                  <div className="flex items-center space-x-2">
-                    <Tag className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                    <div>
-                      <CardTitle className="text-base font-semibold">Visibility & Options</CardTitle>
-                      <CardDescription className="text-xs">Publish status and variant toggles</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-6 space-y-5">
-                  
-                  {/* Status Selection */}
-                  <div className="space-y-2">
-                    <Label htmlFor="status" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Catalog Status
-                    </Label>
-                    <Select
-                      value={form.watch('status')}
-                      onValueChange={(value: 'active' | 'inactive') => form.setValue('status', value)}
-                    >
-                      <SelectTrigger className="h-10 font-medium">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">
-                          <span className="flex items-center gap-2 font-medium text-emerald-600">
-                            <span className="h-2 w-2 rounded-full bg-emerald-500" /> Active (Visible on Store)
-                          </span>
-                        </SelectItem>
-                        <SelectItem value="inactive">
-                          <span className="flex items-center gap-2 font-medium text-gray-500">
-                            <span className="h-2 w-2 rounded-full bg-gray-400" /> Inactive (Hidden / Draft)
-                          </span>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="h-px bg-border my-2" />
-
-                  {/* Toggles */}
-                  <div className="space-y-4">
-                    
-                    {/* Featured Toggle */}
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="is_featured" className="text-sm font-semibold flex items-center gap-1.5 cursor-pointer">
-                          <Sparkles className="h-4 w-4 text-amber-500" />
-                          Featured Product
-                        </Label>
-                        <p className="text-xs text-muted-foreground">Display in hero & featured collections</p>
-                      </div>
-                      <Switch
-                        id="is_featured"
-                        checked={form.watch('is_featured')}
-                        onCheckedChange={(checked) => form.setValue('is_featured', checked)}
-                      />
-                    </div>
-
-                    {/* Color Variants Toggle */}
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="has_color_variants" className="text-sm font-semibold flex items-center gap-1.5 cursor-pointer">
-                          <Palette className="h-4 w-4 text-blue-500" />
-                          Has Color Variants
-                        </Label>
-                        <p className="text-xs text-muted-foreground">Enable custom color swatches & images</p>
-                      </div>
-                      <Switch
-                        id="has_color_variants"
-                        checked={form.watch('has_color_variants')}
-                        onCheckedChange={(checked) => {
-                          form.setValue('has_color_variants', checked);
-                          if (!checked) {
-                            setColorVariants([]);
-                            form.setValue('has_size_variants', false);
-                          }
-                        }}
-                      />
-                    </div>
-
-                    {/* Size Variants Toggle */}
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50">
-                      <div className="space-y-0.5">
-                        <Label 
-                          htmlFor="has_size_variants" 
-                          className={`text-sm font-semibold flex items-center gap-1.5 cursor-pointer ${!watchedHasColorVariants ? 'opacity-50' : ''}`}
-                        >
-                          <Ruler className="h-4 w-4 text-emerald-500" />
-                          Has Size Variants
-                        </Label>
-                        <p className="text-xs text-muted-foreground">Enable size options per color</p>
-                      </div>
-                      <Switch
-                        id="has_size_variants"
-                        checked={form.watch('has_size_variants')}
-                        onCheckedChange={(checked) => form.setValue('has_size_variants', checked)}
-                        disabled={!watchedHasColorVariants}
-                      />
-                    </div>
-                  </div>
-
-                </CardContent>
-              </Card>
-
             </div>
 
           </div>
 
-          {/* Variants Section (Positioned Above SEO & FAQ) */}
+          {/* Variants Section (Positioned ABOVE SEO & FAQ) */}
           {(watchedHasColorVariants || watchedHasSizeVariants) && (
             <Card className="shadow-sm border-border/80 overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-blue-600/10 via-indigo-500/5 to-transparent border-b border-border/60 py-4">
@@ -840,7 +787,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
             </Card>
           )}
 
-          {/* SEO Settings Section (Below Variants) */}
+          {/* SEO Settings Section */}
           <ProductSEOSection
             metaTitle={form.watch('meta_title') || ''}
             metaDescription={form.watch('meta_description') || ''}
@@ -857,6 +804,11 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
             onOgTitleChange={(v) => form.setValue('og_title', v)}
             onOgDescriptionChange={(v) => form.setValue('og_description', v)}
           />
+
+          {/* Product FAQs Section (Positioned BELOW SEO) */}
+          {createdProductId && (
+            <ProductFAQsManager productId={createdProductId} />
+          )}
 
           {/* Bottom Action Footer */}
           <div className="flex items-center justify-end space-x-4 pt-6 border-t border-border">
