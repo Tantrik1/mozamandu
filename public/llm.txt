@@ -1,0 +1,2 @@
+# Mozamandu (Moja Mandu) - AI Model Index
+Please refer to https://mozamandu.com/llms.txt for summary information and https://mozamandu.com/llms-full.txt for the comprehensive store and product manual.

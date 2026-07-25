@@ -3,8 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { X, Eye, ImagePlus, Loader2, Upload } from 'lucide-react';
+import { X, Eye, ImagePlus, Loader2, Upload, Image as ImageIcon } from 'lucide-react';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
+import { MediaPicker } from './MediaPicker';
 
 interface AdditionalImage {
   id?: string;
@@ -33,6 +34,7 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
   function ProductAdditionalImagesComponent({ productId, onImagesChange, maxImages = 3 }, ref) {
     const [images, setImages] = useState<AdditionalImage[]>([]);
     const [loading, setLoading] = useState(false);
+    const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -68,9 +70,10 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
           try {
             // Optimize image with compression
             const { file: optimizedFile } = await prepareImageForUpload(img.file, PRODUCT_COMPRESSION);
-            const { uploadToR2 } = await import('@/utils/r2Upload');
+            const { uploadToR2, ensureUploadedUrl } = await import('@/utils/r2Upload');
 
-            const publicUrl = await uploadToR2(optimizedFile, `product_additional_images/${targetProductId}`);
+            let publicUrl = await uploadToR2(optimizedFile, `product_additional_images/${targetProductId}`);
+            publicUrl = (await ensureUploadedUrl(publicUrl, `product_additional_images/${targetProductId}`)) || publicUrl;
 
             // Save to product_additional_images table (cast to any for external table)
             const insertData = {
@@ -209,17 +212,13 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
           continue;
         }
 
-        // Generate preview
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const newImage: AdditionalImage = {
-            file,
-            preview: event.target?.result as string,
-            isNew: true,
-          };
-          setImages(prev => [...prev, newImage]);
+        // Generate preview using Blob URL
+        const newImage: AdditionalImage = {
+          file,
+          preview: URL.createObjectURL(file),
+          isNew: true,
         };
-        reader.readAsDataURL(file);
+        setImages(prev => [...prev, newImage]);
       }
 
       // Reset input
@@ -270,7 +269,7 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
             Additional Images ({images.length}/{maxImages})
           </Label>
           {canAddMore && (
-            <div>
+            <div className="flex gap-2">
               <input
                 id="additional-images-upload"
                 type="file"
@@ -282,11 +281,21 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
               />
               <label
                 htmlFor="additional-images-upload"
-                className={`cursor-pointer inline-flex items-center justify-center px-3 py-1.5 border border-dashed border-border rounded-md text-sm text-muted-foreground hover:bg-muted/50 transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`cursor-pointer inline-flex items-center justify-center px-3 py-1.5 border border-dashed border-border rounded-md text-xs text-muted-foreground hover:bg-muted/50 transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <ImagePlus className="h-4 w-4 mr-1.5" />
-                Add Images
+                <ImagePlus className="h-3.5 w-3.5 mr-1" />
+                Upload File
               </label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsMediaPickerOpen(true)}
+                className="h-8 gap-1.5 text-xs"
+              >
+                <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                Media Library
+              </Button>
             </div>
           )}
         </div>
@@ -364,6 +373,23 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
             New images will be uploaded when you save the product
           </p>
         )}
+
+        <MediaPicker
+          open={isMediaPickerOpen}
+          onClose={() => setIsMediaPickerOpen(false)}
+          folder="products"
+          onSelect={(url) => {
+            setImages(prev => [
+              ...prev,
+              {
+                preview: url,
+                isNew: false,
+                storagePath: url,
+              }
+            ]);
+            toast({ title: 'Image Selected', description: 'Added image from Media Library' });
+          }}
+        />
       </div>
     );
   }

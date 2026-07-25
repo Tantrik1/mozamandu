@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
+import { ArrowLeft, Upload, Eye, X, Image as ImageIcon } from 'lucide-react';
 import { EnhancedProductVariantForm } from './EnhancedProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 import { ProductAdditionalImages, type AdditionalImage, type ProductAdditionalImagesRef } from './ProductAdditionalImages';
@@ -19,6 +19,7 @@ import { ProductSEOSection } from './ProductSEOSection';
 import { ProductFAQsManager } from './ProductFAQsManager';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
 import { CareInstructionsInput } from './CareInstructionsInput';
+import { MediaPicker } from './MediaPicker';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -67,6 +68,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [showInventoryPopup, setShowInventoryPopup] = useState(false);
   const [additionalImages, setAdditionalImages] = useState<AdditionalImage[]>([]);
   const additionalImagesRef = useRef<ProductAdditionalImagesRef>(null);
@@ -252,12 +254,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
     setUploadingImage(true);
     
     try {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-
+      setImagePreview(URL.createObjectURL(file));
       setImageFile(file);
       
       toast({
@@ -328,6 +325,9 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
           imageUrl = newImageUrl;
         }
       }
+
+      const { ensureUploadedUrl } = await import('@/utils/r2Upload');
+      imageUrl = await ensureUploadedUrl(imageUrl, 'products');
 
       // Convert care_instructions to array for Supabase text[] column
       const careInstructionsArray = data.care_instructions
@@ -635,13 +635,24 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                       className="hidden"
                       disabled={uploadingImage}
                     />
-                    <label
-                      htmlFor="image-upload"
-                      className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      {uploadingImage ? 'Preparing...' : 'Change Image'}
-                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <label
+                        htmlFor="image-upload"
+                        className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {uploadingImage ? 'Preparing...' : 'Upload File'}
+                      </label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsMediaPickerOpen(true)}
+                        className="gap-2"
+                      >
+                        <ImageIcon className="h-4 w-4 text-primary" />
+                        Choose from Media Library
+                      </Button>
+                    </div>
                   </div>
 
                   {imagePreview && (
@@ -769,6 +780,16 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
           isOpen={showInventoryPopup}
         />
       )}
+
+      <MediaPicker
+        open={isMediaPickerOpen}
+        onClose={() => setIsMediaPickerOpen(false)}
+        folder="products"
+        onSelect={(url) => {
+          setImagePreview(url);
+          setImageFile(null);
+        }}
+      />
     </div>
   );
 }

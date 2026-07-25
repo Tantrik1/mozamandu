@@ -76,11 +76,7 @@ export function PaymentMethodManagement() {
 
       if (file.type.startsWith('image/')) {
         setQrCodeFile(file);
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setQrCodePreview(e.target?.result as string);
-        };
-        reader.readAsDataURL(file);
+        setQrCodePreview(URL.createObjectURL(file));
       } else {
         toast({
           title: "Error",
@@ -120,13 +116,26 @@ export function PaymentMethodManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    let qrCodeUrl = formData.qr_code_url;
+    let qrCodeUrl = qrCodePreview || formData.qr_code_url;
     
     // Upload new QR code if file is selected
     if (qrCodeFile) {
       const uploadedUrl = await uploadQrCode();
       if (!uploadedUrl) return;
       qrCodeUrl = uploadedUrl;
+    }
+
+    try {
+      const { ensureUploadedUrl } = await import('@/utils/r2Upload');
+      const guardedUrl = await ensureUploadedUrl(qrCodeUrl, 'payment_methods');
+      if (guardedUrl) qrCodeUrl = guardedUrl;
+    } catch (guardErr) {
+      toast({
+        title: "Upload Error",
+        description: guardErr instanceof Error ? guardErr.message : "Failed to process QR code image",
+        variant: "destructive",
+      });
+      return;
     }
 
     if (!qrCodeUrl) {

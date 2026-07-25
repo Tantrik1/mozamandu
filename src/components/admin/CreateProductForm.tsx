@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Upload, Eye, X } from 'lucide-react';
+import { ArrowLeft, Upload, Eye, X, ImageIcon } from 'lucide-react';
 import { SmartProductVariantForm } from './SmartProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 import { ProductAdditionalImages, type AdditionalImage, type ProductAdditionalImagesRef } from './ProductAdditionalImages';
@@ -19,6 +19,7 @@ import { ProductSEOSection } from './ProductSEOSection';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
 import { uploadToR2 } from '@/utils/r2Upload';
 import { CareInstructionsInput } from './CareInstructionsInput';
+import { MediaPicker } from './MediaPicker';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
@@ -83,6 +84,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showInventoryPopup, setShowInventoryPopup] = useState(false);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [additionalImages, setAdditionalImages] = useState<AdditionalImage[]>([]);
   const additionalImagesRef = useRef<ProductAdditionalImagesRef>(null);
   const { toast } = useToast();
@@ -195,12 +197,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
     setUploadingImage(true);
     
     try {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-
+      setImagePreview(URL.createObjectURL(file));
       setImageFile(file);
       
       toast({
@@ -258,7 +255,12 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       let imageUrl = null;
       if (imageFile) {
         imageUrl = await uploadImageAndGetUrl();
+      } else if (imagePreview) {
+        imageUrl = imagePreview;
       }
+
+      const { ensureUploadedUrl } = await import('@/utils/r2Upload');
+      imageUrl = await ensureUploadedUrl(imageUrl, 'products');
 
       // Convert care_instructions to array for Supabase text[] column
       const careInstructionsArray = data.care_instructions
@@ -621,7 +623,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
               <div>
                 <Label>Product Image</Label>
                 <div className="mt-2 space-y-4">
-                  <div>
+                  <div className="flex gap-2 items-center">
                     <input
                       id="image-upload"
                       type="file"
@@ -637,6 +639,14 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                       <Upload className="h-4 w-4 mr-2" />
                       {uploadingImage ? 'Preparing...' : 'Upload Image'}
                     </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsMediaPickerOpen(true)}
+                    >
+                      <ImageIcon className="h-4 w-4 mr-2 text-primary" />
+                      Media Library
+                    </Button>
                   </div>
 
                   {imagePreview && (
@@ -725,6 +735,16 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
           isOpen={showInventoryPopup}
         />
       )}
+
+      <MediaPicker
+        open={isMediaPickerOpen}
+        onClose={() => setIsMediaPickerOpen(false)}
+        folder="products"
+        onSelect={(url) => {
+          setImagePreview(url);
+          setImageFile(null);
+        }}
+      />
     </div>
   );
 }

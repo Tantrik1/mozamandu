@@ -81,11 +81,7 @@ export const CategoryManagement = memo(function CategoryManagement() {
       }
 
       setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setImagePreview(URL.createObjectURL(file));
     }
   };
 
@@ -108,7 +104,7 @@ export const CategoryManagement = memo(function CategoryManagement() {
     e.preventDefault();
     setIsUploading(true);
     
-    let imageUrl = editingCategory?.image_url || null;
+    let imageUrl = imagePreview || editingCategory?.image_url || null;
     
     if (selectedImage) {
       const uploadedUrl = await uploadImage(selectedImage);
@@ -123,6 +119,19 @@ export const CategoryManagement = memo(function CategoryManagement() {
         setIsUploading(false);
         return;
       }
+    }
+
+    try {
+      const { ensureUploadedUrl } = await import('@/utils/r2Upload');
+      imageUrl = await ensureUploadedUrl(imageUrl, 'categories');
+    } catch (guardErr) {
+      toast({
+        title: "Upload Error",
+        description: guardErr instanceof Error ? guardErr.message : "Failed to process image",
+        variant: "destructive",
+      });
+      setIsUploading(false);
+      return;
     }
 
     const categoryData = {

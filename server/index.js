@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command, CopyObjectCommand } from '@aws-sdk/client-s3';
 import { createClient } from '@supabase/supabase-js';
 import cors from 'cors';
 
@@ -238,14 +238,158 @@ app.get(['/api/media/stats', '/media/stats'], async (req, res) => {
   }
 });
 
+// ── Sync Cloudflare R2 Bucket with media_library table ──────────
+app.post(['/api/media/sync', '/media/sync'], async (req, res) => {
+  try {
+    const listRes = await s3Client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
+    const r2Objects = listRes.Contents || [];
+    
+    const { data: dbItems, error: dbErr } = await supabase.from('media_library').select('*');
+    if (dbErr) throw dbErr;
+
+    const dbMap = new Map((dbItems || []).map(item => [item.r2_key, item]));
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    for (const obj of r2Objects) {
+      const key = obj.Key;
+      if (!key) continue;
+      const parts = key.split('/');
+      const folder = parts.length > 1 ? parts[0] : 'uploads';
+      const filename = parts[parts.length - 1];
+      const publicUrl = `${CDN_BASE}/${key}`;
+      const title = filename.replace(/\.[^/.]+$/, '').replace(/[-_]+/g, ' ');
+      const altText = title;
+      const ext = filename.split('.').pop()?.toLowerCase() || 'webp';
+      const mimeType = ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : 'image/webp';
+
+      const existing = dbMap.get(key);
+      if (!existing) {
+        await supabase.from('media_library').insert({
+          url: publicUrl,
+          r2_key: key,
+          filename,
+          title,
+          alt_text: altText,
+          folder,
+          mime_type: mimeType,
+          size_bytes: obj.Size || 0,
+        });
+        addedCount++;
+      } else if (existing.size_bytes !== obj.Size || existing.url !== publicUrl) {
+        await supabase.from('media_library').update({
+          size_bytes: obj.Size || 0,
+          url: publicUrl,
+        }).eq('id', existing.id);
+        updatedCount++;
+      }
+    }
+
+    clearCache();
+    console.log(`[R2 SYNC] Total: ${r2Objects.length}, Added: ${addedCount}, Updated: ${updatedCount}`);
+    return res.json({
+      success: true,
+      total_r2_files: r2Objects.length,
+      synced_added: addedCount,
+      synced_updated: updatedCount,
+    });
+  } catch (err) {
+    console.error('[R2 SYNC ERROR]', err);
+    return res.status(500).json({ error: err.message || 'R2 sync failed' });
+  }
+});
+
+// ── Rename / Move R2 File Key & Sync All Database Links ───────
+app.post(['/api/media/:id/rename', '/media/:id/rename'], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { new_filename, new_folder, title, alt_text } = req.body;
+
+    const { data: media, error: fetchErr } = await supabase
+      .from('media_library')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !media) {
+      return res.status(404).json({ error: 'Media item not found' });
+    }
+
+    const oldKey = media.r2_key;
+    const folder = new_folder !== undefined ? new_folder.trim().toLowerCase() : media.folder;
+    let filename = new_filename !== undefined ? new_filename.trim() : media.filename;
+    
+    // Ensure filename extension matches
+    const oldExt = oldKey.split('.').pop() || 'webp';
+    if (!filename.toLowerCase().endsWith(`.${oldExt.toLowerCase()}`)) {
+      filename = `${filename}.${oldExt}`;
+    }
+
+    const newKey = `${folder}/${filename}`.replace(/\/+/g, '/');
+    const newUrl = `${CDN_BASE}/${newKey}`;
+
+    if (oldKey !== newKey && oldKey) {
+      console.log(`[R2 RENAME] Copying ${oldKey} -> ${newKey} in R2...`);
+      await s3Client.send(new CopyObjectCommand({
+        Bucket: BUCKET,
+        CopySource: `${BUCKET}/${oldKey}`,
+        Key: newKey,
+      }));
+
+      await s3Client.send(new DeleteObjectCommand({
+        Bucket: BUCKET,
+        Key: oldKey,
+      }));
+    }
+
+    const updates = {
+      r2_key: newKey,
+      url: newUrl,
+      filename,
+      folder,
+    };
+    if (title !== undefined) updates.title = title;
+    if (alt_text !== undefined) updates.alt_text = alt_text;
+
+    const { data: updatedMedia, error: updateErr } = await supabase
+      .from('media_library')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    // Update all database tables referencing the old URL
+    if (media.url !== newUrl) {
+      await Promise.all([
+        supabase.from('products').update({ image_url: newUrl }).eq('image_url', media.url),
+        supabase.from('categories').update({ image_url: newUrl }).eq('image_url', media.url),
+        supabase.from('subcategories').update({ image_url: newUrl }).eq('image_url', media.url),
+        supabase.from('product_additional_images').update({ image_url: newUrl }).eq('image_url', media.url),
+        supabase.from('payment_methods').update({ qr_code_url: newUrl }).eq('qr_code_url', media.url),
+        supabase.from('site_settings').update({ value: newUrl }).eq('value', media.url),
+      ]);
+    }
+
+    clearCache();
+    console.log(`[R2 RENAME SUCCESS] ${oldKey} -> ${newKey}`);
+    return res.json(updatedMedia);
+  } catch (err) {
+    console.error('[R2 RENAME ERROR]', err);
+    return res.status(500).json({ error: err.message || 'Rename failed' });
+  }
+});
+
 // ── Update Media Metadata ───────────────────────────────────
 app.patch(['/api/media/:id', '/media/:id'], async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, alt_text } = req.body;
+    const { title, alt_text, folder } = req.body;
     const updates = {};
     if (title !== undefined) updates.title = title;
     if (alt_text !== undefined) updates.alt_text = alt_text;
+    if (folder !== undefined) updates.folder = folder;
 
     const { data, error } = await supabase
       .from('media_library')

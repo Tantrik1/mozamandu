@@ -86,11 +86,7 @@ export function NoticeManagement() {
       }
 
       setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setImagePreview(URL.createObjectURL(file));
     }
   };
 
@@ -109,11 +105,14 @@ export function NoticeManagement() {
     setIsSubmitting(true);
 
     try {
-      let imageUrl = editingNotice?.image_url || null;
+      let imageUrl = imagePreview || editingNotice?.image_url || null;
 
       if (selectedImage) {
         imageUrl = await uploadImage(selectedImage);
       }
+
+      const { ensureUploadedUrl } = await import('@/utils/r2Upload');
+      imageUrl = await ensureUploadedUrl(imageUrl, 'notice-images');
 
       const noticeData = {
         title: formData.title,

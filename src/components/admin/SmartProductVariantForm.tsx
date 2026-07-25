@@ -160,8 +160,9 @@ export function SmartProductVariantForm({
       
       // Optimize image with aggressive compression (~250KB)
       const { file: optimizedFile } = await prepareImageForUpload(file, PRODUCT_COMPRESSION);
-      const { uploadToR2 } = await import('@/utils/r2Upload');
-      const imageUrl = await uploadToR2(optimizedFile, 'color_variants');
+      const { uploadToR2, ensureUploadedUrl } = await import('@/utils/r2Upload');
+      let imageUrl = await uploadToR2(optimizedFile, 'color_variants');
+      imageUrl = (await ensureUploadedUrl(imageUrl, 'color_variants')) || imageUrl;
       updateColorVariant(colorIndex, 'image_url', imageUrl);
 
       toast({

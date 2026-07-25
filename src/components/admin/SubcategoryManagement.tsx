@@ -151,11 +151,7 @@ export function SubcategoryManagement() {
       }
 
       setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setImagePreview(URL.createObjectURL(file));
     }
   };
 
@@ -201,7 +197,7 @@ export function SubcategoryManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    let imageUrl = editingSubcategory?.image_url || null;
+    let imageUrl = imagePreview || editingSubcategory?.image_url || null;
     
     // Upload new image if selected
     if (selectedImage) {
@@ -216,6 +212,18 @@ export function SubcategoryManagement() {
         });
         return;
       }
+    }
+
+    try {
+      const { ensureUploadedUrl } = await import('@/utils/r2Upload');
+      imageUrl = await ensureUploadedUrl(imageUrl, 'subcategories');
+    } catch (guardErr) {
+      toast({
+        title: "Upload Error",
+        description: guardErr instanceof Error ? guardErr.message : "Failed to process image",
+        variant: "destructive",
+      });
+      return;
     }
 
     const subcategoryData = {

@@ -39,3 +39,35 @@ export async function uploadToR2(
 
   return data.url;
 }
+
+/**
+ * Ensures an image reference is a public HTTP/HTTPS URL.
+ * If given a base64 data URI or blob URL, it converts it to a Blob and uploads it to R2.
+ */
+export async function ensureUploadedUrl(
+  urlOrData: string | null | undefined,
+  folder: string = "uploads"
+): Promise<string | null> {
+  if (!urlOrData) return null;
+
+  // If already a valid public HTTP/HTTPS URL, return as-is
+  if (urlOrData.startsWith('http://') || urlOrData.startsWith('https://')) {
+    return urlOrData;
+  }
+
+  // If it's a base64 data URI or blob URL, upload to R2
+  if (urlOrData.startsWith('data:') || urlOrData.startsWith('blob:')) {
+    try {
+      console.log(`[R2 Guard] Converting legacy data/blob URL in folder '${folder}' to R2...`);
+      const res = await fetch(urlOrData);
+      const blob = await res.blob();
+      return await uploadToR2(blob, folder);
+    } catch (err) {
+      console.error('[R2 Guard Error] Failed to process image:', err);
+      throw new Error('Failed to process image. Please re-select the image file.');
+    }
+  }
+
+  return urlOrData;
+}
+

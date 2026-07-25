@@ -62,11 +62,14 @@ export function MediaPage() {
   const [folderFilter, setFolderFilter] = useState('');
   const [showOnlyUnused, setShowOnlyUnused] = useState(false);
 
-  // Selected item for detail/editing
+  // Selected item for detail/editing & renaming in R2
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editAlt, setEditAlt] = useState('');
+  const [editFilename, setEditFilename] = useState('');
+  const [editFolder, setEditFolder] = useState('');
   const [isSavingMeta, setIsSavingMeta] = useState(false);
+  const [syncingR2, setSyncingR2] = useState(false);
 
   // MediaPicker dialog states
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -140,35 +143,64 @@ export function MediaPage() {
     }
   };
 
-  const handleSaveMeta = async () => {
+  const handleSyncR2 = async () => {
+    setSyncingR2(true);
+    try {
+      const res = await fetch('/api/media/sync', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        toast({
+          title: 'Cloudflare R2 Synced!',
+          description: `Synced ${data.total_r2_files} file(s) from bucket. Added ${data.synced_added} new items.`,
+        });
+        fetchMedia();
+        fetchStats();
+      } else {
+        throw new Error('R2 sync failed');
+      }
+    } catch (err) {
+      toast({ title: 'Sync Error', description: 'Failed to sync with Cloudflare R2 bucket', variant: 'destructive' });
+    } finally {
+      setSyncingR2(false);
+    }
+  };
+
+  const handleSaveMetaAndRename = async () => {
     if (!editingItem) return;
     setIsSavingMeta(true);
     try {
-      const res = await fetch(`/api/media/${editingItem.id}`, {
-        method: 'PATCH',
+      const res = await fetch(`/api/media/${editingItem.id}/rename`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: editTitle, alt_text: editAlt }),
+        body: JSON.stringify({
+          new_filename: editFilename,
+          new_folder: editFolder,
+          title: editTitle,
+          alt_text: editAlt,
+        }),
       });
       if (res.ok) {
-        toast({ title: 'Success', description: 'SEO Metadata updated' });
+        toast({ title: 'Updated & Renamed!', description: 'Cloudflare R2 key & database updated' });
         setEditingItem(null);
         fetchMedia();
+        fetchStats();
       } else {
-        throw new Error('Failed to update metadata');
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update item');
       }
     } catch (err) {
-      toast({ title: 'Error', description: 'Failed to update metadata', variant: 'destructive' });
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to update', variant: 'destructive' });
     } finally {
       setIsSavingMeta(false);
     }
   };
 
   const handleDeleteMedia = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this media item from Cloudflare R2?')) return;
+    if (!confirm('Are you sure you want to delete this media item from Cloudflare R2 bucket?')) return;
     try {
       const res = await fetch(`/api/media/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        toast({ title: 'Deleted', description: 'Image deleted from R2 and database' });
+        toast({ title: 'Deleted', description: 'Image deleted from Cloudflare R2 and database' });
         fetchMedia();
         fetchStats();
       } else {
@@ -410,17 +442,28 @@ export function MediaPage() {
         {/* TAB 3: MEDIA LIBRARY MANAGEMENT */}
         <TabsContent value="library">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <CardTitle>Cloudflare R2 Media Library</CardTitle>
                 <CardDescription>
-                  Browse all images, manage SEO titles & alt tags, delete unused files.
+                  Browse all images, edit R2 file keys, manage SEO titles & alt tags, delete unused files.
                 </CardDescription>
               </div>
-              <Button onClick={() => { setPickerTarget(null); setPickerOpen(true); }} className="gap-2">
-                <ImageIcon className="h-4 w-4" />
-                Upload New Media
-              </Button>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  onClick={handleSyncR2}
+                  disabled={syncingR2}
+                  className="gap-2 flex-1 sm:flex-initial"
+                >
+                  <RefreshCw className={`h-4 w-4 ${syncingR2 ? 'animate-spin' : ''}`} />
+                  {syncingR2 ? 'Syncing R2...' : 'Sync Cloudflare R2'}
+                </Button>
+                <Button onClick={() => { setPickerTarget(null); setPickerOpen(true); }} className="gap-2 flex-1 sm:flex-initial">
+                  <ImageIcon className="h-4 w-4" />
+                  Upload New Media
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Search & Filters */}
@@ -438,7 +481,7 @@ export function MediaPage() {
                 <select
                   value={folderFilter}
                   onChange={(e) => setFolderFilter(e.target.value)}
-                  className="px-3 py-2 border rounded-md text-sm bg-background"
+                  className="px-3 py-2 border rounded-md text-sm bg-background font-medium"
                 >
                   <option value="">All Folders</option>
                   <option value="products">Products</option>
@@ -446,10 +489,13 @@ export function MediaPage() {
                   <option value="subcategories">Subcategories</option>
                   <option value="color_variants">Color Variants</option>
                   <option value="hero">Hero Backgrounds</option>
-                  <option value="website">Website & Logo Assets</option>
+                  <option value="website">Website Assets</option>
+                  <option value="logos">Logos & Favicons</option>
                   <option value="payment_methods">Payment Methods</option>
+                  <option value="payment-qr-codes">Payment QR Codes</option>
                   <option value="notice-images">Notices</option>
                   <option value="blog-images">Blog</option>
+                  <option value="assets">Theme Assets</option>
                   <option value="uploads">General Uploads</option>
                 </select>
 
@@ -473,7 +519,7 @@ export function MediaPage() {
                 <div className="py-16 text-center border-2 border-dashed rounded-lg">
                   <ImageIcon className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
                   <p className="text-sm font-medium">No media found</p>
-                  <p className="text-xs text-muted-foreground mt-1">Try adjusting your filters or upload new images.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Try adjusting your filters or click "Sync Cloudflare R2".</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -521,10 +567,25 @@ export function MediaPage() {
                               setEditingItem(item);
                               setEditTitle(item.title || '');
                               setEditAlt(item.alt_text || '');
+                              setEditFilename(item.filename || '');
+                              setEditFolder(item.folder || 'uploads');
                             }}
-                            title="Edit SEO Title & Alt Text"
+                            title="Edit SEO & Rename R2 File"
                           >
                             <Edit3 className="h-3.5 w-3.5 text-slate-600" />
+                          </Button>
+
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => {
+                              navigator.clipboard.writeText(item.url);
+                              toast({ title: 'URL Copied', description: 'CDN URL copied to clipboard' });
+                            }}
+                            title="Copy Public R2 CDN URL"
+                          >
+                            <Check className="h-3.5 w-3.5 text-slate-600" />
                           </Button>
 
                           <a
@@ -542,7 +603,7 @@ export function MediaPage() {
                             variant="ghost"
                             className="h-7 w-7 text-destructive hover:bg-destructive/10"
                             onClick={() => handleDeleteMedia(item.id)}
-                            title="Delete image"
+                            title="Delete image from R2"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -557,34 +618,74 @@ export function MediaPage() {
         </TabsContent>
       </Tabs>
 
-      {/* SEO Metadata Editing Modal */}
+      {/* Advanced R2 File Editing & Renaming Modal */}
       {editingItem && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-lg bg-background">
+          <Card className="w-full max-w-lg bg-background shadow-xl">
             <CardHeader>
-              <CardTitle className="text-lg">Edit SEO Metadata</CardTitle>
-              <CardDescription className="truncate">{editingItem.filename}</CardDescription>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Edit3 className="h-5 w-5 text-primary" />
+                Edit & Rename R2 Bucket Image
+              </CardTitle>
+              <CardDescription className="truncate font-mono text-xs text-muted-foreground">
+                {editingItem.url}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="h-32 rounded border overflow-hidden bg-slate-100 flex items-center justify-center">
+              <div className="h-36 rounded-lg border overflow-hidden bg-slate-100 flex items-center justify-center p-2">
                 <img src={editingItem.url} alt="Preview" className="max-h-full object-contain" />
               </div>
 
-              <div className="space-y-2">
-                <Label>SEO Title</Label>
-                <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Image Title" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Folder Category</Label>
+                  <select
+                    value={editFolder}
+                    onChange={(e) => setEditFolder(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md text-xs bg-background font-medium"
+                  >
+                    <option value="products">Products</option>
+                    <option value="categories">Categories</option>
+                    <option value="subcategories">Subcategories</option>
+                    <option value="color_variants">Color Variants</option>
+                    <option value="hero">Hero Backgrounds</option>
+                    <option value="website">Website Assets</option>
+                    <option value="logos">Logos & Favicons</option>
+                    <option value="payment_methods">Payment Methods</option>
+                    <option value="payment-qr-codes">Payment QR Codes</option>
+                    <option value="notice-images">Notices</option>
+                    <option value="blog-images">Blog</option>
+                    <option value="assets">Theme Assets</option>
+                    <option value="uploads">General Uploads</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">R2 Filename</Label>
+                  <Input
+                    value={editFilename}
+                    onChange={(e) => setEditFilename(e.target.value)}
+                    placeholder="my-image.webp"
+                    className="text-xs font-mono"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>SEO Alt Text</Label>
-                <Input value={editAlt} onChange={(e) => setEditAlt(e.target.value)} placeholder="Alt description for search engines & accessibility" />
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">SEO Title</Label>
+                <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Display / Search Title" className="text-sm" />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setEditingItem(null)}>Cancel</Button>
-                <Button onClick={handleSaveMeta} disabled={isSavingMeta} className="gap-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">SEO Alt Text</Label>
+                <Input value={editAlt} onChange={(e) => setEditAlt(e.target.value)} placeholder="Alt text for search engines & screen readers" className="text-sm" />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <Button variant="outline" size="sm" onClick={() => setEditingItem(null)}>Cancel</Button>
+                <Button onClick={handleSaveMetaAndRename} disabled={isSavingMeta} size="sm" className="gap-2">
                   <Save className="h-4 w-4" />
-                  Save Metadata
+                  Save & Rename R2 Key
                 </Button>
               </div>
             </CardContent>

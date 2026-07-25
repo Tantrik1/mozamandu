@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, Upload, Eye, X, Save, AlertTriangle } from 'lucide-react';
+import { Trash2, Plus, Upload, Eye, X, Save, AlertTriangle, Image as ImageIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimizer';
+import { MediaPicker } from './MediaPicker';
 
 interface SizeVariant {
   id?: string;
@@ -89,6 +90,7 @@ export function EnhancedProductVariantForm({
   const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const [pickerState, setPickerState] = useState<{ open: boolean; targetIndex: number | null }>({ open: false, targetIndex: null });
   const [productInfo, setProductInfo] = useState<any>(null);
   const { toast } = useToast();
 
@@ -269,8 +271,9 @@ export function EnhancedProductVariantForm({
     try {
       // Optimize image to WebP before uploading
       const { file: optimizedFile } = await prepareImageForUpload(file, PRODUCT_COMPRESSION);
-      const { uploadToR2 } = await import('@/utils/r2Upload');
-      const imageUrl = await uploadToR2(optimizedFile, 'color_variants');
+      const { uploadToR2, ensureUploadedUrl } = await import('@/utils/r2Upload');
+      let imageUrl = await uploadToR2(optimizedFile, 'color_variants');
+      imageUrl = (await ensureUploadedUrl(imageUrl, 'color_variants')) || imageUrl;
       updateColorVariant(colorIndex, 'image_url', imageUrl);
 
       toast({
@@ -737,13 +740,24 @@ export function EnhancedProductVariantForm({
                         onChange={(e) => handleImageUpload(e, originalIndex)}
                         className="hidden"
                       />
-                      <label
-                        htmlFor={`image-upload-${originalIndex}`}
-                        className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploading[`color-${originalIndex}`] ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        {uploading[`color-${originalIndex}`] ? 'Uploading...' : 'Upload Image'}
-                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <label
+                          htmlFor={`image-upload-${originalIndex}`}
+                          className={`cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploading[`color-${originalIndex}`] ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          {uploading[`color-${originalIndex}`] ? 'Uploading...' : 'Upload File'}
+                        </label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setPickerState({ open: true, targetIndex: originalIndex })}
+                          className="gap-2"
+                        >
+                          <ImageIcon className="h-4 w-4 text-primary" />
+                          Media Library
+                        </Button>
+                      </div>
 
                       {colorVariant.image_url && (
                         <div className="relative">
@@ -855,6 +869,18 @@ export function EnhancedProductVariantForm({
           {loading ? 'Saving Variants...' : 'Save Variants & Manage Inventory'}
         </Button>
       </div>
+
+      <MediaPicker
+        open={pickerState.open}
+        onClose={() => setPickerState({ open: false, targetIndex: null })}
+        folder="color_variants"
+        onSelect={(url) => {
+          if (pickerState.targetIndex !== null) {
+            updateColorVariant(pickerState.targetIndex, 'image_url', url);
+            toast({ title: 'Variant Image Updated', description: 'Selected image from Media Library' });
+          }
+        }}
+      />
     </div>
   );
 }
