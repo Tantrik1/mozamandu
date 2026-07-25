@@ -1,6 +1,8 @@
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { DollarSign, ShoppingCart, TrendingUp, TrendingDown, Percent, RotateCcw } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { DollarSign, ShoppingCart, TrendingUp, TrendingDown, Percent, RotateCcw, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface CoreBusinessStatsProps {
   totalRevenue: number;
@@ -8,9 +10,9 @@ interface CoreBusinessStatsProps {
   netProfit: number;
   grossMargin: number;
   averageOrderValue: number;
-  conversionRate: number;
+  conversionRate?: number;
   refundRate: number;
-  returnRate: number;
+  returnRate?: number;
 }
 
 export function CoreBusinessStats({
@@ -19,162 +21,232 @@ export function CoreBusinessStats({
   netProfit,
   grossMargin,
   averageOrderValue,
-  conversionRate,
   refundRate,
-  returnRate
 }: CoreBusinessStatsProps) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // 6 Core Stats (Conversion Rate & Return Rate Removed as requested)
   const stats = [
     {
+      id: 'revenue',
       label: 'Total Revenue',
       value: `Rs. ${totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
       icon: DollarSign,
-      color: 'text-emerald-600',
-      bgColor: 'bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/40 dark:to-emerald-900/20',
-      borderColor: 'border-emerald-200/50 dark:border-emerald-800/30',
-      glowColor: 'shadow-emerald-500/10'
+      color: 'text-emerald-600 dark:text-emerald-400',
+      bgColor: 'bg-emerald-500/10 dark:bg-emerald-500/20',
+      borderColor: 'border-emerald-500/20 dark:border-emerald-500/30',
+      glowColor: 'hover:shadow-emerald-500/15'
     },
     {
+      id: 'orders',
       label: 'Total Orders',
       value: totalOrders.toLocaleString(),
       icon: ShoppingCart,
-      color: 'text-blue-600',
-      bgColor: 'bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20',
-      borderColor: 'border-blue-200/50 dark:border-blue-800/30',
-      glowColor: 'shadow-blue-500/10'
+      color: 'text-blue-600 dark:text-blue-400',
+      bgColor: 'bg-blue-500/10 dark:bg-blue-500/20',
+      borderColor: 'border-blue-500/20 dark:border-blue-500/30',
+      glowColor: 'hover:shadow-blue-500/15'
     },
     {
+      id: 'profit',
       label: 'Net Profit',
       value: `Rs. ${netProfit.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
       icon: netProfit >= 0 ? TrendingUp : TrendingDown,
-      color: netProfit >= 0 ? 'text-emerald-600' : 'text-red-600',
+      color: netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400',
       bgColor: netProfit >= 0 
-        ? 'bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/40 dark:to-emerald-900/20'
-        : 'bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/40 dark:to-red-900/20',
-      borderColor: netProfit >= 0 ? 'border-emerald-200/50 dark:border-emerald-800/30' : 'border-red-200/50 dark:border-red-800/30',
-      glowColor: netProfit >= 0 ? 'shadow-emerald-500/10' : 'shadow-red-500/10'
+        ? 'bg-emerald-500/10 dark:bg-emerald-500/20'
+        : 'bg-rose-500/10 dark:bg-rose-500/20',
+      borderColor: netProfit >= 0 ? 'border-emerald-500/20 dark:border-emerald-500/30' : 'border-rose-500/20 dark:border-rose-500/30',
+      glowColor: netProfit >= 0 ? 'hover:shadow-emerald-500/15' : 'hover:shadow-rose-500/15'
     },
     {
+      id: 'margin',
       label: 'Gross Margin',
       value: `${grossMargin.toFixed(1)}%`,
       icon: Percent,
-      color: 'text-purple-600',
-      bgColor: 'bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/40 dark:to-purple-900/20',
-      borderColor: 'border-purple-200/50 dark:border-purple-800/30',
-      glowColor: 'shadow-purple-500/10'
+      color: 'text-purple-600 dark:text-purple-400',
+      bgColor: 'bg-purple-500/10 dark:bg-purple-500/20',
+      borderColor: 'border-purple-500/20 dark:border-purple-500/30',
+      glowColor: 'hover:shadow-purple-500/15'
     },
     {
+      id: 'aov',
       label: 'Avg Order Value',
       value: `Rs. ${averageOrderValue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
       icon: DollarSign,
-      color: 'text-orange-600',
-      bgColor: 'bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/40 dark:to-orange-900/20',
-      borderColor: 'border-orange-200/50 dark:border-orange-800/30',
-      glowColor: 'shadow-orange-500/10'
+      color: 'text-amber-600 dark:text-amber-400',
+      bgColor: 'bg-amber-500/10 dark:bg-amber-500/20',
+      borderColor: 'border-amber-500/20 dark:border-amber-500/30',
+      glowColor: 'hover:shadow-amber-500/15'
     },
     {
-      label: 'Conversion Rate',
-      value: conversionRate > 0 ? `${conversionRate.toFixed(1)}%` : 'N/A',
-      icon: TrendingUp,
-      color: 'text-cyan-600',
-      bgColor: 'bg-gradient-to-br from-cyan-50 to-cyan-100/50 dark:from-cyan-950/40 dark:to-cyan-900/20',
-      borderColor: 'border-cyan-200/50 dark:border-cyan-800/30',
-      glowColor: 'shadow-cyan-500/10'
-    },
-    {
+      id: 'cancellation',
       label: 'Cancellation Rate',
       value: `${refundRate.toFixed(1)}%`,
       icon: RotateCcw,
-      color: 'text-amber-600',
-      bgColor: 'bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/40 dark:to-amber-900/20',
-      borderColor: 'border-amber-200/50 dark:border-amber-800/30',
-      glowColor: 'shadow-amber-500/10'
-    },
-    {
-      label: 'Return Rate',
-      value: returnRate > 0 ? `${returnRate.toFixed(1)}%` : 'N/A',
-      icon: RotateCcw,
-      color: 'text-rose-600',
-      bgColor: 'bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/40 dark:to-rose-900/20',
-      borderColor: 'border-rose-200/50 dark:border-rose-800/30',
-      glowColor: 'shadow-rose-500/10'
+      color: 'text-orange-600 dark:text-orange-400',
+      bgColor: 'bg-orange-500/10 dark:bg-orange-500/20',
+      borderColor: 'border-orange-500/20 dark:border-orange-500/30',
+      glowColor: 'hover:shadow-orange-500/15'
     }
   ];
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.05
-      }
+  // Auto-slide 3 seconds timer
+  useEffect(() => {
+    if (!isAutoPlaying) return;
+
+    const timer = setInterval(() => {
+      setActiveIndex((prev) => {
+        const nextIndex = (prev + 1) % stats.length;
+        scrollToCard(nextIndex);
+        return nextIndex;
+      });
+    }, 3000);
+
+    return () => clearInterval(timer);
+  }, [isAutoPlaying, stats.length]);
+
+  const scrollToCard = (index: number) => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      const cardWidth = container.scrollWidth / stats.length;
+      container.scrollTo({
+        left: cardWidth * index,
+        behavior: 'smooth',
+      });
     }
   };
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20, scale: 0.95 },
-    visible: { 
-      opacity: 1, 
-      y: 0, 
-      scale: 1,
-      transition: {
-        type: "spring" as const,
-        stiffness: 300,
-        damping: 24
-      }
-    }
+  const handleNext = () => {
+    const nextIndex = (activeIndex + 1) % stats.length;
+    setActiveIndex(nextIndex);
+    scrollToCard(nextIndex);
+  };
+
+  const handlePrev = () => {
+    const prevIndex = (activeIndex - 1 + stats.length) % stats.length;
+    setActiveIndex(prevIndex);
+    scrollToCard(prevIndex);
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-          Core Business Stats
-        </h2>
+    <div className="space-y-3">
+      {/* Top Header Controls Bar */}
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+          <h2 className="text-base font-bold text-foreground tracking-tight">Core Business Stats</h2>
+          <span className="text-xs text-muted-foreground font-medium hidden sm:inline">(6 Key Metrics)</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Pause / Play Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsAutoPlaying(!isAutoPlaying)}
+            className="h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground"
+            title={isAutoPlaying ? "Pause Auto-Slide (3s)" : "Start Auto-Slide (3s)"}
+          >
+            {isAutoPlaying ? <Pause className="h-3.5 w-3.5 text-primary animate-pulse" /> : <Play className="h-3.5 w-3.5" />}
+          </Button>
+
+          {/* Nav Arrows */}
+          <div className="flex items-center gap-1 bg-muted/30 p-0.5 rounded-lg border border-border/50">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handlePrev}
+              className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleNext}
+              className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
-      <motion.div 
-        className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
+
+      {/* One-Row Carousel Container */}
+      <div 
+        className="relative group"
+        onMouseEnter={() => setIsAutoPlaying(false)}
+        onMouseLeave={() => setIsAutoPlaying(true)}
       >
-        {stats.map((stat, index) => (
-          <motion.div key={stat.label} variants={itemVariants}>
-            <Card className={`
-              group relative overflow-hidden border ${stat.borderColor}
-              hover:shadow-lg ${stat.glowColor} transition-all duration-300
-              hover:-translate-y-0.5
-            `}>
-              {/* Animated background gradient */}
-              <div className={`absolute inset-0 ${stat.bgColor} opacity-60`} />
-              <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent dark:from-white/5" />
-              
-              <CardContent className="relative p-3 sm:p-4">
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <motion.div 
-                      className={`p-1.5 sm:p-2 rounded-xl ${stat.bgColor} border ${stat.borderColor} shrink-0`}
-                      whileHover={{ scale: 1.1, rotate: 5 }}
-                      transition={{ type: "spring", stiffness: 400 }}
-                    >
-                      <stat.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${stat.color}`} />
-                    </motion.div>
-                    <p className="text-xs text-muted-foreground font-medium">{stat.label}</p>
-                  </div>
-                  <motion.p 
-                    className="text-base sm:text-lg font-bold text-foreground break-all leading-tight"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    key={stat.value}
-                  >
-                    {stat.value}
-                  </motion.p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </motion.div>
+        <div
+          ref={scrollContainerRef}
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory touch-pan-x"
+        >
+          {stats.map((stat, index) => {
+            const Icon = stat.icon;
+            const isActive = index === activeIndex;
+
+            return (
+              <motion.div
+                key={stat.id}
+                className="snap-start min-w-[140px] sm:min-w-0"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <Card
+                  onClick={() => {
+                    setActiveIndex(index);
+                    scrollToCard(index);
+                  }}
+                  className={`
+                    relative overflow-hidden cursor-pointer transition-all duration-300 border
+                    ${stat.borderColor} ${stat.glowColor} hover:shadow-md hover:-translate-y-0.5
+                    ${isActive ? 'ring-2 ring-primary/40 shadow-sm scale-[1.02]' : 'opacity-95'}
+                  `}
+                >
+                  {/* Subtle Background Accent */}
+                  <div className={`absolute inset-0 ${stat.bgColor} opacity-40`} />
+
+                  <CardContent className="relative p-3 space-y-1.5">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-[11px] font-semibold text-muted-foreground tracking-tight truncate">
+                        {stat.label}
+                      </span>
+                      <div className={`p-1 rounded-md ${stat.bgColor} ${stat.color} shrink-0`}>
+                        <Icon className="h-3.5 w-3.5" />
+                      </div>
+                    </div>
+
+                    <p className="text-sm sm:text-base font-extrabold text-foreground tracking-tight truncate">
+                      {stat.value}
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* Mobile Pagination Dot Indicators */}
+        <div className="flex items-center justify-center gap-1.5 pt-1 lg:hidden">
+          {stats.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                setActiveIndex(i);
+                scrollToCard(i);
+              }}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                i === activeIndex ? 'w-4 bg-primary' : 'w-1.5 bg-muted-foreground/30'
+              }`}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
