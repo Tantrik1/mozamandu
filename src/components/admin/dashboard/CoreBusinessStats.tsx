@@ -183,7 +183,7 @@ export function CoreBusinessStats({
       >
         <div
           ref={scrollContainerRef}
-          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory touch-pan-x"
+          className="grid grid-cols-3 sm:grid-cols-6 gap-2 overflow-x-auto pb-1.5 scrollbar-none snap-x snap-mandatory touch-pan-x"
         >
           {stats.map((stat, index) => {
             const Icon = stat.icon;
@@ -192,10 +192,10 @@ export function CoreBusinessStats({
             return (
               <motion.div
                 key={stat.id}
-                className="snap-start min-w-[140px] sm:min-w-0"
-                initial={{ opacity: 0, y: 15 }}
+                className="snap-start min-w-[110px] sm:min-w-0"
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
+                transition={{ delay: index * 0.04 }}
               >
                 <Card
                   onClick={() => {
@@ -204,24 +204,24 @@ export function CoreBusinessStats({
                   }}
                   className={`
                     relative overflow-hidden cursor-pointer transition-all duration-300 border
-                    ${stat.borderColor} ${stat.glowColor} hover:shadow-md hover:-translate-y-0.5
-                    ${isActive ? 'ring-2 ring-primary/40 shadow-sm scale-[1.02]' : 'opacity-95'}
+                    ${stat.borderColor} ${stat.glowColor} hover:shadow-xs hover:-translate-y-0.5
+                    ${isActive ? 'ring-2 ring-primary/40 shadow-xs scale-[1.01]' : 'opacity-95'}
                   `}
                 >
                   {/* Subtle Background Accent */}
                   <div className={`absolute inset-0 ${stat.bgColor} opacity-40`} />
 
-                  <CardContent className="relative p-3 space-y-1.5">
+                  <CardContent className="relative p-2.5 space-y-1">
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-[11px] font-semibold text-muted-foreground tracking-tight truncate">
+                      <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground tracking-tight truncate">
                         {stat.label}
                       </span>
                       <div className={`p-1 rounded-md ${stat.bgColor} ${stat.color} shrink-0`}>
-                        <Icon className="h-3.5 w-3.5" />
+                        <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       </div>
                     </div>
 
-                    <p className="text-sm sm:text-base font-extrabold text-foreground tracking-tight truncate">
+                    <p className="text-xs sm:text-sm font-extrabold text-foreground tracking-tight truncate">
                       {stat.value}
                     </p>
                   </CardContent>
