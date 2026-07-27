@@ -347,8 +347,9 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                 <Package className="h-5 w-5" />
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight text-foreground">Create New Product</h1>
-                <p className="text-xs text-muted-foreground">Add a new item to your store catalog</p>
+                <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground truncate max-w-xs sm:max-w-md md:max-w-lg">
+                  {form.watch('name') ? `Create ${form.watch('name')}` : 'Create New Product'}
+                </h1>
               </div>
             </div>
           </div>

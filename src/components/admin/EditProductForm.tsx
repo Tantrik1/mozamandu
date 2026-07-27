@@ -347,13 +347,12 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                 <Package className="h-5 w-5" />
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                  Edit Product
-                  <Badge variant={form.watch('status') === 'active' ? "default" : "secondary"} className="text-[10px] uppercase font-bold">
+                <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground flex items-center gap-2 max-w-xs sm:max-w-md md:max-w-lg">
+                  <span className="truncate">Edit {form.watch('name') || 'Product'}</span>
+                  <Badge variant={form.watch('status') === 'active' ? "default" : "secondary"} className="text-[10px] uppercase font-bold shrink-0">
                     {form.watch('status')}
                   </Badge>
                 </h1>
-                <p className="text-xs text-muted-foreground truncate max-w-xs">{form.watch('name')}</p>
               </div>
             </div>
           </div>
