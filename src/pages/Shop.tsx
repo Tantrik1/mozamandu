@@ -268,9 +268,6 @@ const Shop = memo(function Shop() {
   }, [localSearch, setSearchParams]);
 
   const handleRemoveFilter = useCallback((filterId: string, type: string) => {
-    setIsFiltering(true);
-    setTimeout(() => setIsFiltering(false), 300);
-    
     switch (type) {
       case 'category':
         setSelectedCategoryId(null);
@@ -293,9 +290,6 @@ const Shop = memo(function Shop() {
   }, [setSearchParams]);
 
   const handleClearAllFilters = useCallback(() => {
-    setIsFiltering(true);
-    setTimeout(() => setIsFiltering(false), 300);
-    
     setSelectedCategoryId(null);
     setSelectedSubcategoryId(null);
     setSelectedColorIds([]);
@@ -437,15 +431,11 @@ const Shop = memo(function Shop() {
             setSelectedCategoryId(id);
             setSelectedSubcategoryId(null);
             updateUrlParams({ category: id, subcategory: null });
-            setIsFiltering(true);
-            setTimeout(() => setIsFiltering(false), 300);
           }}
           selectedSubcategoryId={selectedSubcategoryId}
           onSubcategorySelect={(id) => {
             setSelectedSubcategoryId(id);
             updateUrlParams({ subcategory: id });
-            setIsFiltering(true);
-            setTimeout(() => setIsFiltering(false), 300);
           }}
           onMoreFilters={() => setFilterSheetOpen(true)}
           activeFilterCount={filterCount}
@@ -495,14 +485,10 @@ const Shop = memo(function Shop() {
               setSelectedCategoryId(id);
               setSelectedSubcategoryId(null);
               updateUrlParams({ category: id, subcategory: null });
-              setIsFiltering(true);
-              setTimeout(() => setIsFiltering(false), 300);
             }}
             onSubcategorySelect={(id) => {
               setSelectedSubcategoryId(id);
               updateUrlParams({ subcategory: id });
-              setIsFiltering(true);
-              setTimeout(() => setIsFiltering(false), 300);
             }}
             availableColors={availableColors}
             selectedColorIds={selectedColorIds}
@@ -603,15 +589,24 @@ const Shop = memo(function Shop() {
       <FilterBottomSheet
         isOpen={filterSheetOpen}
         onClose={() => setFilterSheetOpen(false)}
+        categories={categories}
+        selectedCategoryId={selectedCategoryId}
+        onCategorySelect={(id) => {
+          setSelectedCategoryId(id);
+          setSelectedSubcategoryId(null);
+          updateUrlParams({ category: id, subcategory: null });
+        }}
+        selectedSubcategoryId={selectedSubcategoryId}
+        onSubcategorySelect={(id) => {
+          setSelectedSubcategoryId(id);
+          updateUrlParams({ subcategory: id });
+        }}
         availableColors={availableColors}
         selectedColorIds={selectedColorIds}
         onColorToggle={handleColorToggle}
         priceRange={priceRange}
         onPriceChange={setPriceRange}
-        onApply={() => {
-          setIsFiltering(true);
-          setTimeout(() => setIsFiltering(false), 300);
-        }}
+        onApply={() => setFilterSheetOpen(false)}
         onReset={handleClearAllFilters}
         resultCount={filteredProducts.length}
       />
