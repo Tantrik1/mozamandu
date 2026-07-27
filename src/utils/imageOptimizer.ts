@@ -60,8 +60,56 @@ export function validateFileSize(file: File): { valid: boolean; message?: string
 }
 
 /**
+ * Checks if a file is an Apple HEIC/HEIF image format from iPhone
+ */
+export function isHeicFile(file: File): boolean {
+  const mimeType = (file.type || '').toLowerCase();
+  const name = (file.name || '').toLowerCase();
+  return (
+    mimeType.includes('heic') ||
+    mimeType.includes('heif') ||
+    name.endsWith('.heic') ||
+    name.endsWith('.heif')
+  );
+}
+
+/**
+ * Automatically converts iPhone HEIC/HEIF photos to JPEG in-browser
+ */
+export async function convertHeicIfNeeded(file: File): Promise<File> {
+  if (!isHeicFile(file)) return file;
+
+  console.log(`HEIC/HEIF image detected (${file.name}). Converting iPhone photo...`);
+  try {
+    const heic2anyModule = await import('heic2any');
+    const heic2any = heic2anyModule.default;
+
+    const convertedResult = await heic2any({
+      blob: file,
+      toType: 'image/jpeg',
+      quality: 0.95,
+    });
+
+    const resultBlob = Array.isArray(convertedResult) ? convertedResult[0] : convertedResult;
+    const baseName = file.name.replace(/\.(heic|heif)$/i, '');
+    return new File([resultBlob], `${baseName}.jpg`, { type: 'image/jpeg' });
+  } catch (error) {
+    console.error('Error converting HEIC image:', error);
+    throw new Error('Failed to convert iPhone HEIC photo. Please ensure file is a valid image.');
+  }
+}
+
+/**
+ * Checks if a file is an image (including iPhone HEIC format)
+ */
+export function isImageFile(file: File): boolean {
+  if (isHeicFile(file)) return true;
+  return file.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif|avif|bmp|svg)$/i.test(file.name);
+}
+
+/**
  * Converts an image file to high-quality WebP format
- * Targets 800KB-1MB output with excellent visual quality
+ * Supports iPhone HEIC/HEIF, JPG, PNG, WebP
  */
 export async function optimizeImage(
   file: File,
@@ -69,33 +117,36 @@ export async function optimizeImage(
 ): Promise<OptimizedImageResult> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   
+  // 1. Convert iPhone HEIC/HEIF files first if needed
+  const targetFile = await convertHeicIfNeeded(file);
+
   // Validate the original file size
-  const validation = validateFileSize(file);
+  const validation = validateFileSize(targetFile);
   if (!validation.valid) {
     throw new Error(validation.message);
   }
 
   // Skip optimization if requested
   if (opts.skipOptimization) {
-    const preview = await generatePreview(file);
-    return { file, preview };
+    const preview = await generatePreview(targetFile);
+    return { file: targetFile, preview };
   }
 
   try {
-    const originalSizeKB = file.size / 1024;
+    const originalSizeKB = targetFile.size / 1024;
     const targetSizeKB = (opts.maxSizeMB || TARGET_SIZE_MB) * 1024;
     
-    console.log(`Processing ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`Processing ${targetFile.name}: ${(targetFile.size / 1024 / 1024).toFixed(2)}MB`);
     
     // If file is already small and WebP, minimal processing
-    if (file.type === 'image/webp' && originalSizeKB <= targetSizeKB * 1.2) {
+    if (targetFile.type === 'image/webp' && originalSizeKB <= targetSizeKB * 1.2) {
       console.log(`File already optimized WebP, keeping as-is`);
-      const preview = await generatePreview(file);
-      return { file, preview };
+      const preview = await generatePreview(targetFile);
+      return { file: targetFile, preview };
     }
 
     // Convert to high-quality WebP
-    const compressedFile = await imageCompression(file, {
+    const compressedFile = await imageCompression(targetFile, {
       maxSizeMB: opts.maxSizeMB!,
       maxWidthOrHeight: opts.maxWidthOrHeight!,
       useWebWorker: true,
@@ -105,7 +156,7 @@ export async function optimizeImage(
       preserveExif: false, // Remove metadata to save space
     });
 
-    const originalName = file.name.replace(/\.[^/.]+$/, '');
+    const originalName = targetFile.name.replace(/\.[^/.]+$/, '');
     const resultFile = new File([compressedFile], `${originalName}.webp`, {
       type: 'image/webp',
     });
@@ -113,7 +164,7 @@ export async function optimizeImage(
     // Generate preview URL
     const preview = await generatePreview(resultFile);
 
-    const originalSizeMB = (file.size / 1024 / 1024).toFixed(2);
+    const originalSizeMB = (targetFile.size / 1024 / 1024).toFixed(2);
     const newSizeKB = (resultFile.size / 1024).toFixed(0);
     const newSizeMB = (resultFile.size / 1024 / 1024).toFixed(2);
     
@@ -148,13 +199,6 @@ export function generatePreview(file: File): Promise<string> {
 }
 
 /**
- * Checks if a file is an image
- */
-export function isImageFile(file: File): boolean {
-  return file.type.startsWith('image/');
-}
-
-/**
  * Gets human-readable file size
  */
 export function formatFileSize(bytes: number): string {
@@ -173,7 +217,7 @@ export async function prepareImageForUpload(
 ): Promise<{ file: File; preview: string }> {
   // Validate it's an image
   if (!isImageFile(file)) {
-    throw new Error('Please select a valid image file (JPG, PNG, GIF, WebP)');
+    throw new Error('Please select a valid image file (JPG, PNG, GIF, WebP, HEIC)');
   }
 
   // Validate file size
@@ -182,6 +226,6 @@ export async function prepareImageForUpload(
     throw new Error(sizeValidation.message);
   }
 
-  // Optimize the image (converts to WebP with high quality)
+  // Optimize the image (converts HEIC to JPEG then WebP with high quality)
   return optimizeImage(file, options);
 }

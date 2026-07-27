@@ -59,6 +59,7 @@
     "embla-carousel-react": "^8.3.0",
     "express": "^5.2.1",
     "framer-motion": "^12.23.26",
+    "heic2any": "^0.0.4",
     "input-otp": "^1.2.4",
     "lucide-react": "^0.462.0",
     "multer": "^2.2.0",
