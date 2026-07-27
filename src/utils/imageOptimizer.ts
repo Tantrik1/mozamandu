@@ -15,32 +15,32 @@ export interface ImageOptimizationOptions {
 // Target file size: 800KB - 1MB for optimal quality/size balance
 const TARGET_SIZE_MB = 1.0;
 
-// Default options - high quality WebP conversion
+// Default options - high quality WebP conversion preserving full resolution
 const DEFAULT_OPTIONS: ImageOptimizationOptions = {
-  maxSizeMB: TARGET_SIZE_MB,
-  maxWidthOrHeight: 2048, // Keep high resolution
-  quality: 0.92, // High quality
+  maxSizeMB: 10.0, // High size limit to prevent quality degradation
+  maxWidthOrHeight: 3840, // Preserve up to 4K resolution
+  quality: 0.96, // Maximum visual fidelity
 };
 
-// Preset for product images - highest quality
+// Preset for product images - maximum crispness and zero loss of detail
 export const PRODUCT_COMPRESSION: ImageOptimizationOptions = {
-  maxSizeMB: 1.2, // Allow slightly larger for product images
-  maxWidthOrHeight: 2048,
-  quality: 0.95, // Very high quality for products
+  maxSizeMB: 10.0,
+  maxWidthOrHeight: 3840,
+  quality: 0.96,
 };
 
-// Preset for banners/hero images - high quality, larger size allowed
+// Preset for banners/hero images - pristine quality, no resolution downscaling
 export const HIGH_COMPRESSION: ImageOptimizationOptions = {
-  maxSizeMB: 1.5,
-  maxWidthOrHeight: 2560,
-  quality: 0.93,
+  maxSizeMB: 12.0,
+  maxWidthOrHeight: 4096, // Full 4K ultra-wide resolution
+  quality: 0.98, // Pristine quality for hero images
 };
 
-// Preset for thumbnails/category images - balanced
+// Preset for thumbnails/category images - high clarity
 export const THUMBNAIL_COMPRESSION: ImageOptimizationOptions = {
-  maxSizeMB: 0.8,
-  maxWidthOrHeight: 1200,
-  quality: 0.90,
+  maxSizeMB: 5.0,
+  maxWidthOrHeight: 2048,
+  quality: 0.94,
 };
 
 const MAX_FILE_SIZE_MB = 15; // Allow uploads up to 15MB
@@ -145,15 +145,15 @@ export async function optimizeImage(
       return { file: targetFile, preview };
     }
 
-    // Convert to high-quality WebP
+    // Convert to high-quality WebP format without downscaling or compression loss
     const compressedFile = await imageCompression(targetFile, {
-      maxSizeMB: opts.maxSizeMB!,
-      maxWidthOrHeight: opts.maxWidthOrHeight!,
+      maxSizeMB: opts.maxSizeMB || 12.0,
+      maxWidthOrHeight: opts.maxWidthOrHeight || 4096,
       useWebWorker: true,
       fileType: 'image/webp',
-      initialQuality: opts.quality!,
-      alwaysKeepResolution: originalSizeKB < 500, // Keep resolution for small images
-      preserveExif: false, // Remove metadata to save space
+      initialQuality: opts.quality || 0.98,
+      alwaysKeepResolution: true, // Always preserve full resolution and original dimensions
+      preserveExif: true, // Keep color profile metadata for maximum visual quality
     });
 
     const originalName = targetFile.name.replace(/\.[^/.]+$/, '');
