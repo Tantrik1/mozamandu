@@ -358,12 +358,6 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            {watchedSellingPrice > 0 && watchedCostPrice > 0 && (
-              <Badge variant={profitMarginPercent >= 0 ? "secondary" : "destructive"} className="hidden sm:flex items-center gap-1.5 px-3 py-1 text-xs">
-                <Percent className="h-3.5 w-3.5" />
-                Profit: <span className="font-bold">+{profitMarginPercent}%</span> (Rs. {profitAmount})
-              </Badge>
-            )}
             <Button variant="outline" size="sm" onClick={onCancel}>
               Cancel
             </Button>
