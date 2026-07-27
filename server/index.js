@@ -47,32 +47,47 @@ function clearCache() {
   responseCache.clear();
 }
 
-// ── Helper: Batch fetch usage counts (7 queries TOTAL, not N*7) ──
+function normalizeMediaKey(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  return rawUrl
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\/[^\/]+/, '')
+    .replace(/^\/+/, '');
+}
+
+// ── Helper: Batch fetch usage counts by checking image URLs across all database tables ──
 async function getAllUsageCounts() {
-  const tables = [
-    { table: 'products', col: 'media_id' },
-    { table: 'categories', col: 'media_id' },
-    { table: 'subcategories', col: 'media_id' },
-    { table: 'color_variants', col: 'media_id' },
-    { table: 'product_additional_images', col: 'media_id' },
-    { table: 'payment_methods', col: 'qr_media_id' },
-    { table: 'site_settings', col: 'media_id' },
+  const urlQueries = [
+    { table: 'products', col: 'image_url' },
+    { table: 'categories', col: 'image_url' },
+    { table: 'subcategories', col: 'image_url' },
+    { table: 'product_color_variants', col: 'image_url' },
+    { table: 'product_additional_images', col: 'image_url' },
+    { table: 'product_additional_images', col: 'storage_path' },
+    { table: 'payment_methods', col: 'qr_code_url' },
+    { table: 'notices', col: 'image_url' },
+    { table: 'blogs', col: 'image_url' },
+    { table: 'site_settings', col: 'value' },
   ];
 
-  const map = {};
-  await Promise.all(tables.map(async ({ table, col }) => {
+  const dbKeys = [];
+  await Promise.all(urlQueries.map(async ({ table, col }) => {
     try {
       const { data } = await supabase.from(table).select(col).not(col, 'is', null);
       if (data) {
         data.forEach(r => {
-          const id = r[col];
-          if (id) map[id] = (map[id] || 0) + 1;
+          const val = r[col];
+          if (val && typeof val === 'string' && val.trim()) {
+            const normalized = normalizeMediaKey(val);
+            if (normalized) dbKeys.push(normalized);
+          }
         });
       }
     } catch (e) {}
   }));
 
-  return map;
+  return dbKeys;
 }
 
 // ── Upload to R2 + Register in media_library ─────────────────
@@ -160,7 +175,7 @@ app.get(['/api/media', '/media'], async (req, res) => {
     if (folder) query = query.eq('folder', folder);
     if (search) query = query.or(`title.ilike.%${search}%,filename.ilike.%${search}%,alt_text.ilike.%${search}%`);
 
-    const [{ data, error, count }, usageMap] = await Promise.all([
+    const [{ data, error, count }, dbUrls] = await Promise.all([
       query,
       getAllUsageCounts(),
     ]);
@@ -170,10 +185,29 @@ app.get(['/api/media', '/media'], async (req, res) => {
       return res.json({ items: [], total: 0 });
     }
 
-    let items = (data || []).map(item => ({
-      ...item,
-      usage_count: usageMap[item.id] || 0,
-    }));
+    let items = (data || []).map(item => {
+      const itemUrlKey = normalizeMediaKey(item.url);
+      const itemR2Key = normalizeMediaKey(item.r2_key);
+      const filenameKey = normalizeMediaKey(item.filename);
+
+      let usageCount = 0;
+      for (const dbKey of dbKeys) {
+        if (!dbKey) continue;
+        
+        if (
+          (itemUrlKey && (dbKey === itemUrlKey || dbKey.includes(itemUrlKey) || itemUrlKey.includes(dbKey))) ||
+          (itemR2Key && (dbKey === itemR2Key || dbKey.includes(itemR2Key) || itemR2Key.includes(dbKey))) ||
+          (filenameKey && filenameKey.length > 4 && dbKey.endsWith(filenameKey))
+        ) {
+          usageCount++;
+        }
+      }
+
+      return {
+        ...item,
+        usage_count: usageCount,
+      };
+    });
 
     if (unused === 'true') {
       items = items.filter(i => i.usage_count === 0);
@@ -372,6 +406,7 @@ app.post(['/api/media/:id/rename', '/media/:id/rename'], async (req, res) => {
         supabase.from('products').update({ image_url: newUrl }).eq('image_url', media.url),
         supabase.from('categories').update({ image_url: newUrl }).eq('image_url', media.url),
         supabase.from('subcategories').update({ image_url: newUrl }).eq('image_url', media.url),
+        supabase.from('product_color_variants').update({ image_url: newUrl }).eq('image_url', media.url),
         supabase.from('product_additional_images').update({ image_url: newUrl }).eq('image_url', media.url),
         supabase.from('payment_methods').update({ qr_code_url: newUrl }).eq('qr_code_url', media.url),
         supabase.from('site_settings').update({ value: newUrl }).eq('value', media.url),

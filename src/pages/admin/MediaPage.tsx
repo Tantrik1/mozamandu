@@ -195,10 +195,16 @@ export function MediaPage() {
     }
   };
 
-  const handleDeleteMedia = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this media item from Cloudflare R2 bucket?')) return;
+  const handleDeleteMedia = async (item: MediaItem) => {
+    let confirmMsg = 'Are you sure you want to delete this media item from Cloudflare R2 bucket?';
+    if (item.usage_count && item.usage_count > 0) {
+      confirmMsg = `⚠️ WARNING: This image is currently IN USE by ${item.usage_count} item(s) on your store!\n\nDeleting this image will remove the photo from those live products or categories.\n\nAre you sure you want to permanently delete it?`;
+    }
+
+    if (!confirm(confirmMsg)) return;
+
     try {
-      const res = await fetch(`/api/media/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/media/${item.id}`, { method: 'DELETE' });
       if (res.ok) {
         toast({ title: 'Deleted', description: 'Image deleted from Cloudflare R2 and database' });
         fetchMedia();
@@ -602,7 +608,7 @@ export function MediaPage() {
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                            onClick={() => handleDeleteMedia(item.id)}
+                            onClick={() => handleDeleteMedia(item)}
                             title="Delete image from R2"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
