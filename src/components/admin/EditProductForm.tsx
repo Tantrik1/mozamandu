@@ -12,18 +12,18 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  ArrowLeft, 
-  Eye, 
-  X, 
-  ImageIcon, 
-  Package, 
-  DollarSign, 
-  Tag, 
-  Layers, 
-  Sparkles, 
-  Percent, 
-  CheckCircle2, 
+import {
+  ArrowLeft,
+  Eye,
+  X,
+  ImageIcon,
+  Package,
+  DollarSign,
+  Tag,
+  Layers,
+  Sparkles,
+  Percent,
+  CheckCircle2,
   AlertCircle,
   FileText,
   Palette,
@@ -38,6 +38,7 @@ import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimiz
 import { uploadToR2 } from '@/utils/r2Upload';
 import { CareInstructionsInput } from './CareInstructionsInput';
 import { MediaPicker } from './MediaPicker';
+import { useHeaderOffset } from '@/hooks/useHeaderOffset';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required').max(120, 'Name must be under 120 characters'),
@@ -89,6 +90,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const [additionalImages, setAdditionalImages] = useState<AdditionalImage[]>([]);
   const additionalImagesRef = useRef<ProductAdditionalImagesRef>(null);
   const variantFormRef = useRef<EnhancedProductVariantFormRef>(null);
+  const headerOffset = useHeaderOffset();
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -121,7 +123,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const watchedSellingPrice = form.watch('selling_price') || 0;
 
   const profitAmount = watchedSellingPrice > 0 ? watchedSellingPrice - watchedCostPrice : 0;
-  const profitMarginPercent = watchedCostPrice > 0 && watchedSellingPrice > 0 
+  const profitMarginPercent = watchedCostPrice > 0 && watchedSellingPrice > 0
     ? Math.round(((watchedSellingPrice - watchedCostPrice) / watchedCostPrice) * 100)
     : 0;
 
@@ -282,8 +284,8 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
           status: data.status,
           image_url: finalImageUrl || null,
           material_composition: data.material_composition || null,
-          care_instructions: Array.isArray(data.care_instructions) 
-            ? JSON.stringify(data.care_instructions) 
+          care_instructions: Array.isArray(data.care_instructions)
+            ? JSON.stringify(data.care_instructions)
             : data.care_instructions || null,
           meta_title: data.meta_title || null,
           meta_description: data.meta_description || null,
@@ -333,8 +335,11 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50 pb-16">
-      {/* Sticky Top Header Banner */}
-      <div className="sticky top-16 z-40 bg-background/95 backdrop-blur-md border-b border-border/60 shadow-md px-6 py-3.5">
+      {/* Sticky Top Header Banner — Dynamic pixel offset */}
+      <div 
+        className="sticky z-40 bg-background/95 backdrop-blur-md border-b border-border/60 shadow-md px-6 py-3.5 transition-[top] duration-150"
+        style={{ top: `${headerOffset}px` }}
+      >
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
             <Button variant="ghost" size="sm" onClick={onCancel} className="hover:bg-accent rounded-lg">
@@ -404,10 +409,10 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       <div className="max-w-7xl mx-auto px-6 pt-8">
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
+
             {/* Left 2 Columns: Essential Info & Pricing */}
             <div className="lg:col-span-2 space-y-8">
-              
+
               {/* Product Basic Information Card */}
               <Card className="shadow-sm border-border/80 overflow-hidden">
                 <CardHeader className="bg-gradient-to-r from-primary/5 via-primary/2 to-transparent border-b border-border/60 py-4">
@@ -420,7 +425,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                   </div>
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
-                  
+
                   {/* Name */}
                   <div className="space-y-2">
                     <Label htmlFor="name" className="text-sm font-semibold flex items-center gap-1">
@@ -482,7 +487,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                   </div>
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
-                  
+
                   {/* Price Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div className="space-y-2">
@@ -609,7 +614,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
             {/* Right Column: Visibility FIRST, Media SECOND */}
             <div className="space-y-8">
-              
+
               {/* Status & Options Toggles Card (Positioned FIRST) */}
               <Card className="shadow-sm border-border/80 overflow-hidden">
                 <CardHeader className="bg-gradient-to-r from-purple-500/5 via-transparent to-transparent border-b border-border/60 py-4">
@@ -622,7 +627,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                   </div>
                 </CardHeader>
                 <CardContent className="p-6 space-y-5">
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="status" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Catalog Status
@@ -689,8 +694,8 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
 
                     <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50">
                       <div className="space-y-0.5">
-                        <Label 
-                          htmlFor="has_size_variants" 
+                        <Label
+                          htmlFor="has_size_variants"
                           className={`text-sm font-semibold flex items-center gap-1.5 cursor-pointer ${!watchedHasColorVariants ? 'opacity-50' : ''}`}
                         >
                           <Ruler className="h-4 w-4 text-emerald-500" />
@@ -758,7 +763,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                         </Badge>
                       </div>
                     ) : (
-                      <div 
+                      <div
                         onClick={() => setIsMediaPickerOpen(true)}
                         className="border-2 border-dashed border-border hover:border-primary/50 rounded-2xl p-8 text-center cursor-pointer transition-colors bg-muted/20 hover:bg-muted/40 flex flex-col items-center justify-center space-y-3 group"
                       >
@@ -869,10 +874,10 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
               <Button type="button" variant="outline" size="lg" onClick={onCancel} className="px-6">
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                size="lg" 
-                disabled={saving} 
+              <Button
+                type="submit"
+                size="lg"
+                disabled={saving}
                 className="bg-primary hover:bg-primary/90 px-8 font-semibold shadow-md"
               >
                 {saving ? (
