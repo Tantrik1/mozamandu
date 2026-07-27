@@ -282,9 +282,9 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
           status: data.status,
           image_url: finalImageUrl || null,
           material_composition: data.material_composition || null,
-          care_instructions: Array.isArray(data.care_instructions)
-            ? JSON.stringify(data.care_instructions)
-            : data.care_instructions || null,
+          care_instructions: (Array.isArray(data.care_instructions)
+            ? data.care_instructions.map(s => String(s).trim()).filter(Boolean)
+            : (data.care_instructions ? [String(data.care_instructions).trim()].filter(Boolean) : null)) as any,
           meta_title: data.meta_title || null,
           meta_description: data.meta_description || null,
           meta_keywords: data.meta_keywords || null,

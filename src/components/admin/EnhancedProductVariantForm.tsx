@@ -336,11 +336,10 @@ export const EnhancedProductVariantForm = forwardRef<EnhancedProductVariantFormR
         }
       }
 
-      // Convert care_instructions to array for DB
       const careInstructionsArray = productData.care_instructions
         ? (Array.isArray(productData.care_instructions)
-            ? productData.care_instructions.filter(Boolean)
-            : String(productData.care_instructions).split('\n').filter(Boolean))
+            ? productData.care_instructions.map(s => String(s).trim()).filter(Boolean)
+            : String(productData.care_instructions).split('\n').map(s => s.trim()).filter(Boolean))
         : null;
 
       // Convert meta_keywords string to array for DB
