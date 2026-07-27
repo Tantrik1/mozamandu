@@ -119,12 +119,12 @@ export function FilterBottomSheet({
       />
       
       {/* Sheet */}
-      <div className="absolute inset-x-0 bottom-0 max-h-[90vh] bg-background rounded-t-3xl overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-300 shadow-2xl border-t border-border/50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="absolute inset-x-0 bottom-0 max-h-[85vh] bg-background rounded-t-3xl overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-300 shadow-2xl border-t border-border/50">
         {/* Top Drag Handle Indicator */}
-        <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full mx-auto mt-2.5 mb-1" />
+        <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full mx-auto mt-2.5 mb-1 shrink-0" />
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/50">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border/50 shrink-0">
           <span className="text-sm font-black uppercase tracking-wider text-foreground flex items-center gap-2">
             <SlidersHorizontal className="w-4 h-4 text-primary" /> Filter Products
           </span>
@@ -145,8 +145,8 @@ export function FilterBottomSheet({
           </div>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+        {/* Scrollable Content with ample bottom padding so items are never hidden behind sticky footer */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 pb-12 space-y-6">
           {/* 1. Categories Section */}
           {categories.length > 0 && (
             <div className="space-y-3">
@@ -337,7 +337,7 @@ export function FilterBottomSheet({
               </button>
 
               {expandedSections.includes('color') && (
-                <div className="flex flex-wrap gap-3 pt-1">
+                <div className="flex flex-wrap gap-3 pt-1 pb-4">
                   {availableColors.map((color) => {
                     const isSelected = selectedColorIds.includes(color.id);
                     const isWhite = color.hex_code?.toLowerCase() === '#ffffff' || color.hex_code?.toLowerCase() === '#fff';
@@ -369,8 +369,8 @@ export function FilterBottomSheet({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-5 py-4 border-t border-border/50 bg-background safe-area-bottom">
+        {/* Sticky Footer with ample padding for mobile safe area */}
+        <div className="p-4 px-5 pb-8 sm:pb-5 border-t border-border/60 bg-background/95 backdrop-blur-md shrink-0 shadow-lg z-20">
           <Button
             onClick={handleApplyAndClose}
             className="w-full h-12 rounded-2xl text-sm font-extrabold shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
