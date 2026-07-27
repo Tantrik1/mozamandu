@@ -38,7 +38,6 @@ import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimiz
 import { uploadToR2 } from '@/utils/r2Upload';
 import { CareInstructionsInput } from './CareInstructionsInput';
 import { MediaPicker } from './MediaPicker';
-import { useHeaderOffset } from '@/hooks/useHeaderOffset';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required').max(120, 'Name must be under 120 characters'),
@@ -104,7 +103,6 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [additionalImages, setAdditionalImages] = useState<AdditionalImage[]>([]);
   const additionalImagesRef = useRef<ProductAdditionalImagesRef>(null);
-  const headerOffset = useHeaderOffset();
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -335,11 +333,8 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50 pb-16">
-      {/* Sticky Top Header Banner — Dynamic pixel offset */}
-      <div 
-        className="sticky z-40 bg-background/95 backdrop-blur-md border-b border-border/60 shadow-md px-6 py-3.5 transition-[top] duration-150"
-        style={{ top: `${headerOffset}px` }}
-      >
+      {/* Sticky Top Header Banner — Locks at top of main scroll container */}
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border/60 shadow-md px-6 py-3.5">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
             <Button variant="ghost" size="sm" onClick={onCancel} className="hover:bg-accent rounded-lg">

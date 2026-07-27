@@ -96,9 +96,9 @@ export default function AdminPage() {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AdminSidebar />
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
           <AdminHeader />
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-y-auto">
             <Routes>
               <Route index element={<EnhancedAdminDashboard />} />
               <Route path="products" element={<ProductManagement />} />

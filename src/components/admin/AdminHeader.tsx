@@ -7,7 +7,7 @@ export function AdminHeader() {
   const { user } = useAuth();
 
   return (
-    <header className="h-16 border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/80 sticky top-0 z-50">
+    <header className="h-16 shrink-0 border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/80 sticky top-0 z-50">
       <div className="flex h-full items-center justify-between px-4 lg:px-6 gap-4">
         {/* Left side - Sidebar trigger + Logo */}
         <div className="flex items-center gap-4">
