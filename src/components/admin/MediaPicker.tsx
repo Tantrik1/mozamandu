@@ -81,8 +81,14 @@ export function MediaPicker({ open, onClose, onSelect, folder, multiple = false 
       if (searchQuery) params.set('search', searchQuery);
       if (folderFilter) params.set('folder', folderFilter);
       params.set('limit', '100');
+      params.set('_t', Date.now().toString());
 
-      const res = await fetch(`/api/media?${params}`);
+      const res = await fetch(`/api/media?${params}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       if (res.ok) {
         const data = await res.json();
         setMedia(data.items || []);
@@ -134,8 +140,10 @@ export function MediaPicker({ open, onClose, onSelect, folder, multiple = false 
     
     try {
       for (const file of fileArray) {
-        if (!file.type.startsWith('image/')) {
-          toast({ title: 'Error', description: `${file.name} is not an image`, variant: 'destructive' });
+        // Optimize and upload to Cloudflare R2
+        const { prepareImageForUpload, PRODUCT_COMPRESSION, isImageFile } = await import('@/utils/imageOptimizer');
+        if (!isImageFile(file)) {
+          toast({ title: 'Error', description: `${file.name} is not a supported image format`, variant: 'destructive' });
           continue;
         }
         if (file.size > 15 * 1024 * 1024) {
@@ -143,8 +151,6 @@ export function MediaPicker({ open, onClose, onSelect, folder, multiple = false 
           continue;
         }
 
-        // Optimize and upload to Cloudflare R2
-        const { prepareImageForUpload, PRODUCT_COMPRESSION } = await import('@/utils/imageOptimizer');
         const { file: optimizedFile } = await prepareImageForUpload(file, PRODUCT_COMPRESSION);
         const url = await uploadToR2(optimizedFile, folderFilter || folder || 'uploads');
 
@@ -414,7 +420,7 @@ export function MediaPicker({ open, onClose, onSelect, folder, multiple = false 
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.heic,.heif,.HEIC,.HEIF"
               multiple={multiple}
               onChange={(e) => e.target.files && handleUploadFiles(e.target.files)}
               className="hidden"

@@ -137,13 +137,19 @@ app.post(['/api/upload-r2', '/upload-r2'], upload.single('file'), async (req, re
 // ── Ultra-Fast List Media (Batch usage query + in-memory cache) ──
 app.get(['/api/media', '/media'], async (req, res) => {
   try {
-    const cacheKey = JSON.stringify(req.query);
-    const cached = getCached(cacheKey);
-    if (cached) {
-      return res.json(cached);
-    }
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
 
-    const { search, folder, limit = '100', offset = '0', unused } = req.query;
+    const { search, folder, limit = '100', offset = '0', unused, _t } = req.query;
+
+    if (!_t) {
+      const cacheKey = JSON.stringify({ search, folder, limit, offset, unused });
+      const cached = getCached(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+    }
 
     let query = supabase
       .from('media_library')
