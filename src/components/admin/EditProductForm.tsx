@@ -29,7 +29,7 @@ import {
   Palette,
   Ruler
 } from 'lucide-react';
-import { EnhancedProductVariantForm } from './EnhancedProductVariantForm';
+import { EnhancedProductVariantForm, type EnhancedProductVariantFormRef } from './EnhancedProductVariantForm';
 import { ProductFAQsManager } from './ProductFAQsManager';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 import { ProductAdditionalImages, type AdditionalImage, type ProductAdditionalImagesRef } from './ProductAdditionalImages';
@@ -88,6 +88,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [additionalImages, setAdditionalImages] = useState<AdditionalImage[]>([]);
   const additionalImagesRef = useRef<ProductAdditionalImagesRef>(null);
+  const variantFormRef = useRef<EnhancedProductVariantFormRef>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -207,7 +208,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
         subcategory_id: prod.subcategory_id || '',
         is_featured: prod.is_featured || false,
         has_color_variants: prod.has_color_variants || false,
-        has_size_variants: prod.has_size_variants || false,
+        has_size_variants: prod.color_has_size_variants || false,
         status: (prod.status as 'active' | 'inactive') || 'active',
         material_composition: prod.material_composition || '',
         care_instructions: careInstructions,
@@ -277,7 +278,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
           subcategory_id: data.subcategory_id,
           is_featured: data.is_featured,
           has_color_variants: data.has_color_variants,
-          has_size_variants: data.has_size_variants,
+          color_has_size_variants: data.has_size_variants,
           status: data.status,
           image_url: finalImageUrl || null,
           material_composition: data.material_composition || null,
@@ -307,7 +308,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
       if (data.has_color_variants || data.has_size_variants) {
         setShowInventoryPopup(true);
       } else {
-        onSave();
+        setShowInventoryPopup(true);
       }
     } catch (error: any) {
       console.error('Error updating product:', error);
@@ -333,7 +334,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50 pb-16">
       {/* Sticky Top Header Banner */}
-      <div className="sticky top-0 z-30 bg-background/85 backdrop-blur-md border-b border-border/60 shadow-sm px-6 py-4">
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/60 shadow-md px-6 py-3.5">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
             <Button variant="ghost" size="sm" onClick={onCancel} className="hover:bg-accent rounded-lg">
@@ -356,7 +357,6 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
               </div>
             </div>
           </div>
-
           <div className="flex items-center space-x-3">
             {watchedSellingPrice > 0 && watchedCostPrice > 0 && (
               <Badge variant={profitMarginPercent >= 0 ? "secondary" : "destructive"} className="hidden sm:flex items-center gap-1.5 px-3 py-1 text-xs">
@@ -367,11 +367,22 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
             <Button variant="outline" size="sm" onClick={onCancel}>
               Cancel
             </Button>
-            <Button 
-              size="sm" 
-              onClick={form.handleSubmit(onSubmit)} 
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                if (watchedHasColorVariants || watchedHasSizeVariants) {
+                  if (variantFormRef.current) {
+                    variantFormRef.current.handleSave();
+                  } else {
+                    form.handleSubmit(onSubmit)();
+                  }
+                } else {
+                  form.handleSubmit(onSubmit)();
+                }
+              }}
               disabled={saving}
-              className="bg-primary hover:bg-primary/90 shadow-sm font-medium px-5"
+              className="bg-primary hover:bg-primary/90 shadow-md font-semibold px-5"
             >
               {saving ? (
                 <>
@@ -380,8 +391,8 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Update Product
+                  <Layers className="h-4 w-4 mr-2" />
+                  Save Variants & Manage Inventory
                 </>
               )}
             </Button>
@@ -792,6 +803,7 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
               </CardHeader>
               <CardContent className="p-6">
                 <EnhancedProductVariantForm
+                  ref={variantFormRef}
                   productId={productId}
                   hasColorVariants={watchedHasColorVariants}
                   hasSizeVariants={watchedHasSizeVariants}
@@ -851,15 +863,32 @@ export function EditProductForm({ productId, onSave, onCancel }: EditProductForm
           {/* Product FAQs Manager Section (Positioned BELOW SEO) */}
           <ProductFAQsManager productId={productId} />
 
-          {/* Bottom Actions Footer */}
-          <div className="flex items-center justify-end space-x-4 pt-6 border-t border-border">
-            <Button type="button" variant="outline" size="lg" onClick={onCancel} className="px-6">
-              Cancel
-            </Button>
-            <Button type="submit" size="lg" disabled={saving} className="bg-primary hover:bg-primary/90 px-8 font-semibold shadow-md">
-              {saving ? 'Updating Product...' : 'Update Product Now'}
-            </Button>
-          </div>
+          {/* Unified Bottom CTA — always visible regardless of variant state */}
+          {!(watchedHasColorVariants || watchedHasSizeVariants) && (
+            <div className="flex items-center justify-end space-x-4 pt-6 border-t border-border">
+              <Button type="button" variant="outline" size="lg" onClick={onCancel} className="px-6">
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                size="lg" 
+                disabled={saving} 
+                className="bg-primary hover:bg-primary/90 px-8 font-semibold shadow-md"
+              >
+                {saving ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Layers className="h-4 w-4 mr-2" />
+                    Save Variants & Manage Inventory
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </form>
       </div>
 

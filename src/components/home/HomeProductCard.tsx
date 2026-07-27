@@ -47,6 +47,12 @@ export const HomeProductCard = memo(function HomeProductCard({
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
           decoding="async"
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          onError={(e) => {
+            const target = e.currentTarget;
+            target.onerror = null;
+            target.src = '/placeholder.svg';
+          }}
           width={300}
           height={300}
         />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,6 +63,11 @@ interface ProductData {
   og_description?: string;
 }
 
+export interface EnhancedProductVariantFormRef {
+  handleSave: () => Promise<void>;
+  loading: boolean;
+}
+
 interface EnhancedProductVariantFormProps {
   productId: string;
   hasColorVariants: boolean;
@@ -75,24 +80,25 @@ interface EnhancedProductVariantFormProps {
   onCancel: () => void;
 }
 
-export function EnhancedProductVariantForm({
-  productId,
-  hasColorVariants,
-  hasSizeVariants,
-  getProductData,
-  imageFile,
-  imagePreview,
-  onBeforeSave,
-  onSave,
-  onCancel,
-}: EnhancedProductVariantFormProps) {
-  const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
-  const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState<Record<string, boolean>>({});
-  const [pickerState, setPickerState] = useState<{ open: boolean; targetIndex: number | null }>({ open: false, targetIndex: null });
-  const [productInfo, setProductInfo] = useState<any>(null);
-  const { toast } = useToast();
+export const EnhancedProductVariantForm = forwardRef<EnhancedProductVariantFormRef, EnhancedProductVariantFormProps>(
+  function EnhancedProductVariantForm({
+    productId,
+    hasColorVariants,
+    hasSizeVariants,
+    getProductData,
+    imageFile,
+    imagePreview,
+    onBeforeSave,
+    onSave,
+    onCancel,
+  }: EnhancedProductVariantFormProps, ref) {
+    const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
+    const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState<Record<string, boolean>>({});
+    const [pickerState, setPickerState] = useState<{ open: boolean; targetIndex: number | null }>({ open: false, targetIndex: null });
+    const [productInfo, setProductInfo] = useState<any>(null);
+    const { toast } = useToast();
 
   useEffect(() => {
     fetchExistingData();
@@ -469,6 +475,11 @@ export function EnhancedProductVariantForm({
       setLoading(false);
     }
   };
+
+  useImperativeHandle(ref, () => ({
+    handleSave,
+    loading,
+  }));
 
   // Phase 2: Fix deletion to clean up ALL size variants for deleted colors
   // Helper: clean up all FK references to inventory IDs, then delete the inventory records
@@ -883,4 +894,4 @@ export function EnhancedProductVariantForm({
       />
     </div>
   );
-}
+});

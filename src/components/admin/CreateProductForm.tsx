@@ -232,7 +232,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
           subcategory_id: data.subcategory_id,
           is_featured: data.is_featured,
           has_color_variants: data.has_color_variants,
-          has_size_variants: data.has_size_variants,
+          color_has_size_variants: data.has_size_variants,
           status: data.status,
           image_url: finalImageUrl || null,
           material_composition: data.material_composition || null,
@@ -269,7 +269,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
       if (data.has_color_variants || data.has_size_variants) {
         setShowInventoryPopup(true);
       } else {
-        onSave();
+        setShowInventoryPopup(true);
       }
     } catch (error: any) {
       console.error('Error creating product:', error);
@@ -334,7 +334,7 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50 pb-16">
       {/* Sticky Top Header Banner */}
-      <div className="sticky top-0 z-30 bg-background/85 backdrop-blur-md border-b border-border/60 shadow-sm px-6 py-4">
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/60 shadow-md px-6 py-3.5">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
             <Button variant="ghost" size="sm" onClick={onCancel} className="hover:bg-accent rounded-lg">
@@ -363,11 +363,12 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
             <Button variant="outline" size="sm" onClick={onCancel}>
               Cancel
             </Button>
-            <Button 
-              size="sm" 
-              onClick={form.handleSubmit(onSubmit)} 
+            <Button
+              type="button"
+              size="sm"
+              onClick={form.handleSubmit(onSubmit)}
               disabled={loading}
-              className="bg-primary hover:bg-primary/90 shadow-sm font-medium px-5"
+              className="bg-primary hover:bg-primary/90 shadow-md font-semibold px-5"
             >
               {loading ? (
                 <>
@@ -376,8 +377,8 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Save Product
+                  <Layers className="h-4 w-4 mr-2" />
+                  Save & Manage Inventory
                 </>
               )}
             </Button>
@@ -820,15 +821,32 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
             <ProductFAQsManager productId={createdProductId} />
           )}
 
-          {/* Bottom Action Footer */}
-          <div className="flex items-center justify-end space-x-4 pt-6 border-t border-border">
-            <Button type="button" variant="outline" size="lg" onClick={onCancel} className="px-6">
-              Cancel
-            </Button>
-            <Button type="submit" size="lg" disabled={loading} className="bg-primary hover:bg-primary/90 px-8 font-semibold shadow-md">
-              {loading ? 'Creating Product...' : 'Create Product Now'}
-            </Button>
-          </div>
+          {/* Unified Bottom CTA — always visible regardless of variant state */}
+          {!(watchedHasColorVariants || watchedHasSizeVariants) && (
+            <div className="flex items-center justify-end space-x-4 pt-6 border-t border-border">
+              <Button type="button" variant="outline" size="lg" onClick={onCancel} className="px-6">
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                size="lg" 
+                disabled={loading} 
+                className="bg-primary hover:bg-primary/90 px-8 font-semibold shadow-md"
+              >
+                {loading ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Layers className="h-4 w-4 mr-2" />
+                    Save & Manage Inventory
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </form>
       </div>
 
