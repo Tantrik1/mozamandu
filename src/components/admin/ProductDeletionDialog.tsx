@@ -33,25 +33,9 @@ export function ProductDeletionDialog({
 
       if (error) throw error;
 
-      // Reset all inventory for this product so that historical stock does not
-      // leak back when the product is reactivated or transformed into a new item.
-      const { error: invError } = await supabase
-        .from('product_inventory')
-        .update({
-          stock_quantity: 0,
-          reserved_stock: 0,
-          is_active: false,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('product_id', productId);
-
-      if (invError) {
-        console.error('Error resetting inventory on archive:', invError);
-      }
-
       toast({
         title: 'Product Archived',
-        description: `"${productName}" has been deactivated, hidden from the store, and its stock has been reset.`,
+        description: `"${productName}" has been deactivated and hidden from the store. Stock and variants remain preserved.`,
       });
 
       onConfirm();

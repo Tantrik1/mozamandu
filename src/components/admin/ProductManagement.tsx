@@ -7,7 +7,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { CreateProductForm } from './CreateProductForm';
 import { EditProductForm } from './EditProductForm';
-import { ProductDetailView } from './ProductDetailView';
 import { ProductDeletionDialog } from './ProductDeletionDialog';
 import { Pencil, Trash2, Plus, Search, Package, Eye, Filter, Archive, RotateCcw } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,7 +40,6 @@ export function ProductManagement() {
   const [subcategories, setSubcategories] = useState<{ id: string; name: string; category_id: string }[]>([]);
   const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
-  const [viewingProductId, setViewingProductId] = useState<string | null>(null);
   const [productStocks, setProductStocks] = useState<Record<string, number>>({});
   const [deletingProduct, setDeletingProduct] = useState<{ id: string; name: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
@@ -131,7 +129,7 @@ export function ProductManagement() {
   };
 
   const handleView = (productId: string) => {
-    setViewingProductId(productId);
+    setEditingProductId(productId);
   };
 
   const handleEdit = (productId: string) => {
@@ -167,22 +165,6 @@ export function ProductManagement() {
 
   const handleEditCancel = () => {
     setEditingProductId(null);
-  };
-
-  const handleDetailViewEdit = () => {
-    if (viewingProductId) {
-      setEditingProductId(viewingProductId);
-      setViewingProductId(null);
-    }
-  };
-
-  const handleDetailViewDelete = () => {
-    setViewingProductId(null);
-    fetchProducts();
-  };
-
-  const handleDetailViewBack = () => {
-    setViewingProductId(null);
   };
 
   const handleReactivate = async (productId: string) => {
@@ -233,17 +215,6 @@ export function ProductManagement() {
 
   if (loading) {
     return <div className="flex justify-center p-8">Loading products...</div>;
-  }
-
-  if (viewingProductId) {
-    return (
-      <ProductDetailView
-        productId={viewingProductId}
-        onEdit={handleDetailViewEdit}
-        onDelete={handleDetailViewDelete}
-        onBack={handleDetailViewBack}
-      />
-    );
   }
 
   if (isCreateFormOpen) {
