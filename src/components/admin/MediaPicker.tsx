@@ -91,7 +91,25 @@ export function MediaPicker({ open, onClose, onSelect, folder, multiple = false 
       });
       if (res.ok) {
         const data = await res.json();
-        setMedia(data.items || []);
+        const items = data.items || [];
+        
+        // Smart Fallback: If folder filter returned 0 items, fetch all folders so user is never stuck with 0 items
+        if (items.length === 0 && folderFilter && !searchQuery) {
+          const fallbackParams = new URLSearchParams();
+          fallbackParams.set('limit', '100');
+          fallbackParams.set('_t', Date.now().toString());
+          const fallbackRes = await fetch(`/api/media?${fallbackParams}`);
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json();
+            const fallbackItems = fallbackData.items || [];
+            if (fallbackItems.length > 0) {
+              setMedia(fallbackItems);
+              setFolderFilter(''); // Automatically switch to All Folders
+              return;
+            }
+          }
+        }
+        setMedia(items);
       }
     } catch (err) {
       console.error('Failed to fetch media:', err);

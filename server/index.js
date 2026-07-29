@@ -172,7 +172,9 @@ app.get(['/api/media', '/media'], async (req, res) => {
       .order('created_at', { ascending: false })
       .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
 
-    if (folder) query = query.eq('folder', folder);
+    if (folder && folder !== 'all' && folder !== '') {
+      query = query.or(`folder.eq.${folder},folder.ilike.${folder},r2_key.ilike.${folder}/%,r2_key.ilike.%/${folder}/%`);
+    }
     if (search) query = query.or(`title.ilike.%${search}%,filename.ilike.%${search}%,alt_text.ilike.%${search}%`);
 
     const [{ data, error, count }, dbUrls] = await Promise.all([
