@@ -157,9 +157,9 @@ app.get(['/api/media', '/media'], async (req, res) => {
     res.set('Expires', '0');
 
     const { search, folder, limit = '100', offset = '0', unused, _t } = req.query;
+    const cacheKey = JSON.stringify({ search, folder, limit, offset, unused });
 
     if (!_t) {
-      const cacheKey = JSON.stringify({ search, folder, limit, offset, unused });
       const cached = getCached(cacheKey);
       if (cached) {
         return res.json(cached);
@@ -191,7 +191,7 @@ app.get(['/api/media', '/media'], async (req, res) => {
       const filenameKey = normalizeMediaKey(item.filename);
 
       let usageCount = 0;
-      for (const dbKey of dbKeys) {
+      for (const dbKey of (dbUrls || [])) {
         if (!dbKey) continue;
         
         if (
