@@ -522,15 +522,6 @@ export function MediaPage() {
                   <option value="assets">Theme Assets</option>
                   <option value="uploads">General Uploads</option>
                 </select>
-
-                <Button
-                  variant={showOnlyUnused ? 'secondary' : 'outline'}
-                  onClick={() => setShowOnlyUnused(!showOnlyUnused)}
-                  className="gap-2"
-                >
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  {showOnlyUnused ? 'Showing Unassigned Assets' : 'Filter Unassigned'}
-                </Button>
               </div>
 
               {/* Grid of Media */}
