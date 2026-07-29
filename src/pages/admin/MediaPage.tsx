@@ -550,13 +550,6 @@ export function MediaPage() {
                           className="w-full h-full object-cover"
                           loading="lazy"
                         />
-                        {item.usage_count !== undefined && item.usage_count > 0 && (
-                          <div className="absolute top-1.5 right-1.5 flex gap-1">
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-emerald-500/90 text-white font-medium shadow-sm">
-                              In Use ({item.usage_count})
-                            </Badge>
-                          </div>
-                        )}
                       </div>
 
                       <div className="p-2 space-y-1 flex-1 flex flex-col justify-between">
