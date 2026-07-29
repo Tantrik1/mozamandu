@@ -27,8 +27,11 @@ import {
   AlertCircle,
   FileText,
   Palette,
-  Ruler
+  Ruler,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { SmartProductVariantForm } from './SmartProductVariantForm';
 import { InventoryManagementPopup } from './InventoryManagementPopup';
 import { ProductAdditionalImages, type AdditionalImage, type ProductAdditionalImagesRef } from './ProductAdditionalImages';
@@ -38,6 +41,7 @@ import { prepareImageForUpload, PRODUCT_COMPRESSION } from '@/utils/imageOptimiz
 import { uploadToR2 } from '@/utils/r2Upload';
 import { CareInstructionsInput } from './CareInstructionsInput';
 import { MediaPicker } from './MediaPicker';
+import { ButtonColorful } from '@/components/ui/button-colorful';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required').max(120, 'Name must be under 120 characters'),
@@ -334,73 +338,104 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50 pb-16">
       {/* Sticky Top Header Banner — Locks at top of main scroll container */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border/60 shadow-md px-6 py-3.5">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
-            <Button variant="ghost" size="sm" onClick={onCancel} className="hover:bg-accent rounded-lg">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border/60 shadow-xs px-3 sm:px-6 py-2">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+          
+          {/* Left: Back Button + Product Title */}
+          <div className="flex items-center space-x-1.5 sm:space-x-3 min-w-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onCancel}
+              className="h-7.5 sm:h-8 w-7.5 sm:w-auto px-0 sm:px-3 hover:bg-cyan-500/10 rounded-full text-[11px] sm:text-xs font-semibold shrink-0 border border-cyan-500/20 hover:border-cyan-500/40 text-foreground transition-all active:scale-95 backdrop-blur-md shadow-2xs"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 sm:mr-1.5 text-cyan-600 dark:text-cyan-400" />
+              <span className="hidden sm:inline">Back</span>
             </Button>
-            <div className="h-5 w-px bg-border" />
-            <div className="flex items-center space-x-2">
-              <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                <Package className="h-5 w-5" />
+            <div className="h-4 w-px bg-border shrink-0" />
+            <div className="flex items-center space-x-1.5 sm:space-x-2 min-w-0">
+              <div className="p-1.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 shrink-0">
+                <Package className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </div>
-              <div>
-                <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground truncate max-w-xs sm:max-w-md md:max-w-lg">
-                  {form.watch('name') ? `Create ${form.watch('name')}` : 'Create New Product'}
-                </h1>
-              </div>
+              <h1 className="text-xs sm:text-base font-bold tracking-tight text-foreground truncate max-w-[90px] xs:max-w-[140px] sm:max-w-xs md:max-w-md">
+                {form.watch('name') ? `Create ${form.watch('name')}` : 'Create New Product'}
+              </h1>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
-            <Button variant="outline" size="sm" onClick={onCancel}>
+          {/* Right: Profit Margin Badge + Cancel + Save */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Profit Margin Small Badge on left side of Cancel button */}
+            {watchedSellingPrice > 0 && watchedCostPrice > 0 && (
+              <div
+                className={cn(
+                  "inline-flex items-center gap-1 px-2.5 sm:px-3.5 h-7.5 sm:h-8 rounded-full text-[11px] sm:text-xs font-extrabold transition-all shrink-0 border shadow-2xs backdrop-blur-md",
+                  profitAmount >= 0
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 shadow-emerald-500/10"
+                    : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 shadow-rose-500/10"
+                )}
+                title={`Cost: Rs. ${watchedCostPrice.toLocaleString()} | Selling: Rs. ${watchedSellingPrice.toLocaleString()} | Profit: Rs. ${profitAmount.toLocaleString()}`}
+              >
+                <span>{profitMarginPercent >= 0 ? `+${profitMarginPercent}%` : `${profitMarginPercent}%`} <span className="hidden xs:inline">Margin</span></span>
+                <span className="text-[10px] opacity-85 hidden md:inline font-bold">
+                  (Rs. {profitAmount.toLocaleString()})
+                </span>
+              </div>
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onCancel}
+              className="h-7.5 sm:h-8 px-2.5 sm:px-3.5 text-[11px] sm:text-xs font-bold rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:border-rose-500/60 shadow-2xs hover:shadow-xs shadow-rose-500/10 active:scale-95 transition-all backdrop-blur-md"
+            >
               Cancel
             </Button>
-            <Button
+
+            {/* Futuristic 21st.dev ButtonColorful Save Button */}
+            <ButtonColorful
               type="button"
-              size="sm"
               onClick={form.handleSubmit(onSubmit)}
               disabled={loading}
-              className="bg-primary hover:bg-primary/90 shadow-md font-semibold px-5"
+              className="h-7.5 sm:h-8 px-3.5 sm:px-4.5 text-[11px] sm:text-xs"
             >
               {loading ? (
                 <>
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                  Saving...
+                  <div className="h-3 w-3 sm:h-3.5 sm:w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin sm:mr-1" />
+                  <span className="hidden sm:inline">Saving...</span>
                 </>
               ) : (
                 <>
-                  <Layers className="h-4 w-4 mr-2" />
-                  Save & Manage Inventory
+                  <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5 sm:mr-1 text-white fill-white/20" />
+                  <span className="hidden sm:inline">Save & Manage Inventory</span>
+                  <span className="sm:hidden">Save</span>
                 </>
               )}
-            </Button>
+            </ButtonColorful>
           </div>
         </div>
       </div>
 
       {/* Main Container */}
-      <div className="max-w-7xl mx-auto px-6 pt-8">
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-4 sm:pt-8">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
             
             {/* Left 2 Columns: Essential Info & Pricing */}
-            <div className="lg:col-span-2 space-y-8">
+            <div className="lg:col-span-2 space-y-4 sm:space-y-8">
               
               {/* Product Basic Information Card */}
               <Card className="shadow-sm border-border/80 overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-primary/5 via-primary/2 to-transparent border-b border-border/60 py-4">
+                <CardHeader className="bg-gradient-to-r from-primary/5 via-primary/2 to-transparent border-b border-border/60 py-3 sm:py-4 px-4 sm:px-6">
                   <div className="flex items-center space-x-2">
-                    <FileText className="h-5 w-5 text-primary" />
+                    <FileText className="h-5 w-5 text-primary shrink-0" />
                     <div>
-                      <CardTitle className="text-base font-semibold">General Details</CardTitle>
-                      <CardDescription className="text-xs">Title, description, and fabric details</CardDescription>
+                      <CardTitle className="text-sm sm:text-base font-semibold">General Details</CardTitle>
+                      <CardDescription className="text-[11px] sm:text-xs">Title, description, and fabric details</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-6 space-y-6">
+                <CardContent className="p-3.5 sm:p-6 space-y-4 sm:space-y-6">
                   
                   {/* Name */}
                   <div className="space-y-2">
@@ -818,15 +853,14 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
 
           {/* Unified Bottom CTA — always visible regardless of variant state */}
           {!(watchedHasColorVariants || watchedHasSizeVariants) && (
-            <div className="flex items-center justify-end space-x-4 pt-6 border-t border-border">
-              <Button type="button" variant="outline" size="lg" onClick={onCancel} className="px-6">
+            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-6 border-t border-border">
+              <Button type="button" variant="outline" size="lg" onClick={onCancel} className="w-full sm:w-auto px-6">
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                size="lg" 
-                disabled={loading} 
-                className="bg-primary hover:bg-primary/90 px-8 font-semibold shadow-md"
+              <ButtonColorful
+                type="submit"
+                disabled={loading}
+                className="w-full sm:w-auto px-8 h-11 text-xs"
               >
                 {loading ? (
                   <>
@@ -835,11 +869,11 @@ export function CreateProductForm({ onSave, onCancel }: CreateProductFormProps) 
                   </>
                 ) : (
                   <>
-                    <Layers className="h-4 w-4 mr-2" />
+                    <Sparkles className="h-4 w-4 mr-2 text-white fill-white/20" />
                     Save & Manage Inventory
                   </>
                 )}
-              </Button>
+              </ButtonColorful>
             </div>
           )}
         </form>

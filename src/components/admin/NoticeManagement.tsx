@@ -10,6 +10,7 @@ import { Trash2, Plus, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { MediaPicker } from './MediaPicker';
+import { ButtonColorful } from '@/components/ui/button-colorful';
 
 interface Notice {
   id: string;
@@ -217,10 +218,10 @@ export function NoticeManagement() {
           <h1 className="text-2xl md:text-3xl font-bold">Notice Management</h1>
           <p className="text-muted-foreground mt-1">Manage homepage notice popups</p>
         </div>
-        <Button onClick={() => setShowForm(true)}>
-          <Plus className="h-4 w-4 mr-2" />
+        <ButtonColorful onClick={() => setShowForm(true)} className="h-9 px-4 text-xs">
+          <Plus className="h-4 w-4 mr-1.5 text-white" />
           Add Notice
-        </Button>
+        </ButtonColorful>
       </div>
 
       {showForm && (
@@ -299,13 +300,18 @@ export function NoticeManagement() {
                 <Label htmlFor="is_active">Active</Label>
               </div>
 
-              <div className="flex space-x-2">
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving...' : 'Save Notice'}
-                </Button>
-                <Button type="button" variant="outline" onClick={resetForm}>
+              <div className="flex items-center gap-2.5 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetForm}
+                  className="h-9 px-4 text-xs font-bold rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:border-rose-500/60 shadow-2xs active:scale-95 transition-all backdrop-blur-md"
+                >
                   Cancel
                 </Button>
+                <ButtonColorful type="submit" disabled={isSubmitting} className="h-9 px-5 text-xs">
+                  {isSubmitting ? 'Saving...' : 'Save Notice'}
+                </ButtonColorful>
               </div>
             </form>
           </CardContent>

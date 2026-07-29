@@ -5,12 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Search, CreditCard, QrCode, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { MediaPicker } from './MediaPicker';
+import { ButtonColorful } from '@/components/ui/button-colorful';
 
 interface PaymentMethod {
   id: string;
@@ -297,16 +298,19 @@ export function PaymentMethodManagement() {
         </div>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="h-4 w-4 mr-2" />
+            <ButtonColorful onClick={resetForm} className="h-9 px-4 text-xs">
+              <Plus className="h-4 w-4 mr-1.5 text-white" />
               Add Payment Method
-            </Button>
+            </ButtonColorful>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-xl font-semibold">
                 {editingPaymentMethod ? 'Edit Payment Method' : 'Add New Payment Method'}
               </DialogTitle>
+              <DialogDescription className="sr-only">
+                {editingPaymentMethod ? 'Edit payment method settings' : 'Form to configure a new payment method'}
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
@@ -370,13 +374,18 @@ export function PaymentMethodManagement() {
                 <Label htmlFor="is_active">Active</Label>
               </div>
               
-              <div className="flex justify-end space-x-3 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
+              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="h-9 px-4 text-xs font-bold rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:border-rose-500/60 shadow-2xs active:scale-95 transition-all backdrop-blur-md"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={uploading}>
+                <ButtonColorful type="submit" disabled={uploading} className="h-9 px-5 text-xs">
                   {uploading ? 'Uploading...' : editingPaymentMethod ? 'Update' : 'Create'}
-                </Button>
+                </ButtonColorful>
               </div>
             </form>
           </DialogContent>

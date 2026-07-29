@@ -5,12 +5,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Search, FolderOpen, Upload, ImageIcon } from 'lucide-react';
 import { MediaPicker } from './MediaPicker';
+import { ButtonColorful } from '@/components/ui/button-colorful';
 
 interface Category {
   id: string;
@@ -236,10 +237,10 @@ export const CategoryManagement = memo(function CategoryManagement() {
         </div>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="h-4 w-4 mr-2" />
+            <ButtonColorful onClick={resetForm} className="h-9 px-4 text-xs">
+              <Plus className="h-4 w-4 mr-1.5 text-white" />
               Add Category
-            </Button>
+            </ButtonColorful>
           </DialogTrigger>
           <DialogContent className="max-w-md p-0 overflow-hidden rounded-2xl shadow-xl">
             <DialogHeader className="p-6 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-border/60">
@@ -247,6 +248,9 @@ export const CategoryManagement = memo(function CategoryManagement() {
                 <FolderOpen className="h-5 w-5 text-primary" />
                 {editingCategory ? 'Edit Category' : 'Create New Category'}
               </DialogTitle>
+              <DialogDescription className="sr-only">
+                {editingCategory ? 'Edit existing category details' : 'Fill in the form to create a new category'}
+              </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={(e) => {
@@ -269,36 +273,15 @@ export const CategoryManagement = memo(function CategoryManagement() {
                 >
                   {imagePreview ? (
                     <>
-                      <img 
-                        src={imagePreview} 
-                        alt="Preview" 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <Button 
-                          type="button" 
-                          size="icon" 
-                          variant="destructive"
-                          className="h-8 w-8 rounded-full"
-                          onClick={(evt) => {
-                            evt.stopPropagation();
-                            setSelectedImage(null);
-                            setImagePreview(null);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <img src={imagePreview} alt="Category Preview" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-xs font-semibold text-white bg-black/60 px-3 py-1.5 rounded-full">Change Image</span>
                       </div>
                     </>
                   ) : (
-                    <div className="flex flex-col items-center justify-center p-4 text-center space-y-2">
-                      <div className="p-3 rounded-full bg-primary/10 text-primary">
-                        <ImageIcon className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-foreground">Click to select image</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">Pick or upload to R2</p>
-                      </div>
+                    <div className="text-center p-4">
+                      <ImageIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-xs font-semibold text-foreground">Click to select image</p>
                     </div>
                   )}
                 </div>
@@ -306,7 +289,7 @@ export const CategoryManagement = memo(function CategoryManagement() {
 
               {/* Category Name Input */}
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-semibold flex items-center gap-1">
+                <Label htmlFor="name" className="text-sm font-semibold">
                   Category Name <span className="text-destructive">*</span>
                 </Label>
                 <Input
@@ -344,13 +327,18 @@ export const CategoryManagement = memo(function CategoryManagement() {
                 />
               </div>
               
-              <div className="flex justify-end space-x-3 pt-3 border-t border-border">
-                <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="h-9 px-4 text-xs font-bold rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:border-rose-500/60 shadow-2xs active:scale-95 transition-all backdrop-blur-md"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isUploading} className="bg-primary hover:bg-primary/90 font-semibold px-5">
+                <ButtonColorful type="submit" disabled={isUploading} className="h-9 px-5 text-xs">
                   {isUploading ? 'Saving...' : (editingCategory ? 'Update Category' : 'Create Category')}
-                </Button>
+                </ButtonColorful>
               </div>
             </form>
           </DialogContent>

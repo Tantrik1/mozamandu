@@ -7,11 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Search, FolderOpen, Upload, ImageIcon, X, Package } from 'lucide-react';
 import { MediaPicker } from './MediaPicker';
+import { ButtonColorful } from '@/components/ui/button-colorful';
 
 interface Category {
   id: string;
@@ -391,10 +392,10 @@ export function SubcategoryManagement() {
         </div>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="h-4 w-4 mr-2" />
+            <ButtonColorful onClick={resetForm} className="h-9 px-4 text-xs">
+              <Plus className="h-4 w-4 mr-1.5 text-white" />
               Add Subcategory
-            </Button>
+            </ButtonColorful>
           </DialogTrigger>
           <DialogContent className="max-w-3xl p-0 overflow-hidden rounded-2xl shadow-2xl">
             <DialogHeader className="p-6 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-border/60">
@@ -402,6 +403,9 @@ export function SubcategoryManagement() {
                 <FolderOpen className="h-5 w-5 text-primary" />
                 {editingSubcategory ? 'Edit Subcategory' : 'Create New Subcategory'}
               </DialogTitle>
+              <DialogDescription className="sr-only">
+                {editingSubcategory ? 'Edit subcategory details' : 'Form to create a new subcategory'}
+              </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={(e) => {
@@ -667,13 +671,18 @@ export function SubcategoryManagement() {
                 )}
               </div>
 
-              <div className="flex justify-end space-x-3 pt-4 border-t border-border">
-                <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
+              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="h-9 px-4 text-xs font-bold rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:border-rose-500/60 shadow-2xs active:scale-95 transition-all backdrop-blur-md"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-primary hover:bg-primary/90 font-semibold px-6">
+                <ButtonColorful type="submit" className="h-9 px-6 text-xs">
                   {editingSubcategory ? 'Update Subcategory' : 'Create Subcategory'}
-                </Button>
+                </ButtonColorful>
               </div>
             </form>
           </DialogContent>

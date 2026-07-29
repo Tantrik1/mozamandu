@@ -12,6 +12,7 @@ import { Pencil, Trash2, Plus, Search, Package, Eye, Filter, Archive, RotateCcw 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getProductStockSummary } from '@/utils/stockCalculation';
+import { ButtonColorful } from '@/components/ui/button-colorful';
 
 interface Product {
   id: string;
@@ -243,10 +244,10 @@ export function ProductManagement() {
           <h2 className="text-2xl md:text-3xl font-bold">Product Management</h2>
           <p className="text-muted-foreground mt-1">Manage your product catalog</p>
         </div>
-        <Button onClick={() => setIsCreateFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
+        <ButtonColorful onClick={() => setIsCreateFormOpen(true)} className="h-9 px-4 text-xs">
+          <Plus className="h-4 w-4 mr-1.5 text-white" />
           Add Product
-        </Button>
+        </ButtonColorful>
       </div>
 
       <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'active' | 'inactive' | 'all')}>
@@ -402,11 +403,22 @@ export function ProductManagement() {
                 <p className="text-xs text-muted-foreground line-clamp-1">
                   {product.categories?.name} › {product.subcategories?.name}
                 </p>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Cost: Rs {product.cost_price}</span>
-                  {product.selling_price && (
-                    <span className="font-medium">Rs {product.selling_price}</span>
-                  )}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/40 text-xs">
+                  <div className="flex items-center gap-2 flex-wrap font-medium">
+                    <span className="text-[11px] font-semibold text-muted-foreground">
+                      CP: <span className="text-foreground font-bold">Rs. {product.cost_price?.toLocaleString() ?? 0}</span>
+                    </span>
+                    {product.selling_price ? (
+                      <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                        SP: <span className="text-emerald-700 dark:text-emerald-300 font-extrabold">Rs. {product.selling_price?.toLocaleString()}</span>
+                      </span>
+                    ) : null}
+                  </div>
+                  {product.selling_price && product.cost_price && product.selling_price > 0 ? (
+                    <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                      +{Math.round(((product.selling_price - product.cost_price) / product.selling_price) * 100)}%
+                    </span>
+                  ) : null}
                 </div>
                 {(product.has_color_variants || product.color_has_size_variants) && (
                   <div className="flex gap-1 flex-wrap">
