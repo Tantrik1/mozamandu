@@ -45,6 +45,7 @@ function setCache(key, data) {
 
 function clearCache() {
   responseCache.clear();
+  cachedUsageKeys = null;
 }
 
 function normalizeMediaKey(rawUrl) {
@@ -56,8 +57,16 @@ function normalizeMediaKey(rawUrl) {
     .replace(/^\/+/, '');
 }
 
-// ── Helper: Batch fetch usage counts by checking image URLs across all database tables ──
-async function getAllUsageCounts() {
+let cachedUsageKeys = null;
+let lastUsageFetchTime = 0;
+
+// ── Helper: Batch fetch usage counts by checking image URLs across all database tables (Ultra-Fast Cached) ──
+async function getAllUsageCounts(force = false) {
+  const now = Date.now();
+  if (!force && cachedUsageKeys && (now - lastUsageFetchTime < 30000)) {
+    return cachedUsageKeys;
+  }
+
   const urlQueries = [
     { table: 'products', col: 'image_url' },
     { table: 'categories', col: 'image_url' },
@@ -87,7 +96,9 @@ async function getAllUsageCounts() {
     } catch (e) {}
   }));
 
-  return dbKeys;
+  cachedUsageKeys = dbKeys;
+  lastUsageFetchTime = now;
+  return cachedUsageKeys;
 }
 
 // ── Upload to R2 + Register in media_library ─────────────────
