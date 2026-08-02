@@ -1235,7 +1235,7 @@ export type Database = {
       products: {
         Row: {
           additional_images: string[] | null
-          care_instructions: string | null
+          care_instructions: string[] | null
           category_id: string | null
           color_has_size_variants: boolean | null
           cost_price: number
@@ -1254,7 +1254,7 @@ export type Database = {
         }
         Insert: {
           additional_images?: string[] | null
-          care_instructions?: string | null
+          care_instructions?: string[] | null
           category_id?: string | null
           color_has_size_variants?: boolean | null
           cost_price?: number
@@ -1273,7 +1273,7 @@ export type Database = {
         }
         Update: {
           additional_images?: string[] | null
-          care_instructions?: string | null
+          care_instructions?: string[] | null
           category_id?: string | null
           color_has_size_variants?: boolean | null
           cost_price?: number

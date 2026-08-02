@@ -2,6 +2,7 @@ import { useState, useRef, memo, useCallback, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ZoomIn, Heart, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 
 interface ProductImageGalleryProps {
   images: string[];
@@ -98,18 +99,15 @@ export const ProductImageGallery = memo(function ProductImageGallery({
         onTouchEnd={handleTouchEnd}
       >
         {/* Main Image */}
-        <img 
+        <OptimizedImage 
           src={displayImages[currentIndex]} 
           alt={`${productName} - Image ${currentIndex + 1}`}
           className={cn(
             "w-full h-full object-cover transition-transform duration-300 ease-out",
             isZoomed && "lg:scale-[2]"
           )}
-          style={isZoomed ? {
-            transformOrigin: `${zoomPosition.x}% ${zoomPosition.y}%`
-          } : undefined}
-          loading={currentIndex === 0 ? "eager" : "lazy"}
-          decoding="async"
+          containerClassName="w-full h-full"
+          priority={currentIndex === 0}
         />
 
         {/* Gradient Overlay for badges */}
@@ -220,11 +218,10 @@ export const ProductImageGallery = memo(function ProductImageGallery({
               )}
               aria-label={`View image ${idx + 1}`}
             >
-              <img 
+              <OptimizedImage 
                 src={img} 
                 alt="" 
                 className="w-full h-full object-cover"
-                loading="lazy"
               />
             </button>
           ))}

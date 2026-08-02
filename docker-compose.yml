@@ -1,7 +1,18 @@
-version: '3.8'
-
 services:
-  mozamandu:
+  # Node.js + Sharp Image Compression & Cloudflare R2 Upload Server
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: mozamandu-server
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+
+  # Frontend Web App (Nginx SPA)
+  web:
     build:
       context: .
       dockerfile: Dockerfile
@@ -11,6 +22,8 @@ services:
         VITE_SUPABASE_PROJECT_ID: "huwhbxjlyucamitwwhyg"
     container_name: mozamandu-web
     restart: unless-stopped
+    depends_on:
+      - server
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

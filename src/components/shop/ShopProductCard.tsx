@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 
 interface Product {
   id: string;
@@ -35,18 +36,11 @@ export const ShopProductCard = memo(function ShopProductCard({ product, classNam
     >
       {/* Image - 1:1 Aspect Ratio */}
       <div className="aspect-square bg-muted relative overflow-hidden">
-        <img
-          src={displayImage || '/placeholder.svg'}
+        <OptimizedImage
+          src={displayImage}
           alt={product.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          loading="lazy"
-          decoding="async"
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          onError={(e) => {
-            const target = e.currentTarget;
-            target.onerror = null;
-            target.src = '/placeholder.svg';
-          }}
           width={300}
           height={300}
         />

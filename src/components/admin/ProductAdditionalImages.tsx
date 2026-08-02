@@ -48,89 +48,90 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
     }, [images, onImagesChange]);
 
     const uploadImagesHandler = async (targetProductId: string): Promise<boolean> => {
-      const newImages = images.filter(img => img.isNew && img.file);
+      const unsavedImages = images.filter(img => !img.id);
       
-      if (newImages.length === 0) {
-        console.log('No new images to upload');
+      if (unsavedImages.length === 0) {
+        console.log('No new images to save');
         return true;
       }
 
       setLoading(true);
       
       try {
-        for (let i = 0; i < newImages.length; i++) {
-          const img = newImages[i];
-          if (!img.file) continue;
+        for (let i = 0; i < unsavedImages.length; i++) {
+          const img = unsavedImages[i];
+          let publicUrl = img.preview;
 
-          // Update uploading state
+          if (img.file) {
+            // Update uploading state
+            setImages(prev => prev.map((p) => 
+              p === img ? { ...p, uploading: true } : p
+            ));
+
+            try {
+              // Optimize image with compression
+              const { file: optimizedFile } = await prepareImageForUpload(img.file, PRODUCT_COMPRESSION);
+              const { uploadToR2 } = await import('@/utils/r2Upload');
+
+              publicUrl = await uploadToR2(optimizedFile, 'products');
+            } catch (error) {
+              console.error('❌ Error uploading additional image:', error);
+              setImages(prev => prev.map((p) => 
+                p === img ? { ...p, uploading: false } : p
+              ));
+              throw error;
+            }
+          }
+
+          // Save to product_additional_images table (cast to any for external table)
+          const insertData = {
+            product_id: targetProductId,
+            image_url: publicUrl,
+            storage_path: publicUrl,
+            display_order: images.indexOf(img),
+          };
+
+          const { data: dbData, error: dbError } = await (supabase as any)
+            .from('product_additional_images')
+            .insert(insertData)
+            .select()
+            .single();
+
+          if (dbError) {
+            console.error('❌ Database insert error:', dbError);
+            toast({
+              title: 'Database Error',
+              description: `Failed to save image record: ${dbError.message}`,
+              variant: 'destructive',
+            });
+            throw dbError;
+          }
+
+          console.log('✅ Database insert success:', dbData);
+
+          // Update image state to mark as uploaded
           setImages(prev => prev.map((p) => 
-            p === img ? { ...p, uploading: true } : p
+            p === img ? { 
+              ...p, 
+              isNew: false, 
+              uploading: false, 
+              id: dbData?.id || crypto.randomUUID(),
+              storagePath: publicUrl 
+            } : p
           ));
 
-          try {
-            // Optimize image with compression
-            const { file: optimizedFile } = await prepareImageForUpload(img.file, PRODUCT_COMPRESSION);
-            const { uploadToR2, ensureUploadedUrl } = await import('@/utils/r2Upload');
-
-            let publicUrl = await uploadToR2(optimizedFile, `product_additional_images/${targetProductId}`);
-            publicUrl = (await ensureUploadedUrl(publicUrl, `product_additional_images/${targetProductId}`)) || publicUrl;
-
-            // Save to product_additional_images table (cast to any for external table)
-            const insertData = {
-              product_id: targetProductId,
-              image_url: publicUrl,
-              storage_path: publicUrl,
-              display_order: i,
-            };
-
-            const { data: dbData, error: dbError } = await (supabase as any)
-              .from('product_additional_images')
-              .insert(insertData)
-              .select()
-              .single();
-
-            if (dbError) {
-              console.error('❌ Database insert error:', dbError);
-              toast({
-                title: 'Database Error',
-                description: `Failed to save image record: ${dbError.message}`,
-                variant: 'destructive',
-              });
-              throw dbError;
-            }
-
-            console.log('✅ Database insert success:', dbData);
-
-            // Update image state to mark as uploaded
-            setImages(prev => prev.map((p) => 
-              p === img ? { 
-                ...p, 
-                isNew: false, 
-                uploading: false, 
-                id: dbData?.id || crypto.randomUUID(),
-                storagePath: publicUrl 
-              } : p
-            ));
-
-            toast({
-              title: 'Image Uploaded',
-              description: `Additional image ${i + 1} saved successfully`,
-            });
-          } catch (error) {
-            console.error('❌ Error uploading additional image:', error);
-            setImages(prev => prev.map((p) => 
-              p === img ? { ...p, uploading: false } : p
-            ));
-            throw error;
-          }
+          toast({
+            title: 'Image Saved',
+            description: `Additional image ${i + 1} saved successfully`,
+          });
         }
 
         return true;
       } catch (error) {
-        console.error('Error uploading additional images:', error);
+        console.error('Error saving additional images:', error);
         toast({
           title: 'Error',
-          description: 'Failed to upload some images',
+          description: 'Failed to save some images',
           variant: 'destructive',
         });
         return false;
@@ -142,7 +143,7 @@ export const ProductAdditionalImages = forwardRef<ProductAdditionalImagesRef, Pr
     // Expose methods to parent via ref
     useImperativeHandle(ref, () => ({
       uploadImages: uploadImagesHandler,
-      hasNewImages: () => images.some(img => img.isNew),
+      hasNewImages: () => images.some(img => !img.id),
     }));
 
     const fetchExistingImages = async () => {

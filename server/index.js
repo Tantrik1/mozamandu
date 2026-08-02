@@ -3,12 +3,35 @@ import multer from 'multer';
 import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command, CopyObjectCommand } from '@aws-sdk/client-s3';
 import { createClient } from '@supabase/supabase-js';
 import cors from 'cors';
+import sharp from 'sharp';
+import ws from 'ws';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Prevent EIO TTY stream errors when running in non-interactive background terminals
+if (process.stdin) {
+  process.stdin.on('error', () => {});
+}
+
 const upload = multer({ limits: { fileSize: 25 * 1024 * 1024 } });
+
+// ── Compression config per folder ──────────────────────────────
+const FOLDER_SETTINGS = {
+  products: { maxWidth: 1200, quality: 90 },
+  categories: { maxWidth: 1000, quality: 90 },
+  subcategories: { maxWidth: 1000, quality: 90 },
+  color_variants: { maxWidth: 1200, quality: 90 },
+  product_additional_images: { maxWidth: 1200, quality: 90 },
+  'blog-images': { maxWidth: 1400, quality: 90 },
+  'notice-images': { maxWidth: 1200, quality: 90 },
+  'payment-screenshots': { maxWidth: 1200, quality: 88 },
+  payment_methods: { maxWidth: 800, quality: 88 },
+  uploads: { maxWidth: 1200, quality: 90 },
+};
+
+const DEFAULT_SETTINGS = { maxWidth: 1200, quality: 90 };
 
 // ── Clients ──────────────────────────────────────────────────
 const s3Client = new S3Client({
@@ -25,7 +48,11 @@ const CDN_BASE = 'https://images.mozamandu.com';
 
 const supabase = createClient(
   'https://huwhbxjlyucamitwwhyg.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1d2hieGpseXVjYW1pdHd3aHlnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MDY1ODg1NywiZXhwIjoyMDY2MjM0ODU3fQ.Hr_KRFCup-UpGr2x6FHJI6xGaR5_NNfTaCLb874NNzk'
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1d2hieGpseXVjYW1pdHd3aHlnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MDY1ODg1NywiZXhwIjoyMDY2MjM0ODU3fQ.Hr_KRFCup-UpGr2x6FHJI6xGaR5_NNfTaCLb874NNzk',
+  {
+    auth: { persistSession: false, autoRefreshToken: false },
+    realtime: { transport: ws },
+  }
 );
 
 // In-memory cache (5 seconds TTL for sub-20ms responses)
@@ -102,6 +129,9 @@ async function getAllUsageCounts(force = false) {
 }
 
 // ── Upload to R2 + Register in media_library ─────────────────
+// Sharp optimization runs SYNCHRONOUSLY before upload so the final
+// permanent WebP URL is returned to the client. No background worker,
+// no URL mutations, no race conditions.
 app.post(['/api/upload-r2', '/upload-r2'], upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
@@ -110,31 +140,100 @@ app.post(['/api/upload-r2', '/upload-r2'], upload.single('file'), async (req, re
     const title = req.body.title || '';
     const altText = req.body.alt_text || '';
     const timestamp = Date.now();
-    const origExt = req.file.originalname ? req.file.originalname.split('.').pop() : 'webp';
-    const ext = (origExt && origExt.length <= 4) ? origExt.toLowerCase() : 'webp';
-    const key = `${folder}/${folder}-${timestamp}.${ext}`.replace(/\/+/g, '/');
+    const originalName = req.file.originalname || '';
+    const settings = FOLDER_SETTINGS[folder] || DEFAULT_SETTINGS;
+
+    let uploadBuffer = req.file.buffer;
+    let mimeType = 'image/webp';
+    let fileExt = 'webp';
+    let imageWidth = 0;
+    let imageHeight = 0;
+
+    const isSvg = (req.file.mimetype && req.file.mimetype.includes('svg')) || originalName.toLowerCase().endsWith('.svg');
+    const isGif = (req.file.mimetype && req.file.mimetype.includes('gif')) || originalName.toLowerCase().endsWith('.gif');
+    const isImage = isSvg || isGif || (req.file.mimetype && req.file.mimetype.startsWith('image/')) ||
+                    /\.(jpe?g|png|gif|webp|heic|heif|avif|bmp|tiff?|svg)$/i.test(originalName);
+
+    if (isSvg) {
+      // SVGs are vector files — keep raw SVG data
+      mimeType = 'image/svg+xml';
+      fileExt = 'svg';
+    } else if (isImage) {
+      try {
+        const sharpInstance = sharp(req.file.buffer, {
+          failOn: 'none',
+          animated: isGif,
+        });
+
+        const meta = await sharpInstance.metadata().catch(() => ({}));
+
+        let pipeline = sharpInstance
+          .rotate() // Auto-rotate EXIF orientation (critical for iPhone photos)
+          .resize({
+            width: settings.maxWidth,
+            height: settings.maxWidth,
+            fit: 'inside',
+            withoutEnlargement: true,
+          });
+
+        if (isGif) {
+          uploadBuffer = await pipeline.gif({ effort: 4 }).toBuffer();
+          mimeType = 'image/gif';
+          fileExt = 'gif';
+        } else {
+          uploadBuffer = await pipeline.webp({
+            quality: settings.quality,
+            effort: 4,
+            smartSubsample: true,
+            alphaQuality: 90,
+          }).toBuffer();
+          mimeType = 'image/webp';
+          fileExt = 'webp';
+        }
+
+        const outMeta = await sharp(uploadBuffer, { animated: false }).metadata().catch(() => ({}));
+        imageWidth = outMeta.width || meta.width || 0;
+        imageHeight = outMeta.height || meta.height || 0;
+
+        console.log(`⚡ [SHARP] ${originalName} (${(req.file.size / 1024).toFixed(0)} KB → ${(uploadBuffer.length / 1024).toFixed(0)} KB ${fileExt.toUpperCase()}) [${imageWidth}x${imageHeight}]`);
+      } catch (sharpErr) {
+        console.warn(`[SHARP WARN] Could not process with sharp, uploading original:`, sharpErr.message);
+        const origExt = originalName ? originalName.split('.').pop().toLowerCase() : 'jpg';
+        fileExt = (origExt && origExt.length <= 4) ? origExt : 'jpg';
+        mimeType = req.file.mimetype || `image/${fileExt}`;
+      }
+    } else {
+      // Non-image file — keep original extension
+      const origExt = originalName ? originalName.split('.').pop().toLowerCase() : 'bin';
+      fileExt = (origExt && origExt.length <= 4) ? origExt : 'bin';
+      mimeType = req.file.mimetype || 'application/octet-stream';
+    }
+
+    // Upload the ALREADY-OPTIMIZED file to R2 with final permanent key
+    const key = `${folder}/${folder}-${timestamp}.${fileExt}`.replace(/\/+/g, '/');
 
     await s3Client.send(new PutObjectCommand({
       Bucket: BUCKET,
       Key: key,
-      Body: req.file.buffer,
-      ContentType: req.file.mimetype || 'image/webp',
+      Body: uploadBuffer,
+      ContentType: mimeType,
       CacheControl: 'public, max-age=31536000, immutable',
     }));
 
     const publicUrl = `${CDN_BASE}/${key}`;
 
+    // Register in Supabase media_library with final dimensions & size
     const mediaRow = {
       url: publicUrl,
       r2_key: key,
-      filename: req.file.originalname || `${folder}-${timestamp}.${ext}`,
-      title: title || req.file.originalname?.replace(/\.[^/.]+$/, '') || folder,
+      filename: `${folder}-${timestamp}.${fileExt}`,
+      title: title || originalName.replace(/\.[^/.]+$/, '') || folder,
       alt_text: altText || `${folder} image`,
       folder,
-      mime_type: req.file.mimetype || 'image/webp',
-      size_bytes: req.file.size,
-      width: 0,
-      height: 0,
+      mime_type: mimeType,
+      size_bytes: uploadBuffer.length,
+      width: imageWidth,
+      height: imageHeight,
     };
 
     const { data: inserted, error: dbErr } = await supabase
@@ -148,7 +247,8 @@ app.post(['/api/upload-r2', '/upload-r2'], upload.single('file'), async (req, re
     }
 
     clearCache();
-    console.log(`[R2 UPLOAD] ${req.file.originalname} -> ${publicUrl}`);
+    console.log(`[UPLOAD SUCCESS] ${originalName} -> ${publicUrl} (${(uploadBuffer.length / 1024).toFixed(0)} KB)`);
+
     return res.json({
       url: publicUrl,
       media_id: inserted?.id || null,

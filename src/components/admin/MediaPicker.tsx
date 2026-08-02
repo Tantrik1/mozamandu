@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -269,6 +269,9 @@ export function MediaPicker({ open, onClose, onSelect, folder, multiple = false 
             <ImageIcon className="h-5 w-5 text-primary" />
             Media Library & Assets
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Select or upload media assets for products, categories, and banners.
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col min-h-0">

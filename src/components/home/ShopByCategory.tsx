@@ -2,6 +2,7 @@ import { memo, useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 
 interface Category {
   id: string;
@@ -135,12 +136,10 @@ export const ShopByCategory = memo(function ShopByCategory({ categories, isLoadi
                     {/* Category Image - Same Aspect Ratio as Product Cards */}
                     <div className="aspect-square bg-muted relative overflow-hidden">
                       {categoryImage ? (
-                        <img
+                        <OptimizedImage
                           src={categoryImage}
                           alt={category.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          loading="lazy"
-                          decoding="async"
                           width={300}
                           height={300}
                         />

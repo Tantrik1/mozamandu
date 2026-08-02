@@ -5,16 +5,21 @@ import { ArrowRight } from "lucide-react";
 import defaultHeroBackground from "@/assets/hero-background.webp";
 
 export function HeroSection() {
-  const [heroBg, setHeroBg] = useState<string>(defaultHeroBackground);
+  const [heroBg, setHeroBg] = useState<string | null>(null);
   const [heading, setHeading] = useState<string>("Welcome To Mozamandu");
   const [subheading, setSubheading] = useState<string>("Premium socks, boxers & essentials designed for everyday comfort and style.");
 
   useEffect(() => {
     fetch("/api/site-settings")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch settings");
+        return res.json();
+      })
       .then((settings) => {
         if (settings.hero_background?.value) {
           setHeroBg(settings.hero_background.value);
+        } else {
+          setHeroBg(defaultHeroBackground);
         }
         if (settings.hero_background?.metadata?.heading) {
           setHeading(settings.hero_background.metadata.heading);
@@ -24,22 +29,25 @@ export function HeroSection() {
         }
       })
       .catch(() => {
-        // Fallback to defaults on error
+        // Fallback to default on error
+        setHeroBg(defaultHeroBackground);
       });
   }, []);
 
   return (
-    <section className="relative h-[60vh] min-h-[320px] max-h-[500px] md:h-[60vh] md:min-h-[300px] md:max-h-[400px] lg:h-[70vh] lg:min-h-[600px] lg:max-h-[650px] flex items-center justify-center overflow-hidden">
-      {/* Hero Background Image - Dynamic from site_settings with instant fallback */}
-      <img
-        alt="Mozamandu Premium Socks Collection"
-        fetchPriority="high"
-        decoding="sync"
-        width={1920}
-        height={1080}
-        className="absolute inset-0 w-full h-full object-cover object-center md:object-center"
-        src={heroBg}
-      />
+    <section className="relative h-[60vh] min-h-[320px] max-h-[500px] md:h-[60vh] md:min-h-[300px] md:max-h-[400px] lg:h-[70vh] lg:min-h-[600px] lg:max-h-[650px] flex items-center justify-center overflow-hidden bg-slate-900">
+      {/* Hero Background Image - Loaded only after database config check is complete */}
+      {heroBg && (
+        <img
+          alt="Mozamandu Premium Socks Collection"
+          fetchPriority="high"
+          decoding="sync"
+          width={1920}
+          height={1080}
+          className="absolute inset-0 w-full h-full object-cover object-center md:object-center"
+          src={heroBg}
+        />
+      )}
 
       {/* Content */}
       <div className="relative z-10 text-center px-6 sm:px-10 max-w-[75%] sm:max-w-3xl mx-auto py-8 bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 shadow-xl shadow-black/10 sm:py-[37px]">

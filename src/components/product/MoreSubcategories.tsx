@@ -4,6 +4,7 @@ import { ArrowRight, Layers } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 
 interface MoreSubcategoriesProps {
   categoryId: string;
@@ -77,11 +78,10 @@ export const MoreSubcategories = memo(function MoreSubcategories({ categoryId, c
             >
               <div className="relative aspect-square rounded-2xl overflow-hidden bg-card border border-border/50 shadow-sm hover:shadow-lg hover:border-primary/30 transition-all duration-500">
                 {subcategory.image_url ? (
-                  <img
+                  <OptimizedImage
                     src={subcategory.image_url}
                     alt={subcategory.name}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                    loading="lazy"
                   />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">

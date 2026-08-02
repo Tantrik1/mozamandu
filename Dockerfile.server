@@ -1,0 +1,19 @@
+# Dedicated Dockerfile for Express + Sharp Image Compression Server
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Create package.json with ESM module support (server/index.js uses import syntax)
+RUN echo '{"type":"module","dependencies":{}}' > package.json
+
+# Install production packages, sharp, and ws binary directly inside container
+RUN npm install sharp express @aws-sdk/client-s3 @supabase/supabase-js cors multer ws
+
+# Copy server code
+COPY server/ ./server/
+
+EXPOSE 3001
+
+ENV PORT=3001
+
+CMD ["node", "server/index.js"]

@@ -1,5 +1,3 @@
-import imageCompression from 'browser-image-compression';
-
 export interface OptimizedImageResult {
   file: File;
   preview: string;
@@ -9,41 +7,29 @@ export interface ImageOptimizationOptions {
   maxSizeMB?: number;
   maxWidthOrHeight?: number;
   quality?: number;
-  skipOptimization?: boolean; // Skip optimization entirely, just validate
+  skipOptimization?: boolean;
 }
 
-// Target file size: 800KB - 1MB for optimal quality/size balance
-const TARGET_SIZE_MB = 1.0;
-
-// Default options - high quality WebP conversion preserving full resolution
-const DEFAULT_OPTIONS: ImageOptimizationOptions = {
-  maxSizeMB: 10.0, // High size limit to prevent quality degradation
-  maxWidthOrHeight: 3840, // Preserve up to 4K resolution
-  quality: 0.96, // Maximum visual fidelity
-};
-
-// Preset for product images - maximum crispness and zero loss of detail
+// Preset configurations (used for metadata reference)
 export const PRODUCT_COMPRESSION: ImageOptimizationOptions = {
-  maxSizeMB: 10.0,
-  maxWidthOrHeight: 3840,
-  quality: 0.96,
+  maxSizeMB: 15.0,
+  maxWidthOrHeight: 1200,
+  quality: 0.90,
 };
 
-// Preset for banners/hero images - pristine quality, no resolution downscaling
 export const HIGH_COMPRESSION: ImageOptimizationOptions = {
-  maxSizeMB: 12.0,
-  maxWidthOrHeight: 4096, // Full 4K ultra-wide resolution
-  quality: 0.98, // Pristine quality for hero images
+  maxSizeMB: 15.0,
+  maxWidthOrHeight: 1920,
+  quality: 0.92,
 };
 
-// Preset for thumbnails/category images - high clarity
 export const THUMBNAIL_COMPRESSION: ImageOptimizationOptions = {
   maxSizeMB: 5.0,
-  maxWidthOrHeight: 2048,
-  quality: 0.94,
+  maxWidthOrHeight: 800,
+  quality: 0.88,
 };
 
-const MAX_FILE_SIZE_MB = 15; // Allow uploads up to 15MB
+const MAX_FILE_SIZE_MB = 25; // Allow uploads up to 25MB (processed by backend Sharp)
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 /**
@@ -74,12 +60,12 @@ export function isHeicFile(file: File): boolean {
 }
 
 /**
- * Automatically converts iPhone HEIC/HEIF photos to JPEG in-browser
+ * Automatically converts iPhone HEIC/HEIF photos to JPEG in-browser for instant UI preview
  */
 export async function convertHeicIfNeeded(file: File): Promise<File> {
   if (!isHeicFile(file)) return file;
 
-  console.log(`HEIC/HEIF image detected (${file.name}). Converting iPhone photo...`);
+  console.log(`[HEIC Converter] iPhone photo detected (${file.name}). Converting to JPEG...`);
   try {
     const heic2anyModule = await import('heic2any');
     const heic2any = heic2anyModule.default;
@@ -108,78 +94,32 @@ export function isImageFile(file: File): boolean {
 }
 
 /**
- * Converts an image file to high-quality WebP format
- * Supports iPhone HEIC/HEIF, JPG, PNG, WebP
+ * Prepares image for upload by validating size/format, converting HEIC if needed,
+ * and generating an instant local UI preview.
+ * Actual compression & WebP conversion is handled 100% server-side by Sharp.
  */
 export async function optimizeImage(
   file: File,
-  options: ImageOptimizationOptions = {}
+  _options: ImageOptimizationOptions = {}
 ): Promise<OptimizedImageResult> {
-  const opts = { ...DEFAULT_OPTIONS, ...options };
-  
-  // 1. Convert iPhone HEIC/HEIF files first if needed
+  // 1. Convert iPhone HEIC/HEIF files first if needed for browser preview
   const targetFile = await convertHeicIfNeeded(file);
 
-  // Validate the original file size
+  // 2. Validate file size
   const validation = validateFileSize(targetFile);
   if (!validation.valid) {
     throw new Error(validation.message);
   }
 
-  // Skip optimization if requested
-  if (opts.skipOptimization) {
-    const preview = await generatePreview(targetFile);
-    return { file: targetFile, preview };
-  }
+  // 3. Generate instant UI preview
+  const preview = await generatePreview(targetFile);
 
-  try {
-    const originalSizeKB = targetFile.size / 1024;
-    const targetSizeKB = (opts.maxSizeMB || TARGET_SIZE_MB) * 1024;
-    
-    console.log(`Processing ${targetFile.name}: ${(targetFile.size / 1024 / 1024).toFixed(2)}MB`);
-    
-    // If file is already small and WebP, minimal processing
-    if (targetFile.type === 'image/webp' && originalSizeKB <= targetSizeKB * 1.2) {
-      console.log(`File already optimized WebP, keeping as-is`);
-      const preview = await generatePreview(targetFile);
-      return { file: targetFile, preview };
-    }
+  console.log(`[Upload Ready] ${targetFile.name} (${(targetFile.size / 1024 / 1024).toFixed(2)}MB) → Server Sharp will optimize to WebP`);
 
-    // Convert to high-quality WebP format without downscaling or compression loss
-    const compressedFile = await imageCompression(targetFile, {
-      maxSizeMB: opts.maxSizeMB || 12.0,
-      maxWidthOrHeight: opts.maxWidthOrHeight || 4096,
-      useWebWorker: true,
-      fileType: 'image/webp',
-      initialQuality: opts.quality || 0.98,
-      alwaysKeepResolution: true, // Always preserve full resolution and original dimensions
-      preserveExif: true, // Keep color profile metadata for maximum visual quality
-    });
-
-    const originalName = targetFile.name.replace(/\.[^/.]+$/, '');
-    const resultFile = new File([compressedFile], `${originalName}.webp`, {
-      type: 'image/webp',
-    });
-
-    // Generate preview URL
-    const preview = await generatePreview(resultFile);
-
-    const originalSizeMB = (targetFile.size / 1024 / 1024).toFixed(2);
-    const newSizeKB = (resultFile.size / 1024).toFixed(0);
-    const newSizeMB = (resultFile.size / 1024 / 1024).toFixed(2);
-    
-    console.log(
-      `✓ Optimized: ${file.name} (${originalSizeMB}MB) → ${resultFile.name} (${newSizeKB}KB / ${newSizeMB}MB)`
-    );
-
-    return {
-      file: resultFile,
-      preview,
-    };
-  } catch (error) {
-    console.error('Error optimizing image:', error);
-    throw new Error('Failed to optimize image. Please try a different image.');
-  }
+  return {
+    file: targetFile,
+    preview,
+  };
 }
 
 /**
